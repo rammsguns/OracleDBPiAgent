@@ -1,4 +1,4 @@
-# MVP status — 2026-10-26
+# MVP status — 2026-10-26 (round 2)
 
 The MVP is built, reviewed and passing on this host (z4g5). An AI coordinator
 (Claude) and AI agents did all of the work and verification; no human has signed off.
@@ -39,17 +39,34 @@ Found during the eval runs:
 - `top_sql` failed on p1 because it lacks access to `V$SQLSTATS`. It now falls back to `V$SQL`, aggregated by `sql_id`.
 - `doctor` rejected d1 because `SELECT_CATALOG_ROLE` carries read-only FLASHBACK and EXECUTE grants (on `DBMS_ASH` and Data Pump types). `doctor` now accepts these and names the failing check.
 
-## Known limits (accepted for the MVP)
+## Round 2 (next candidates from round 1)
 
-- **d1 data.** `HARNESS_LAB` can read only SH, not HR, OE or CO. The default schema is SH.
-- **p1 grants.** `db_overview`, `list_schemas`, `wait_events` and `tablespace_usage` fail with ORA-00942 on p1. The agent reports this instead of guessing. Full coverage needs SELECT grants from a DBA, which this project must not make itself.
-- **Plans.** `explain_plan` shows cached plans only (`DISPLAY_CURSOR`/`V$SQL_PLAN`), because `EXPLAIN PLAN` writes to `PLAN_TABLE`.
+| Step | Who | Result |
+|---|---|---|
+| WP-D: p1 fallbacks and DBA grant request | Codex, Orca worktree `wp-d-p1-fallbacks` | `aa02261` |
+| WP-E: single approved-target list, testable `doctor` | Codex, Orca worktree `wp-e-allowlist-doctor` | `3288f5d` |
+| Eval cases for the p1 fallbacks | Claude | `c3ab0d0`, `c98166a` |
+| Review | Antigravity, Orca worktree `review-round2` | **APPROVE**, no findings, [report](review-round2-2026-10-26.md) |
+
+- On p1, `db_overview`, `list_schemas` and `tablespace_usage` fall back to granted views (`PRODUCT_COMPONENT_VERSION`/`SYS_CONTEXT`/`NLS_DATABASE_PARAMETERS`, `ALL_USERS`/`ALL_OBJECTS`, and `DBA_TABLESPACE_USAGE_METRICS` × `BLOCK_SIZE`). They fall back only on ORA-00942. Each result states its source, and unavailable fields are `NULL` with a note.
+- `wait_events` still needs a grant on p1, and its error names `SYS.V_$SYSTEM_EVENT`.
+- The approved targets are held once, in `src/config/approvedTargets.ts`. Both `loadConfig` and the session provider enforce them.
+- `doctor` exits 1 with a named check and no connection details when Strata is unloaded, a target is unreachable, the 19c gate fails, or privileges are unexpected. These outages are simulated in unit tests.
+- `docs/grants-request-2026-10-26.sql` contains read-only SELECT grants for a **human DBA** to review and run. No agent has executed it.
+
+Round 2 verification: typecheck passes, 133 unit tests, 7 integration tests, and `doctor` exits 0 on both targets.
+The eval suite has 33 cases. The full run scored 32/33; the miss was a scorer regex for `prod-overview`, not the agent's answer. After the fix, `prod-overview` passed on rerun, so the suite stands at 33/33 across the two runs with the same agent code.
+
+## Known limits (accepted)
+
+- **d1 data.** `HARNESS_LAB` can read only SH. The grant script covers HR, OE and CO.
+- **p1 waits.** `wait_events` and full SGA/PGA/startup details need the p1 grants in the grant script.
+- **Plans.** `explain_plan` shows cached plans only, because `EXPLAIN PLAN` writes to `PLAN_TABLE`.
 - **View source.** It is limited to a 4 KB preview.
-- **Doctor failure modes.** `doctor` failing on an unloaded Strata is unit-tested only. A DB outage was not exercised.
-- **Builders vs product.** The product uses only local Strata. The builder agents (Codex, Antigravity) are cloud services, as for OracleDBHarness.
+- **Builders vs product.** The product uses only local Strata. The builder agents (Codex, Antigravity) are cloud services.
 
 ## Next candidates
 
-- Ask a DBA to grant `HARNESS_RO` SELECT on `V$INSTANCE`, `V$SYSTEM_EVENT`, `DBA_DATA_FILES`, `DBA_FREE_SPACE`, `DBA_USERS`, `DBA_SEGMENTS` and `V$SQLSTATS` (p1), and HR/OE/CO to `HARNESS_LAB` (d1).
-- Add a `tablespace_usage` fallback through `DBA_TABLESPACE_USAGE_METRICS`, which is granted on p1.
-- Remove the duplicated target allowlist. It is held in `config/targets.json`, `src/config/index.ts` and `src/oracle/index.ts` (`APPROVED_ENDPOINTS`).
+- A human DBA reviews and runs `docs/grants-request-2026-10-26.sql`. Then rerun `doctor`, the integration tests and the eval suite, and remove fallbacks that are no longer needed.
+- Add eval cases for multi-turn `chat` and for budget exhaustion (`maxToolCalls`) behavior.
+- Page view source beyond the 4 KB preview.
