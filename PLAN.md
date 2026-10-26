@@ -25,7 +25,7 @@ project is TypeScript because PI is.
 
 | Target | Container | DSN | Account | Default schema | Notes |
 |---|---|---|---|---|---|
-| `d1-19c-lab` | `oracle19c` | `localhost:1522/ORCL` | `HARNESS_LAB` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `HR` | 19.9.1 EE non-CDB; sample schemas HR, OE, SH (918k SALES rows), CO, PM, IX, BI |
+| `d1-19c-lab` | `oracle19c` | `localhost:1522/ORCL` | `HARNESS_LAB` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `SH` | 19.9.1 EE non-CDB; HARNESS_LAB can read only SH (918k SALES rows); HR/OE/CO exist but are not granted |
 | `p1-19c-prod` | `oracle19c-prod` | `localhost:1523/PRODCDB` | `HARNESS_RO` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `SHOPAPP` | 19.9.1 EE non-CDB; production-shaped stand-in with a SHOPAPP OLTP scheduler workload |
 
 Passwords come from `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets`
@@ -103,13 +103,11 @@ calls in parallel (evals included).
 3. **Session.** Each `query()` runs inside `SET TRANSACTION READ ONLY` and ends with a
    rollback. It sets `callTimeout = statementTimeoutSeconds`, fetches at most
    `maxRows + 1` rows, and turns LOBs into previews of 4 KB or less.
-4. **Explain plan.** `EXPLAIN PLAN` writes to `PLAN_TABLE`, so it cannot run in a
-   read-only transaction. The `explain_plan` tool accepts only a statement the
-   classifier allows. It runs `EXPLAIN PLAN SET STATEMENT_ID = :id FOR <sql>` and
-   reads `DBMS_XPLAN.DISPLAY('PLAN_TABLE', :id, 'TYPICAL')`, then **rolls back**. If
-   the account cannot write to PLAN_TABLE, the tool falls back to
-   `DBMS_XPLAN.DISPLAY_CURSOR` for a `sql_id`. Check which works on both targets and
-   document it.
+4. **Explain plan.** `EXPLAIN PLAN` writes to `PLAN_TABLE`, so the MVP does not use
+   it. `explain_plan` shows cached plans only: `DBMS_XPLAN.DISPLAY_CURSOR` for a
+   `sql_id`, falling back to `V$SQL_PLAN`. Both work on both targets (decided in WP-B;
+   see `docs/compatibility-19c.md`). Plans for statements not yet executed are out of
+   scope for the MVP.
 5. **Licensing.** Do not query ASH/AWR (`V$ACTIVE_SESSION_HISTORY`, `DBA_HIST_*`).
    They need the Diagnostics Pack. MVP diagnostics use `V$SESSION`, `V$SQL`,
    `V$SQLSTATS`, `V$SYSTEM_EVENT`, `V$SESSION_WAIT`, `V$LOCK` and `DBA_*`/`ALL_*`

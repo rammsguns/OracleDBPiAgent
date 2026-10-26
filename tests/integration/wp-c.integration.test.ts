@@ -66,7 +66,7 @@ describe('WP-C real Oracle gates and policy', () => {
 		const lab = config.targets.find(target => target.name === 'd1-19c-lab')!;
 		// Sole permitted non-19c connection: never add this target to product config.
 		const gateTarget = { ...lab, name: 'gate-only-non19c', host: 'localhost', port: 1521, serviceName: 'FREEPDB1', username: 'HARNESS_LAB', passwordFile: 'd2_lab.pw' };
-		const provider: SessionProvider = await oracleModule.createSessionProvider({ ...config, targets: [gateTarget], defaultTarget: gateTarget.name });
+		const provider: SessionProvider = await oracleModule.createSessionProvider({ ...config, targets: [gateTarget], defaultTarget: gateTarget.name }, [gateTarget]);
 		providers.push(provider);
 		await expect(provider.get(gateTarget.name)).rejects.toMatchObject({ name: 'UnsupportedVersionError' });
 	}, 30000);

@@ -15,7 +15,15 @@ export async function previewValue(value: any): Promise<unknown> {
 	} finally { await value.destroy(); }
 }
 
-export function createSessionProvider(config: AppConfig): SessionProvider {
+/** Endpoints a session may open, independent of config (defense in depth). */
+export interface ApprovedEndpoint { name: string; host: string; port: number; serviceName: string; username: string }
+export const APPROVED_ENDPOINTS: readonly ApprovedEndpoint[] = [
+	{ name: "d1-19c-lab", host: "localhost", port: 1522, serviceName: "ORCL", username: "HARNESS_LAB" },
+	{ name: "p1-19c-prod", host: "localhost", port: 1523, serviceName: "PRODCDB", username: "HARNESS_RO" },
+];
+
+/** approvedEndpoints is overridable only so the gate integration test can reach a non-19c DB. */
+export function createSessionProvider(config: AppConfig, approvedEndpoints: readonly ApprovedEndpoint[] = APPROVED_ENDPOINTS): SessionProvider {
 	const sessions = new Set<OracleSession>();
 	return {
 		async get(targetName = config.defaultTarget) {
@@ -26,7 +34,7 @@ export function createSessionProvider(config: AppConfig): SessionProvider {
 			const secretDir = process.env.PIAGENT_SECRET_DIR;
 			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw new Error("PIAGENT_SECRET_DIR must match config.secretDir");
 			if (basename(target.passwordFile) !== target.passwordFile) throw new Error("Invalid password file");
-			if (!((target.name === "d1-19c-lab" && target.port === 1522 && target.serviceName === "ORCL" && target.username === "HARNESS_LAB") || (target.name === "p1-19c-prod" && target.port === 1523 && target.serviceName === "PRODCDB" && target.username === "HARNESS_RO")) || target.host !== "localhost") throw new Error("Target endpoint is not approved");
+			if (!approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new Error("Target endpoint is not approved");
 			if (!oracledb.thin) throw new Error("Only thin mode is supported");
 			const password = (await readFile(resolve(secretDir, target.passwordFile), "utf8")).trim();
 			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` });

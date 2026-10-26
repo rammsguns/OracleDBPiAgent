@@ -3,13 +3,13 @@
   "targets": [
     {
       "name": "d1-19c-lab",
-      "description": "Local Docker oracle19c (19.9.1 EE, non-CDB). Sample schemas HR, OE, SH, CO, PM, IX, BI.",
+      "description": "Local Docker oracle19c (19.9.1 EE, non-CDB). HARNESS_LAB can read only the SH sample schema (918k SALES rows).",
       "host": "localhost",
       "port": 1522,
       "serviceName": "ORCL",
       "username": "HARNESS_LAB",
       "passwordFile": "d1_lab.pw",
-      "defaultSchema": "HR",
+      "defaultSchema": "SH",
       "environment": "development"
     },
     {

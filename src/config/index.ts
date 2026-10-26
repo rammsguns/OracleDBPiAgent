@@ -23,7 +23,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const raw = JSON.parse(readFileSync(path(get("TARGETS_FILE", "config/targets.json")), "utf8"));
 	if (raw.version !== 1 || !Array.isArray(raw.targets) || raw.targets.length !== 2) throw new Error("Expected the two approved 19c targets");
 	const approved = new Map([
-		["d1-19c-lab", [1522, "ORCL", "HARNESS_LAB", "d1_lab.pw", "HR", "development"]],
+		["d1-19c-lab", [1522, "ORCL", "HARNESS_LAB", "d1_lab.pw", "SH", "development"]],
 		["p1-19c-prod", [1523, "PRODCDB", "HARNESS_RO", "p1_harness_ro.pw", "SHOPAPP", "production-like"]],
 	]);
 	const seen = new Set<string>();

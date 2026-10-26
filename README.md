@@ -14,7 +14,7 @@ for the rules coding agents follow.
 npm ci
 cp .env.example .env
 node --env-file=.env --import tsx src/cli/index.ts doctor
-node --env-file=.env --import tsx src/cli/index.ts ask "Which HR employees earn more than their manager?"
+node --env-file=.env --import tsx src/cli/index.ts ask "Which SH channels had the highest sales amount in 2001?"
 ```
 
 Requirements:
