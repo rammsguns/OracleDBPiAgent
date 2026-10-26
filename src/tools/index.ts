@@ -29,6 +29,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 			const target = p.target ?? ctx.config.defaultTarget;
 			const base = { at: new Date().toISOString(), runId: ctx.runId, target, tool: name };
 			let sql: string | undefined;
+			let sourceNote: string | undefined;
 			try {
 				if (signal?.aborted) throw new Error("Tool aborted");
 				if (!ctx.config.targets.some(t => t.name === target)) throw new Error(`Unknown target: ${target}`);
@@ -91,9 +92,21 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
 						try { result = await session.query(sql, binds, { maxRows }); }
 						catch (error) {
-							// p1's HARNESS_RO can read V$SQL but not V$SQLSTATS; aggregate child cursors instead.
-							if (name !== "top_sql" || !/ORA-00942/.test(String(error))) throw error;
-							sql = `SELECT sql_id, SUM(executions) executions, SUM(elapsed_time) elapsed_time, SUM(cpu_time) cpu_time, SUM(buffer_gets) buffer_gets, MAX(SUBSTR(sql_text,1,300)) sql_text FROM v$sql GROUP BY sql_id ORDER BY ${p.metric ?? "elapsed_time"} DESC FETCH FIRST :n ROWS ONLY`;
+							if (!/ORA-00942/.test(String(error))) throw error;
+							if (name === "wait_events") throw new Error("ORA-00942: wait_events requires SELECT on SYS.V_$SYSTEM_EVENT (V$SYSTEM_EVENT); no granted equivalent is available", { cause: error });
+							if (name === "top_sql") {
+								sql = `SELECT sql_id, SUM(executions) executions, SUM(elapsed_time) elapsed_time, SUM(cpu_time) cpu_time, SUM(buffer_gets) buffer_gets, MAX(SUBSTR(sql_text,1,300)) sql_text FROM v$sql GROUP BY sql_id ORDER BY ${p.metric ?? "elapsed_time"} DESC FETCH FIRST :n ROWS ONLY`;
+								sourceNote = "Source: V$SQL, aggregated child cursors; V$SQLSTATS unavailable. Statistics cover currently cached cursors only.";
+							} else if (name === "tablespace_usage") {
+								sql = `SELECT m.tablespace_name, t.contents, m.tablespace_size*t.block_size capacity_bytes, m.used_space*t.block_size used_bytes, (m.tablespace_size-m.used_space)*t.block_size free_capacity_bytes, m.used_percent FROM dba_tablespace_usage_metrics m JOIN dba_tablespaces t ON t.tablespace_name=m.tablespace_name ORDER BY m.tablespace_name`;
+								sourceNote = "Source: DBA_TABLESPACE_USAGE_METRICS joined to DBA_TABLESPACES; blocks converted to bytes using BLOCK_SIZE. Capacity includes possible autoextension; free capacity is not allocated-file free bytes. Allocated bytes, file max bytes and autoextend file counts unavailable (DBA_DATA_FILES/DBA_FREE_SPACE missing). Includes permanent, temporary and undo metrics.";
+							} else if (name === "db_overview") {
+								sql = `SELECT SYS_CONTEXT('USERENV','DB_NAME') name, p.version_full, SYS_CONTEXT('USERENV','INSTANCE_NAME') instance_name, SYS_CONTEXT('USERENV','SERVER_HOST') host_name, (SELECT value FROM nls_database_parameters WHERE parameter='NLS_CHARACTERSET') character_set, NULL cdb, NULL startup_time, NULL datafile_bytes, NULL sga_bytes, NULL pga_bytes FROM product_component_version p WHERE p.product LIKE 'Oracle%Database%'`;
+								sourceNote = "Source: PRODUCT_COMPONENT_VERSION, SYS_CONTEXT('USERENV',...) and NLS_DATABASE_PARAMETERS. Unavailable (NULL): CDB status, startup time, datafile bytes, SGA bytes and PGA bytes; required V$DATABASE/V$INSTANCE/V$SGA/V$PGASTAT/DBA_DATA_FILES access missing.";
+							} else if (name === "list_schemas") {
+								sql = `SELECT u.username, (SELECT COUNT(*) FROM all_objects o WHERE o.owner=u.username) visible_object_count, NULL segment_bytes FROM all_users u WHERE u.oracle_maintained='N' ORDER BY u.username`;
+								sourceNote = "Source: ALL_USERS with ALL_OBJECTS; counts cover only objects visible to this login, and zero does not prove an empty schema. Full object counts and segment bytes unavailable (DBA_USERS/DBA_OBJECTS/DBA_SEGMENTS missing); segment bytes are NULL.";
+							} else throw error;
 							result = await session.query(sql, binds, { maxRows });
 						}
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
@@ -112,6 +125,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					const lines = source.rows.length ? text.split("\n") : []; const start = p.startLine ?? 1;
 					result = { ...source, columns: ["LINE", "TEXT"], rows: lines.slice(start - 1, start - 1 + (p.lines ?? 200)).map((text, i) => [start + i, text]), truncated: text.length >= 4000 || lines.length > start - 1 + (p.lines ?? 200) };
 				}
+				if (sourceNote) result = { ...(result as QueryResult), sourceNote };
 				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes);
 				const q = output.details as QueryResult;
 				await ctx.audit.record({ ...base, kind: "tool_call", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), rows: q.rows?.length, truncated: q.truncated, elapsedMs: q.elapsedMs });
@@ -126,11 +140,12 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 
 export function boundedResult(result: unknown, cap: number): { content: { type: "text"; text: string }[]; details: any } {
 	let details: any = structuredClone(result);
-	const render = () => Array.isArray(details) ? JSON.stringify(details) : details.columns ? [details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
+	const render = () => Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
 		if (details.rows?.length) { details.rows.pop(); details.truncated = true; }
 		else if (Array.isArray(details) && details.length) details.pop();
+		else if (details.sourceNote) throw new Error("Tool result byte limit is too small to retain fallback source and limitations");
 		else { details = { truncated: true }; output = { content: [{ type: "text", text: "[truncated]" }], details }; break; }
 		output = { content: [{ type: "text", text: render() }], details };
 	}

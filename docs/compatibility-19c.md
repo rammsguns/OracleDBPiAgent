@@ -7,7 +7,7 @@ were read through PIAGENT_SECRET_DIR; no credentials are recorded here.
 ## Sessions and access
 
 Both targets report Oracle 19.9.1.0.0 through PRODUCT_COMPONENT_VERSION.
-Both pass the 19c gate, set CURRENT_SCHEMA (HR / SHOPAPP respectively), execute
+Both pass the 19c gate, set CURRENT_SCHEMA (SH / SHOPAPP respectively), execute
 SET TRANSACTION READ ONLY, return bounded rows, and roll back. Identity uses
 SYS_CONTEXT rather than V$INSTANCE because the latter is inaccessible on p1.
 The provider opens independently owned thin connections (no global pool), closes
@@ -37,12 +37,38 @@ a full Oracle parser or a proof about arbitrary stored functions.
 | ALL_* object/source metadata | Yes | Yes, limited to objects visible to login |
 
 The effective catalog role on lab is broader than PLAN.md's role description.
-On p1, db_overview, list_schemas, wait_events and tablespace_usage
-currently throw ORA-00942. top_sql falls back from V$SQLSTATS to V$SQL (granted). Integration tests assert this observed access boundary;
-the tests passing does **not** mean all MVP diagnostics are usable on p1.
-An administrator/coordinator must arrange the missing SELECT access if full MVP
-coverage is required. WP-B did not change grants or use elevated credentials.
-Tablespace reporting currently covers permanent data files, not temporary files.
+On p1, db_overview, list_schemas and tablespace_usage now succeed using
+ORA-00942-only fallbacks. Other errors propagate without retrying. Every fallback
+returns a source/limitation note in its text and `details.sourceNote`, within the
+existing byte cap. Rows are removed before the disclosure; if the disclosure
+cannot fit, the tool throws instead of returning evidence without its limitations.
+No shared contract change is needed.
+
+| Tool | p1 fallback source | Limits |
+|---|---|---|
+| db_overview | PRODUCT_COMPONENT_VERSION, SYS_CONTEXT('USERENV',...), NLS_DATABASE_PARAMETERS | Version, database/instance/host names and character set available. CDB status, startup time, datafile bytes, SGA and PGA bytes explicitly NULL/unavailable. |
+| list_schemas | ALL_USERS, correlated ALL_OBJECTS counts | Non-Oracle-maintained users; VISIBLE_OBJECT_COUNT counts only objects visible to HARNESS_RO. Zero does not establish an empty schema. SEGMENT_BYTES is NULL/unavailable. |
+| tablespace_usage | DBA_TABLESPACE_USAGE_METRICS joined to DBA_TABLESPACES | TABLESPACE_SIZE and USED_SPACE blocks multiplied by the tablespace's BLOCK_SIZE. CAPACITY_BYTES includes possible autoextension; FREE_CAPACITY_BYTES is capacity minus usage, not allocated-file free space. Allocated bytes, file maximum bytes and autoextend file counts unavailable. Includes permanent, temporary and undo metrics. |
+| top_sql | V$SQL aggregated by SQL_ID | Child cursor statistics from the current cache; V$SQLSTATS unavailable. |
+
+wait_events still throws on p1. Its ORA-00942 error explicitly requests SELECT on
+SYS.V_$SYSTEM_EVENT (the object behind V$SYSTEM_EVENT); no granted equivalent
+exists. The primary tablespace query on d1 still reports permanent data files only.
+
+WP-D verified each of the three new fallback SELECTs against p1 through the 19c
+session provider, in read-only transactions, **before implementing them** on
+2026-10-26. Observed overview: 19.9.1.0.0, PRODCDB, AL32UTF8; schemas HARNESS_RO and
+SHOPAPP had respectively 0 and 12 visible objects. Metrics returned six tablespaces
+including TEMP and UNDOTBS1; SHOP_DATA capacity was 4,294,967,296 bytes. Counts and
+usage are snapshots, not fixed expectations.
+
+[grants-request-2026-10-26.sql](grants-request-2026-10-26.sql) is a request for a
+human DBA, never executed by the agent. It separates p1 diagnostic SELECTs from
+d1 HR/OE/CO sample-table SELECTs, and grants no write privileges. The sample table
+list follows the 19c inventory; nested storage tables are accessed through parents.
+HARNESS_LAB's ALL_TABLES exposed no HR/OE/CO tables during read-only verification,
+so a DBA must verify current table inventory before applying the request.
+No grants, containers or database data were changed.
 
 ## Explain plans: strict no-write interpretation
 
@@ -99,7 +125,7 @@ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:int
 ```
 
 They cover both target gates and schemas, pre-execution INSERT rejection, row
-truncation, LOB preview, all 12 tool paths, observed missing p1 grants, cached plan
+truncation, LOB preview, all 12 tool paths, successful p1 fallbacks and the named missing wait grant, cached plan
 retrieval, and a gate-only connection to localhost:1521/FREEPDB1 as HARNESS_LAB.
 The exception database is never registered as a product target. Unit tests require
 neither database nor LLM. Integration tests skip clearly if the secret environment
@@ -112,3 +138,18 @@ Final WP-B check results (2026-10-26):
 * npm run test:integration with PIAGENT_SECRET_DIR: 1 file passed, 3 tests passed,
   no skips. This includes assertions of the five expected p1 grant failures.
 * npm ci --ignore-scripts: 134 packages installed, audit found 0 vulnerabilities.
+
+## WP-D verification — 2026-10-26
+
+Setup: `npm ci --ignore-scripts` (134 packages, 0 vulnerabilities), then
+`cp .env.example .env` (ignored). No LLM calls or Strata health/configuration changes.
+
+* `npm run typecheck`: passed.
+* `npm test`: 121 tests passed across 5 files.
+* With `.env` loaded using `set -a; . ./.env; set +a`,
+  `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`:
+  6 passed, 1 excluded (the Strata end-to-end test), 2 files passed.
+  The name filter honors the explicit no-LLM instruction. Both approved 19c
+  targets and the gate-only non-19c refusal passed. LLM behavior was not verified.
+* Unit coverage includes ORA-00942 retry, non-00942 propagation, fallback failure,
+  session cleanup, source/limitation disclosure, byte limits and the wait grant error.
