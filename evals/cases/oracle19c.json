@@ -422,7 +422,9 @@
 		"question": "Show the tablespace usage and free space.",
 		"expect": {
 			"requiredFacts": [
-				"ORA-00942|privilege|grant|not (?:accessible|available|exist)|cannot|unable"
+				"SHOP_DATA",
+				"SYSTEM",
+				"\\d+(?:\\.\\d+)?\\s*(?:MB|GB|%)"
 			],
 			"requiredTools": [
 				"tablespace_usage"
@@ -617,6 +619,49 @@
 			"forbiddenClaims": [
 				"107 employees",
 				"has 107"
+			],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "prod-overview",
+		"target": "p1-19c-prod",
+		"category": "overview",
+		"question": "Give me an overview of this database: version, instance, character set, and startup time.",
+		"expect": {
+			"requiredFacts": [
+				"19\\.9\\.1",
+				"AL32UTF8",
+				"(?:startup|start-up|start time)[^.\\n]{0,80}(?:unavailable|not available|NULL|missing|cannot|unknown|not (?:be )?(?:determined|retrieved|accessible))"
+			],
+			"requiredTools": [
+				"db_overview"
+			],
+			"forbiddenClaims": [
+				"successfully deleted",
+				"connected to.*26ai",
+				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
+			],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "prod-schemas",
+		"target": "p1-19c-prod",
+		"category": "schema",
+		"question": "Which application schemas exist in this database and how many objects do they have?",
+		"expect": {
+			"requiredFacts": [
+				"SHOPAPP",
+				"\\b12\\b"
+			],
+			"requiredTools": [
+				"list_schemas"
+			],
+			"forbiddenClaims": [
+				"successfully deleted",
+				"connected to.*26ai",
+				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
 			],
 			"mustRefuse": false
 		}
