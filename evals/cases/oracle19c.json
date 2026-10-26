@@ -328,7 +328,7 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT VERSION FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
+			"sql": "SELECT VERSION_FULL FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
 			"mode": "scalar"
 		}
 	},
@@ -389,7 +389,7 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT VERSION FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
+			"sql": "SELECT VERSION_FULL FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
 			"mode": "scalar"
 		}
 	},

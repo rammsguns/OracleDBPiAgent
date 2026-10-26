@@ -11,6 +11,9 @@ const cases: EvalCase[] = [];
 for (const file of (await readdir('evals/cases')).filter(file => file.endsWith('.json')).sort()) {
 	cases.push(...JSON.parse(await readFile(`evals/cases/${file}`, 'utf8')));
 }
+// Optional: npm run eval -- <case-id>... runs only those cases.
+const only = process.argv.slice(2);
+if (only.length) cases.splice(0, cases.length, ...cases.filter(test => only.includes(test.id)));
 const records = [];
 try {
 	for (const test of cases) {
