@@ -22,12 +22,20 @@ export async function doctor(config: AppConfig): Promise<boolean> {
 				if (session.identity.versionFull.split(".")[0] !== "19" || session.identity.currentUser.toUpperCase() !== target.username) throw new Error("Identity mismatch");
 				const privileges = await session.query("SELECT PRIVILEGE FROM SESSION_PRIVS");
 				const roles = await session.query("SELECT ROLE FROM SESSION_ROLES");
-				const objectGrants = await session.query("SELECT PRIVILEGE FROM USER_TAB_PRIVS_RECD UNION SELECT PRIVILEGE FROM ROLE_TAB_PRIVS WHERE ROLE IN (SELECT ROLE FROM SESSION_ROLES)");
-				if (objectGrants.rows.some(r => !["SELECT", "READ", "REFERENCES"].includes(String(r[0])))) throw new Error("Unexpected object privileges");
+				// Oracle's SELECT_CATALOG_ROLE also carries FLASHBACK on dictionary views and EXECUTE on
+				// DBMS_ASH and Data Pump types; both are read-only, and sqlPolicy blocks DBMS_ calls.
+				const objectGrants = await session.query("SELECT 'USER', PRIVILEGE FROM USER_TAB_PRIVS_RECD UNION SELECT ROLE, PRIVILEGE FROM ROLE_TAB_PRIVS WHERE ROLE IN (SELECT ROLE FROM SESSION_ROLES)");
+				const unexpected = objectGrants.rows.filter(([role, privilege]) => !["SELECT", "READ", "REFERENCES"].includes(String(privilege)) && !(role === "SELECT_CATALOG_ROLE" && ["FLASHBACK", "EXECUTE"].includes(String(privilege))));
+				if (unexpected.length) throw new Error(`Unexpected object privileges: ${unexpected.map(r => r.join(" ")).join(", ")}`);
 				const safe = new Set(["CREATE SESSION", "SELECT ANY DICTIONARY"]);
 				if (privileges.rows.some(r => !safe.has(String(r[0]))) || roles.rows.some(r => ["DBA", "RESOURCE", "IMP_FULL_DATABASE", "EXP_FULL_DATABASE"].includes(String(r[0])))) throw new Error("Unexpected privileges");
 				console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
-			} catch { ok = false; console.error(`${target.name}: connection, 19c gate, or read-only privilege check failed (WP-B required)`); }
+			} catch (error) {
+				ok = false;
+				// Name the failing check only; driver messages can carry connection details.
+				const reason = error instanceof Error && /^(Identity mismatch|Unexpected)/.test(error.message) ? error.message : error instanceof Error ? error.name : "unknown error";
+				console.error(`${target.name}: connection, 19c gate, or read-only privilege check failed (${reason})`);
+			}
 		}
 	} finally { await sessions.closeAll(); }
 	return ok;

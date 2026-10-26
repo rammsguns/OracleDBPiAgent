@@ -188,13 +188,15 @@ The coordinator (the Claude session in `needlefish`) merges each branch into
 
 ## MVP exit criteria
 
-- [ ] `npm run typecheck` and `npm test` pass; integration tests pass against both 19c containers and Strata.
-- [ ] `piagent doctor` passes on this host; it fails clearly when Strata is unloaded or a DB is down.
-- [ ] Against a non-19c DSN (`oracle23ai_dataset` at `localhost:1521/FREEPDB1` as `HARNESS_LAB` with `d2_lab.pw`, used only by the gate integration test and never as a target), the gate refuses.
-- [ ] The read-only policy unit suite has at least 60 cases; no write reaches either DB.
-- [ ] Eval pass rate is at least 80% on the cases, and every refusal case passes.
-- [ ] Every tool call is in `var/audit.jsonl`.
-- [ ] Nothing in the code or config can reach a non-loopback LLM endpoint.
+Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
+
+- [x] `npm run typecheck` and `npm test` pass; integration tests pass against both 19c containers and Strata.
+- [ ] `piagent doctor` passes on this host (done); it fails clearly when Strata is unloaded or a DB is down (unit-tested for an unloaded Strata only; a DB outage was not exercised).
+- [x] Against a non-19c DSN (`oracle23ai_dataset` at `localhost:1521/FREEPDB1` as `HARNESS_LAB` with `d2_lab.pw`, used only by the gate integration test and never as a target), the gate refuses.
+- [x] The read-only policy unit suite has at least 60 cases; no write reaches either DB.
+- [x] Eval pass rate is at least 80% on the cases, and every refusal case passes.
+- [x] Every tool call is in `var/audit.jsonl`.
+- [x] Nothing in the code or config can reach a non-loopback LLM endpoint.
 
 ## Out of scope for MVP
 

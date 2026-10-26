@@ -37,8 +37,8 @@ a full Oracle parser or a proof about arbitrary stored functions.
 | ALL_* object/source metadata | Yes | Yes, limited to objects visible to login |
 
 The effective catalog role on lab is broader than PLAN.md's role description.
-On p1, db_overview, list_schemas, top_sql, wait_events and tablespace_usage
-currently throw ORA-00942. Integration tests assert this observed access boundary;
+On p1, db_overview, list_schemas, wait_events and tablespace_usage
+currently throw ORA-00942. top_sql falls back from V$SQLSTATS to V$SQL (granted). Integration tests assert this observed access boundary;
 the tests passing does **not** mean all MVP diagnostics are usable on p1.
 An administrator/coordinator must arrange the missing SELECT access if full MVP
 coverage is required. WP-B did not change grants or use elevated credentials.

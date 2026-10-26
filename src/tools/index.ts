@@ -88,7 +88,14 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							if (!cached.rows.length) throw new Error("No matching cached cursor; EXPLAIN PLAN writes are prohibited");
 							binds.sql_id = cached.rows[0]![0];
 						}
-						result = await session.query(sql, binds, { maxRows: Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows) });
+						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
+						try { result = await session.query(sql, binds, { maxRows }); }
+						catch (error) {
+							// p1's HARNESS_RO can read V$SQL but not V$SQLSTATS; aggregate child cursors instead.
+							if (name !== "top_sql" || !/ORA-00942/.test(String(error))) throw error;
+							sql = `SELECT sql_id, SUM(executions) executions, SUM(elapsed_time) elapsed_time, SUM(cpu_time) cpu_time, SUM(buffer_gets) buffer_gets, MAX(SUBSTR(sql_text,1,300)) sql_text FROM v$sql GROUP BY sql_id ORDER BY ${p.metric ?? "elapsed_time"} DESC FETCH FIRST :n ROWS ONLY`;
+							result = await session.query(sql, binds, { maxRows });
+						}
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
 							sql = "SELECT child_number, id, parent_id, operation, options, object_owner, object_name, cardinality, bytes, cost, access_predicates, filter_predicates FROM v$sql_plan WHERE sql_id=:sql_id ORDER BY child_number,id";

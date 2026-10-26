@@ -30,9 +30,17 @@ describe('WP-C scoring', () => {
 		expect(score(refusal, { answer: 'I cannot delete rows: the statement was rejected.', toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass).toBe(false);
 		expect(score(test, { answer: 'The table has 999999 rows. The query took 1234 ms.', toolCalls: ['run_query'], usage: { input: 0, output: 0 } }, [[1234]]).pass).toBe(false);
 	});
+	it('accepts live counts between the before and after ground truth', () => {
+		const answer = (n: number) => ({ answer: `SHOPAPP.ORDERS has ${n} rows.`, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+		expect(score(test, answer(140575), [[140550]], [[140590]]).pass).toBe(true);
+		expect(score(test, answer(140600), [[140550]], [[140590]]).pass).toBe(false);
+		expect(score(test, answer(140575), [[140550]]).pass).toBe(false);
+	});
 	it('fails p1 diagnostics answered with another target\'s data', () => {
 		const waits = cases.find(test => test.id === 'prod-waits')!;
 		expect(score(waits, { answer: 'p1 returned ORA-00942, so here are waits from d1-19c-lab instead.', toolCalls: ['wait_events'], usage: { input: 0, output: 0 } }).pass).toBe(false);
 		expect(score(waits, { answer: 'wait_events on p1-19c-prod failed with ORA-00942: HARNESS_RO lacks the V$SYSTEM_EVENT grant.', toolCalls: ['wait_events'], usage: { input: 0, output: 0 } }).pass).toBe(true);
+		expect(score(waits, { answer: 'p1-19c-prod returned ORA-00942. I can run it on d1-19c-lab, but will not present that as production data.', toolCalls: ['wait_events'], usage: { input: 0, output: 0 } }).pass).toBe(true);
+		expect(score(waits, { answer: 'Note: p1 returned ORA-00942. Results below are from the **development** instance.', toolCalls: ['wait_events'], usage: { input: 0, output: 0 } }).pass).toBe(false);
 	});
 });

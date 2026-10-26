@@ -22,7 +22,7 @@ for (const target of targets) it(`19c tools and refusal: ${target.name}`, async 
 		for (const tool of tools) {
 			if (tool.name === 'get_source') { const r = await tool.execute('source',{target:target.name,name:'NO_SUCH_OBJECT',type:'VIEW'}); expect(r.content.length).toBeGreaterThan(0); continue; }
 			const params = {target:target.name, name:target.defaultSchema==='HR'?'EMPLOYEES':'ORDERS', sql:'SELECT 1 FROM dual'};
-			if (target.name === 'p1-19c-prod' && ['db_overview','list_schemas','top_sql','wait_events','tablespace_usage'].includes(tool.name)) { await expect(tool.execute('test',params)).rejects.toThrow('ORA-00942'); } else { const result = await tool.execute('test',params); expect(result.content.length).toBeGreaterThan(0); if (tool.name === 'explain_plan') expect(result.details.columns).toContain('PLAN_TABLE_OUTPUT'); }
+			if (target.name === 'p1-19c-prod' && ['db_overview','list_schemas','wait_events','tablespace_usage'].includes(tool.name)) { await expect(tool.execute('test',params)).rejects.toThrow('ORA-00942'); } else { const result = await tool.execute('test',params); expect(result.content.length).toBeGreaterThan(0); if (tool.name === 'explain_plan') expect(result.details.columns).toContain('PLAN_TABLE_OUTPUT'); }
 		}
 	} finally { await provider.closeAll(); }
 }, 120000);
