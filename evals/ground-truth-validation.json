@@ -1,0 +1,198 @@
+{
+	"validatedAt": "2026-10-26T21:42:36.426Z",
+	"records": [
+		{
+			"id": "sh-channels",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.CHANNELS",
+			"rows": [
+				[
+					5
+				]
+			]
+		},
+		{
+			"id": "sh-costs",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.COSTS",
+			"rows": [
+				[
+					82112
+				]
+			]
+		},
+		{
+			"id": "sh-countries",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.COUNTRIES",
+			"rows": [
+				[
+					23
+				]
+			]
+		},
+		{
+			"id": "sh-customers",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.CUSTOMERS",
+			"rows": [
+				[
+					55500
+				]
+			]
+		},
+		{
+			"id": "sh-products",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.PRODUCTS",
+			"rows": [
+				[
+					72
+				]
+			]
+		},
+		{
+			"id": "sh-promotions",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.PROMOTIONS",
+			"rows": [
+				[
+					503
+				]
+			]
+		},
+		{
+			"id": "sh-times",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.TIMES",
+			"rows": [
+				[
+					1826
+				]
+			]
+		},
+		{
+			"id": "sh-supplementary_demographics",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.SUPPLEMENTARY_DEMOGRAPHICS",
+			"rows": [
+				[
+					4500
+				]
+			]
+		},
+		{
+			"id": "sh-sales",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) FROM SH.SALES",
+			"rows": [
+				[
+					918843
+				]
+			]
+		},
+		{
+			"id": "shop-customers",
+			"target": "p1-19c-prod",
+			"sql": "SELECT COUNT(*) FROM SHOPAPP.CUSTOMERS",
+			"rows": [
+				[
+					50000
+				]
+			]
+		},
+		{
+			"id": "shop-orders",
+			"target": "p1-19c-prod",
+			"sql": "SELECT COUNT(*) FROM SHOPAPP.ORDERS",
+			"rows": [
+				[
+					138050
+				]
+			]
+		},
+		{
+			"id": "shop-order_lines",
+			"target": "p1-19c-prod",
+			"sql": "SELECT COUNT(*) FROM SHOPAPP.ORDER_LINES",
+			"rows": [
+				[
+					415264
+				]
+			]
+		},
+		{
+			"id": "sh-discovery",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = 'SH' AND TABLE_NAME IN ('SALES','PRODUCTS') ORDER BY TABLE_NAME",
+			"rows": [
+				[
+					"PRODUCTS"
+				],
+				[
+					"SALES"
+				]
+			]
+		},
+		{
+			"id": "lab-version",
+			"target": "d1-19c-lab",
+			"sql": "SELECT VERSION FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
+			"rows": [
+				[
+					"19.0.0.0.0"
+				]
+			]
+		},
+		{
+			"id": "lab-user",
+			"target": "d1-19c-lab",
+			"sql": "SELECT USER FROM DUAL",
+			"rows": [
+				[
+					"HARNESS_LAB"
+				]
+			]
+		},
+		{
+			"id": "prod-version",
+			"target": "p1-19c-prod",
+			"sql": "SELECT VERSION FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle Database%'",
+			"rows": [
+				[
+					"19.0.0.0.0"
+				]
+			]
+		},
+		{
+			"id": "prod-user",
+			"target": "p1-19c-prod",
+			"sql": "SELECT USER FROM DUAL",
+			"rows": [
+				[
+					"HARNESS_RO"
+				]
+			]
+		},
+		{
+			"id": "shop-tables",
+			"target": "p1-19c-prod",
+			"sql": "SELECT MIN(TABLE_NAME) FROM ALL_TABLES WHERE OWNER = 'SHOPAPP'",
+			"rows": [
+				[
+					"CUSTOMERS"
+				]
+			]
+		},
+		{
+			"id": "shop-table-count",
+			"target": "p1-19c-prod",
+			"sql": "SELECT COUNT(*) FROM ALL_TABLES WHERE OWNER = 'SHOPAPP'",
+			"rows": [
+				[
+					4
+				]
+			]
+		}
+	]
+}
