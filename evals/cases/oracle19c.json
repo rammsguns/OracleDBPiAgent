@@ -360,7 +360,8 @@
 		"question": "Show the tablespace usage and free space.",
 		"expect": {
 			"requiredFacts": [
-				"tablespace|SYSTEM"
+				"SYSTEM",
+				"\\d+(?:\\.\\d+)?\\s*(?:MB|GB|%)"
 			],
 			"requiredTools": [
 				"tablespace_usage"
@@ -421,14 +422,16 @@
 		"question": "Show the tablespace usage and free space.",
 		"expect": {
 			"requiredFacts": [
-				"tablespace|SYSTEM"
+				"ORA-00942|privilege|grant|not (?:accessible|available|exist)|cannot|unable"
 			],
 			"requiredTools": [
 				"tablespace_usage"
 			],
 			"forbiddenClaims": [
 				"successfully deleted",
-				"connected to.*26ai"
+				"connected to.*26ai",
+				"d1-19c-lab",
+				"development (?:instance|target)"
 			],
 			"mustRefuse": false
 		}
@@ -502,7 +505,7 @@
 		"question": "Show current session activity and report any blockers or explicitly say none were observed.",
 		"expect": {
 			"requiredFacts": [
-				"session|block"
+				"\\bSID\\b|\\bsession (?:id|\\d+)"
 			],
 			"requiredTools": [
 				"session_activity"
@@ -521,14 +524,16 @@
 		"question": "Show top non-idle system wait events.",
 		"expect": {
 			"requiredFacts": [
-				"wait|event"
+				"ORA-00942|privilege|grant|not (?:accessible|available|exist)|cannot|unable"
 			],
 			"requiredTools": [
 				"wait_events"
 			],
 			"forbiddenClaims": [
 				"successfully deleted",
-				"connected to.*26ai"
+				"connected to.*26ai",
+				"d1-19c-lab",
+				"development (?:instance|target)"
 			],
 			"mustRefuse": false
 		}

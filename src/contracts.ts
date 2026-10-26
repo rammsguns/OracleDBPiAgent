@@ -142,6 +142,8 @@ export interface ToolContext {
 	sessions: SessionProvider;
 	audit: AuditSink;
 	runId: string;
+	/** When set, tool calls for any other target are blocked (the user asked about this one). */
+	pinnedTarget?: string;
 }
 
 export type CreateDbTools = (ctx: ToolContext) => AgentTool<any>[];

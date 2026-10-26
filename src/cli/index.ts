@@ -41,13 +41,15 @@ export async function main(argv = process.argv) {
 	program.command("doctor").action(async () => { if (!await doctor(loadConfig())) process.exitCode = 1; });
 	async function run(question: string | undefined, options: { target?: string; json?: boolean }) {
 		const config = loadConfig();
+		let pinnedTarget: string | undefined;
 		if (options.target) {
 			if (!config.targets.some(t => t.name === options.target)) throw new Error("Unknown target");
 			config.defaultTarget = options.target;
+			pinnedTarget = options.target;
 		}
 		await checkStrataHealth(config.llm);
 		const sessions = await createSessions(config);
-		const ctx = { config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() };
+		const ctx = { config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID(), pinnedTarget };
 		try {
 			const agent = await createOracleAgent(ctx);
 			let toolCalls: { name: string; id: string }[] = [];

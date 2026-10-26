@@ -32,7 +32,7 @@ export async function runtime() {
 				if (event.kind === 'tool_call' && event.tool) events.push(event.tool);
 				await audit.record(event);
 			},
-		}, runId: crypto.randomUUID() };
+		}, runId: crypto.randomUUID(), pinnedTarget: target };
 		const tools = toolsModule.createDbTools(ctx);
 		// Local adapter: coordinator must confirm the WP-A factory/context contract.
 		const agent = await agentModule.createOracleAgent({ ...ctx, tools });

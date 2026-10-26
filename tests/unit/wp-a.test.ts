@@ -74,3 +74,16 @@ it("blocks budget overflow and requests exactly one final turn without tools", a
 	} finally { clock.mockRestore(); }
 	expect(requests).toBe(4); expect(events).toContainEqual(expect.objectContaining({ kind: "tool_blocked" }));
 });
+it("blocks tool calls for any target other than the pinned one", async () => {
+	const config = loadConfig({}); const events: { kind: string }[] = [];
+	const model = { id: "test", name: "test", api: "openai-completions", provider: "strata", baseUrl: config.llm.baseUrl, reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 } as const;
+	const agent = await createOracleAgent({ config, runId: "pin", pinnedTarget: "p1-19c-prod", sessions: { get: async () => { throw Error("No DB"); }, closeAll: async () => {} }, audit: { record: async e => { events.push(e); } } }, { model: { ...model, input: ["text"] }, streamFn: () => { throw Error("No LLM"); } });
+	expect(agent.state.systemPrompt).toContain("pinned to target p1-19c-prod");
+	// Outside a prompt the run clock is unset; keep the wall budget from tripping.
+	const clock = vi.spyOn(Date, "now").mockReturnValue(1);
+	try {
+		await expect(agent.beforeToolCall!({ toolCall: { id: "a", name: "wait_events" }, args: { target: "d1-19c-lab" } } as never)).resolves.toMatchObject({ block: true });
+		await expect(agent.beforeToolCall!({ toolCall: { id: "b", name: "wait_events" }, args: { target: "p1-19c-prod" } } as never)).resolves.toBeUndefined();
+	} finally { clock.mockRestore(); }
+	expect(events.map(e => e.kind)).toEqual(["tool_blocked", "tool_call"]);
+});
