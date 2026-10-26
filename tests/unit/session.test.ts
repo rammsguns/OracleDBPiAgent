@@ -28,3 +28,15 @@ it('closes a refused-version connection before setting schema',async()=>{
 	const {c}=connection('26.0'); await expect(createSessionProvider(config).get()).rejects.toThrow('only Oracle');expect(c.execute).toHaveBeenCalledOnce();expect(c.close).toHaveBeenCalledOnce();
 });
 it('bounds LOB reads and destroys locators',async()=>{const lob={getData:vi.fn().mockResolvedValue('x'.repeat(6000)),destroy:vi.fn()};const result=await previewValue(lob);expect(Buffer.byteLength(String(result))).toBeLessThanOrEqual(4096);expect(lob.getData).toHaveBeenCalledWith(1,1024);expect(lob.destroy).toHaveBeenCalledOnce();});
+it.each([{host:'remote'}, {port:1521}, {serviceName:'FREEPDB1'}, {username:'SYS'}, {name:'other'}])('rejects edited endpoint before reading a secret: %j', async changes => {
+	const changed = {...config, targets: config.targets.map(t => ({...t, ...changes}))};
+	await expect(createSessionProvider(changed).get(changed.targets[0]!.name)).rejects.toThrow();
+	expect(mocks.connect).not.toHaveBeenCalled();
+	expect(mocks.read).not.toHaveBeenCalled();
+});
+it('preserves the explicit endpoint override for the gate integration test', async () => {
+	const target = {...config.targets[0]!, name:'gate-only-non19c', port:1521, serviceName:'FREEPDB1', passwordFile:'d2_lab.pw'};
+	const {c} = connection('26.0');
+	await expect(createSessionProvider({...config, targets:[target]}, [target]).get(target.name)).rejects.toThrow('only Oracle');
+	expect(c.close).toHaveBeenCalledOnce();
+});

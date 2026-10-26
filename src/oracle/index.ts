@@ -1,3 +1,5 @@
+import { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
+export { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 import oracledb from "oracledb";
 import { readFile } from "node:fs/promises";
 import { resolve, basename } from "node:path";
@@ -14,13 +16,6 @@ export async function previewValue(value: any): Promise<unknown> {
 		return Buffer.isBuffer(data) ? data.subarray(0, 4096).toString("hex").slice(0, 4096) : Buffer.from(String(data)).subarray(0, 4096).toString("utf8");
 	} finally { await value.destroy(); }
 }
-
-/** Endpoints a session may open, independent of config (defense in depth). */
-export interface ApprovedEndpoint { name: string; host: string; port: number; serviceName: string; username: string }
-export const APPROVED_ENDPOINTS: readonly ApprovedEndpoint[] = [
-	{ name: "d1-19c-lab", host: "localhost", port: 1522, serviceName: "ORCL", username: "HARNESS_LAB" },
-	{ name: "p1-19c-prod", host: "localhost", port: 1523, serviceName: "PRODCDB", username: "HARNESS_RO" },
-];
 
 /** approvedEndpoints is overridable only so the gate integration test can reach a non-19c DB. */
 export function createSessionProvider(config: AppConfig, approvedEndpoints: readonly ApprovedEndpoint[] = APPROVED_ENDPOINTS): SessionProvider {

@@ -1,3 +1,4 @@
+import { APPROVED_TARGETS } from "./approvedTargets.js";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve, basename } from "node:path";
@@ -22,14 +23,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	if (llmUrl.port !== "8080" || llmUrl.pathname.replace(/\/$/, "") !== "/v1") throw new Error("Only Strata on port 8080 at /v1 is supported");
 	const raw = JSON.parse(readFileSync(path(get("TARGETS_FILE", "config/targets.json")), "utf8"));
 	if (raw.version !== 1 || !Array.isArray(raw.targets) || raw.targets.length !== 2) throw new Error("Expected the two approved 19c targets");
-	const approved = new Map([
-		["d1-19c-lab", [1522, "ORCL", "HARNESS_LAB", "d1_lab.pw", "SH", "development"]],
-		["p1-19c-prod", [1523, "PRODCDB", "HARNESS_RO", "p1_harness_ro.pw", "SHOPAPP", "production-like"]],
-	]);
 	const seen = new Set<string>();
 	for (const t of raw.targets) {
-		const expected = approved.get(t.name);
-		if (!expected || seen.has(t.name) || t.host !== "localhost" || typeof t.description !== "string" || !t.description || basename(t.passwordFile ?? "") !== t.passwordFile || JSON.stringify([t.port, t.serviceName, t.username, t.passwordFile, t.defaultSchema, t.environment]) !== JSON.stringify(expected)) throw new Error("Invalid or unapproved target configuration");
+		const expected = APPROVED_TARGETS.find(expected => expected.name === t.name);
+		if (!expected || seen.has(t.name) || typeof t.description !== "string" || !t.description || basename(t.passwordFile ?? "") !== t.passwordFile || Object.entries(expected).some(([key, value]) => t[key] !== value)) throw new Error("Invalid or unapproved target configuration");
 		seen.add(t.name);
 	}
 	const targets = raw.targets as TargetConfig[];
