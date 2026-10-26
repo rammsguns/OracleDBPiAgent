@@ -1,0 +1,34 @@
+{
+  "name": "oracledb-pi-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Oracle 19c DBA/developer agent harness built on the PI agent SDK, using only the local Strata LLM",
+  "type": "module",
+  "bin": {
+    "piagent": "dist/cli/index.js"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "eval": "tsx evals/run.ts",
+    "piagent": "tsx src/cli/index.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "commander": "^15.0.0",
+    "oracledb": "^26.0.0",
+    "typebox": "^1.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

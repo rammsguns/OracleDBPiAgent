@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "name": "d1-19c-lab",
+      "description": "Local Docker oracle19c (19.9.1 EE, non-CDB). Sample schemas HR, OE, SH, CO, PM, IX, BI.",
+      "host": "localhost",
+      "port": 1522,
+      "serviceName": "ORCL",
+      "username": "HARNESS_LAB",
+      "passwordFile": "d1_lab.pw",
+      "defaultSchema": "HR",
+      "environment": "development"
+    },
+    {
+      "name": "p1-19c-prod",
+      "description": "Local Docker oracle19c-prod (19.9.1 EE, non-CDB), production-shaped stand-in with the SHOPAPP OLTP workload.",
+      "host": "localhost",
+      "port": 1523,
+      "serviceName": "PRODCDB",
+      "username": "HARNESS_RO",
+      "passwordFile": "p1_harness_ro.pw",
+      "defaultSchema": "SHOPAPP",
+      "environment": "production-like"
+    }
+  ]
+}
