@@ -87,7 +87,7 @@ it('throws when a byte cap cannot retain the fallback disclosure', () => {
 function viewSetup(text: string) {
 	const state = setup();
 	state.query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH'], rows: [[Buffer.byteLength(text)]], truncated: false, elapsedMs: 1 });
-	state.query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH', 'TEXT'], rows: [[Buffer.byteLength(text), text]], truncated: false, elapsedMs: 1 });
+	state.query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH', 'TEXT', 'CHARSET'], rows: [[Buffer.byteLength(text), text, 'AL32UTF8']], truncated: false, elapsedMs: 1 });
 	return { ...state, tool: state.tools.find(t => t.name === 'get_source')! };
 }
 it('pages full LONG view text beyond 4000 bytes with line and continuation metadata', async () => {
@@ -120,8 +120,21 @@ it('refuses oversized source before fetching LONG and closes the session', async
 });
 it('rejects incomplete LONG data', async () => {
 	const { tool, query } = viewSetup('abc');
-	query.mockReset().mockResolvedValueOnce({ rows: [[10]] }).mockResolvedValueOnce({ rows: [[10, 'abc']] });
+	query.mockReset().mockResolvedValueOnce({ rows: [[10]] }).mockResolvedValueOnce({ rows: [[10, 'abc', 'AL32UTF8']] });
 	await expect(tool.execute('1', { name: 'V', type: 'VIEW' })).rejects.toThrow('incomplete');
+});
+it('checks view source length in the database character set', async () => {
+	const fetch = async (bytes: number, charset: string) => {
+		const { tool, query } = viewSetup('café');
+		query.mockReset().mockResolvedValueOnce({ rows: [[bytes]] }).mockResolvedValueOnce({ columns: ['TEXT_LENGTH', 'TEXT', 'CHARSET'], rows: [[bytes, 'café', charset]], truncated: false, elapsedMs: 1 });
+		return tool.execute('1', { name: 'V', type: 'VIEW' });
+	};
+	// é is one byte in a single-byte character set, two in UTF-8.
+	await expect(fetch(4, 'WE8MSWIN1252')).resolves.toMatchObject({ details: { totalLines: 1 } });
+	await expect(fetch(5, 'WE8MSWIN1252')).rejects.toThrow('incomplete');
+	await expect(fetch(5, 'UTF8')).resolves.toMatchObject({ details: { totalLines: 1 } });
+	await expect(fetch(4, 'AL32UTF8')).rejects.toThrow('incomplete');
+	await expect(fetch(4, 'JA16SJIS')).rejects.toThrow('character set JA16SJIS');
 });
 it('updates the continuation after the result byte cap removes lines', () => {
 	const r = boundedResult({ columns: ['LINE','TEXT'], rows: Array.from({length:10}, (_, i) => [i + 1, 'x'.repeat(80)]), startLine: 1, totalLines: 10, hasMore: false, nextStartLine: null, truncated: false }, 1000);

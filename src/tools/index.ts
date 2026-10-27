@@ -60,7 +60,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						if (p.type?.toUpperCase() === "VIEW") {
 							// Thin mode fetches LONG as a string by default. Bound it before transfer.
 							binds.max_source_bytes = MAX_VIEW_SOURCE_BYTES;
-							sql = `SELECT text_length, text FROM all_views WHERE owner=:owner AND view_name=:name AND text_length<=:max_source_bytes`;
+							sql = `SELECT text_length, text, (SELECT value FROM nls_database_parameters WHERE parameter='NLS_CHARACTERSET') charset FROM all_views WHERE owner=:owner AND view_name=:name AND text_length<=:max_source_bytes`;
 						} else {
 							Object.assign(binds, { source_type: p.type?.toUpperCase() ?? null, start_line: start, end_line: start + lines });
 							sql = `SELECT type, line, text FROM all_source WHERE owner=:owner AND name=:name AND (:source_type IS NULL OR type=:source_type) AND line>=:start_line AND line<:end_line ORDER BY type,line`;
@@ -129,7 +129,14 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
 					const source = result as QueryResult;
 					const text = source.rows[0]?.[1] ?? "";
-					if (typeof text !== "string" || Buffer.byteLength(text) > MAX_VIEW_SOURCE_BYTES || (source.rows.length && Buffer.byteLength(text) !== Number(source.rows[0]?.[0]))) throw new Error("View source fetch is incomplete or exceeds the 1 MiB limit");
+					if (typeof text !== "string" || Buffer.byteLength(text) > MAX_VIEW_SOURCE_BYTES) throw new Error("View source fetch is incomplete or exceeds the 1 MiB limit");
+					if (source.rows.length) {
+						// TEXT_LENGTH counts bytes in the database character set.
+						const charset = String(source.rows[0]?.[2] ?? "");
+						const bytes = charset === "AL32UTF8" || charset === "UTF8" ? Buffer.byteLength(text) : /^[A-Z]+[78][A-Z]/.test(charset) ? text.length : undefined;
+						if (bytes === undefined) throw new Error(`View source completeness cannot be checked in database character set ${charset || "(unknown)"}`);
+						if (bytes !== Number(source.rows[0]?.[0])) throw new Error("View source fetch is incomplete or exceeds the 1 MiB limit");
+					}
 					const lines = source.rows.length ? text.split(/\r\n|\n|\r/) : []; const start = p.startLine ?? 1;
 					const count = Math.min(p.lines ?? 200, ctx.config.limits.maxRows);
 					const rows = lines.slice(start - 1, start - 1 + count).map((text, i) => [start + i, text]);
