@@ -58,7 +58,7 @@
 			"requiredFacts": [
 				"\\bSH\\b",
 				"\\bOE\\b",
-				"(unavailable|not accessible|cannot|unable|permission|grant|only.*SH)"
+				"(unavailable|not accessible|inaccessible|no access|cannot|unable|permission|grant|only.*SH|\\bOE\\b[^.\\n]{0,20}\\bnot\\b)"
 			],
 			"requiredTools": [
 				"run_query"

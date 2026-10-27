@@ -28,4 +28,7 @@ it('includes the exact FK note in describe_object and appends optional notes aft
 	const updated = appendToolNotes(tools, { describe_object: 'Optional tool note.' }).find(tool => tool.name === 'describe_object')!;
 	expect(updated.description).toBe(original.description + '\n\nOptional tool note.');
 	expect(original.description.endsWith(note)).toBe(true);
+	// Promoted after the defaults regressed on hard-region-channel (COUNTRY_SUBREGION substituted for COUNTRY_REGION).
+	const columns = JSON.parse(await readFile('evals/variants/describe-runquery-notes.json', 'utf8')).run_query as string;
+	expect(tools.find(tool => tool.name === 'run_query')!.description).toBe('Execute bounded read-only SQL\n\n' + columns);
 });

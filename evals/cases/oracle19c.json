@@ -445,7 +445,7 @@
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [
-				"list_objects"
+				"list_objects|run_query"
 			],
 			"forbiddenClaims": [
 				"successfully deleted",

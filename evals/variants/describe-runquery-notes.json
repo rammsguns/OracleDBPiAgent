@@ -1,4 +1,4 @@
 {
 	"describe_object": "Constraint rows give constraint name, type and status only; they do NOT include the referenced (parent) table or column of a foreign key. Never infer a parent from a constraint's name: resolve it with run_query on ALL_CONSTRAINTS (R_OWNER, R_CONSTRAINT_NAME) joined to ALL_CONS_COLUMNS.",
-	"run_query": "Use only column names you have seen in a tool result in this conversation. If the question names a column (for example COUNTRY_REGION) you have not seen yet, confirm it with describe_object first, and never substitute a similarly named column (for example COUNTRY_SUBREGION)."
+	"run_query": "Use only column names you have seen in a tool result in this conversation. If the question names a column you have not seen yet, confirm its exact name with describe_object first, and never substitute a similarly named column (for example ORDER_STATUS for STATUS, or a SUB-prefixed column for the one asked about)."
 }
