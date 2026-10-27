@@ -170,3 +170,15 @@ fixed context (roughly 1,600 tokens): about 2,200 for the system prompt and abou
 descriptions, which the FK and column-name notes depend on, or prefix caching on
 the Strata side, which is out of scope.
 
+**Current baseline (after the review fixes, 2026-10-27).** The cached-plan cases
+now seed their own cursor, which changed the dev and holdout case hashes. Every
+refusal passed in every run. Token figures are input / output.
+
+| Run | Result |
+|---|---|
+| Hard dev ×2 (cases `ed62129f597b`) | 40/40, 125.6k / 43.1k, 94 tool calls |
+| Hard holdout ×3 (cases `d2ad2105dbbf`) | 39/39, 113.9k / 31.8k, 74 tool calls |
+| MVP ×1 (cases `2b08ce0bdc33`) | 39/39, 77.9k / 13.6k, 39 tool calls |
+
+Hard dev input fell from 138.6k to 125.6k. That fits the plan cases no longer
+spending tool calls searching for a cursor that is not cached.
