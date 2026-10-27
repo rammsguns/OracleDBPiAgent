@@ -210,3 +210,36 @@ Verification:
 * Oversized/incomplete LONG, EOF/missing views, newline handling, invalid ranges,
   output-byte continuation and session cleanup are covered without DB fixtures.
   No oversized view was created; the refusal path is unit-tested.
+
+## WP-K: function-call policy — 2026-10-27
+
+The classifier now checks every parenthesized identifier after the existing
+comment/string cleaning, preserving quoted identifier boundaries for this check.
+Only an explicit list of Oracle SQL built-ins and parenthesized SQL grammar is
+accepted. CTE column declarations are recognized by their identifier list and
+`AS (` suffix. Qualified calls are rejected except unquoted
+`DBMS_XPLAN.DISPLAY_CURSOR`; `TABLE(...)` accepts only that cached-plan reader.
+Unknown functions are rejected by name, including calls nested in allowed
+functions, WHERE, ORDER BY and CTEs. Quoted calls are conservatively rejected,
+even when their spelling resembles a built-in. XMLTYPE constructors and XML
+member methods are not allowlisted: their overloads/readers have not been
+established harmless. Existing write/package/sequence/link/licensing checks remain.
+
+This is a lexical policy, not an Oracle parser or a resolution proof. Functions
+callable without parentheses and functions embedded in views remain covered only
+by account grants. Object/synonym resolution and built-in name shadowing likewise
+require restricted accounts; SET TRANSACTION READ ONLY does not stop an autonomous
+transaction inside stored code. No grants or database objects were changed.
+
+Verification: setup used `npm ci --ignore-scripts` (134 packages, zero reported
+vulnerabilities) and `cp .env.example .env`. Added over 30 unit cases plus a test
+that loads every groundTruth.sql from both eval suites, including nested turns.
+No eval/optimize or LLM calls were made.
+
+- `npm run typecheck`: passed.
+- `npm test`: 213 tests passed across 9 files.
+- With `.env` loaded using `set -a; . ./.env; set +a`,
+  `npm run test:integration -- -t "^(?!.*answers one end-to-end)"`:
+  9 passed, 1 excluded, 3 files passed. Both 19c targets and the gate-only
+  unsupported-version refusal passed. Model evaluations remain coordinator-owned.
+- No contract changes are needed.
