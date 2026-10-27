@@ -195,6 +195,44 @@ The coordinator (the Claude session in `needlefish`) merges each branch into
 `npm run test:integration` and `npm run eval`, and records results in
 `docs/mvp-status.md`.
 
+## Model optimization loop (post-MVP, 2026-10-27)
+
+Goal: get the best answers from the current Strata model
+(`qwen3.8-flash-next-iq3_s`) by tuning the harness only. The loop never restarts,
+unloads or reconfigures Strata, and never swaps the model. The 39 MVP cases pass
+39/39, so a harder suite comes first.
+
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-H | `wp-h-hard-evals` | codex | `evals/cases-hard/`, its ground-truth checks, `docs/evals-hard.md` |
+| WP-I | `wp-i-optimizer` | codex | tunables in `src/config`, `src/agent`, `src/llm`; `evals/run.ts` suite/split/repeat options; `evals/optimize.ts`; `evals/variants/` |
+
+- **Hard suite (WP-H):** at least 24 cases in `evals/cases-hard/`, each with
+  `split: "dev"` or `"holdout"` (about 2:1, every category in both). Categories:
+  multi-step diagnosis on p1's live workload, analytical SQL on SH with
+  `allCells` ground truth, cached-plan reading, schema relationships, disguised
+  writes and injection refusals, and multi-turn follow-ups. Ground truth comes
+  from read-only SQL, never from the model.
+- **Tunables (WP-I):** env settings, all off by default so behavior is unchanged:
+  `PIAGENT_LLM_THINKING` (exists), `PIAGENT_LLM_MAX_OUTPUT_TOKENS` (exists),
+  `PIAGENT_LLM_TEMPERATURE` (only if Strata honors it), `PIAGENT_PROMPT_APPENDIX_FILE`
+  (text appended after the fixed safety rules) and `PIAGENT_TOOL_NOTES_FILE` (JSON:
+  extra text per tool description). Appendices cannot remove or override the
+  read-only rules, which stay first and are enforced in code.
+- **Runner (WP-I):** `npm run eval -- --suite <dir> --split dev|holdout --repeat N`.
+  `npm run optimize -- --variant evals/variants/<name>.json --suite ... --split ...
+  --repeat N` applies a variant's settings and appends one record to
+  `var/optimize/ledger.jsonl`: variant name and hash, suite, split, repeats, pass
+  rate, per-case pass counts, refusals pass, tokens in/out, tool calls and wall
+  time. `npm run optimize:report` prints the leaderboard.
+- **Loop (coordinator):** one variant per iteration on the hard dev split. A
+  variant that fails any refusal is disqualified. Keep a variant only if it beats
+  the current best on mean pass rate across repeats (cost breaks ties). Confirm
+  each new best on the hard holdout and the 39 MVP cases, and reject it if either
+  regresses. Stop after 3 iterations in a row with no improvement, then promote
+  the winner's settings as defaults, behind an Antigravity review.
+- LLM calls stay sequential: only one eval or optimize process runs at a time.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

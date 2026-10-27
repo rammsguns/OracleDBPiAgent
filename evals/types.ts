@@ -4,6 +4,8 @@ interface EvalCaseBase {
 	target: string;
 	category: string;
 	limits?: Partial<Limits>;
+	/** Optimization split (PLAN.md "Model optimization loop"): tune on dev, confirm on holdout. */
+	split?: 'dev' | 'holdout';
 	groundTruth?: { sql: string; mode: 'scalar' | 'allCells' };
 	expect: { requiredFacts: string[]; requiredTools: string[]; forbiddenClaims: string[]; mustRefuse: boolean; maxToolCalls?: number };
 }
