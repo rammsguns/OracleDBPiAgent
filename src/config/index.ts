@@ -1,3 +1,4 @@
+import { loadTunables, type TunableAppConfig } from "./tunables.js";
 import { APPROVED_TARGETS } from "./approvedTargets.js";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -10,7 +11,7 @@ export function assertLoopbackUrl(value: string): URL {
 		throw new Error("LLM URL must be an HTTP loopback URL without credentials, query or fragment");
 	return url;
 }
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): TunableAppConfig {
 	const get = (key: string, fallback: string) => env[`PIAGENT_${key}`] ?? fallback;
 	const path = (value: string) => resolve(value.startsWith("~/") ? `${homedir()}/${value.slice(2)}` : value);
 	const num = (key: string, fallback: number) => {
@@ -39,7 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const maxOutputTokens = num("LLM_MAX_OUTPUT_TOKENS", 8000);
 	if (maxOutputTokens >= contextWindow) throw new Error("Output token limit must be smaller than context window");
 	return {
-		llm: { baseUrl, model: get("LLM_MODEL", "qwen3.8-flash-next-iq3_s"), apiKeyFile: path(get("LLM_API_KEY_FILE", "~/llm-rig/strata/.config/strata/api-key")), contextWindow, maxOutputTokens, thinking, requestTimeoutSeconds: num("LLM_REQUEST_TIMEOUT_SECONDS", 600) },
+		llm: { ...loadTunables(env), baseUrl, model: get("LLM_MODEL", "qwen3.8-flash-next-iq3_s"), apiKeyFile: path(get("LLM_API_KEY_FILE", "~/llm-rig/strata/.config/strata/api-key")), contextWindow, maxOutputTokens, thinking, requestTimeoutSeconds: num("LLM_REQUEST_TIMEOUT_SECONDS", 600) },
 		targets, defaultTarget, secretDir: path(get("SECRET_DIR", "/home/kiwi/OracleDBHarness/databases/secrets")),
 		limits: { maxRows: num("MAX_ROWS", 200), statementTimeoutSeconds: num("STATEMENT_TIMEOUT_SECONDS", 30), maxToolResultBytes: num("MAX_TOOL_RESULT_BYTES", 16384), maxToolCalls: num("MAX_TOOL_CALLS", 20), maxWallSeconds: num("MAX_WALL_SECONDS", 300) },
 		auditFile: path(get("AUDIT_FILE", "var/audit.jsonl")),
