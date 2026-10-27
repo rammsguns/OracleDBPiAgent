@@ -1,0 +1,116 @@
+[
+	{
+		"id": "hard-region-channel",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "For calendar 2000 in SH, join SALES, TIMES, CUSTOMERS, COUNTRIES and CHANNELS. Return the top 3 (country_region, channel_desc) groups by total amount_sold descending, ties by region then channel. Show region, channel and revenue rounded to 2 decimals. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT * FROM (SELECT co.country_region,ch.channel_desc,TO_CHAR(ROUND(SUM(s.amount_sold),2), 'FM999999999990.00') revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.customers c ON c.cust_id=s.cust_id JOIN SH.countries co ON co.country_id=c.country_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year=2000 GROUP BY co.country_region,ch.channel_desc ORDER BY SUM(s.amount_sold) DESC,co.country_region,ch.channel_desc) WHERE ROWNUM<=3",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-category-leaders",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In SH calendar 2001, find the highest-revenue product in each product category. Break revenue ties by lowest prod_id. Return category, prod_id, and revenue rounded to 2 decimals; sort by category. Use SALES joined to TIMES and PRODUCTS. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT prod_category,prod_id,TO_CHAR(ROUND(revenue,2), 'FM999999999990.00') FROM (SELECT p.prod_category,p.prod_id,SUM(s.amount_sold) revenue,ROW_NUMBER() OVER(PARTITION BY p.prod_category ORDER BY SUM(s.amount_sold) DESC,p.prod_id) rn FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=2001 GROUP BY p.prod_category,p.prod_id) WHERE rn=1 ORDER BY prod_category",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-yoy",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "Using SH SALES, TIMES and CHANNELS, show each channel's revenue percentage growth from calendar 2000 to 2001: 100*(2001 revenue-2000 revenue)/2000 revenue, rounded to 2 decimals. Return channel_desc and growth percent, ordered by channel_desc. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT ch.channel_desc,TO_CHAR(ROUND(100*(SUM(CASE WHEN t.calendar_year=2001 THEN s.amount_sold ELSE 0 END)-SUM(CASE WHEN t.calendar_year=2000 THEN s.amount_sold ELSE 0 END))/NULLIF(SUM(CASE WHEN t.calendar_year=2000 THEN s.amount_sold ELSE 0 END),0),2), 'FM999999999990.00') FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year IN (2000,2001) GROUP BY ch.channel_desc ORDER BY ch.channel_desc",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-share",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "For SH calendar 1999, return each product category's percentage of that year's total SALES amount_sold. Join TIMES and PRODUCTS, round 100*category revenue/total revenue to 2 decimals, and order by category. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT prod_category,TO_CHAR(ROUND(100*revenue/SUM(revenue) OVER(),2), 'FM999999999990.00') FROM (SELECT p.prod_category,SUM(s.amount_sold) revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=1999 GROUP BY p.prod_category) ORDER BY prod_category",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-country-average",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "For SH calendar 2000, rank countries by revenue per distinct purchasing customer, descending (tie country_name). Return only the top 3 country names, distinct buyer counts and revenue per buyer rounded to 2 decimals. Join SALES, TIMES, CUSTOMERS and COUNTRIES; do not divide by all registered customers. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT * FROM (SELECT co.country_name,COUNT(DISTINCT s.cust_id),TO_CHAR(ROUND(SUM(s.amount_sold)/COUNT(DISTINCT s.cust_id),2), 'FM999999999990.00') avg_revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.customers c ON c.cust_id=s.cust_id JOIN SH.countries co ON co.country_id=c.country_id WHERE t.calendar_year=2000 GROUP BY co.country_name ORDER BY SUM(s.amount_sold)/COUNT(DISTINCT s.cust_id) DESC,co.country_name) WHERE ROWNUM<=3",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-quarter-winners",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "For every calendar quarter of 2001 in SH, find the channel with highest SALES revenue (ties lowest channel_id). Return quarter number, channel_desc and total revenue rounded to 2 decimals, ordered by quarter. Join TIMES and CHANNELS. Display rounded monetary amounts and percentages with exactly two fractional digits.",
+		"groundTruth": {
+			"sql": "SELECT calendar_quarter_number,channel_desc,TO_CHAR(ROUND(revenue,2), 'FM999999999990.00') FROM (SELECT t.calendar_quarter_number,ch.channel_id,ch.channel_desc,SUM(s.amount_sold) revenue,ROW_NUMBER() OVER(PARTITION BY t.calendar_quarter_number ORDER BY SUM(s.amount_sold) DESC,ch.channel_id) rn FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year=2001 GROUP BY t.calendar_quarter_number,ch.channel_id,ch.channel_desc) WHERE rn=1 ORDER BY calendar_quarter_number",
+			"mode": "allCells"
+		}
+	}
+]

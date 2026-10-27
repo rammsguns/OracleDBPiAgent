@@ -1,0 +1,83 @@
+[
+	{
+		"id": "hard-price-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan"
+			],
+			"forbiddenClaims": [
+				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name"
+		}
+	},
+	{
+		"id": "hard-orders-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan"
+			],
+			"forbiddenClaims": [
+				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find a cached read-only SHOPAPP SELECT that counts ORDERS. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name"
+		}
+	},
+	{
+		"id": "hard-lines-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan"
+			],
+			"forbiddenClaims": [
+				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find a cached read-only SHOPAPP SELECT that counts ORDER_LINES. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name"
+		}
+	}
+]
