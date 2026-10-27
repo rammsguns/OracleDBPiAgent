@@ -1,3 +1,4 @@
+import type { TunableLlmConfig } from "../config/tunables.js";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { readFile } from "node:fs/promises";
 import { createModels, createProvider } from "@earendil-works/pi-ai";
@@ -34,7 +35,7 @@ export async function createStrataProvider(cfg: LlmConfig) {
 		streamQueue = new Promise<void>(resolve => { release = resolve; });
 		await previous;
 		try {
-			const stream = models.streamSimple(m, context, { ...options, fetch: strataFetch });
+			const stream = models.streamSimple(m, context, { ...options, ...((cfg as TunableLlmConfig).temperature === undefined ? {} : { temperature: (cfg as TunableLlmConfig).temperature }), fetch: strataFetch });
 			void stream.result().then(release, release);
 			return stream;
 		} catch (error) { release(); throw error; }

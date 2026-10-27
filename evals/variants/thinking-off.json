@@ -1,0 +1,1 @@
+{"name":"thinking-off","description":"Disable thinking","env":{"PIAGENT_LLM_THINKING":"off"}}
