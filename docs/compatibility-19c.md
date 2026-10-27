@@ -254,6 +254,12 @@ can use the same name. Each is accepted only in its grammar position instead:
 In any other position, such as `SELECT DAY(3)` or `SELECT offset(1) rows FROM t`,
 these words are still rejected as calls.
 
+A follow-up review (`docs/review-post-jk-2026-10-27.md`) approved this and found
+no bypass. It reported two low-severity false rejections, both now fixed:
+- Signed interval literals, such as `INTERVAL - '1' DAY(3)`.
+- `CAST(... AS [NATIONAL] CHARACTER [VARYING](n))`, accepted only after AS or
+  NATIONAL.
+
 Verification: setup used `npm ci --ignore-scripts` (134 packages, zero reported
 vulnerabilities) and `cp .env.example .env`. Added over 30 unit cases plus a test
 that loads every groundTruth.sql from both eval suites, including nested turns.

@@ -46,9 +46,15 @@ function isContextualSyntax(tokens: string[], at: number, upper: string): boolea
 	const close = closingParen(tokens, at + 1);
 	if (close < 0) return false;
 	const precision = /^\(\d+(?:,\d+)?\)$/.test(tokens.slice(at + 1, close + 1).join(''));
-	// INTERVAL '1' DAY(3), INTERVAL DAY(3) TO SECOND(2); string literals lex as `literal`.
-	if (intervalUnits.has(upper)) return precision && (prev === 'INTERVAL' || prev === 'TO' || (tokens[at - 1] === 'literal' && tokens[at - 2]?.toUpperCase() === 'INTERVAL'));
+	// INTERVAL [+|-] '1' DAY(3), INTERVAL DAY(3) TO SECOND(2); string literals lex as `literal`.
+	if (intervalUnits.has(upper)) {
+		const sign = ['+', '-'].includes(tokens[at - 2] ?? '') ? 1 : 0;
+		return precision && (prev === 'INTERVAL' || prev === 'TO' || (tokens[at - 1] === 'literal' && tokens[at - 2 - sign]?.toUpperCase() === 'INTERVAL'));
+	}
 	if (['NUMERIC', 'DECIMAL', 'DEC'].includes(upper)) return precision && prev === 'AS';
+	// CAST(... AS [NATIONAL] CHARACTER [VARYING](n))
+	if (upper === 'CHARACTER') return precision && (prev === 'AS' || (prev === 'NATIONAL' && tokens[at - 2]?.toUpperCase() === 'AS'));
+	if (upper === 'VARYING') return precision && prev === 'CHARACTER' && ['AS', 'NATIONAL'].includes(tokens[at - 2]?.toUpperCase() ?? '');
 	if (upper === 'FIRST' || upper === 'NEXT') return prev === 'FETCH';
 	if (upper === 'NULLS') return prev === 'INCLUDE' || prev === 'EXCLUDE';
 	// OFFSET (n) ROWS ends a query block: only FETCH, ")" or the end may follow.

@@ -136,6 +136,12 @@ database name, the 19.9.1 version and the grantee. All 31 SELECT grants succeede
   passes 36/36 on dev and 18/18 on holdout. The MVP suite passed 38/39; the one
   failure was `prod-schemas`, whose stale expected count was then fixed. The four
   changed MVP cases then passed 12/12 (×3). Every refusal passes.
+- **Full MVP rerun:** after fixing `prod-schemas`, the MVP suite passed 39/39
+  with every refusal passing (79.7k input / 12.9k output tokens, 40 tool calls).
+- **Review:** Antigravity's follow-up review (`docs/review-post-jk-2026-10-27.md`)
+  covered the column-name note, the SQL policy fix and these grant changes, and
+  returned APPROVE. Its two low-severity SQL policy findings are fixed (246 unit
+  tests).
 - **Ungranted objects:** PM, IX and V$SQL_PLAN_STATISTICS_ALL on p1 stay
   ungranted, by design.
 

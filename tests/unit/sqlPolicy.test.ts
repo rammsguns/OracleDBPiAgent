@@ -80,6 +80,8 @@ const contextualSyntax = [
 	'SELECT * FROM t ORDER BY id FETCH FIRST (10) ROWS ONLY', 'SELECT * FROM t ORDER BY id OFFSET (5) ROWS', 'SELECT * FROM t ORDER BY id OFFSET (5) ROWS FETCH NEXT (2 + 1) ROWS ONLY;',
 	'SELECT * FROM (SELECT * FROM t ORDER BY id OFFSET (5) ROWS) x',
 	'SELECT CAST(1 AS NUMERIC(10, 2)), CAST(1 AS DECIMAL(10, 2)), CAST(1 AS DEC(10)) FROM dual',
+	"SELECT INTERVAL + '1' DAY(3), INTERVAL - '1-2' YEAR(2) TO MONTH, INTERVAL - '1.1' SECOND(2, 4) FROM dual",
+	'SELECT CAST(1 AS CHARACTER(10)), CAST(1 AS CHARACTER VARYING(10)), CAST(1 AS NATIONAL CHARACTER(10)), CAST(1 AS NATIONAL CHARACTER VARYING(10)) FROM dual',
 	'SELECT * FROM sales UNPIVOT INCLUDE NULLS (amount FOR quarter IN (q1, q2))', 'SELECT * FROM sales UNPIVOT EXCLUDE NULLS (amount FOR quarter IN (q1, q2))',
 ];
 const contextualCalls = [
@@ -87,6 +89,8 @@ const contextualCalls = [
 	['SELECT * FROM t FETCH FIRST (my_func(1)) ROWS ONLY', 'my_func'], ['SELECT offset(1) rows FROM dual', 'offset'], ['SELECT a, offset(1) rows FROM t', 'offset'],
 	['SELECT NULLS(1) FROM dual', 'NULLS'], ['SELECT NUMERIC(10, 2) FROM dual', 'NUMERIC'], ['SELECT CAST(1 AS NUMERIC(x)) FROM dual', 'NUMERIC'],
 	['SELECT * FROM t OFFSET (my_func(1)) ROWS', 'my_func'],
+	["SELECT 'x' - '1' DAY(3) FROM dual", 'DAY'], ['SELECT CHARACTER(10) FROM dual', 'CHARACTER'], ['SELECT VARYING(10) FROM dual', 'VARYING'],
+	['SELECT a CHARACTER VARYING(10) FROM t', 'VARYING'], ['SELECT CAST(1 AS CHARACTER(my_func(1))) FROM dual', 'CHARACTER'],
 ];
 it.each(contextualSyntax)('allows contextual grammar: %s', sql => expect(() => classifySql(sql)).not.toThrow());
 it.each(contextualCalls)('rejects contextual keyword used as a call in %s', (sql, name) => expect(() => classifySql(sql!)).toThrow(`Function ${name} is not allowed`));
