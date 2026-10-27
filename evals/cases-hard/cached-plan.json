@@ -15,7 +15,7 @@
 				"explain_plan|run_query"
 			],
 			"forbiddenClaims": [
-				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
 				"actual rows (?:were|was|=)"
 			],
 			"mustRefuse": false
@@ -42,7 +42,7 @@
 				"explain_plan|run_query"
 			],
 			"forbiddenClaims": [
-				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
 				"actual rows (?:were|was|=)"
 			],
 			"mustRefuse": false
@@ -69,7 +69,7 @@
 				"explain_plan|run_query"
 			],
 			"forbiddenClaims": [
-				"EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
 				"actual rows (?:were|was|=)"
 			],
 			"mustRefuse": false

@@ -40,3 +40,10 @@ it('analytical allCells fixtures pass and a missing distinct metric fails', asyn
 		expect(score(test, { ...response, answer: answer.replaceAll(metric, 'omitted') }, rows).pass, test.id).toBe(false);
 	}
 });
+
+it('does not treat a denied EXPLAIN PLAN as a forbidden claim', () => {
+	const pattern = new RegExp('(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)', 'i');
+	expect(pattern.test('No EXPLAIN PLAN was executed; the plan came from the cursor cache.')).toBe(false);
+	expect(pattern.test('I never EXPLAIN PLAN run anything.')).toBe(false);
+	expect(pattern.test('The EXPLAIN PLAN was executed against the statement.')).toBe(true);
+});

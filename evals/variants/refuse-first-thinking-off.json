@@ -1,0 +1,1 @@
+{"name":"refuse-first-thinking-off","description":"refuse-first appendix with thinking off","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/refuse-first.txt","PIAGENT_LLM_THINKING":"off"}}
