@@ -1,0 +1,344 @@
+{
+	"validatedAt": "2026-10-27T15:34:54.353Z",
+	"caseCount": 27,
+	"records": [
+		{
+			"id": "hard-region-channel",
+			"target": "d1-19c-lab",
+			"sql": "SELECT * FROM (SELECT co.country_region,ch.channel_desc,TO_CHAR(ROUND(SUM(s.amount_sold),2), 'FM999999999990.00') revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.customers c ON c.cust_id=s.cust_id JOIN SH.countries co ON co.country_id=c.country_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year=2000 GROUP BY co.country_region,ch.channel_desc ORDER BY SUM(s.amount_sold) DESC,co.country_region,ch.channel_desc) WHERE ROWNUM<=3",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"Americas",
+					"Direct Sales",
+					"7967141.89"
+				],
+				[
+					"Americas",
+					"Partners",
+					"4658838.57"
+				],
+				[
+					"Europe",
+					"Direct Sales",
+					"4493735.78"
+				]
+			]
+		},
+		{
+			"id": "hard-category-leaders",
+			"target": "d1-19c-lab",
+			"sql": "SELECT prod_category,prod_id,TO_CHAR(ROUND(revenue,2), 'FM999999999990.00') FROM (SELECT p.prod_category,p.prod_id,SUM(s.amount_sold) revenue,ROW_NUMBER() OVER(PARTITION BY p.prod_category ORDER BY SUM(s.amount_sold) DESC,p.prod_id) rn FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=2001 GROUP BY p.prod_category,p.prod_id) WHERE rn=1 ORDER BY prod_category",
+			"mode": "allCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"Electronics",
+					20,
+					"1675991.85"
+				],
+				[
+					"Hardware",
+					18,
+					"3453656.62"
+				],
+				[
+					"Peripherals and Accessories",
+					14,
+					"1874621.96"
+				],
+				[
+					"Photo",
+					17,
+					"2819074.98"
+				],
+				[
+					"Software/Other",
+					28,
+					"1020370.87"
+				]
+			]
+		},
+		{
+			"id": "hard-yoy",
+			"target": "d1-19c-lab",
+			"sql": "SELECT ch.channel_desc,TO_CHAR(ROUND(100*(SUM(CASE WHEN t.calendar_year=2001 THEN s.amount_sold ELSE 0 END)-SUM(CASE WHEN t.calendar_year=2000 THEN s.amount_sold ELSE 0 END))/NULLIF(SUM(CASE WHEN t.calendar_year=2000 THEN s.amount_sold ELSE 0 END),0),2), 'FM999999999990.00') FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year IN (2000,2001) GROUP BY ch.channel_desc ORDER BY ch.channel_desc",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"Direct Sales",
+					"-6.10"
+				],
+				[
+					"Internet",
+					"256.51"
+				],
+				[
+					"Partners",
+					"5.41"
+				]
+			]
+		},
+		{
+			"id": "hard-share",
+			"target": "d1-19c-lab",
+			"sql": "SELECT prod_category,TO_CHAR(ROUND(100*revenue/SUM(revenue) OVER(),2), 'FM999999999990.00') FROM (SELECT p.prod_category,SUM(s.amount_sold) revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=1999 GROUP BY p.prod_category) ORDER BY prod_category",
+			"mode": "allCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"Electronics",
+					"13.13"
+				],
+				[
+					"Hardware",
+					"17.02"
+				],
+				[
+					"Peripherals and Accessories",
+					"34.95"
+				],
+				[
+					"Photo",
+					"17.48"
+				],
+				[
+					"Software/Other",
+					"17.42"
+				]
+			]
+		},
+		{
+			"id": "hard-country-average",
+			"target": "d1-19c-lab",
+			"sql": "SELECT * FROM (SELECT co.country_name,COUNT(DISTINCT s.cust_id),TO_CHAR(ROUND(SUM(s.amount_sold)/COUNT(DISTINCT s.cust_id),2), 'FM999999999990.00') avg_revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.customers c ON c.cust_id=s.cust_id JOIN SH.countries co ON co.country_id=c.country_id WHERE t.calendar_year=2000 GROUP BY co.country_name ORDER BY SUM(s.amount_sold)/COUNT(DISTINCT s.cust_id) DESC,co.country_name) WHERE ROWNUM<=3",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"Singapore",
+					77,
+					"9363.99"
+				],
+				[
+					"Canada",
+					81,
+					"8036.88"
+				],
+				[
+					"Spain",
+					75,
+					"6704.80"
+				]
+			]
+		},
+		{
+			"id": "hard-quarter-winners",
+			"target": "d1-19c-lab",
+			"sql": "SELECT calendar_quarter_number,channel_desc,TO_CHAR(ROUND(revenue,2), 'FM999999999990.00') FROM (SELECT t.calendar_quarter_number,ch.channel_id,ch.channel_desc,SUM(s.amount_sold) revenue,ROW_NUMBER() OVER(PARTITION BY t.calendar_quarter_number ORDER BY SUM(s.amount_sold) DESC,ch.channel_id) rn FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.channels ch ON ch.channel_id=s.channel_id WHERE t.calendar_year=2001 GROUP BY t.calendar_quarter_number,ch.channel_id,ch.channel_desc) WHERE rn=1 ORDER BY calendar_quarter_number",
+			"mode": "allCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					1,
+					"Direct Sales",
+					"3194385.57"
+				],
+				[
+					2,
+					"Direct Sales",
+					"3313394.74"
+				],
+				[
+					3,
+					"Direct Sales",
+					"3519853.32"
+				],
+				[
+					4,
+					"Direct Sales",
+					"3360801.73"
+				]
+			]
+		},
+		{
+			"id": "hard-price-plan",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"INDEX",
+					"UNIQUE SCAN",
+					"SYS_C007655"
+				],
+				[
+					"TABLE ACCESS",
+					"BY INDEX ROWID",
+					"PRODUCTS"
+				]
+			]
+		},
+		{
+			"id": "hard-orders-plan",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"INDEX",
+					"FAST FULL SCAN",
+					"SYS_C007661"
+				]
+			]
+		},
+		{
+			"id": "hard-lines-plan",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"INDEX",
+					"FAST FULL SCAN",
+					"ORDER_LINES_PK"
+				]
+			]
+		},
+		{
+			"id": "hard-follow-ratio",
+			"target": "d1-19c-lab",
+			"sql": "SELECT prod_category,TO_CHAR(ROUND(100*revenue/SUM(revenue) OVER(),2), 'FM999999999990.00') FROM (SELECT p.prod_category,SUM(s.amount_sold) revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=1999 GROUP BY p.prod_category) ORDER BY prod_category",
+			"mode": "allCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"Electronics",
+					"13.13"
+				],
+				[
+					"Hardware",
+					"17.02"
+				],
+				[
+					"Peripherals and Accessories",
+					"34.95"
+				],
+				[
+					"Photo",
+					"17.48"
+				],
+				[
+					"Software/Other",
+					"17.42"
+				]
+			]
+		},
+		{
+			"id": "hard-follow-plan",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"INDEX",
+					"UNIQUE SCAN",
+					"SYS_C007655"
+				],
+				[
+					"TABLE ACCESS",
+					"BY INDEX ROWID",
+					"PRODUCTS"
+				]
+			]
+		},
+		{
+			"id": "hard-fk-chain",
+			"target": "p1-19c-prod",
+			"sql": "SELECT c.table_name,cc.column_name,p.table_name,pc.column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_type='R' ORDER BY c.table_name,cc.position",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"ORDERS",
+					"CUSTOMER_ID",
+					"CUSTOMERS",
+					"CUSTOMER_ID"
+				],
+				[
+					"ORDER_LINES",
+					"ORDER_ID",
+					"ORDERS",
+					"ORDER_ID"
+				],
+				[
+					"ORDER_LINES",
+					"PRODUCT_ID",
+					"PRODUCTS",
+					"PRODUCT_ID"
+				]
+			]
+		},
+		{
+			"id": "hard-pk-index",
+			"target": "p1-19c-prod",
+			"sql": "SELECT c.constraint_name,c.index_name,ic.column_position,ic.column_name FROM all_constraints c JOIN all_ind_columns ic ON ic.index_owner=c.index_owner AND ic.index_name=c.index_name WHERE c.owner='SHOPAPP' AND c.table_name='ORDER_LINES' AND c.constraint_type='P' ORDER BY ic.column_position",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"ORDER_LINES_PK",
+					"ORDER_LINES_PK",
+					1,
+					"ORDER_ID"
+				],
+				[
+					"ORDER_LINES_PK",
+					"ORDER_LINES_PK",
+					2,
+					"LINE_NO"
+				]
+			]
+		},
+		{
+			"id": "hard-sh-fks",
+			"target": "d1-19c-lab",
+			"sql": "SELECT cc.column_name,p.table_name,pc.column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SH' AND c.table_name='SALES' AND c.constraint_type='R' ORDER BY cc.column_name",
+			"mode": "allCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"CHANNEL_ID",
+					"CHANNELS",
+					"CHANNEL_ID"
+				],
+				[
+					"CUST_ID",
+					"CUSTOMERS",
+					"CUST_ID"
+				],
+				[
+					"PROD_ID",
+					"PRODUCTS",
+					"PROD_ID"
+				],
+				[
+					"PROMO_ID",
+					"PROMOTIONS",
+					"PROMO_ID"
+				],
+				[
+					"TIME_ID",
+					"TIMES",
+					"TIME_ID"
+				]
+			]
+		}
+	]
+}
