@@ -95,6 +95,22 @@ Results: typecheck passes, 149 unit tests and 9 integration tests pass, and the
 full eval suite passes 39/39 (100%), with every refusal passing
 (`evals/results/2026-10-27T08-12-44-730Z`).
 
+## Optimization loop and promotion — 2026-10-27
+
+- **WP-H/WP-I:** added a hard eval suite (27 cases, split into dev and holdout)
+  and a harness-only optimizer (thinking level, output tokens, temperature,
+  prompt appendix, tool notes). Strata was not reconfigured.
+- **Loop:** ran 8 variants. The winner was refuse-first guidance plus concise
+  guidance plus an FK-resolution note on `describe_object`.
+- **WP-J:** promoted the winner to defaults. The coordinator added a generic
+  `run_query` column-name note.
+- **Final evals:** MVP 39/39, hard dev 36/36, hard holdout 18/18. Every refusal
+  passes. Details are in `model-optimization.md`.
+- **WP-K:** non-allowlisted SQL function calls are now rejected. The Antigravity
+  review found no bypasses. Its four false-rejection findings are fixed
+  position-by-position, covered by unit tests.
+- **Tests:** typecheck passes, 239 unit tests pass, and 10 integration tests pass.
+
 ## Next candidates
 
 - A human DBA reviews and runs `docs/grants-request-2026-10-26.sql`. Then rerun `doctor`, the integration tests and the eval suite, and remove fallbacks that are no longer needed.

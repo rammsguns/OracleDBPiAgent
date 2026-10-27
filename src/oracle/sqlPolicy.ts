@@ -30,6 +30,31 @@ FROM JOIN ON WHERE AND OR NOT HAVING WHEN THEN ELSE SELECT BY DISTINCT ALL
 COLUMNS ROLLUP CUBE GROUPING SETS PARTITION SUBPARTITION PIVOT UNPIVOT
 VARCHAR2 VARCHAR CHAR NCHAR NVARCHAR2 NUMBER FLOAT RAW TIMESTAMP INTERVAL`.split(/\s+/));
 const identifier = /^(?:[\p{L}_][\p{L}\p{N}\p{M}_$#]*|"(?:[^"]|"")*")$/u;
+const intervalUnits = new Set(["YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND"]);
+
+function closingParen(tokens: string[], open: number): number {
+	for (let depth = 0, k = open; k < tokens.length; k++) {
+		if (tokens[k] === '(') depth++;
+		else if (tokens[k] === ')' && --depth === 0) return k;
+	}
+	return -1;
+}
+
+/** Non-reserved keywords (DAY, FIRST, NULLS, ...) can also name functions, so accept them only in their grammar position. */
+function isContextualSyntax(tokens: string[], at: number, upper: string): boolean {
+	const prev = (tokens[at - 1] ?? '').toUpperCase();
+	const close = closingParen(tokens, at + 1);
+	if (close < 0) return false;
+	const precision = /^\(\d+(?:,\d+)?\)$/.test(tokens.slice(at + 1, close + 1).join(''));
+	// INTERVAL '1' DAY(3), INTERVAL DAY(3) TO SECOND(2); string literals lex as `literal`.
+	if (intervalUnits.has(upper)) return precision && (prev === 'INTERVAL' || prev === 'TO' || (tokens[at - 1] === 'literal' && tokens[at - 2]?.toUpperCase() === 'INTERVAL'));
+	if (['NUMERIC', 'DECIMAL', 'DEC'].includes(upper)) return precision && prev === 'AS';
+	if (upper === 'FIRST' || upper === 'NEXT') return prev === 'FETCH';
+	if (upper === 'NULLS') return prev === 'INCLUDE' || prev === 'EXCLUDE';
+	// OFFSET (n) ROWS ends a query block: only FETCH, ")" or the end may follow.
+	if (upper === 'OFFSET') return !['SELECT', ',', '('].includes(prev) && ['ROW', 'ROWS'].includes((tokens[close + 1] ?? '').toUpperCase()) && [undefined, 'FETCH', ')', ';'].includes(tokens[close + 2]?.toUpperCase());
+	return false;
+}
 
 function checkFunctionCalls(clean: string): void {
 	const tokens = clean.match(/"(?:[^"]|"")*"|[\p{L}_][\p{L}\p{N}\p{M}_$#]*|[^\s]/gu) ?? [];
@@ -44,7 +69,7 @@ function checkFunctionCalls(clean: string): void {
 		const plain = /^[A-Za-z_][A-Za-z0-9_$#.]*$/.test(name);
 		if (plain && upper === 'DBMS_XPLAN.DISPLAY_CURSOR') continue;
 		if (end === i && plain) {
-			if (sqlFunctions.has(upper) || parenthesizedSyntax.has(upper)) continue;
+			if (sqlFunctions.has(upper) || parenthesizedSyntax.has(upper) || isContextualSyntax(tokens, end, upper)) continue;
 			if (upper === 'TABLE' && tokens.slice(end + 2, end + 6).join('').toUpperCase() === 'DBMS_XPLAN.DISPLAY_CURSOR(') continue;
 		}
 		// A CTE declaration is name (identifier, ...) AS (, never an invocation.

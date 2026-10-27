@@ -72,6 +72,25 @@ it.each(safeFunctionQueries)('allows SQL function/grammar: %s', sql => expect(()
 it.each(unsafeFunctionQueries)('names rejected function in %s', (sql, name) => expect(() => classifySql(sql!)).toThrow(`Function ${name} is not allowed`));
 it.each(['SELECT s.NEXTVAL FROM dual', 'SELECT "s"."NEXTVAL" FROM dual'])('rejects sequence advancement: %s', sql => expect(() => classifySql(sql)).toThrow('Sequence advancement'));
 
+// Antigravity WP-J/K review findings 1-4: valid grammar, accepted only in position.
+const contextualSyntax = [
+	"SELECT INTERVAL '1' DAY(3) FROM dual", "SELECT INTERVAL '1-2' YEAR(2) TO MONTH FROM dual", "SELECT INTERVAL '1' MINUTE(2) FROM dual",
+	"SELECT INTERVAL '1.1' SECOND(2, 4) FROM dual", "SELECT INTERVAL '1 2:3:4' DAY(3) TO SECOND(2) FROM dual",
+	'SELECT CAST(sysdate - sysdate AS INTERVAL DAY(3) TO SECOND(2)) FROM dual', 'SELECT CAST(NULL AS INTERVAL YEAR(3) TO MONTH) FROM dual',
+	'SELECT * FROM t ORDER BY id FETCH FIRST (10) ROWS ONLY', 'SELECT * FROM t ORDER BY id OFFSET (5) ROWS', 'SELECT * FROM t ORDER BY id OFFSET (5) ROWS FETCH NEXT (2 + 1) ROWS ONLY;',
+	'SELECT * FROM (SELECT * FROM t ORDER BY id OFFSET (5) ROWS) x',
+	'SELECT CAST(1 AS NUMERIC(10, 2)), CAST(1 AS DECIMAL(10, 2)), CAST(1 AS DEC(10)) FROM dual',
+	'SELECT * FROM sales UNPIVOT INCLUDE NULLS (amount FOR quarter IN (q1, q2))', 'SELECT * FROM sales UNPIVOT EXCLUDE NULLS (amount FOR quarter IN (q1, q2))',
+];
+const contextualCalls = [
+	['SELECT DAY(3) FROM dual', 'DAY'], ['SELECT INTERVAL \'1\' DAY(my_func(1)) FROM dual', 'DAY'], ['SELECT FIRST(1) FROM dual', 'FIRST'],
+	['SELECT * FROM t FETCH FIRST (my_func(1)) ROWS ONLY', 'my_func'], ['SELECT offset(1) rows FROM dual', 'offset'], ['SELECT a, offset(1) rows FROM t', 'offset'],
+	['SELECT NULLS(1) FROM dual', 'NULLS'], ['SELECT NUMERIC(10, 2) FROM dual', 'NUMERIC'], ['SELECT CAST(1 AS NUMERIC(x)) FROM dual', 'NUMERIC'],
+	['SELECT * FROM t OFFSET (my_func(1)) ROWS', 'my_func'],
+];
+it.each(contextualSyntax)('allows contextual grammar: %s', sql => expect(() => classifySql(sql)).not.toThrow());
+it.each(contextualCalls)('rejects contextual keyword used as a call in %s', (sql, name) => expect(() => classifySql(sql!)).toThrow(`Function ${name} is not allowed`));
+
 it('accepts every MVP and hard-suite groundTruth.sql, including conversation turns', async () => {
 	const { readdir, readFile } = await import('node:fs/promises');
 	let checked = 0;

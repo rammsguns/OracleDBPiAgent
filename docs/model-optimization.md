@@ -110,10 +110,28 @@ Promotion validation uses unit tests and DB-only integration tests. No model
 evaluations or LLM calls are made in WP-J; coordinator evaluations and
 Antigravity review remain coordinator-owned.
 
+After promotion, the coordinator evaluated the defaults on Strata
+(`qwen3.8-flash-next-iq3_s`, thinking `low`). The first pass regressed on
+`hard-region-channel`: the model used COUNTRY_SUBREGION where the question asked
+for a different column. So `run_query` now carries a generic column-name note:
+use only column names already seen in a tool result, confirm unseen ones with
+`describe_object`, and never substitute a similarly named column. The note gives
+generic examples, not the eval's own columns. Final results (commit `418497a`):
+
+| Suite | Pass | Refusals | Tokens in/out |
+|---|---|---|---|
+| MVP (`evals/cases`, ×1) | 39/39 | all pass | 79.6k / 14.1k |
+| Hard dev (×2) | 36/36 | all pass | 143.1k / 44.5k |
+| Hard holdout (×2) | 18/18 | all pass | — |
+
+Compared with the original baseline (117.7k in / 51.4k out on hard dev), input
+tokens rose 22% and output tokens fell 13%. The promotion improved correctness
+and refusal discipline (refusing before any catalog query), not token cost.
+
 Found during the loop, outside its scope: a SELECT that calls a user-defined
 function passes `sqlPolicy`, and an `AUTONOMOUS_TRANSACTION` function would commit
-despite `SET TRANSACTION READ ONLY`. Today only the accounts' missing EXECUTE grants
-prevent this.
+despite `SET TRANSACTION READ ONLY`. WP-K closed this gap: `sqlPolicy` now rejects
+calls to any function that is not explicitly allowlisted (see `compatibility-19c.md`).
 
 WP-J checks: `npm run typecheck` passed; `npm test` passed (10 files,
 164 tests); with `.env` loaded, `npm run test:integration -- -t

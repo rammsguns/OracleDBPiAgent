@@ -231,6 +231,22 @@ by account grants. Object/synonym resolution and built-in name shadowing likewis
 require restricted accounts; SET TRANSACTION READ ONLY does not stop an autonomous
 transaction inside stored code. No grants or database objects were changed.
 
+Review fix (Antigravity, `docs/review-wp-jk-2026-10-27.md`, findings 1–4): some
+valid grammar was rejected. Interval precision (`INTERVAL '1' DAY(3)`,
+`DAY(3) TO SECOND(2)`), parenthesized `FETCH FIRST|NEXT (n)` and `OFFSET (n) ROWS`,
+`CAST(... AS NUMERIC|DECIMAL|DEC(p, s))` and `UNPIVOT INCLUDE|EXCLUDE NULLS (...)`
+are now accepted. The review suggested adding these words to the global grammar
+list. They are not Oracle reserved words, though, so a function or public synonym
+can use the same name. Each is accepted only in its grammar position instead:
+- Interval units and ANSI numeric types need integer-only precision after
+  INTERVAL, a literal, TO or AS.
+- FIRST and NEXT need a preceding FETCH.
+- NULLS needs a preceding INCLUDE or EXCLUDE.
+- OFFSET (n) needs ROW or ROWS, followed by the end of the statement, FETCH or ")".
+
+In any other position, such as `SELECT DAY(3)` or `SELECT offset(1) rows FROM t`,
+these words are still rejected as calls.
+
 Verification: setup used `npm ci --ignore-scripts` (134 packages, zero reported
 vulnerabilities) and `cp .env.example .env`. Added over 30 unit cases plus a test
 that loads every groundTruth.sql from both eval suites, including nested turns.
