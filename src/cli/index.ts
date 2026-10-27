@@ -41,6 +41,11 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				if (unexpected.length) throw new Error("Unexpected object privileges");
 				const safe = new Set(["CREATE SESSION", "SELECT ANY DICTIONARY"]);
 				if (privileges.rows.some(r => !safe.has(String(r[0]))) || roles.rows.some(r => ["DBA", "RESOURCE", "IMP_FULL_DATABASE", "EXP_FULL_DATABASE"].includes(String(r[0])))) throw new Error("Unexpected privileges");
+				// sqlPolicy only sees the SQL text: a granted view could still run non-Oracle code
+				// (for example an autonomous-transaction function) when selected.
+				check = "view code dependencies";
+				const viewCode = await session.query("SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND d.referenced_type IN ('FUNCTION', 'PROCEDURE', 'PACKAGE', 'TYPE', 'OPERATOR', 'LIBRARY', 'JAVA CLASS') AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN (SELECT username FROM all_users WHERE oracle_maintained = 'Y')");
+				if (viewCode.rows.length) throw new Error("Accessible views call non-Oracle code");
 				console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
 			} catch (error) {
 				ok = false;

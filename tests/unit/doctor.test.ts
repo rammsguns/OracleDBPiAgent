@@ -18,7 +18,7 @@ function setup(failure?: string) {
 		}
 		return {
 			target, identity: { versionFull: "19.9.1.0.0", currentUser: target.username },
-			query: vi.fn(async (sql: string) => ({ rows: sql.includes("SESSION_PRIVS") ? [[failure === "privileges" ? sensitive : "CREATE SESSION"]] : [], columns: [], truncated: false, elapsedMs: 0 })),
+			query: vi.fn(async (sql: string) => ({ rows: sql.includes("SESSION_PRIVS") ? [[failure === "privileges" ? sensitive : "CREATE SESSION"]] : failure === "views" && sql.includes("all_dependencies") ? [[sensitive, sensitive]] : [], columns: [], truncated: false, elapsedMs: 0 })),
 		} as unknown as OracleSession;
 	});
 	const createSessions = vi.fn(() => ({ get, closeAll }));
@@ -30,6 +30,7 @@ it.each([
 	["connection", "d1-19c-lab: connection check failed"],
 	["gate", "d1-19c-lab: 19c gate check failed"],
 	["privileges", "read-only privileges check failed"],
+	["views", "view code dependencies check failed"],
 ])("doctor and main fail safely for %s", async (failure, label) => {
 	const test = setup(failure);
 	expect(await doctor(config, test.dependencies)).toBe(false);
