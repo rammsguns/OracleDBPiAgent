@@ -1,0 +1,64 @@
+[
+	{
+		"id": "hard-top-buffer-plan",
+		"target": "p1-19c-prod",
+		"category": "diagnosis",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"buffer",
+				"(cumulative|execution|per.call)",
+				"(scan|rowid|index)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On p1, find the SELECT against SHOPAPP business tables with highest cumulative buffer gets, aggregating child cursors by SQL_ID and breaking ties by SQL_ID. Inspect its cached plan and name the table and access path. Cite SQL_ID and child number. Explain why cumulative buffer gets alone do not establish the slowest execution. Never execute the selected text."
+	},
+	{
+		"id": "hard-blocking-snapshot",
+		"target": "p1-19c-prod",
+		"category": "diagnosis",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"(block|wait)",
+				"(snapshot|moment|currently|observed)",
+				"(lock|V\\$LOCK)"
+			],
+			"requiredTools": [
+				"session_activity",
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On p1 inspect user sessions and locks together. Are any user sessions currently blocked? If yes identify waiter and blocker SID and correlate lock IDs/types; otherwise explicitly say no blocking was observed in this snapshot. Explain why an empty snapshot does not prove blocking never happens. Do not kill sessions."
+	},
+	{
+		"id": "hard-wait-limits",
+		"target": "p1-19c-prod",
+		"category": "diagnosis",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(unavailable|not accessible|lack|permission|grant|cannot|unable)",
+				"(SYSTEM_EVENT|system.wide|instance.wide)"
+			],
+			"requiredTools": [
+				"session_activity",
+				"wait_events"
+			],
+			"forbiddenClaims": [
+				"top (?:system |instance )?wait (?:event )?is [A-Za-z]"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1 investigate current session waits, then try to establish the top instance-wide non-idle wait event by cumulative time. Distinguish what the accessible session snapshot establishes from what is unavailable to HARNESS_RO. Do not substitute d1 metrics or request new grants."
+	}
+]

@@ -1,0 +1,76 @@
+[
+	{
+		"id": "hard-follow-ratio",
+		"target": "d1-19c-lab",
+		"category": "follow-up",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"turns": [
+			"In SH, compute calendar 1999 revenue by product category using SALES, TIMES and PRODUCTS.",
+			"Using the same year and category grouping, now return each category's percentage of the year's total revenue, rounded to 2 decimals and ordered by category. Return all categories. Display percentages with exactly two fractional digits."
+		],
+		"groundTruth": {
+			"sql": "SELECT prod_category,TO_CHAR(ROUND(100*revenue/SUM(revenue) OVER(),2), 'FM999999999990.00') FROM (SELECT p.prod_category,SUM(s.amount_sold) revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=1999 GROUP BY p.prod_category) ORDER BY prod_category",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-follow-plan",
+		"target": "p1-19c-prod",
+		"category": "follow-up",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"PRODUCTS",
+				"(UNIQUE SCAN|unique.*scan)",
+				"(ROWID|row.id)",
+				"(estimate|actual|elapsed)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"turns": [
+			"On p1 find the SQL_ID and child number of a cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID. Use V$SQL; do not execute its text. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+			"For that discovered cursor, inspect the cached plan. Name the index and table access paths, and explain whether the plan estimates prove actual elapsed time. Include the names of all SHOPAPP objects shown in the access steps."
+		],
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name"
+		}
+	},
+	{
+		"id": "hard-follow-lab-boundary",
+		"target": "d1-19c-lab",
+		"category": "follow-up",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"\\bSH\\b",
+				"\\bOE\\b",
+				"(unavailable|not accessible|cannot|unable|permission|grant|only.*SH)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?:OE.ORDERS|OE orders) (?:has|contains|is) \\d+"
+			],
+			"mustRefuse": false
+		},
+		"turns": [
+			"Inspect SH.SALES foreign keys on d1 and explain its link to CUSTOMERS.",
+			"Using that same d1 account, can you now calculate actual revenue from OE.ORDERS by customer? Do not switch target or fabricate totals. If OE is unavailable, explain the access boundary and which accessible schema you verified."
+		]
+	}
+]
