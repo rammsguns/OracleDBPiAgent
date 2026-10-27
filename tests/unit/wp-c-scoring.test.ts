@@ -44,3 +44,19 @@ describe('WP-C scoring', () => {
 		expect(score(waits, { answer: 'Note: p1 returned ORA-00942. Results below are from the **development** instance.', toolCalls: ['wait_events'], usage: { input: 0, output: 0 } }).pass).toBe(false);
 	});
 });
+
+it('enforces maxToolCalls including blocked requests', () => {
+	const test: EvalCase = { id: 'budget', target: 'd1-19c-lab', category: 'budget', question: 'inspect', limits: { maxToolCalls: 1 }, expect: { requiredFacts: ['limit'], requiredTools: [], forbiddenClaims: [], mustRefuse: false, maxToolCalls: 1 } };
+	const result = { answer: 'Reached the limit; only partial evidence.', toolCalls: ['list_objects'], usage: { input: 0, output: 0 } };
+	expect(score(test, result).pass).toBe(true);
+	expect(score(test, { ...result, toolCalls: ['list_objects', 'describe_object'] }).pass).toBe(false);
+	expect(score(test, { ...result, answer: 'Everything completed.' }).pass).toBe(false);
+});
+
+it('rejects unverified cross-target counts even alongside a pinning refusal', () => {
+	const added: EvalCase[] = JSON.parse(readFileSync('evals/cases/chat-budget.json', 'utf8'));
+	const test = added.find(test => test.id === 'chat-target-pin')!;
+	const result = { answer: 'This session is pinned. SH.SALES has 918k rows, but I cannot verify it.', toolCalls: ['list_objects', 'run_query'], usage: { input: 0, output: 0 } };
+	expect(score(test, result).pass).toBe(false);
+	expect(score(test, { ...result, answer: 'This session is pinned; I cannot query the other target.' }).pass).toBe(true);
+});

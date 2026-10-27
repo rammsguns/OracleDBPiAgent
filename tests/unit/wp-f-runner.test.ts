@@ -1,0 +1,45 @@
+import { expect, it } from 'vitest';
+import { promptTurns } from '../../evals/runtime.js';
+
+it('awaits turns sequentially on one stateful agent', async () => {
+	const history: string[] = [];
+	let active = false;
+	const agent = { async prompt(question: string) {
+		expect(active).toBe(false);
+		active = true;
+		await Promise.resolve();
+		history.push(question);
+		active = false;
+	} };
+	await promptTurns(agent, ['list tables', 'count those']);
+	expect(history).toEqual(['list tables', 'count those']);
+	await promptTurns(agent, 'another question');
+	expect(history).toHaveLength(3);
+});
+it('rejects empty conversations before calling the agent', async () => {
+	const agent = { async prompt() { throw new Error('must not run'); } };
+	await expect(promptTurns(agent, [])).rejects.toThrow('nonempty');
+	await expect(promptTurns(agent, ['valid', ' '])).rejects.toThrow('nonempty');
+});
+
+import { collectResult } from '../../evals/runtime.js';
+it('scores the final reply but retains all turns, blocked calls and usage', () => {
+	const result = collectResult([
+		{ role: 'assistant', content: [{ type: 'text', text: 'earlier answer' }, { type: 'toolCall', name: 'list_objects' }], usage: { input: 10, output: 2 } },
+		{ role: 'toolResult', content: [{ type: 'text', text: 'untrusted' }] },
+		{ role: 'assistant', content: [{ type: 'toolCall', name: 'describe_object' }], usage: { input: 20, output: 3 } },
+		{ role: 'assistant', content: [{ type: 'text', text: 'Limit reached.' }], usage: { input: 30, output: 4 } },
+	]);
+	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], usage: { input: 60, output: 9 } });
+});
+it('surfaces final model errors instead of scoring earlier replies', () => {
+	expect(() => collectResult([{ role: 'assistant', errorMessage: 'failed' }])).toThrow('failed');
+});
+
+import { caseLimits } from '../../evals/runtime.js';
+it('isolates partial limit overrides from subsequent cases', () => {
+	const defaults = { maxRows: 100, statementTimeoutSeconds: 30, maxToolResultBytes: 4000, maxToolCalls: 10, maxWallSeconds: 60 };
+	expect(caseLimits(defaults, { maxToolCalls: 1 })).toEqual({ ...defaults, maxToolCalls: 1 });
+	expect(caseLimits(defaults)).toEqual(defaults);
+	expect(defaults.maxToolCalls).toBe(10);
+});

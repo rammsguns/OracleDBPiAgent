@@ -23,7 +23,7 @@ try {
 			if (!target) throw new Error(`Unconfigured target ${test.target}`);
 			const truth = test.groundTruth ? await groundTruth(target, test.groundTruth.sql) : [];
 			// Await each complete ask before starting another: Strata has one request slot.
-			const result = await app.ask(test.question, test.target);
+			const result = await app.ask(test.turns ?? test.question, test.target, test.limits);
 			const truthAfter = test.groundTruth ? await groundTruth(target, test.groundTruth.sql) : undefined;
 			const scored = score(test, result, truth, truthAfter);
 			records.push({ id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
