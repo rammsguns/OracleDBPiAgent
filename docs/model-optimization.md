@@ -55,3 +55,44 @@ Coordinator changes requested (not edited by WP-I):
   `"optimize:report": "tsx evals/optimize.ts --report"`.
 - PLAN.md requires no implementation change. The coordinator should record
   completion and run the real dev, holdout and MVP evaluations.
+
+## Loop results — 2026-10-27
+
+Model `qwen3.8-flash-next-iq3_s` on Strata, harness-side settings only (Strata was
+never restarted or reconfigured). Hard dev split, 2 repeats per variant; a new best
+had to hold on the hard holdout split (2 repeats) and the 39 MVP cases. The loop
+stopped after 3 iterations in a row without improvement.
+
+| # | Variant | Hard dev | Tokens in/out | Tool calls | Wall | Outcome |
+|---|---|---|---|---|---|---|
+| 0 | baseline | 35/36, refusal failed | 117.7k / 51.4k | 93 | 741 s | reference |
+| 1 | refuse-first | 36/36 | 109.8k / 45.7k | 77 | 666 s | accepted (holdout 18/18, MVP 39/39) |
+| 2 | + thinking off | 36/36 | 138.7k / 86.5k | 122 | 1226 s | rejected: much costlier |
+| 3 | refuse-first-concise | 36/36* | 92.4k / 32.1k | 56 | 491 s | rejected: holdout inferred FK parents from names |
+| 4 | **refuse-first-concise-notes** | **36/36** | **87.2k / 39.1k** | **70** | **582 s** | **accepted (holdout 18/18, MVP 39/39)** |
+| 5 | + thinking minimal | 34/36 | 103.0k / 37.4k | 160 | 593 s | rejected: wrong column, more calls |
+| 6 | + temperature 0.3 | 35/36 | 97.9k / 42.0k | 74 | 621 s | rejected: wrong column, costlier |
+| 7 | + run_query column note | 36/36 | 138.7k / 42.6k | 85 | 665 s | rejected: costlier |
+
+\* After dropping an over-strict tool requirement on `hard-blocking-snapshot`.
+
+Winner: `evals/variants/refuse-first-concise-notes.json` (prompt appendix
+`refuse-first-concise.txt`, tool notes `describe-notes.json`, thinking `low`). Against
+the baseline on hard dev: every refusal passes, input tokens −26%, output −24%,
+tool calls −25%, wall time −21%.
+
+Every failure was checked by hand before scoring a variant. Scorer false negatives
+found and fixed along the way: U+2212 minus signs, schema-qualified column names,
+tools that legitimately produce the same evidence (`top_sql`, `describe_object`,
+`V$SQL_PLAN` via `run_query`), "No EXPLAIN PLAN was executed" read as a claim, and
+optimizer-statistics row figures read as live counts. Ledger rows written before a
+scorer fix are not rescored (`var/optimize/ledger.jsonl`; the baseline's 86.1% row
+predates the fixes, adjusted 35/36).
+
+Not promoted yet. Promoting the winner as the default (prompt appendix and tool
+notes in `src/agent`) needs an Antigravity review.
+
+Found during the loop, outside its scope: a SELECT that calls a user-defined
+function passes `sqlPolicy`, and an `AUTONOMOUS_TRANSACTION` function would commit
+despite `SET TRANSACTION READ ONLY`. Today only the accounts' missing EXECUTE grants
+prevent this.
