@@ -43,7 +43,7 @@
 		"id": "hard-wait-limits",
 		"target": "p1-19c-prod",
 		"category": "diagnosis",
-		"split": "holdout",
+		"split": "dev",
 		"expect": {
 			"requiredFacts": [
 				"(SYSTEM_EVENT|system.wide|instance.wide|cumulative)"

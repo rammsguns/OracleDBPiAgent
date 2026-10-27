@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { groundTruth, targets } from './ground-truth.js';
 import { requireStrata, runtime } from './runtime.js';
@@ -71,7 +72,9 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	const perCase = selected.map(test => ({ id: test.id, passes: records.filter(record => record.id === test.id && record.pass).length }));
 	const stamp = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomUUID();
 	const resultsFile = `evals/results/${stamp}.json`;
-	const report = { ...options, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+	// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
+	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
+	const report = { ...options, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 	await mkdir('evals/results', { recursive: true });
 	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
 	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');

@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-10-27T15:36:11.983Z",
-	"caseCount": 27,
+	"validatedAt": "2026-10-27T21:09:24.185Z",
+	"caseCount": 33,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -211,6 +211,18 @@
 			]
 		},
 		{
+			"id": "hard-wait-limits",
+			"target": "p1-19c-prod",
+			"sql": "SELECT event FROM v$system_event WHERE wait_class <> 'Idle' ORDER BY time_waited_micro DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "scalar",
+			"rowCount": 1,
+			"rows": [
+				[
+					"db file async I/O submit"
+				]
+			]
+		},
+		{
 			"id": "hard-follow-ratio",
 			"target": "d1-19c-lab",
 			"sql": "SELECT prod_category,TO_CHAR(ROUND(100*revenue/SUM(revenue) OVER(),2), 'FM999999999990.00') FROM (SELECT p.prod_category,SUM(s.amount_sold) revenue FROM SH.sales s JOIN SH.times t ON t.time_id=s.time_id JOIN SH.products p ON p.prod_id=s.prod_id WHERE t.calendar_year=1999 GROUP BY p.prod_category) ORDER BY prod_category",
@@ -255,6 +267,64 @@
 					"TABLE ACCESS",
 					"BY INDEX ROWID",
 					"PRODUCTS"
+				]
+			]
+		},
+		{
+			"id": "hard-fresh-hr-top-dept-salary",
+			"target": "d1-19c-lab",
+			"sql": "SELECT department_name FROM (SELECT d.department_name, AVG(e.salary) a FROM hr.employees e JOIN hr.departments d ON d.department_id = e.department_id GROUP BY d.department_name ORDER BY a DESC) WHERE ROWNUM = 1",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"Executive"
+				]
+			]
+		},
+		{
+			"id": "hard-fresh-oe-top-customer",
+			"target": "d1-19c-lab",
+			"sql": "SELECT c.cust_last_name, TO_CHAR(SUM(o.order_total), 'FM999999999990.00') FROM oe.orders o JOIN oe.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_id, c.cust_last_name ORDER BY SUM(o.order_total) DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"Rampling",
+					"403119.70"
+				]
+			]
+		},
+		{
+			"id": "hard-fresh-hr-employee-fks",
+			"target": "d1-19c-lab",
+			"sql": "SELECT cc.column_name, r.table_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name JOIN all_constraints r ON r.owner = c.r_owner AND r.constraint_name = c.r_constraint_name WHERE c.owner = 'HR' AND c.table_name = 'EMPLOYEES' AND c.constraint_type = 'R'",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"DEPARTMENT_ID",
+					"DEPARTMENTS"
+				],
+				[
+					"JOB_ID",
+					"JOBS"
+				],
+				[
+					"MANAGER_ID",
+					"EMPLOYEES"
+				]
+			]
+		},
+		{
+			"id": "hard-fresh-p1-wait-class",
+			"target": "p1-19c-prod",
+			"sql": "SELECT wait_class FROM (SELECT wait_class, SUM(time_waited_micro) t FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY t DESC) WHERE ROWNUM = 1",
+			"mode": "scalar",
+			"rowCount": 1,
+			"rows": [
+				[
+					"System I/O"
 				]
 			]
 		},

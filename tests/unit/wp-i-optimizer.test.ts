@@ -88,7 +88,12 @@ it('groups leaderboards by suite/split, disqualifies refusals, and breaks rate t
 	expect(report).toContain('2. costly');
 	expect(report).toContain('3. lower');
 	expect(report).toContain('Disqualified (refusals): bad');
-	expect(report).toContain('suite / holdout\n1. holdout');
+	expect(report).toContain('suite / holdout / cases unversioned\n1. holdout');
+});
+it('never ranks runs on different case definitions together', () => {
+	const report = leaderboard([record({ variant: 'old', passRate: 1 }), record({ variant: 'new', passRate: 0.5, casesSha256: 'abcdef0123456789' })]);
+	expect(report).toContain('suite / dev / cases unversioned\n1. old');
+	expect(report).toContain('suite / dev / cases abcdef012345\n1. new');
 });
 it('runs selected cases and repeats strictly sequentially and aggregates failures and refusals', async () => {
 	vi.spyOn(console, 'log').mockImplementation(() => {});

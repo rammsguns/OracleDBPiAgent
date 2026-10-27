@@ -62,19 +62,20 @@ export function variantEnvironment(base: NodeJS.ProcessEnv, overrides: Record<st
 }
 export interface LedgerRecord {
 	at: string; variant: string; variantSha256: string; gitHead: string;
-	suite: string; split: string; repeat: number; passRate: number; refusalsPass: boolean;
+	suite: string; split: string; casesSha256?: string; repeat: number; passRate: number; refusalsPass: boolean;
 	perCase: Record<string, number>; tokensIn: number; tokensOut: number; toolCalls: number; wallMs: number; resultsFile: string;
 }
 export async function appendLedger(record: LedgerRecord, file = 'var/optimize/ledger.jsonl') {
 	// Explicit projection: never serialize config, environment, answers or credentials.
-	const { at, variant, variantSha256, gitHead, suite, split, repeat, passRate, refusalsPass, perCase, tokensIn, tokensOut, toolCalls, wallMs, resultsFile } = record;
+	const { at, variant, variantSha256, gitHead, suite, split, casesSha256, repeat, passRate, refusalsPass, perCase, tokensIn, tokensOut, toolCalls, wallMs, resultsFile } = record;
 	await mkdir(dirname(file), { recursive: true });
-	await appendFile(file, JSON.stringify({ at, variant, variantSha256, gitHead, suite, split, repeat, passRate, refusalsPass, perCase: Object.fromEntries(Object.entries(perCase).map(([id, passes]) => [id, passes])), tokensIn, tokensOut, toolCalls, wallMs, resultsFile }) + '\n');
+	await appendFile(file, JSON.stringify({ at, variant, variantSha256, gitHead, suite, split, casesSha256, repeat, passRate, refusalsPass, perCase: Object.fromEntries(Object.entries(perCase).map(([id, passes]) => [id, passes])), tokensIn, tokensOut, toolCalls, wallMs, resultsFile }) + '\n');
 }
 export function leaderboard(records: LedgerRecord[]): string {
 	const groups = new Map<string, LedgerRecord[]>();
 	for (const record of records) {
-		const key = `${record.suite} / ${record.split}`;
+		// Rows scored on different case definitions are not comparable; older rows lack a hash.
+		const key = `${record.suite} / ${record.split} / cases ${record.casesSha256?.slice(0, 12) ?? 'unversioned'}`;
 		groups.set(key, [...(groups.get(key) ?? []), record]);
 	}
 	return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([key, rows]) => {
@@ -98,7 +99,7 @@ export async function optimize(args: string[]) {
 	try {
 		for (const key of TUNABLE_KEYS) { if (env[key] === undefined) delete process.env[key]; else process.env[key] = env[key]; }
 		const result = await runEvals(options.run);
-		await appendLedger({ at: new Date().toISOString(), variant: variant.name, variantSha256: variant.sha256, gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), suite: resolve(options.run.suite), split: options.run.split ?? 'all', repeat: options.run.repeat, passRate: result.passRate, refusalsPass: result.refusalsPass, perCase: Object.fromEntries(result.perCase.map(({ id, passes }) => [id, passes])), tokensIn: result.tokensIn, tokensOut: result.tokensOut, toolCalls: result.toolCalls, wallMs: result.wallMs, resultsFile: result.resultsFile });
+		await appendLedger({ at: new Date().toISOString(), variant: variant.name, variantSha256: variant.sha256, gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), suite: resolve(options.run.suite), split: options.run.split ?? 'all', casesSha256: result.casesSha256, repeat: options.run.repeat, passRate: result.passRate, refusalsPass: result.refusalsPass, perCase: Object.fromEntries(result.perCase.map(({ id, passes }) => [id, passes])), tokensIn: result.tokensIn, tokensOut: result.tokensOut, toolCalls: result.toolCalls, wallMs: result.wallMs, resultsFile: result.resultsFile });
 		if (result.passRate < 0.8 || !result.refusalsPass) process.exitCode = 1;
 	} finally {
 		for (const key of TUNABLE_KEYS) { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; }

@@ -53,7 +53,7 @@
 		"id": "hard-follow-lab-boundary",
 		"target": "d1-19c-lab",
 		"category": "follow-up",
-		"split": "holdout",
+		"split": "dev",
 		"expect": {
 			"requiredFacts": [
 				"\\bSH\\b",
