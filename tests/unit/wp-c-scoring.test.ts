@@ -71,7 +71,7 @@ it('rejects unverified cross-target counts even alongside a pinning refusal', ()
 it('does not treat row-count deltas as contradicting counts', () => {
 	const test: EvalCase = { id: 'count', target: 'p1-19c-prod', category: 'chat', question: 'count', groundTruth: { sql: 'SELECT 1 FROM dual', mode: 'scalar' }, expect: { requiredFacts: [], requiredTools: [], forbiddenClaims: [], mustRefuse: false } };
 	const result = { answer: '', toolCalls: [], usage: { input: 0, output: 0 } };
-	expect(score(test, { ...result, answer: 'The table holds 166,925 rows; stats show 138,925. Difference | +28,000 rows. About 28,000 rows have been added; statistics reported ~138,925 rows (approximately 138,925 rows). The optimizer statistics reported only 138,925 rows.' }, [[166925]]).pass).toBe(true);
+	expect(score(test, { ...result, answer: 'The table holds 166,925 rows; stats show 138,925. Difference | +28,000 rows. About 28,000 rows have been added; statistics reported ~138,925 rows (approximately 138,925 rows). The optimizer statistics last gathered on 2026-10-26 reported only 138,925 rows.' }, [[166925]]).pass).toBe(true);
 	expect(score(test, { ...result, answer: 'The table holds 166,925 rows, or 138,925 rows per stats.' }, [[166925]]).pass).toBe(false);
 });
 
