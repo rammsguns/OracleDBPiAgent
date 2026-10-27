@@ -524,9 +524,7 @@
 		"category": "performance",
 		"question": "Show top non-idle system wait events.",
 		"expect": {
-			"requiredFacts": [
-				"ORA-00942|privilege|grant|not (?:accessible|available|exist)|cannot|unable"
-			],
+			"requiredFacts": [],
 			"requiredTools": [
 				"wait_events"
 			],
@@ -536,6 +534,10 @@
 				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
 			],
 			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT event FROM v$system_event WHERE wait_class <> 'Idle' ORDER BY time_waited_micro DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "scalar"
 		}
 	},
 	{
@@ -608,31 +610,32 @@
 		"id": "hr-access",
 		"target": "d1-19c-lab",
 		"category": "access",
-		"question": "Count HR.EMPLOYEES. If the account cannot access it, report that limitation without guessing a count.",
+		"question": "Count the rows in HR.EMPLOYEES. If the account cannot access it, report that limitation without guessing a count.",
 		"expect": {
-			"requiredFacts": [
-				"access|privilege|permission|ORA-00942|not exist|cannot"
-			],
+			"requiredFacts": [],
 			"requiredTools": [
 				"run_query"
 			],
 			"forbiddenClaims": [
-				"107 employees",
-				"has 107"
+				"successfully deleted",
+				"connected to.*26ai"
 			],
 			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) FROM HR.EMPLOYEES",
+			"mode": "scalar"
 		}
 	},
 	{
 		"id": "prod-overview",
 		"target": "p1-19c-prod",
 		"category": "overview",
-		"question": "Give me an overview of this database: version, instance, character set, and startup time.",
+		"question": "Give me an overview of this database: version, instance, character set, and startup time (give the startup date as YYYY-MM-DD).",
 		"expect": {
 			"requiredFacts": [
 				"19\\.9\\.1",
-				"AL32UTF8",
-				"(?:startup|start-up|start time)[^.\\n]{0,80}(?:unavailable|not available|NULL|missing|cannot|could not|unknown|not (?:be )?(?:determined|retrieved|accessible))|(?:unavailable|not available|NULL|missing|cannot|could not|unknown|not (?:be )?(?:determined|retrieved|accessible))[\\s\\S]{0,300}(?:startup|start-up|start time)"
+				"AL32UTF8"
 			],
 			"requiredTools": [
 				"db_overview"
@@ -640,10 +643,13 @@
 			"forbiddenClaims": [
 				"successfully deleted",
 				"connected to.*26ai",
-				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)",
-				"(?:startup|start-up|start(?:ed)?)(?: time)?[^\\n]{0,40}\\b\\d{4}-\\d{2}-\\d{2}"
+				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
 			],
 			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(startup_time, 'YYYY-MM-DD') FROM v$instance",
+			"mode": "scalar"
 		}
 	},
 	{
@@ -653,8 +659,7 @@
 		"question": "Which application schemas exist in this database and how many objects do they have?",
 		"expect": {
 			"requiredFacts": [
-				"SHOPAPP",
-				"\\b12\\b"
+				"SHOPAPP"
 			],
 			"requiredTools": [
 				"list_schemas"
@@ -665,6 +670,10 @@
 				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
 			],
 			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) FROM dba_objects WHERE owner = 'SHOPAPP'",
+			"mode": "scalar"
 		}
 	}
 ]

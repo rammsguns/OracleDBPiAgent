@@ -28,13 +28,15 @@ a full Oracle parser or a proof about arbitrary stored functions.
 |---|---|---|
 | Enabled roles | HARNESS_DIAGNOSTICS_ROLE, SELECT_CATALOG_ROLE, HS_ADMIN_SELECT_ROLE | HARNESS_DIAGNOSTICS_ROLE |
 | Diagnostics role SELECT grants | DBA_SCHEDULER_JOBS, DBA_SCHEDULER_JOB_RUN_DETAILS, DBA_TABLESPACES, DBA_TABLESPACE_USAGE_METRICS, V_$SESSION, V_$SQL, V_$SQL_PLAN | Same, plus V_$LOCK |
-| V$INSTANCE, V$DATABASE, V$SQLSTATS | Yes | ORA-00942 |
-| V$SYSTEM_EVENT, V$SGA, V$PGASTAT | Yes | ORA-00942 |
-| DBA_USERS, DBA_OBJECTS, DBA_SEGMENTS | Yes | ORA-00942 |
-| DBA_DATA_FILES, DBA_FREE_SPACE | Yes | ORA-00942 |
+| V$INSTANCE, V$DATABASE, V$SQLSTATS | Yes | Yes (granted 2026-10-27) |
+| V$SYSTEM_EVENT, V$SGA, V$PGASTAT | Yes | Yes (granted 2026-10-27) |
+| DBA_USERS, DBA_OBJECTS, DBA_SEGMENTS | Yes | Yes (granted 2026-10-27) |
+| DBA_DATA_FILES, DBA_FREE_SPACE | Yes | Yes (granted 2026-10-27) |
 | V$SESSION, V$LOCK, V$SQL, V$SQL_PLAN | Yes | Yes |
 | V$SQL_PLAN_STATISTICS_ALL | Yes | ORA-00942 |
 | ALL_* object/source metadata | Yes | Yes, limited to objects visible to login |
+| HR, OE, CO sample tables | Yes (granted 2026-10-27) | n/a |
+| PM, IX sample schemas | Not granted | n/a |
 
 The effective catalog role on lab is broader than PLAN.md's role description.
 On p1, db_overview, list_schemas and tablespace_usage now succeed using
@@ -63,7 +65,12 @@ including TEMP and UNDOTBS1; SHOP_DATA capacity was 4,294,967,296 bytes. Counts 
 usage are snapshots, not fixed expectations.
 
 [grants-request-2026-10-26.sql](grants-request-2026-10-26.sql) is a request for a
-human DBA, never executed by the agent. It separates p1 diagnostic SELECTs from
+human DBA. It was **applied on 2026-10-27** by the coordinator, with the project
+owner's explicit authorization (see its header). The ORA-00942 fallbacks above
+remain in place for accounts without these grants and stay unit-tested. On the
+live p1, `db_overview`, `list_schemas`, `tablespace_usage`, `top_sql` and
+`wait_events` now take the primary DBA_/V$ path, and the integration test
+asserts this. It separates p1 diagnostic SELECTs from
 d1 HR/OE/CO sample-table SELECTs, and grants no write privileges. The sample table
 list follows the 19c inventory; nested storage tables are accessed through parents.
 HARNESS_LAB's ALL_TABLES exposed no HR/OE/CO tables during read-only verification,

@@ -22,29 +22,19 @@ for (const target of targets) it(`19c tools and refusal: ${target.name}`, async 
 		for (const tool of tools) {
 			if (tool.name === 'get_source') { const r = await tool.execute('source',{target:target.name,name:'NO_SUCH_OBJECT',type:'VIEW'}); expect(r.content.length).toBeGreaterThan(0); continue; }
 			const params = {target:target.name, name:target.defaultSchema==='HR'?'EMPLOYEES':'ORDERS', sql:'SELECT 1 FROM dual'};
-			if (target.name === 'p1-19c-prod' && tool.name === 'wait_events') {
-				await expect(tool.execute('test',params)).rejects.toThrow('SELECT on SYS.V_$SYSTEM_EVENT');
-				continue;
-			}
 			const result = await tool.execute('test',params);
 			expect(result.content.length).toBeGreaterThan(0);
-			if (target.name === 'p1-19c-prod' && ['db_overview','list_schemas','tablespace_usage','top_sql'].includes(tool.name)) {
-				expect(result.details.sourceNote).toMatch(/^Source:/);
-				expect(result.content[0]).toMatchObject({type:'text',text:expect.stringContaining(result.details.sourceNote)});
+			// The DBA grants (docs/grants-request-2026-10-26.sql, applied 2026-10-27) give p1 the
+			// primary DBA_/V$ path; fallbacks for accounts without them are unit-tested.
+			if (target.name === 'p1-19c-prod' && ['db_overview','list_schemas','tablespace_usage','top_sql','wait_events'].includes(tool.name)) {
+				expect(result.details.sourceNote).toBeUndefined();
 				expect(result.details.rows.length).toBeGreaterThan(0);
 				const value = (column: string) => result.details.rows[0][result.details.columns.indexOf(column)];
 				if (tool.name === 'db_overview') {
 					expect(value('VERSION_FULL')).toMatch(/^19\./);
-					for (const column of ['CDB','STARTUP_TIME','DATAFILE_BYTES','SGA_BYTES','PGA_BYTES']) expect(value(column)).toBeNull();
+					for (const column of ['CDB','STARTUP_TIME','DATAFILE_BYTES','SGA_BYTES','PGA_BYTES']) expect(value(column)).not.toBeNull();
 				}
-				if (tool.name === 'list_schemas') {
-					expect(result.details.columns).toContain('VISIBLE_OBJECT_COUNT');
-					expect(value('SEGMENT_BYTES')).toBeNull();
-				}
-				if (tool.name === 'tablespace_usage') {
-					expect(value('CAPACITY_BYTES')).toBeGreaterThan(0);
-					expect(value('USED_BYTES') + value('FREE_CAPACITY_BYTES')).toBe(value('CAPACITY_BYTES'));
-				}
+				if (tool.name === 'list_schemas') expect(result.details.columns).toContain('SEGMENT_BYTES');
 			}
 			if (tool.name === 'explain_plan') expect(result.details.columns).toContain('PLAN_TABLE_OUTPUT');
 		}

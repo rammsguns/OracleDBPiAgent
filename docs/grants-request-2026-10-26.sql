@@ -1,4 +1,7 @@
--- FOR A HUMAN DBA ONLY. Agent-authored request, 2026-10-26. NOT EXECUTED.
+-- FOR A HUMAN DBA ONLY. Agent-authored request, 2026-10-26.
+-- APPLIED 2026-10-27 by the coordinator, with the project owner's explicit authorization:
+-- each section ran as `/ as sysdba` inside its own container (oracle19c-prod, oracle19c)
+-- after verifying DB name, 19.9.1 and grantee; 31/31 grants succeeded. No password was read.
 -- Review least privilege and target identity before running each section separately.
 -- SELECT grants only: no ANY privileges, writes, EXECUTE, or grant option.
 -- Never run this file as part of the application or automated tests.

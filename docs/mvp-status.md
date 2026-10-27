@@ -52,7 +52,7 @@ Found during the eval runs:
 - `wait_events` still needs a grant on p1, and its error names `SYS.V_$SYSTEM_EVENT`.
 - The approved targets are held once, in `src/config/approvedTargets.ts`. Both `loadConfig` and the session provider enforce them.
 - `doctor` exits 1 with a named check and no connection details when Strata is unloaded, a target is unreachable, the 19c gate fails, or privileges are unexpected. These outages are simulated in unit tests.
-- `docs/grants-request-2026-10-26.sql` contains read-only SELECT grants for a **human DBA** to review and run. No agent has executed it.
+- `docs/grants-request-2026-10-26.sql` contains read-only SELECT grants for a **human DBA** to review and run. It was applied on 2026-10-27 with the project owner's explicit authorization (see below).
 
 Round 2 verification: typecheck passes, 133 unit tests, 7 integration tests, and `doctor` exits 0 on both targets.
 The eval suite has 33 cases. The full run scored 32/33; the miss was a scorer regex for `prod-overview`, not the agent's answer. After the fix, `prod-overview` passed on rerun, so the suite stands at 33/33 across the two runs with the same agent code.
@@ -111,8 +111,35 @@ full eval suite passes 39/39 (100%), with every refusal passing
   position-by-position, covered by unit tests.
 - **Tests:** typecheck passes, 239 unit tests pass, and 10 integration tests pass.
 
+## DBA grants applied — 2026-10-27
+
+The project owner authorized running `docs/grants-request-2026-10-26.sql`. Each
+section ran as `/ as sysdba` inside its own container, after checking the
+database name, the 19.9.1 version and the grantee. All 31 SELECT grants succeeded
+(11 on p1, 20 on d1). No password was read.
+
+- **`doctor`:** passes. Both accounts still hold only CREATE SESSION.
+- **p1 tools:** `db_overview`, `list_schemas`, `tablespace_usage`, `top_sql` and
+  `wait_events` now use the primary DBA_/V$ path. The integration test asserts
+  this. The ORA-00942 fallbacks stay in the code and keep their unit tests.
+- **Changed eval cases:** these cases assumed missing grants and now check live
+  ground truth:
+  - `prod-waits` and `hard-wait-limits`: the top non-idle wait.
+  - `prod-overview`: the startup date.
+  - `hr-access`: the HR.EMPLOYEES count.
+  - `prod-schemas`: the SHOPAPP DBA_OBJECTS count, now 20 instead of the 12
+    objects previously visible to the login.
+- **Boundary case:** `hard-follow-lab-boundary` now tests PM, which is still not
+  granted, instead of OE.
+- **d1 description:** updated in `config/targets.json`.
+- **Results:** 239 unit tests and 10 integration tests pass. The hard suite
+  passes 36/36 on dev and 18/18 on holdout. The MVP suite passed 38/39; the one
+  failure was `prod-schemas`, whose stale expected count was then fixed. The four
+  changed MVP cases then passed 12/12 (×3). Every refusal passes.
+- **Ungranted objects:** PM, IX and V$SQL_PLAN_STATISTICS_ALL on p1 stay
+  ungranted, by design.
+
 ## Next candidates
 
-- A human DBA reviews and runs `docs/grants-request-2026-10-26.sql`. Then rerun `doctor`, the integration tests and the eval suite, and remove fallbacks that are no longer needed.
 - If a non-AL32UTF8 target is ever approved, compare view source length in the
   database character set instead of UTF-8 bytes.

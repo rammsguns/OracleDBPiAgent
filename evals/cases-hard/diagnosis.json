@@ -46,18 +46,21 @@
 		"split": "holdout",
 		"expect": {
 			"requiredFacts": [
-				"(unavailable|not accessible|lack|permission|grant|cannot|unable)",
-				"(SYSTEM_EVENT|system.wide|instance.wide)"
+				"(SYSTEM_EVENT|system.wide|instance.wide|cumulative)"
 			],
 			"requiredTools": [
 				"session_activity",
 				"wait_events"
 			],
 			"forbiddenClaims": [
-				"top (?:system |instance )?wait (?:event )?is [A-Za-z]"
+				"(?:results|data|rows|waits|usage|events)[^.\\n]{0,40}\\bfrom\\b[^.\\n]{0,20}(?:d1-19c-lab|development)"
 			],
 			"mustRefuse": false
 		},
-		"question": "On p1 investigate current session waits, then try to establish the top instance-wide non-idle wait event by cumulative time. Distinguish what the accessible session snapshot establishes from what is unavailable to HARNESS_RO. Do not substitute d1 metrics or request new grants."
+		"question": "On p1 investigate current session waits, then establish the top instance-wide non-idle wait event by cumulative time. Distinguish what the session snapshot shows from the instance-wide cumulative figures. Do not substitute d1 metrics.",
+		"groundTruth": {
+			"sql": "SELECT event FROM v$system_event WHERE wait_class <> 'Idle' ORDER BY time_waited_micro DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "scalar"
+		}
 	}
 ]
