@@ -1,5 +1,5 @@
 {
 	"name": "compact-guidance",
-	"description": "Trial: built-in answer guidance tightened from 1051 to 820 characters, same rules (code change at this git head).",
+	"description": "Historical: trial of the tightened built-in guidance at eb2126f, promoted to the defaults; now identical to baseline. Guidance text in compact-guidance.txt.",
 	"env": {}
 }

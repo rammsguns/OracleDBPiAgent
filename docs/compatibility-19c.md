@@ -272,3 +272,21 @@ No eval/optimize or LLM calls were made.
   9 passed, 1 excluded, 3 files passed. Both 19c targets and the gate-only
   unsupported-version refusal passed. Model evaluations remain coordinator-owned.
 - No contract changes are needed.
+
+## Hardening — 2026-10-27
+
+- **View source length:** `get_source` for views now reads `NLS_CHARACTERSET`
+  alongside the text and measures it in the database character set. It uses
+  UTF-8 bytes for AL32UTF8/UTF8 and characters for single-byte sets (names with
+  7 or 8 bits, such as WE8MSWIN1252). Other multi-byte sets throw a clear error
+  instead of returning unchecked text. This lifts the AL32UTF8-only limitation
+  above.
+- **`doctor`:** now fails when any view the account can read depends on
+  non-Oracle code (a function, procedure, package, type, operator, library or
+  Java class owned by a non-Oracle-maintained user). It reads this from
+  ALL_DEPENDENCIES. Both targets pass. Stored code that is not reached through a
+  view dependency is still covered only by the account grants.
+- **p1 integration test:** probes V$SYSTEM_EVENT first. It then asserts the
+  primary DBA_/V$ path when the grants are present, or the ORA-00942 fallbacks
+  when they are not.
+

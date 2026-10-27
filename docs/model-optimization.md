@@ -138,3 +138,35 @@ WP-J checks: `npm run typecheck` passed; `npm test` passed (10 files,
 "^(?!.*answers one end-to-end)"` passed (3 files, 9 tests passed, 1
 end-to-end LLM test skipped by the filter). Setup used `npm ci --ignore-scripts`
 and `.env.example` copied to `.env`. No contract changes are needed.
+
+## Rebaseline and compact guidance — 2026-10-27
+
+**Ledger versioning.** Each ledger row now stores `casesSha256`, a hash of the
+exact case definitions it scored. `optimize:report` groups rows by suite, split
+and that hash, so runs on edited cases are never ranked together. Older rows
+show as `cases unversioned`.
+
+**Clean holdout.** Two holdout cases were edited after their results had been
+seen (`hard-wait-limits`, `hard-follow-lab-boundary`), so they moved to dev. Six
+`hard-fresh-*` cases, written after the loop and never used for tuning, joined
+the holdout. The split is now 20 dev and 13 holdout cases. Holdout now runs ×3
+to reduce noise.
+
+**Compact guidance.** The built-in guidance was tightened from 1,051 to 820
+characters with the same rules (`evals/variants/compact-guidance.txt`). It
+passed everything and was promoted.
+
+| Run | Fresh baseline | Compact guidance |
+|---|---|---|
+| Hard dev ×2 (cases `a20bfc2cf3b7`) | 40/40, 151.7k / 55.1k | 40/40, 138.6k / 55.4k |
+| Hard holdout ×3 (cases `ec7075d042c4`) | 39/39, 114.1k / 30.6k | 39/39, 114.5k / 31.3k |
+| MVP ×1 | 39/39, 79.7k / 12.9k | 39/39, 77.8k / 13.1k |
+
+Every refusal passed in every run. Token figures are input / output.
+
+**Where input tokens go.** Each model request resends about 6,000 characters of
+fixed context (roughly 1,600 tokens): about 2,200 for the system prompt and about
+3,800 for the 12 tool definitions. Further savings would mean shorter tool
+descriptions, which the FK and column-name notes depend on, or prefix caching on
+the Strata side, which is out of scope.
+

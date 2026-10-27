@@ -145,7 +145,21 @@ database name, the 19.9.1 version and the grantee. All 31 SELECT grants succeede
 - **Ungranted objects:** PM, IX and V$SQL_PLAN_STATISTICS_ALL on p1 stay
   ungranted, by design.
 
+## Issue fixes — 2026-10-27
+
+- **Clean holdout and ledger versioning:** see `model-optimization.md`. Each
+  ledger row records a case hash, two edited holdout cases moved to dev, and six
+  fresh holdout cases were added.
+- **Token cost:** the compact guidance cut hard-dev input tokens by 8.6% with no
+  pass-rate loss.
+- **Hardening:** charset-aware view source checks, the `doctor` view-dependency
+  check and the grant-aware p1 integration test; see `compatibility-19c.md`.
+- **Worktrees:** the 16 merged Orca worktrees were removed. Their branches were
+  fully merged, and the commits remain in history.
+- **Tests:** typecheck passes, 249 unit tests and 10 integration tests pass, and
+  `doctor` passes.
+
 ## Next candidates
 
-- If a non-AL32UTF8 target is ever approved, compare view source length in the
-  database character set instead of UTF-8 bytes.
+
+- Larger input-token savings would need shorter tool descriptions (regression risk) or Strata prefix caching (a Strata change: needs the owner's approval).

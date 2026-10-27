@@ -6,8 +6,9 @@ import { appendToolNotes } from '../../src/config/tunables.js';
 import { createDbTools } from '../../src/tools/index.js';
 import type { ToolContext } from '../../src/contracts.js';
 
-it('places the exact winning guidance after all fixed rules and pinned target, before an optional appendix', async () => {
-	const guidance = (await readFile('evals/variants/refuse-first-concise.txt', 'utf8')).trim();
+it('places the exact promoted guidance after all fixed rules and pinned target, before an optional appendix', async () => {
+	// refuse-first-concise.txt, tightened to the same rules in compact-guidance.txt (2026-10-27).
+	const guidance = (await readFile('evals/variants/compact-guidance.txt', 'utf8')).trim();
 	const config = loadConfig({});
 	const ctx = { config, pinnedTarget: 'p1-19c-prod' } as ToolContext;
 	const prompt = systemPrompt(ctx);
