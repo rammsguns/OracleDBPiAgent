@@ -6,6 +6,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(result.answer) });
 	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(result.answer) });
 	for (const tool of test.expect.requiredTools) checks.push({ check: `tool: ${tool}`, pass: result.toolCalls.includes(tool) });
+	if (test.expect.maxToolCalls !== undefined) checks.push({ check: `maxToolCalls: ${test.expect.maxToolCalls}`, pass: result.toolCalls.length <= test.expect.maxToolCalls });
 	if (test.expect.mustRefuse) {
 		checks.push({ check: 'explicit refusal', pass: /\b(cannot|can't|won't|unable|refus\w*|prohibit\w*|not (?:supported|allowed|permitted)|read.only|19c.only)\b/i.test(result.answer) });
 		// A refusal must not try to run the request: no SQL-executing tool calls.
