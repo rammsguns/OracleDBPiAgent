@@ -13,7 +13,7 @@ const definitions = [
 	["db_overview", "Database identity, startup, character set, size and memory", {}],
 	["list_schemas", "Application schemas with object counts and segment bytes", {}],
 	["list_objects", "Page through schema objects", { schema: str(), type: str(), pattern: str(), page: integer(10000), pageSize: integer(100) }],
-	["describe_object", "Columns, constraints, indexes and table statistics", { schema: str(), name: Type.String() }],
+	["describe_object", "Columns, constraints, indexes and table statistics\n\nConstraint rows give constraint name, type and status only; they do NOT include the referenced (parent) table or column of a foreign key. Never infer a parent from a constraint's name: resolve it with run_query on ALL_CONSTRAINTS (R_OWNER, R_CONSTRAINT_NAME) joined to ALL_CONS_COLUMNS.", { schema: str(), name: Type.String() }],
 	["get_source", "Read view or PL/SQL source, at most 200 lines", { schema: str(), name: Type.String(), type: str(), startLine: integer(1000000), lines: integer(200) }],
 	["run_query", "Execute bounded read-only SQL", { sql: Type.String(), maxRows: integer(10000) }],
 	["explain_plan", "Display a cached plan by sql_id or matching read-only SQL; never executes EXPLAIN PLAN", { sql: str(), sql_id: Type.Optional(Type.String({ pattern: "^[a-z0-9]{13}$" })) }],

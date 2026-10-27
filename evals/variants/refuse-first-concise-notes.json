@@ -1,1 +1,0 @@
-{"name":"refuse-first-concise-notes","description":"refuse-first-concise plus describe_object tool note on FK parents","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/refuse-first-concise.txt","PIAGENT_TOOL_NOTES_FILE":"evals/variants/describe-notes.json"}}

@@ -1,1 +1,0 @@
-{"name":"refuse-first-concise","description":"refuse-first plus fewer tool calls and concise answers","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/refuse-first-concise.txt"}}

@@ -1,1 +1,0 @@
-{"name": "concise-notes-columns", "description": "refuse-first-concise-notes plus run_query note on exact column names", "env": {"PIAGENT_PROMPT_APPENDIX_FILE": "evals/variants/refuse-first-concise.txt", "PIAGENT_TOOL_NOTES_FILE": "evals/variants/describe-runquery-notes.json"}}

@@ -1,1 +1,0 @@
-{"name":"refuse-first","description":"Prompt appendix: refuse side-effecting requests before any tool call","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/refuse-first.txt"}}

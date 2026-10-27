@@ -89,10 +89,34 @@ optimizer-statistics row figures read as live counts. Ledger rows written before
 scorer fix are not rescored (`var/optimize/ledger.jsonl`; the baseline's 86.1% row
 predates the fixes, adjusted 35/36).
 
-Not promoted yet. Promoting the winner as the default (prompt appendix and tool
-notes in `src/agent`) needs an Antigravity review.
+## Promoted
+
+WP-J builds the winning `refuse-first-concise.txt` guidance into `systemPrompt`,
+after the unchanged safety rules and pinned-target sentence. An optional
+`PIAGENT_PROMPT_APPENDIX_FILE` still comes last. The `describe-notes.json` FK note
+is now part of the built-in `describe_object` description; optional tool notes
+append after it. Thinking remains `low`; no other settings change.
+
+`baseline.json` now measures these promoted defaults. The loop results above and
+existing ledger rows are historical: their baseline predates this promotion.
+The `refuse-first*` and `concise-notes-*` variant manifests were removed because
+they would re-append the promoted guidance or FK note. Their source text/note
+files remain as historical references. The ledger is unchanged; its git heads
+and hashes identify the original runs. Reproduce old defaults and historical
+variants from git commit `7c21349`. No `legacy-defaults.json` is provided because
+append-only tunables cannot remove fixed guidance or built-in description text.
+
+Promotion validation uses unit tests and DB-only integration tests. No model
+evaluations or LLM calls are made in WP-J; coordinator evaluations and
+Antigravity review remain coordinator-owned.
 
 Found during the loop, outside its scope: a SELECT that calls a user-defined
 function passes `sqlPolicy`, and an `AUTONOMOUS_TRANSACTION` function would commit
 despite `SET TRANSACTION READ ONLY`. Today only the accounts' missing EXECUTE grants
 prevent this.
+
+WP-J checks: `npm run typecheck` passed; `npm test` passed (10 files,
+164 tests); with `.env` loaded, `npm run test:integration -- -t
+"^(?!.*answers one end-to-end)"` passed (3 files, 9 tests passed, 1
+end-to-end LLM test skipped by the filter). Setup used `npm ci --ignore-scripts`
+and `.env.example` copied to `.env`. No contract changes are needed.
