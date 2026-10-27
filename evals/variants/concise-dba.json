@@ -1,0 +1,1 @@
+{"name":"concise-dba","description":"Concise evidence-based DBA answers","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/concise-dba.txt"}}
