@@ -35,7 +35,7 @@
 			],
 			"requiredTools": [
 				"run_query",
-				"explain_plan"
+				"explain_plan|run_query"
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false

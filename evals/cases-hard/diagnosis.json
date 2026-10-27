@@ -13,7 +13,7 @@
 			],
 			"requiredTools": [
 				"run_query|top_sql",
-				"explain_plan"
+				"explain_plan|run_query"
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
