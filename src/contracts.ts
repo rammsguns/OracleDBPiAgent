@@ -32,6 +32,12 @@ export interface LlmConfig {
 	maxOutputTokens: number;
 	thinking: "off" | "minimal" | "low" | "medium" | "high";
 	requestTimeoutSeconds: number;
+	/** Optional harness tunables (PLAN.md "Model optimization loop"); unset keeps defaults. */
+	temperature?: number;
+	/** Appended after the fixed safety rules; never replaces them. */
+	promptAppendix?: string;
+	/** Extra text appended to known tools' descriptions. */
+	toolNotes?: Record<string, string>;
 }
 
 export interface Limits {
