@@ -1,0 +1,1 @@
+{"name":"concise-notes-thinking-minimal","description":"refuse-first-concise-notes with thinking minimal","env":{"PIAGENT_PROMPT_APPENDIX_FILE":"evals/variants/refuse-first-concise.txt","PIAGENT_TOOL_NOTES_FILE":"evals/variants/describe-notes.json","PIAGENT_LLM_THINKING":"minimal"}}
