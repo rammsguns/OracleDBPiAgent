@@ -63,3 +63,32 @@ it('rejects the out-of-scope database at the gate only', async context => {
 		expect(() => gate19c('gate-test-only',r.rows[0][0])).toThrow('only Oracle Database 19c');
 	} finally { await c.close(); }
 },30000);
+
+for (const target of targets) it(`full LONG view source page 2: ${target.name}`, async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const provider = createSessionProvider(config);
+	try {
+		let session;
+		try { session = await provider.get(target.name); }
+		catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Oracle listener unavailable'); return; } throw error; }
+		// A SYS dictionary view visible to both approved accounts; no fixture DDL.
+		const source = await session.query("SELECT text_length, text FROM all_views WHERE owner='SYS' AND view_name='ALL_CUBE_DEPENDENCIES' AND text_length<=1048576", {}, { maxRows: 1 });
+		const [length, text] = source.rows[0]!;
+		expect(typeof text).toBe('string');
+		expect(Number(length)).toBeGreaterThan(4000);
+		expect(Buffer.byteLength(text as string)).toBe(Number(length));
+		const lines = (text as string).split(/\r\n|\n|\r/);
+		expect(lines.slice(0, 200).join('\n').length).toBeGreaterThan(4000);
+		await session.close();
+		const tool = createDbTools({ config, sessions: provider, audit: { record: async () => {} }, runId: 'view-pages' }).find(t => t.name === 'get_source')!;
+		const first = await tool.execute('1', { target: target.name, schema: 'SYS', name: 'ALL_CUBE_DEPENDENCIES', type: 'VIEW', lines: 200 });
+		expect(first.details.totalLines).toBe(lines.length);
+		expect(first.details.hasMore).toBe(true);
+		const start = first.details.nextStartLine;
+		const second = await tool.execute('2', { target: target.name, schema: 'SYS', name: 'ALL_CUBE_DEPENDENCIES', type: 'VIEW', startLine: start, lines: 200 });
+		expect(second.details.rows.length).toBeGreaterThan(0);
+		expect(second.details.rows).toEqual(lines.slice(start - 1, start - 1 + second.details.rows.length).map((line, i) => [start + i, line]));
+		const beyondPreview = await tool.execute('3', { target: target.name, schema: 'SYS', name: 'ALL_CUBE_DEPENDENCIES', type: 'VIEW', startLine: 201, lines: 2 });
+		expect(beyondPreview.details.rows).toEqual([[201, lines[200]], [202, lines[201]]]);
+	} finally { await provider.closeAll(); }
+}, 30000);

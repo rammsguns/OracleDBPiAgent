@@ -4,6 +4,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolContext, QueryResult } from "../contracts.js";
 import { classifySql } from "../oracle/sqlPolicy.js";
 
+const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
+
 const str = () => Type.Optional(Type.String());
 const integer = (max: number) => Type.Optional(Type.Integer({ minimum: 1, maximum: max }));
 const definitions = [
@@ -56,8 +58,9 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						if (!Number.isInteger(lines) || lines < 1 || lines > 200 || !Number.isInteger(start) || start < 1) throw new Error("Invalid source range");
 						Object.assign(binds, { owner: schema, name: p.name.toUpperCase() });
 						if (p.type?.toUpperCase() === "VIEW") {
-							// ALL_VIEWS.TEXT is LONG; request a bounded VARCHAR preview instead.
-							sql = `SELECT text_vc source_preview FROM all_views WHERE owner=:owner AND view_name=:name`;
+							// Thin mode fetches LONG as a string by default. Bound it before transfer.
+							binds.max_source_bytes = MAX_VIEW_SOURCE_BYTES;
+							sql = `SELECT text_length, text FROM all_views WHERE owner=:owner AND view_name=:name AND text_length<=:max_source_bytes`;
 						} else {
 							Object.assign(binds, { source_type: p.type?.toUpperCase() ?? null, start_line: start, end_line: start + lines });
 							sql = `SELECT type, line, text FROM all_source WHERE owner=:owner AND name=:name AND (:source_type IS NULL OR type=:source_type) AND line>=:start_line AND line<:end_line ORDER BY type,line`;
@@ -88,6 +91,10 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							const cached = await session.query("SELECT sql_id FROM v$sql WHERE sql_text=:statement AND (:id IS NULL OR sql_id=:id) ORDER BY last_active_time DESC FETCH FIRST 1 ROWS ONLY", {statement, id:p.sql_id ?? null});
 							if (!cached.rows.length) throw new Error("No matching cached cursor; EXPLAIN PLAN writes are prohibited");
 							binds.sql_id = cached.rows[0]![0];
+						}
+						if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
+							const size = await session.query("SELECT text_length FROM all_views WHERE owner=:owner AND view_name=:name", { owner: binds.owner, name: binds.name }, { maxRows: 1 });
+							if (Number(size.rows[0]?.[0] ?? 0) > MAX_VIEW_SOURCE_BYTES) throw new Error("View source exceeds the 1 MiB limit; source was not fetched");
 						}
 						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
 						try { result = await session.query(sql, binds, { maxRows }); }
@@ -121,9 +128,13 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				}
 				if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
 					const source = result as QueryResult;
-					const text = String(source.rows[0]?.[0] ?? "");
-					const lines = source.rows.length ? text.split("\n") : []; const start = p.startLine ?? 1;
-					result = { ...source, columns: ["LINE", "TEXT"], rows: lines.slice(start - 1, start - 1 + (p.lines ?? 200)).map((text, i) => [start + i, text]), truncated: text.length >= 4000 || lines.length > start - 1 + (p.lines ?? 200) };
+					const text = source.rows[0]?.[1] ?? "";
+					if (typeof text !== "string" || Buffer.byteLength(text) > MAX_VIEW_SOURCE_BYTES || (source.rows.length && Buffer.byteLength(text) !== Number(source.rows[0]?.[0]))) throw new Error("View source fetch is incomplete or exceeds the 1 MiB limit");
+					const lines = source.rows.length ? text.split(/\r\n|\n|\r/) : []; const start = p.startLine ?? 1;
+					const count = Math.min(p.lines ?? 200, ctx.config.limits.maxRows);
+					const rows = lines.slice(start - 1, start - 1 + count).map((text, i) => [start + i, text]);
+					const hasMore = start - 1 + rows.length < lines.length;
+					result = { ...source, columns: ["LINE", "TEXT"], rows, startLine: start, totalLines: lines.length, hasMore, nextStartLine: hasMore ? start + rows.length : null, truncated: hasMore };
 				}
 				if (sourceNote) result = { ...(result as QueryResult), sourceNote };
 				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes);
@@ -140,11 +151,18 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 
 export function boundedResult(result: unknown, cap: number): { content: { type: "text"; text: string }[]; details: any } {
 	let details: any = structuredClone(result);
-	const render = () => Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
+	const updateSourcePage = () => {
+		if (typeof details.totalLines !== "number") return;
+		details.hasMore = details.startLine - 1 + details.rows.length < details.totalLines;
+		details.nextStartLine = details.hasMore ? details.startLine + details.rows.length : null;
+	};
+	const render = () => Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
-		if (details.rows?.length) { details.rows.pop(); details.truncated = true; }
+		if (details.rows?.length) { details.rows.pop(); details.truncated = true; updateSourcePage();
+			if (typeof details.totalLines === "number" && !details.rows.length) throw new Error("Tool result byte limit cannot fit one source line; request cannot make progress"); }
 		else if (Array.isArray(details) && details.length) details.pop();
+		else if (typeof details.totalLines === "number") throw new Error("Tool result byte limit cannot retain source pagination metadata");
 		else if (details.sourceNote) throw new Error("Tool result byte limit is too small to retain fallback source and limitations");
 		else { details = { truncated: true }; output = { content: [{ type: "text", text: "[truncated]" }], details }; break; }
 		output = { content: [{ type: "text", text: render() }], details };
