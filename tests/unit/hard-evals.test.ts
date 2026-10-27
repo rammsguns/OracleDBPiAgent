@@ -13,6 +13,9 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 	expect(() => checkHardCases(unsafe)).toThrow('FOR UPDATE');
 	const duplicate = [...cases, cases[0]!];
 	expect(() => checkHardCases(duplicate)).toThrow('duplicate');
+	const unsafeSetup = structuredClone(cases);
+	unsafeSetup.find(test => test.groundTruth?.setupSql)!.groundTruth!.setupSql = 'SELECT seq.NEXTVAL FROM dual';
+	expect(() => checkHardCases(unsafeSetup)).toThrow('Sequence');
 	const missingSplit = structuredClone(cases);
 	delete missingSplit[0]!.split;
 	expect(() => checkHardCases(missingSplit)).toThrow('split');

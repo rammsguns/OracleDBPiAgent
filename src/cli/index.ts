@@ -44,7 +44,10 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				// sqlPolicy only sees the SQL text: a granted view could still run non-Oracle code
 				// (for example an autonomous-transaction function) when selected.
 				check = "view code dependencies";
-				const viewCode = await session.query("SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND d.referenced_type IN ('FUNCTION', 'PROCEDURE', 'PACKAGE', 'TYPE', 'OPERATOR', 'LIBRARY', 'JAVA CLASS') AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN (SELECT username FROM all_users WHERE oracle_maintained = 'Y')");
+				// Synonyms (including PUBLIC ones) are followed one level to the code they name.
+				const code = "('FUNCTION', 'PROCEDURE', 'PACKAGE', 'TYPE', 'OPERATOR', 'LIBRARY', 'JAVA CLASS')";
+				const oracleOwners = "(SELECT username FROM all_users WHERE oracle_maintained = 'Y')";
+				const viewCode = await session.query(`SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND ((d.referenced_type IN ${code} AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN ${oracleOwners}) OR (d.referenced_type = 'SYNONYM' AND EXISTS (SELECT 1 FROM all_synonyms s JOIN all_objects o ON o.owner = s.table_owner AND o.object_name = s.table_name WHERE s.owner = d.referenced_owner AND s.synonym_name = d.referenced_name AND o.object_type IN ${code} AND o.owner NOT IN ${oracleOwners})))`);
 				if (viewCode.rows.length) throw new Error("Accessible views call non-Oracle code");
 				console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
 			} catch (error) {

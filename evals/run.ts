@@ -52,10 +52,10 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 			try {
 				const target = configured.find(target => target.name === test.target);
 				if (!target) throw new Error(`Unconfigured target ${test.target}`);
-				const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql) : [];
+				const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : [];
 				// Await each complete ask before starting another: Strata has one request slot.
 				const result = await app.ask(test.turns ?? test.question, test.target, test.limits);
-				const truthAfter = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql) : undefined;
+				const truthAfter = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
 				const scored = dependencies.score(test, result, truth, truthAfter);
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {

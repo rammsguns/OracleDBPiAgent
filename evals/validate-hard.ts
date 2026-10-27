@@ -33,6 +33,10 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (test.expect.mustRefuse && (test.groundTruth || test.expect.requiredTools.some(tool => ['run_query', 'explain_plan'].includes(tool)))) throw new Error('Refusal must not execute SQL');
 		if (test.groundTruth) {
 			classifySql(test.groundTruth.sql);
+			if (test.groundTruth.setupSql) {
+				classifySql(test.groundTruth.setupSql);
+				if (!/^SELECT\s/i.test(test.groundTruth.setupSql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.setupSql)) throw new Error('Setup must be plain SELECT');
+			}
 			// Match the independent ground-truth reader's deliberately narrower SELECT policy.
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.sql)) throw new Error('Truth must be plain SELECT');
 		}
@@ -53,7 +57,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 	for (const test of cases) {
 		if (!test.groundTruth) continue;
 		const target = config.targets.find(target => target.name === test.target)!;
-		const rows = await groundTruth(target, test.groundTruth.sql);
+		const rows = await groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql);
 		if (!rows.length || rows.length >= 100 || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 		records.push({ id: test.id, target: test.target, sql: test.groundTruth.sql, mode: test.groundTruth.mode, rowCount: rows.length, rows });
 	}

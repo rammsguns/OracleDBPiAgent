@@ -123,6 +123,11 @@ it('rejects incomplete LONG data', async () => {
 	query.mockReset().mockResolvedValueOnce({ rows: [[10]] }).mockResolvedValueOnce({ rows: [[10, 'abc', 'AL32UTF8']] });
 	await expect(tool.execute('1', { name: 'V', type: 'VIEW' })).rejects.toThrow('incomplete');
 });
+it('throws when a view seen by the size probe returns no capped source row', async () => {
+	const { tool, query } = viewSetup('abc');
+	query.mockReset().mockResolvedValueOnce({ rows: [[100]] }).mockResolvedValueOnce({ columns: [], rows: [], truncated: false, elapsedMs: 1 });
+	await expect(tool.execute('1', { name: 'V', type: 'VIEW' })).rejects.toThrow('changed during fetch');
+});
 it('checks view source length in the database character set', async () => {
 	const fetch = async (bytes: number, charset: string) => {
 		const { tool, query } = viewSetup('café');

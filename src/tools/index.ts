@@ -32,6 +32,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 			const base = { at: new Date().toISOString(), runId: ctx.runId, target, tool: name };
 			let sql: string | undefined;
 			let sourceNote: string | undefined;
+			let viewFound = false;
 			try {
 				if (signal?.aborted) throw new Error("Tool aborted");
 				if (!ctx.config.targets.some(t => t.name === target)) throw new Error(`Unknown target: ${target}`);
@@ -95,6 +96,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
 							const size = await session.query("SELECT text_length FROM all_views WHERE owner=:owner AND view_name=:name", { owner: binds.owner, name: binds.name }, { maxRows: 1 });
 							if (Number(size.rows[0]?.[0] ?? 0) > MAX_VIEW_SOURCE_BYTES) throw new Error("View source exceeds the 1 MiB limit; source was not fetched");
+							viewFound = size.rows.length > 0;
 						}
 						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
 						try { result = await session.query(sql, binds, { maxRows }); }
@@ -129,6 +131,8 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
 					const source = result as QueryResult;
 					const text = source.rows[0]?.[1] ?? "";
+					// The view existed at the size probe, so no capped row means it changed or grew past the cap.
+					if (viewFound && !source.rows.length) throw new Error("View source changed during fetch or exceeds the 1 MiB limit");
 					if (typeof text !== "string" || Buffer.byteLength(text) > MAX_VIEW_SOURCE_BYTES) throw new Error("View source fetch is incomplete or exceeds the 1 MiB limit");
 					if (source.rows.length) {
 						// TEXT_LENGTH counts bytes in the database character set.

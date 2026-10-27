@@ -284,8 +284,18 @@ No eval/optimize or LLM calls were made.
 - **`doctor`:** now fails when any view the account can read depends on
   non-Oracle code (a function, procedure, package, type, operator, library or
   Java class owned by a non-Oracle-maintained user). It reads this from
-  ALL_DEPENDENCIES. Both targets pass. Stored code that is not reached through a
-  view dependency is still covered only by the account grants.
+  ALL_DEPENDENCIES and follows synonyms, including PUBLIC ones, one level to the
+  code they name. Both targets pass.
+  - It checks only the account's directly visible views. A view built on another
+    view the account cannot see does not expose that inner view's dependencies.
+  - Stored code not reached through a visible view is still covered only by the
+    account grants.
+- **Review fixes (`docs/review-fixes-2026-10-27.md`):** `get_source` now throws
+  if a view seen by the size probe returns no capped row; it no longer returns
+  empty source. The `hard-orders-plan` and `hard-lines-plan` ground truth now
+  first run a read-only `setupSql` count with CURRENT_SCHEMA = SHOPAPP, as product
+  sessions do. Before this, their V$SQL truth existed only if an earlier eval had
+  left the cursor cached.
 - **p1 integration test:** probes V$SYSTEM_EVENT first. It then asserts the
   primary DBA_/V$ path when the grants are present, or the ORA-00942 fallbacks
   when they are not.
