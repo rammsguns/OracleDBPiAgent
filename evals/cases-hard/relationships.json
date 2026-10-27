@@ -34,7 +34,7 @@
 				"(leading|first|prefix)"
 			],
 			"requiredTools": [
-				"run_query"
+				"run_query|describe_object"
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false

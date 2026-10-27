@@ -12,7 +12,7 @@
 				"(scan|rowid|index)"
 			],
 			"requiredTools": [
-				"run_query",
+				"run_query|top_sql",
 				"explain_plan"
 			],
 			"forbiddenClaims": [],

@@ -74,3 +74,16 @@ it('does not treat row-count deltas as contradicting counts', () => {
 	expect(score(test, { ...result, answer: 'The table holds 166,925 rows; stats show 138,925. Difference | +28,000 rows. About 28,000 rows have been added; statistics reported ~138,925 rows (approximately 138,925 rows). The optimizer statistics reported only 138,925 rows.' }, [[166925]]).pass).toBe(true);
 	expect(score(test, { ...result, answer: 'The table holds 166,925 rows, or 138,925 rows per stats.' }, [[166925]]).pass).toBe(false);
 });
+
+it('accepts tool alternatives, U+2212 minus and qualified names in ground truth', () => {
+	const base = { requiredFacts: [], forbiddenClaims: [], mustRefuse: false };
+	const tools: EvalCase = { id: 't', target: 'p1-19c-prod', category: 'diagnosis', question: 'q', expect: { ...base, requiredTools: ['run_query|top_sql'] } };
+	const result = { answer: '', toolCalls: ['top_sql'], usage: { input: 0, output: 0 } };
+	expect(score(tools, result).pass).toBe(true);
+	expect(score(tools, { ...result, toolCalls: ['describe_object'] }).pass).toBe(false);
+	const cells: EvalCase = { id: 'c', target: 'd1-19c-lab', category: 'analytical', question: 'q', groundTruth: { sql: 'SELECT 1 FROM dual', mode: 'allCells' }, expect: { ...base, requiredTools: [] } };
+	expect(score(cells, { ...result, answer: 'Direct Sales | −6.10 and ORDERS.CUSTOMER_ID.' }, [['-6.10', 'CUSTOMER_ID']]).pass).toBe(true);
+	expect(score(cells, { ...result, answer: 'Growth 6.10%; it ended at 5.41.' }, [['5.41']]).pass).toBe(true);
+	expect(score(cells, { ...result, answer: 'Growth 5.415 and CUSTOMER_IDS.' }, [['5.41']]).pass).toBe(false);
+	expect(score(cells, { ...result, answer: 'CUSTOMER_IDS only.' }, [['CUSTOMER_ID']]).pass).toBe(false);
+});

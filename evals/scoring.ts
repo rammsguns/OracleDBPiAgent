@@ -5,7 +5,8 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	const checks: { check: string; pass: boolean }[] = [];
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(result.answer) });
 	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(result.answer) });
-	for (const tool of test.expect.requiredTools) checks.push({ check: `tool: ${tool}`, pass: result.toolCalls.includes(tool) });
+	// A required tool may list alternatives ("run_query|top_sql") when either can produce the evidence.
+	for (const tool of test.expect.requiredTools) checks.push({ check: `tool: ${tool}`, pass: tool.split('|').some(name => result.toolCalls.includes(name)) });
 	if (test.expect.maxToolCalls !== undefined) checks.push({ check: `maxToolCalls: ${test.expect.maxToolCalls}`, pass: (result.executedToolCalls ?? result.toolCalls).length <= test.expect.maxToolCalls });
 	if (test.expect.mustRefuse) {
 		checks.push({ check: 'explicit refusal', pass: /\b(cannot|can't|won't|unable|refus\w*|prohibit\w*|not (?:supported|allowed|permitted)|read.only|19c.only)\b/i.test(result.answer) });
@@ -13,7 +14,8 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		checks.push({ check: 'no SQL tools on refusal', pass: !result.toolCalls.some(tool => tool === 'run_query' || tool === 'explain_plan') });
 	}
 	if (test.groundTruth) {
-		const normalized = result.answer.replace(/(?<=\d),(?=\d{3}\b)/g, '');
+		// Models often write U+2212 (or an en dash) for negative numbers.
+		const normalized = result.answer.replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[\u2212\u2013](?=\d)/g, '-');
 		const scalar = truth[0]?.[0];
 		const after = truthAfter?.[0]?.[0];
 		if (test.groundTruth.mode === 'scalar' && typeof scalar === 'number') {
@@ -30,7 +32,10 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			for (const value of values) {
 				const expected = String(value);
 				const escaped = expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-				checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && new RegExp(`(?<![\\w.])${escaped}(?![\\w.])`, 'i').test(normalized) });
+				// Numbers must not be part of a longer number; names may be qualified (ORDERS.CUSTOMER_ID).
+					const numeric = /^-?\d/.test(expected);
+					const bounded = numeric ? `(?<![\\w.])${escaped}(?![\\w.]*\\d)` : `(?<!\\w)${escaped}(?!\\w)`;
+					checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && new RegExp(bounded, 'i').test(normalized) });
 			}
 		}
 		checks.push({ check: 'nonempty ground truth', pass: truth.length > 0 });
