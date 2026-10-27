@@ -29,8 +29,8 @@ it('scores the final reply but retains all turns, blocked calls and usage', () =
 		{ role: 'toolResult', content: [{ type: 'text', text: 'untrusted' }] },
 		{ role: 'assistant', content: [{ type: 'toolCall', name: 'describe_object' }], usage: { input: 20, output: 3 } },
 		{ role: 'assistant', content: [{ type: 'text', text: 'Limit reached.' }], usage: { input: 30, output: 4 } },
-	]);
-	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], usage: { input: 60, output: 9 } });
+	], ['list_objects']);
+	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'], usage: { input: 60, output: 9 } });
 });
 it('surfaces final model errors instead of scoring earlier replies', () => {
 	expect(() => collectResult([{ role: 'assistant', errorMessage: 'failed' }])).toThrow('failed');

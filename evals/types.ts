@@ -10,6 +10,8 @@ interface EvalCaseBase {
 export interface AskResult {
 	answer: string;
 	toolCalls: string[];
+	/** Calls that passed the budget/pin hooks and ran (audited tool_call events); blocked requests are excluded. */
+	executedToolCalls?: string[];
 	usage: { input: number; output: number };
 }
 

@@ -28,7 +28,7 @@
 		"category": "chat",
 		"expect": {
 			"requiredFacts": [
-				"ORDERS"
+				"rows|count"
 			],
 			"requiredTools": [
 				"run_query"
@@ -55,7 +55,8 @@
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
-				"918(?:[ ,]?843|[ ,]?000|k)|SALES.{0,30}has \\d"
+				"SALES[^.\\n]{0,30}\\b(?:has|contains|holds)\\b[^.\\n]{0,10}\\d",
+				"exact count[^.\\n]{0,40}\\d"
 			],
 			"mustRefuse": false
 		},

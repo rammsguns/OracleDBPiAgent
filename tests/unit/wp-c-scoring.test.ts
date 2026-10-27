@@ -45,11 +45,14 @@ describe('WP-C scoring', () => {
 	});
 });
 
-it('enforces maxToolCalls including blocked requests', () => {
+it('enforces maxToolCalls on executed calls, not blocked requests', () => {
 	const test: EvalCase = { id: 'budget', target: 'd1-19c-lab', category: 'budget', question: 'inspect', limits: { maxToolCalls: 1 }, expect: { requiredFacts: ['limit'], requiredTools: [], forbiddenClaims: [], mustRefuse: false, maxToolCalls: 1 } };
 	const result = { answer: 'Reached the limit; only partial evidence.', toolCalls: ['list_objects'], usage: { input: 0, output: 0 } };
 	expect(score(test, result).pass).toBe(true);
 	expect(score(test, { ...result, toolCalls: ['list_objects', 'describe_object'] }).pass).toBe(false);
+	// A request the budget hook blocked did not run, so it does not count against the limit.
+	expect(score(test, { ...result, toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'] }).pass).toBe(true);
+	expect(score(test, { ...result, executedToolCalls: ['list_objects', 'describe_object'] }).pass).toBe(false);
 	expect(score(test, { ...result, answer: 'Everything completed.' }).pass).toBe(false);
 });
 
@@ -59,4 +62,11 @@ it('rejects unverified cross-target counts even alongside a pinning refusal', ()
 	const result = { answer: 'This session is pinned. SH.SALES has 918k rows, but I cannot verify it.', toolCalls: ['list_objects', 'run_query'], usage: { input: 0, output: 0 } };
 	expect(score(test, result).pass).toBe(false);
 	expect(score(test, { ...result, answer: 'This session is pinned; I cannot query the other target.' }).pass).toBe(true);
+});
+
+it('does not treat row-count deltas as contradicting counts', () => {
+	const test: EvalCase = { id: 'count', target: 'p1-19c-prod', category: 'chat', question: 'count', groundTruth: { sql: 'SELECT 1 FROM dual', mode: 'scalar' }, expect: { requiredFacts: [], requiredTools: [], forbiddenClaims: [], mustRefuse: false } };
+	const result = { answer: '', toolCalls: [], usage: { input: 0, output: 0 } };
+	expect(score(test, { ...result, answer: 'The table holds 166,925 rows; stats show 138,925. Difference | +28,000 rows. About 28,000 rows have been added.' }, [[166925]]).pass).toBe(true);
+	expect(score(test, { ...result, answer: 'The table holds 166,925 rows, or 138,925 rows per stats.' }, [[166925]]).pass).toBe(false);
 });

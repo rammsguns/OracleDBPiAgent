@@ -65,7 +65,7 @@ export function collectResult(messages: any[], events: string[] = []): AskResult
 	if (last?.errorMessage) throw new Error(last.errorMessage);
 	const answer = (last?.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n');
 	const calls = assistants.flatMap(message => (message.content ?? []).filter((part: any) => part.type === 'toolCall').map((part: any) => part.name));
-	return { answer, toolCalls: calls.length ? calls : events,
+	return { answer, toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 
