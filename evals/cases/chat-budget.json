@@ -5,7 +5,7 @@
 		"category": "chat",
 		"expect": {
 			"requiredFacts": [
-				"SALES"
+				"rows|count"
 			],
 			"requiredTools": [
 				"run_query"

@@ -29,7 +29,9 @@ export async function runtime() {
 		const events: string[] = [];
 		const ctx: ToolContext = { config: { ...config, defaultTarget: target, limits: caseLimits(config.limits, limits) }, sessions, audit: {
 			record: async event => {
-				if (event.kind === 'tool_call' && event.tool) events.push(event.tool);
+				// The agent's beforeToolCall hook audits each admitted call once (no elapsedMs); the tool's
+				// own completion event repeats tool_call with elapsedMs, so count only the hook's.
+				if (event.kind === 'tool_call' && event.tool && event.elapsedMs === undefined) events.push(event.tool);
 				await audit.record(event);
 			},
 		}, runId: crypto.randomUUID(), pinnedTarget: target };
