@@ -181,6 +181,15 @@ compact text table with a `details` object. Every tool caps its output at
 | WP-C | `wp-c-evals` | codex | contracts. It builds the runner against `createOracleAgent`/`createDbTools` signatures and finishes after A and B merge. |
 | Review | — | antigravity | Each WP branch before the coordinator merges it |
 
+Post-MVP rounds (next candidates from `docs/mvp-status.md`):
+
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-D | `wp-d-p1-fallbacks` | codex | p1 fallbacks in `src/tools`, grant request script (merged) |
+| WP-E | `wp-e-allowlist-doctor` | codex | single allowlist, testable `doctor` (merged) |
+| WP-F | `wp-f-chat-budget-evals` | codex | `evals/`: multi-turn chat cases and budget exhaustion cases |
+| WP-G | `wp-g-paged-view-source` | codex | `src/tools` `get_source`: full view text paged by line |
+
 The coordinator (the Claude session in `needlefish`) merges each branch into
 `needlefish`, then into `master`. It runs `npm run typecheck`, `npm test`,
 `npm run test:integration` and `npm run eval`, and records results in
