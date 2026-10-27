@@ -83,3 +83,59 @@ it('preserves fallback source and limitations when result rows are truncated', a
 it('throws when a byte cap cannot retain the fallback disclosure', () => {
 	expect(() => boundedResult({columns:['N'],rows:[],sourceNote:'Source: fallback; missing full coverage',truncated:false}, 80)).toThrow('retain fallback source');
 });
+
+function viewSetup(text: string) {
+	const state = setup();
+	state.query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH'], rows: [[Buffer.byteLength(text)]], truncated: false, elapsedMs: 1 });
+	state.query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH', 'TEXT'], rows: [[Buffer.byteLength(text), text]], truncated: false, elapsedMs: 1 });
+	return { ...state, tool: state.tools.find(t => t.name === 'get_source')! };
+}
+it('pages full LONG view text beyond 4000 bytes with line and continuation metadata', async () => {
+	const text = Array.from({ length: 300 }, (_, i) => `line ${i + 1} ${'x'.repeat(30)}`).join('\r\n');
+	const { tool, query, close } = viewSetup(text);
+	const r = await tool.execute('1', { name: 'v', type: 'view', startLine: 201, lines: 2 });
+	expect(r.details).toMatchObject({ columns: ['LINE', 'TEXT'], rows: [[201, `line 201 ${'x'.repeat(30)}`], [202, `line 202 ${'x'.repeat(30)}`]], totalLines: 300, hasMore: true, nextStartLine: 203 });
+	expect(query.mock.calls[1]?.[0]).toContain('text_length<=:max_source_bytes');
+	expect(query.mock.calls[1]?.[1]).toMatchObject({ owner: 'HR', name: 'V', max_source_bytes: 1048576 });
+	expect(close).toHaveBeenCalledOnce();
+});
+it('returns the last page and an empty page past EOF', async () => {
+	for (const startLine of [2, 4]) {
+		const { tool } = viewSetup('a\rb');
+		const r = await tool.execute('1', { name: 'V', type: 'VIEW', startLine });
+		expect(r.details).toMatchObject({ totalLines: 2, hasMore: false, nextStartLine: null, rows: startLine === 2 ? [[2, 'b']] : [] });
+	}
+});
+it('returns missing view as an empty source', async () => {
+	const { tools, query } = setup();
+	query.mockResolvedValue({ columns: [], rows: [], truncated: false, elapsedMs: 1 });
+	const r = await tools.find(t => t.name === 'get_source')!.execute('1', { name: 'MISSING', type: 'VIEW' });
+	expect(r.details).toMatchObject({ rows: [], totalLines: 0, hasMore: false });
+});
+it('refuses oversized source before fetching LONG and closes the session', async () => {
+	const { tools, query, close } = setup();
+	query.mockResolvedValueOnce({ columns: ['TEXT_LENGTH'], rows: [[1048577]], truncated: false, elapsedMs: 1 });
+	await expect(tools.find(t => t.name === 'get_source')!.execute('1', { name: 'V', type: 'VIEW' })).rejects.toThrow('1 MiB');
+	expect(query).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce();
+});
+it('rejects incomplete LONG data', async () => {
+	const { tool, query } = viewSetup('abc');
+	query.mockReset().mockResolvedValueOnce({ rows: [[10]] }).mockResolvedValueOnce({ rows: [[10, 'abc']] });
+	await expect(tool.execute('1', { name: 'V', type: 'VIEW' })).rejects.toThrow('incomplete');
+});
+it('updates the continuation after the result byte cap removes lines', () => {
+	const r = boundedResult({ columns: ['LINE','TEXT'], rows: Array.from({length:10}, (_, i) => [i + 1, 'x'.repeat(80)]), startLine: 1, totalLines: 10, hasMore: false, nextStartLine: null, truncated: false }, 1000);
+	expect(r.details.rows.length).toBeGreaterThan(0); expect(r.details.rows.length).toBeLessThan(10);
+	expect(r.details.nextStartLine).toBe(r.details.rows.length + 1); expect(r.details.hasMore).toBe(true);
+	expect(Buffer.byteLength(JSON.stringify(r))).toBeLessThanOrEqual(1000);
+});
+it('throws if a single source line cannot fit the output budget', () => {
+	expect(() => boundedResult({ columns: ['LINE','TEXT'], rows: [[1, 'x'.repeat(2000)]], startLine: 1, totalLines: 1, hasMore: false }, 1000)).toThrow('cannot fit one source line');
+});
+it('rejects invalid source ranges before opening sessions', async () => {
+	for (const params of [{lines:201}, {lines:0}, {startLine:0}, {startLine:1.5}]) {
+		const { tools, get } = setup();
+		await expect(tools.find(t => t.name === 'get_source')!.execute('1', {name:'V', type:'VIEW', ...params})).rejects.toThrow('Invalid source range');
+		expect(get).not.toHaveBeenCalled();
+	}
+});

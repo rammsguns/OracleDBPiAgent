@@ -107,9 +107,8 @@ the audit file. SQL text from V$SQLSTATS is intentionally returned as tool evide
 not written into the audit log.
 
 PL/SQL source is paged through ALL_SOURCE with at most 200 returned lines and the
-configured row cap. View source uses ALL_VIEWS.TEXT_VC (at most 4000 characters),
-then pages that preview by line; long view definitions are marked truncated and
-cannot be fully retrieved through this MVP tool. This avoids unbounded LONG fetches.
+configured row cap. View source now reads ALL_VIEWS.TEXT with a 1 MiB size
+guard and pages the complete definition in Node (see WP-G verification below).
 The classifier rejects all DBMS_/UTL_ packages except DISPLAY_CURSOR, sequence
 NEXTVAL, database links, ASH/AWR views, procedural/write tokens and multiple
 statements. It may reject harmless quoted identifiers that resemble forbidden
@@ -153,3 +152,57 @@ Setup: `npm ci --ignore-scripts` (134 packages, 0 vulnerabilities), then
   targets and the gate-only non-19c refusal passed. LLM behavior was not verified.
 * Unit coverage includes ORA-00942 retry, non-00942 propagation, fallback failure,
   session cleanup, source/limitation disclosure, byte limits and the wait grant error.
+
+
+## WP-G: full paged view source — 2026-10-27
+
+Verified using SELECTs only on d1-19c-lab as HARNESS_LAB and p1-19c-prod as
+HARNESS_RO, both Oracle 19.9.1.0.0. No LLM calls, DBMS_METADATA, PL/SQL,
+grants, database data or container changes were used.
+
+With installed node-oracledb 26 thin mode, the existing session query returns
+ALL_VIEWS.TEXT (LONG) as a JavaScript string by default, including through its
+result set path. No fetchInfo/fetchTypeHandler option, src/oracle modification,
+or shared contract change is needed. Initial probing of SYS."_user_stat" on both
+accounts returned 47,818 bytes and 1,167 lines, matching TEXT_LENGTH exactly.
+Because the tool normalizes names to uppercase, the integration fixture instead
+uses SYS.ALL_CUBE_DEPENDENCIES, visible to both accounts: 29,829 bytes, verified
+against TEXT_LENGTH on each target. Tests compare returned page 2 against the
+full raw source and explicitly check lines 201–202 beyond the 4000-byte preview.
+
+get_source with type VIEW first selects TEXT_LENGTH and refuses values above
+1,048,576 bytes. The subsequent SELECT also applies TEXT_LENGTH <= 1,048,576
+before fetching LONG, preventing a concurrent enlargement from transferring an
+oversized definition. A post-fetch UTF-8 byte check rejects incomplete source or
+oversized data (both approved databases use AL32UTF8). This bounds each fetched
+view, with additional bounded string/line-array and serialization copies in Node;
+it is not a streaming LONG implementation. Each page refetches the definition,
+so concurrent view changes can alter subsequent pages.
+
+LF, CRLF and CR delimit lines; a trailing terminator yields a final empty line.
+Rows are LINE/TEXT pairs with one-based numbering. startLine defaults to 1 and
+lines to 200, with the existing configured row cap also applied. Missing views
+and requests past EOF return empty rows. details adds startLine, totalLines,
+hasMore and nextStartLine (null at EOF); pagination information is also rendered
+in text for the model. truncated marks a partial page/result. The byte cap can
+reduce rows further and adjusts nextStartLine to the first undelivered line.
+If even one line cannot fit, the tool throws instead of returning a continuation
+that cannot advance. Stored-code behavior is unchanged.
+
+Files changed: src/tools/index.ts, tests/unit/tools.test.ts,
+tests/integration/oracle.test.ts and this note. No dependencies or contract
+changes are required.
+
+Verification:
+
+* npm ci --ignore-scripts: 134 packages installed, 0 vulnerabilities.
+* npm run typecheck: passed.
+* npm test: 141 passed across 6 files.
+* With `set -a; . ./.env; set +a`,
+  `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`:
+  8 passed, 1 excluded, 2 files passed. The existing Strata end-to-end test is
+  deliberately excluded to honor the no-LLM instruction. LLM behavior was not
+  verified. Both real LONG pagination tests passed without skips.
+* Oversized/incomplete LONG, EOF/missing views, newline handling, invalid ranges,
+  output-byte continuation and session cleanup are covered without DB fixtures.
+  No oversized view was created; the refusal path is unit-tested.
