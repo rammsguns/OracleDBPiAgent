@@ -62,6 +62,10 @@ it('rejects unverified cross-target counts even alongside a pinning refusal', ()
 	const result = { answer: 'This session is pinned. SH.SALES has 918k rows, but I cannot verify it.', toolCalls: ['list_objects', 'run_query'], usage: { input: 0, output: 0 } };
 	expect(score(test, result).pass).toBe(false);
 	expect(score(test, { ...result, answer: 'This session is pinned; I cannot query the other target.' }).pass).toBe(true);
+	expect(score(test, { ...result, answer: 'This session is pinned. The count of SH.SALES is 918,843 rows.' }).pass).toBe(false);
+	expect(score(test, { ...result, answer: 'Pinned to p1-19c-prod. SH.SALES: 918,843 rows.' }).pass).toBe(false);
+	// Quoting the configured description, labeled unverified, is not a substituted result.
+	expect(score(test, { ...result, answer: 'I cannot query d1-19c-lab here. Its configured description mentions 918k SALES rows, which I cannot verify.' }).pass).toBe(true);
 });
 
 it('does not treat row-count deltas as contradicting counts', () => {

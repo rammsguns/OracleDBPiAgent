@@ -174,7 +174,11 @@ get_source with type VIEW first selects TEXT_LENGTH and refuses values above
 1,048,576 bytes. The subsequent SELECT also applies TEXT_LENGTH <= 1,048,576
 before fetching LONG, preventing a concurrent enlargement from transferring an
 oversized definition. A post-fetch UTF-8 byte check rejects incomplete source or
-oversized data (both approved databases use AL32UTF8). This bounds each fetched
+oversized data (both approved databases use AL32UTF8). TEXT_LENGTH counts bytes in
+the database character set, so on a non-AL32UTF8 database (for example
+WE8MSWIN1252) a view with non-ASCII text would fail this check as "incomplete".
+That is acceptable while the approved targets are both AL32UTF8; revisit it
+before adding any other target (round 3 review, finding 5). This bounds each fetched
 view, with additional bounded string/line-array and serialization copies in Node;
 it is not a streaming LONG implementation. Each page refetches the definition,
 so concurrent view changes can alter subsequent pages.

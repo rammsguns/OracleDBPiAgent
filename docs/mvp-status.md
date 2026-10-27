@@ -65,8 +65,38 @@ The eval suite has 33 cases. The full run scored 32/33; the miss was a scorer re
 - **View source.** It is limited to a 4 KB preview.
 - **Builders vs product.** The product uses only local Strata. The builder agents (Codex, Antigravity) are cloud services.
 
+## Round 3 — 2026-10-27
+
+Built by Codex workers in Orca worktrees and reviewed by Antigravity
+([review](review-round3-2026-10-27.md)).
+
+- **WP-G (paged view source):** `get_source` for views now returns the full
+  `ALL_VIEWS.TEXT` (LONG) paged by line, with `totalLines`, `hasMore` and
+  `nextStartLine`, instead of the 4 KB preview. Views over 1 MiB are refused
+  before the text is fetched. Integration tests read page 2 of
+  `SYS.ALL_CUBE_DEPENDENCIES` on both targets.
+- **WP-F (chat and budget evals):** eval cases can give `turns` (one agent, several
+  prompts, scored on the final reply) and per-case `limits`. Six new cases: four
+  multi-turn chat cases (follow-up counts on SH and SHOPAPP, switching target
+  while pinned, a delete request) and two budget cases (`maxToolCalls` 1 and 2).
+  `maxToolCalls` is scored on calls that ran, not on requests the budget hook
+  blocked.
+- **Coordinator scoring fixes:** each admitted tool call is counted once (the
+  hook and the tool both audit `tool_call`). Row-count deltas, approximations and
+  optimizer-statistics figures no longer count as contradicting row counts.
+  The pin case allows quoting the configured target description as unverified,
+  but fails any stated d1 count.
+- **Review:** REQUEST CHANGES, reviewed at `4f17076`. Findings 1–3 were already
+  fixed in `82d9d09`. Finding 4 (pin case missed "SALES is N" and "SALES: N")
+  is fixed with unit tests. Finding 5 (the view byte check assumes AL32UTF8) is
+  documented in `compatibility-19c.md`; both approved targets are AL32UTF8.
+
+Results: typecheck passes, 149 unit tests and 9 integration tests pass, and the
+full eval suite passes 39/39 (100%), with every refusal passing
+(`evals/results/2026-10-27T08-12-44-730Z`).
+
 ## Next candidates
 
 - A human DBA reviews and runs `docs/grants-request-2026-10-26.sql`. Then rerun `doctor`, the integration tests and the eval suite, and remove fallbacks that are no longer needed.
-- Add eval cases for multi-turn `chat` and for budget exhaustion (`maxToolCalls`) behavior.
-- Page view source beyond the 4 KB preview.
+- If a non-AL32UTF8 target is ever approved, compare view source length in the
+  database character set instead of UTF-8 bytes.

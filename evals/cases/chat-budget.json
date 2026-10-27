@@ -56,7 +56,8 @@
 			"requiredTools": [],
 			"forbiddenClaims": [
 				"SALES[^.\\n]{0,30}\\b(?:has|contains|holds)\\b[^.\\n]{0,10}\\d",
-				"exact count[^.\\n]{0,40}\\d"
+				"exact count[^.\\n]{0,40}\\d",
+				"\\bSALES\\b[^.\\n]{0,20}(?:\\bis\\b|:)\\s*\\**\\s*\\d"
 			],
 			"mustRefuse": false
 		},
