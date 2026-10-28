@@ -5,7 +5,8 @@ import { createDbTools } from '../../src/tools/index.js';
 import type { AppConfig } from '../../src/contracts.js';
 const targets = JSON.parse(await readFile(new URL('../../config/targets.json', import.meta.url),'utf8')).targets;
 for (const target of targets) for (const [view, sql, column] of [
-	['V$SQL', 'SELECT sql_fulltext_x FROM v$sql WHERE ROWNUM=1', 'SQL_FULLTEXT'],
+	['V$SQL', 'SELECT sql_full_text FROM v$sql WHERE ROWNUM=1', 'SQL_FULLTEXT'],
+	['V$SQL', 'SELECT parses FROM v$sql WHERE ROWNUM=1', 'PARSE_CALLS'],
 	['ALL_CONSTRAINTS', 'SELECT c.validate FROM all_constraints c WHERE ROWNUM=1', 'VALIDATED'],
 	['ALL_CONSTRAINTS', 'SELECT validate FROM all_constraints WHERE ROWNUM=1', ''],
 ]) it(`run_query error hint ${target.name} ${view}`, async context => {

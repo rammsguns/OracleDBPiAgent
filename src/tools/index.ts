@@ -260,8 +260,7 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 // Deliberately conservative: only plain dictionary names in FROM/JOIN lists.
 // Literals, comments and quoted identifiers cannot introduce candidate views.
 function dictionaryViews(sql: string): string[] {
-	const tokens = (sql.replace(/'(?:''|[^'])*'|"(?:""|[^"])*"|--[^\n]*|\/\*[\s\S]*?\*\//g, token => token.startsWith("--") || token.startsWith("/*") ? " " : " ? ").toUpperCase()
-		.match(/[A-Z][A-Z0-9_$#]*|[^\s]/g) ?? []);
+	const tokens = hintTokens(sql);
 	const from = new Map<number, boolean>();
 	const views = new Set<string>();
 	let depth = 0;
@@ -279,6 +278,58 @@ function dictionaryViews(sql: string): string[] {
 		if (name && /^(?:ALL_|USER_|DBA_|G?V\$)[A-Z0-9_$#]+$/.test(name)) views.add(name);
 	}
 	return [...views].slice(0, 3);
+}
+
+// Strip non-code text consistently for view discovery and candidate selection.
+function hintTokens(sql: string): string[] {
+	return sql.replace(/'(?:''|[^'])*'|"(?:""|[^"])*"|--[^\n]*|\/\*[\s\S]*?\*\//g, token => token.startsWith("--") || token.startsWith("/*") ? " " : " ? ").toUpperCase().match(/[A-Z][A-Z0-9_$#]*|[^\s]/g) ?? [];
+}
+
+const hintKeywords = new Set(`SELECT DISTINCT ALL FROM WHERE JOIN INNER LEFT RIGHT FULL OUTER CROSS NATURAL ON USING GROUP BY ORDER ASC DESC NULLS HAVING UNION MINUS INTERSECT AND OR IN NOT NULL IS AS ROWNUM FETCH FIRST NEXT ROW ROWS ONLY OFFSET CASE WHEN THEN ELSE END WITH CONNECT START PRIOR EXISTS BETWEEN LIKE ESCAPE OVER PARTITION COUNT SUM MIN MAX AVG SYS`.split(" "));
+
+function hintCandidates(sql: string, views: string[]): string[] {
+	const tokens = hintTokens(sql);
+	const aliases = new Set<string>();
+	for (let i = 0; i < tokens.length; i++) {
+		// Includes long table aliases and explicit SELECT-expression aliases.
+		if (tokens[i] === "AS" && tokens[i + 1]) aliases.add(tokens[i + 1]!);
+		if (views.includes(tokens[i]!)) {
+			const next = tokens[i + 1] === "AS" ? tokens[i + 2] : tokens[i + 1];
+			if (next && /^[A-Z][A-Z0-9_$#]*$/.test(next) && !hintKeywords.has(next)) aliases.add(next);
+		}
+		if (tokens[i + 1] === ".") aliases.add(tokens[i]!);
+	}
+	const valid = (word: string) => word.length >= 4 && /^[A-Z][A-Z0-9_$#]*$/.test(word) && !hintKeywords.has(word) && !views.includes(word) && !aliases.has(word);
+	const qualified = tokens.filter((word, i) => tokens[i - 1] === "." && valid(word));
+	return [...new Set(qualified.length ? qualified : tokens.filter(valid))];
+}
+
+function closeColumns(columns: string[], candidates: string[]): string[] {
+	const normalized = (word: string) => word.replace(/_/g, "");
+	const distance = (a: string, b: string) => {
+		if (Math.abs(a.length - b.length) > 2) return 3;
+		let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+		for (let i = 1; i <= a.length; i++) {
+			const row = [i];
+			for (let j = 1; j <= b.length; j++) row[j] = Math.min(row[j - 1]! + 1, previous[j]! + 1, previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+			previous = row;
+		}
+		return previous[b.length]!;
+	};
+	return columns.map((column, index) => {
+		const b = normalized(column);
+		let rank = Infinity;
+		for (const word of candidates.filter(word => !columns.includes(word))) {
+			const a = normalized(word);
+			if (a === b) rank = Math.min(rank, 0);
+			else if (Math.min(a.length, b.length) >= 5) {
+				if (a.startsWith(b) || b.startsWith(a)) rank = Math.min(rank, 1);
+				else if (distance(a, b) <= 2) rank = Math.min(rank, 2);
+				else if (a.slice(0, 5) === b.slice(0, 5)) rank = Math.min(rank, 3);
+			}
+		}
+		return { column, rank, index };
+	}).filter(match => Number.isFinite(match.rank)).sort((a, b) => a.rank - b.rank || a.index - b.index).slice(0, 3).map(match => match.column);
 }
 
 async function queryErrorHint(error: unknown, sql: string, session: OracleSession, ctx: ToolContext): Promise<unknown> {
@@ -315,9 +366,10 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 				const result = await lookup("SELECT column_name, COUNT(*) OVER () total_columns FROM all_tab_columns WHERE owner=:owner AND table_name=:name ORDER BY column_id", { owner: "SYS", name: view.replace(/^(G?V)\$/, "$1_$") });
 				if (!result.rows.length) continue;
 				const columns = result.rows.map(row => String(row[0])).filter(column => /^[A-Z][A-Z0-9_$#]*$/.test(column));
-				const used = new Set((sql.toUpperCase().match(/[A-Z][A-Z0-9_$#]*/g) ?? []).filter(word => !columns.includes(word)));
-				const normalized = (word: string) => word.replace(/_/g, "");
-				const matches = columns.filter(column => [...used].some(word => normalized(word) === normalized(column) || word === column + "_X" || word + "D" === column));
+				const reported = error.message.match(/ORA-00904:\s*((?:"[^"]+"|[A-Z0-9_$#]+)(?:\.(?:"[^"]+"|[A-Z0-9_$#]+))*):\s*invalid identifier/i)?.[1];
+				const badColumn = reported?.replace(/"/g, "").split(".").pop()?.toUpperCase();
+				const candidates = error.message.startsWith("ORA-00904:") ? (badColumn ? [badColumn] : []) : hintCandidates(sql, views);
+				const matches = closeColumns(columns, candidates);
 				const prefix = `${view}${matches.length ? ` close matches: ${matches.join(", ")};` : ""} columns: `;
 				const total = Number(result.rows[0]![1]);
 				const shown = [...columns];

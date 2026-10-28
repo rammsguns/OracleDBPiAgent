@@ -10,9 +10,16 @@ are retained; a hint is appended after the original message.
   and literals. This is a conservative tokenizer, not a full SQL parser.
 - Query SYS metadata through bound `ALL_TAB_COLUMNS` lookups in COLUMN_ID order;
   map V$SQL to SYS.V_$SQL and GV$SQL to SYS.GV_$SQL. Close matches come first:
-  underscore differences, a trailing `_X` typo, and VALIDATE/VALIDATED. These
+  normalized equality (underscores removed), prefix matching, edit distance up to
+  two, then a shared normalized prefix of at least five characters. Fuzzy matching
+  requires both normalized names to have at least five characters; at most three
+  matches are listed, ranked in that order with COLUMN_ID breaking ties. These
   heuristics are suggestions, not SQL rewriting; unavailable columns without a
   close match are not invented (for example VERSION_COUNT in V$SQL).
+- ORA-00904 uses only the invalid identifier reported by Oracle (last dotted
+  component, uppercased). ORA-01747 candidates exclude SQL keywords, view names,
+  aliases, literals, comments and tokens shorter than four characters. Qualified
+  column references such as `c.validate` take precedence over unqualified tokens.
 - ORA-00942: for the first DBA_* view, one bound metadata probe reports whether
   ALL_* is visible, with the warning that it covers only objects visible to the
   login. No ORA-00942 hints for user tables.
@@ -34,14 +41,19 @@ contract changes or new dependencies are required.
 ## Read-only integration evidence
 
 Both d1-19c-lab and p1-19c-prod produced the following messages on 2026-10-27.
-The V$SQL example below abbreviates the column list for this document only; the
+The V$SQL examples below abbreviate the column lists for this document only; each
 actual result ended with `EXACT_MATCHING_SIGNATURE; 27 columns omitted`.
 
 ```text
-SELECT sql_fulltext_x FROM v$sql WHERE ROWNUM=1
-ORA-00904: "SQL_FULLTEXT_X": invalid identifier
+SELECT sql_full_text FROM v$sql WHERE ROWNUM=1
+ORA-00904: "SQL_FULL_TEXT": invalid identifier
 Help: https://docs.oracle.com/error-help/db/ora-00904/
 Hint: V$SQL close matches: SQL_FULLTEXT; columns: SQL_TEXT, SQL_FULLTEXT, SQL_ID, SHARABLE_MEM, ...; 27 columns omitted
+
+SELECT parses FROM v$sql WHERE ROWNUM=1
+ORA-00904: "PARSES": invalid identifier
+Help: https://docs.oracle.com/error-help/db/ora-00904/
+Hint: V$SQL close matches: PARSE_CALLS; columns: SQL_TEXT, SQL_FULLTEXT, SQL_ID, ...; 27 columns omitted
 
 SELECT c.validate FROM all_constraints c WHERE ROWNUM=1
 ORA-01747: invalid user.table.column, table.column, or column specification
@@ -58,10 +70,18 @@ Validation:
 
 ```text
 npm run typecheck: passed
-npm test: 14 files passed, 291 tests passed
-npm run test:integration -- -t "^(?!.*answers one end-to-end)" --silent=false:
-  5 files passed, 18 tests passed, 1 skipped (LLM end-to-end excluded by filter)
+npm test: 14 files passed, 301 tests passed
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets
+  npm run test:integration -- -t "^(?!.*answers one end-to-end)" --silent=false:
+  5 files passed, 20 tests passed, 1 skipped (LLM end-to-end excluded by filter)
 ```
 
 No LLM calls, evals, optimization runs or database changes were performed.
 Strata A/B evaluation remains with the coordinator; retry reduction is unverified.
+
+Fix-round validation: the unconfigured integration command skipped all 21 tests
+because PIAGENT_SECRET_DIR was unset. Setting it to the directory specified in
+PLAN.md produced the 20-pass result above, including all eight hint integration
+cases. Typecheck and unit tests ran with no database or LLM dependency. All four
+review fixes are implemented; no contract changes are needed. Model retry
+reduction remains unverified because LLM calls and evals are outside this task.
