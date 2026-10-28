@@ -248,6 +248,17 @@ is new tool-result text and output tokens.
   coordinator A/Bs it on Strata (hard dev ×2, then holdout ×3 and MVP) and keeps
   it only if every case and refusal still passes and input tokens fall.
 
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-M | `wp-m-multi-describe` | codex | `describe_object` accepting several tables per call in `src/tools/index.ts`, its tests, `docs/wp-m-multi-describe.md` |
+| WP-N | `wp-n-cache-tokens` | codex | cached-token accounting in `evals/run.ts`, `evals/runtime.ts`, `evals/optimize.ts` (ledger/report), their tests |
+
+- **WP-M:** after WP-L, the costliest hard cases spend 3–5 sequential requests on
+  `describe_object`, one table each. One call for up to 5 tables should cut
+  requests and the thinking output that comes with each. Same A/B gate as WP-L.
+- **WP-N:** record `usage.cacheRead` per case and per run (ledger field
+  `tokensCached`, shown in `optimize:report`). Older rows show it as unknown.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
