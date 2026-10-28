@@ -294,6 +294,19 @@ is new tool-result text and output tokens.
   on ORA-00935, say that aggregates can't nest at one level. Hints are short and
   added only to errors. Same A/B gate as WP-L, plus fewer `run_query` errors.
 
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-R | `wp-r-request-usage` | codex | per-request usage diagnostics in `evals/runtime.ts`, `evals/run.ts`, their tests, `docs/wp-r-request-usage.md` |
+
+- **WP-R (diagnostics):** in WP-Q's hard dev runs, uncached input is about 63k
+  tokens per run, but tool results add only about 18k tokens' worth of text.
+  pi-ai replays earlier thinking to Strata as `reasoning_content`; whether
+  Strata's chat template keeps it is unknown. Eval records gain one row per
+  LLM request (input, cached and output tokens, plus the characters of thinking,
+  text, tool-call arguments and tool results added since the previous request),
+  and the report gains totals. Eval-only. The coordinator then runs one hard
+  dev eval and fits uncached input against those parts to find the next target.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
