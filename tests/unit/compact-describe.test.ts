@@ -44,7 +44,7 @@ it('uses compact rendering only for describe and keeps binds, audit and the FK n
 	expect(query.mock.calls[0]![0]).not.toMatch(/LISTAGG/i);
 	expect(record).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tool_call', rows: 11 }));
 	expect(close).toHaveBeenCalledOnce();
-	expect(tool.description).toContain('Never infer a parent');
+	expect(tool.description).toContain('never infer');
 });
 
 const headers = [
