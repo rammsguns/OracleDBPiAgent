@@ -413,3 +413,25 @@ ranged from 80.4k to 90.0k), and the plan cases moved in both directions
 (`hard-top-buffer-plan` −39%, `hard-orders-plan` +10%). Not merged; the branch
 is kept. To pay off, the model would need to be steered to `search`, for example
 by a usage hint in the system guidance, and then A/B tested again.
+
+### WP-T round 2: a steering sentence did not help — closed, not merged (2026-10-28)
+
+Round 2 (6e88ca7; Antigravity APPROVE) adds one guidance sentence ("For SQL
+already run, find/show its plan with explain_plan search …, not run_query on
+V$SQL") and a clearer `explain_plan` description. The prefix grows to 5,206
+chars.
+
+Hard dev, alternating, 4 single-repeat runs per side (mean per run):
+
+| | Pass | Tokens in | Tokens out | Total | Tool calls |
+|---|---|---|---|---|---|
+| Baseline (a3517b6) | 80/80 | 55,561 | 22,286 | 77,847 | 43.5 |
+| WP-T round 2 | 80/80 | 57,578 | 22,348 | 79,926 (+2.7%) | 43.25 |
+
+All refusals pass. None of WP-T's 17 `explain_plan` calls used `search`, even
+with the explicit instruction: the model keeps finding sql_ids through
+`run_query` on `V$SQL`. WP-T is closed and not merged; the branch
+`rammsguns/review-wp-t` is kept for reference. Lesson: new optional tool
+parameters are not picked up by this model from the description or the
+guidance alone, so a tool change only helps if it fits the call pattern the
+model already uses.

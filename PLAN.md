@@ -332,7 +332,7 @@ is new tool-result text and output tokens.
   case-insensitive fragments, optional parsing schema, and skip cursors from the
   agent's own login. It returns the matching cursors and the plan of the best
   one in a single call. Same gate as WP-S.
-- **WP-T round 2 (2026-10-28, user request):** add one plain-English instruction
+- **WP-T round 2 (2026-10-28, user request; closed: `search` still unused, +2.7% tokens):** add one plain-English instruction
   that steers the model to `explain_plan` `search` for finding a cached plan by
   its text, instead of querying `V$SQL`. Same gate as before, and `search` must
   actually be used in the WP-T runs.
