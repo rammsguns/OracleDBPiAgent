@@ -337,7 +337,7 @@ is new tool-result text and output tokens.
   its text, instead of querying `V$SQL`. Same gate as before, and `search` must
   actually be used in the WP-T runs.
 
-## Read-only web UI (phase draft, 2026-10-28; awaiting approval)
+## Read-only web UI (phase approved 2026-10-28)
 
 Goal: a local browser front end for the same agent, with the same rules. It is
 read-only, Strata-only and 19c-only, and audits every tool call. It adds no new
@@ -400,5 +400,5 @@ Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
 
 ## Out of scope for MVP
 
-Writes, runbooks and DDL. Web UI. Multi-user auth. 26ai/ADB/TCPS. Remote LLMs.
+Writes, runbooks and DDL. Multi-user auth. 26ai/ADB/TCPS. Remote LLMs.
 ASH/AWR. Thick driver mode.
