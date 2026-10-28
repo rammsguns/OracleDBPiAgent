@@ -298,7 +298,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-R | `wp-r-request-usage` | codex | per-request usage diagnostics in `evals/runtime.ts`, `evals/run.ts`, their tests, `docs/wp-r-request-usage.md` |
 
-- **WP-R (diagnostics):** in WP-Q's hard dev runs, uncached input is about 63k
+- **WP-R (diagnostics, merged 2026-10-28):** in WP-Q's hard dev runs, uncached input is about 63k
   tokens per run, but tool results add only about 18k tokens' worth of text.
   pi-ai replays earlier thinking to Strata as `reasoning_content`; whether
   Strata's chat template keeps it is unknown. Eval records gain one row per
