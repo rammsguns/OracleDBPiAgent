@@ -30,7 +30,7 @@ it('scores the final reply but retains all turns, blocked calls and usage', () =
 		{ role: 'assistant', content: [{ type: 'toolCall', name: 'describe_object' }], usage: { input: 20, output: 3 } },
 		{ role: 'assistant', content: [{ type: 'text', text: 'Limit reached.' }], usage: { input: 30, output: 4 } },
 	], ['list_objects']);
-	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'], usage: { input: 60, output: 9 } });
+	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'], usage: { input: 60, output: 9, cached: 0 } });
 });
 it('surfaces final model errors instead of scoring earlier replies', () => {
 	expect(() => collectResult([{ role: 'assistant', errorMessage: 'failed' }])).toThrow('failed');
@@ -42,4 +42,17 @@ it('isolates partial limit overrides from subsequent cases', () => {
 	expect(caseLimits(defaults, { maxToolCalls: 1 })).toEqual({ ...defaults, maxToolCalls: 1 });
 	expect(caseLimits(defaults)).toEqual(defaults);
 	expect(defaults.maxToolCalls).toBe(10);
+});
+
+it('sums cache reads across all assistant turns only, defaulting absent usage to zero', () => {
+	const result = collectResult([
+		{ role: 'user', usage: { cacheRead: 999 } },
+		{ role: 'assistant', usage: { input: 10, output: 2, cacheRead: 100 } },
+		{ role: 'toolResult', usage: { cacheRead: 999 } },
+		{ role: 'assistant', usage: { input: 20, output: 3, cacheRead: 200 } },
+		{ role: 'assistant', usage: { input: 5, output: 1 } },
+		{ role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+	]);
+	expect(result.usage).toEqual({ input: 35, output: 6, cached: 300 });
+	expect(collectResult([]).usage).toEqual({ input: 0, output: 0, cached: 0 });
 });

@@ -4,6 +4,11 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import type { AppConfig, AuditSink, SessionProvider, ToolContext, Limits } from '../src/contracts.js';
 import type { AskResult } from './types.js';
 
+// Eval-local adapter keeps cached usage out of the shared product contracts.
+export interface CachedAskResult extends AskResult {
+	usage: AskResult['usage'] & { cached: number };
+}
+
 export class DependencyUnavailable extends Error {}
 export async function productModule(path: string): Promise<any> {
 	try { return await import(pathToFileURL(resolve(path)).href); }
@@ -25,7 +30,7 @@ export async function runtime() {
 		const { at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs } = event;
 		await appendFile(config.auditFile, JSON.stringify({ at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs }) + '\n');
 	} };
-	return { config, sessions, async ask(question: string | string[], target: string, limits: Partial<Limits> = {}): Promise<AskResult> {
+	return { config, sessions, async ask(question: string | string[], target: string, limits: Partial<Limits> = {}): Promise<CachedAskResult> {
 		const events: string[] = [];
 		const ctx: ToolContext = { config: { ...config, defaultTarget: target, limits: caseLimits(config.limits, limits) }, sessions, audit: {
 			record: async event => {
@@ -61,14 +66,14 @@ export async function promptTurns(agent: { prompt(question: string): Promise<unk
 }
 
 // Score only the final reply, retaining requests and usage from the entire chat.
-export function collectResult(messages: any[], events: string[] = []): AskResult {
+export function collectResult(messages: any[], events: string[] = []): CachedAskResult {
 	const assistants = messages.filter(message => message.role === 'assistant');
 	const last = assistants.at(-1);
 	if (last?.errorMessage) throw new Error(last.errorMessage);
 	const answer = (last?.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n');
 	const calls = assistants.flatMap(message => (message.content ?? []).filter((part: any) => part.type === 'toolCall').map((part: any) => part.name));
 	return { answer, toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
-		usage: { input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
+		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 
 export function caseLimits(defaults: Limits, overrides: Partial<Limits> = {}): Limits {

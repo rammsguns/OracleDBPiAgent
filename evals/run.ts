@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { groundTruth, targets } from './ground-truth.js';
-import { requireStrata, runtime } from './runtime.js';
+import { requireStrata, runtime, type CachedAskResult } from './runtime.js';
 import { score } from './scoring.js';
-import type { AskResult, EvalCase } from './types.js';
+import type { EvalCase } from './types.js';
 
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -30,7 +30,7 @@ export function parseArgs(args: string[]): RunOptions {
 	}
 	return options;
 }
-interface EvalRecord extends Omit<AskResult, 'answer'> {
+interface EvalRecord extends Omit<CachedAskResult, 'answer'> {
 	answer?: string; iteration: number; id: string; target: string; refusal: boolean; pass: boolean; wallMs: number; error?: string; checks?: { check: string; pass: boolean }[];
 }
 export async function runEvals(options: RunOptions, dependencies = { requireStrata, runtime, targets, groundTruth, score }) {
@@ -60,10 +60,10 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {
 				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], usage: { input: 0, output: 0 }, wallMs: Math.round(performance.now() - start) });
+				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 			}
 			const record = records.at(-1)!;
-			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} wall=${record.wallMs}ms`);
+			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
 		}
 	} finally { await app.sessions.closeAll(); }
 	const passed = records.filter(record => record.pass).length;
@@ -74,11 +74,11 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	const resultsFile = `evals/results/${stamp}.json`;
 	// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
 	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
-	const report = { ...options, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+	const report = { ...options, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 	await mkdir('evals/results', { recursive: true });
 	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
 	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
-	const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Wall ms |\n|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.wallMs} |`).join('\n') + '\n';
+	const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
 	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n');
 	console.log(passCounts);
 	console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);

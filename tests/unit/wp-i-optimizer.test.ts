@@ -91,10 +91,11 @@ function record(overrides: Partial<LedgerRecord> = {}): LedgerRecord {
 }
 it('appends one ledger line per run and projects out unrelated secret fields', async () => {
 	const file = join(await temp(), 'nested/ledger.jsonl');
-	await appendLedger({ ...record(), secret: 'never-persist' } as any, file);
+	await appendLedger({ ...record({ tokensCached: 123 }), secret: 'never-persist', config: { secret: 'never-persist' }, answer: 'never-persist', env: { secret: 'never-persist' } } as any, file);
 	await appendLedger(record({ variant: 'second' }), file);
 	const text = await readFile(file, 'utf8');
 	expect(text).not.toContain('never-persist');
+	expect(JSON.parse(text.split('\n')[0]!)).toEqual(record({ tokensCached: 123 }));
 	expect(text.trim().split('\n').map(line => JSON.parse(line).variant)).toEqual(['baseline', 'second']);
 });
 it('groups leaderboards by suite/split, disqualifies refusals, and breaks rate ties on tokens', () => {
@@ -122,14 +123,30 @@ it('runs selected cases and repeats strictly sequentially and aggregates failure
 		runtime: async () => ({ sessions: { closeAll: async () => { closed = true; } }, ask: async (question: string) => {
 			expect(active).toBe(false); active = true; calls++; seen.push(question);
 			await Promise.resolve(); active = false;
-			return { answer: calls === 3 ? 'fail' : 'pass', toolCalls: ['requested'], executedToolCalls: ['ran'], usage: { input: 10, output: 2 } };
+			return { answer: calls === 3 ? 'fail' : 'pass', toolCalls: ['requested'], executedToolCalls: ['ran'], usage: { input: 10, output: 2, cached: calls * 100 } };
 		} }), groundTruth: async () => [], score: (_test: unknown, result: { answer: string }) => ({ pass: result.answer === 'pass' }),
 	};
 	const result = await runEvals({ suite, split: 'dev', repeat: 2, ids: ['a', 'b'] }, dependencies as any);
 	results.push(result.resultsFile);
 	expect(JSON.parse(await readFile(result.resultsFile, 'utf8')).passRate).toBe(0.75);
 	expect(await readFile(result.resultsFile.replace(/json$/, 'md'), 'utf8')).toContain('a: 1/2\n');
+	expect(await readFile(result.resultsFile.replace(/json$/, 'md'), 'utf8')).toContain('| Tokens cached |');
+	expect(await readFile(result.resultsFile.replace(/json$/, 'md'), 'utf8')).toContain('| 10/2 | 300 |');
+	expect(console.log).toHaveBeenCalledWith(expect.stringContaining('FAIL a: tools=requested tokens=10/2 tokensCached=300'));
+	expect(console.log).toHaveBeenCalledWith(expect.stringContaining('PASS b: tools=requested tokens=10/2 tokensCached=400'));
+	expect(JSON.parse(await readFile(result.resultsFile, 'utf8')).tokensCached).toBe(1000);
 	expect(seen).toEqual(['a', 'b', 'a', 'b']);
 	expect(closed).toBe(true);
-	expect(result).toMatchObject({ passRate: 0.75, refusalsPass: false, perCase: [{ id: 'a', passes: 1 }, { id: 'b', passes: 2 }], tokensIn: 40, tokensOut: 8, toolCalls: 4 });
+	expect(result).toMatchObject({ passRate: 0.75, refusalsPass: false, perCase: [{ id: 'a', passes: 1 }, { id: 'b', passes: 2 }], tokensIn: 40, tokensOut: 8, tokensCached: 1000, toolCalls: 4 });
+});
+
+it('shows unknown cache reads for old ledger rows and keeps cache reads out of ranking', () => {
+	const report = leaderboard([
+		record({ variant: 'old', tokensIn: 20 }),
+		record({ variant: 'cached', tokensCached: 10000 }),
+		record({ variant: 'zero', tokensIn: 30, tokensCached: 0 }),
+	]);
+	expect(report).toContain('1. cached 100.0% tokens=15 tokensCached=10000');
+	expect(report).toContain('2. old 100.0% tokens=25 tokensCached=?');
+	expect(report).toContain('3. zero 100.0% tokens=35 tokensCached=0');
 });
