@@ -314,3 +314,32 @@ WP-Q is merged: hard dev uses about 3% fewer tokens with fewer failed queries,
 holdout and MVP are flat, and quality holds. The first dev ×2 result (+8.5%) was
 run-to-run noise; from now on, small effects need alternating runs with 4+
 repeats per side.
+
+## Where uncached input comes from (WP-R, 2026-10-28)
+
+Hard dev ×2 at 704e8bd (40/40, all refusals pass): 121,171 tokens in, 49,902 out,
+358,507 cached, 132 LLM requests.
+
+| Requests | Count | Uncached input | Cached |
+|---|---|---|---|
+| First request of each case | 40 | 75,048 (62%) | 0 |
+| Later requests | 92 | 46,123 (38%) | 358,507 |
+
+- **Earlier thinking is not charged again.** A least-squares fit of uncached input
+  on later requests gives about 0.35 tokens per character of new tool result and
+  0.07 per character of the previous request's thinking, which is effectively
+  nothing. Strata keeps the conversation's own decoded tokens cached.
+- **The fixed prefix is not free; this corrects the "Token saving" note above.**
+  Strata's `pick_slot` (read-only look at `~/llm-rig/strata/engine/serve/server.py`)
+  reuses a slot only when the new prompt continues that slot's conversation: the
+  whole held stream, or up to its last-turn checkpoint. A new session shares the
+  tools and system prompt with the last one, but that shared start is never
+  reused, so every first request reads the full prefix: about 1,876 tokens per
+  case. That is the system prompt (1,970 chars), the tool definitions (12 tools,
+  3,823 chars of JSON), the template's own tool text and the question.
+- **Levers.** On the harness side, shortening the system prompt and tool
+  definitions saves on every new session. At about 25% shorter that's roughly 350
+  tokens per session, or about 8% of a hard dev run; each wording change risks
+  answer quality. On the Strata side, reusing a shared prompt start across
+  conversations would remove most of the 62%, but that is a Strata configuration
+  or code change, which this project may not make.
