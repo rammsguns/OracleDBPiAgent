@@ -337,6 +337,55 @@ is new tool-result text and output tokens.
   its text, instead of querying `V$SQL`. Same gate as before, and `search` must
   actually be used in the WP-T runs.
 
+## Read-only web UI (phase draft, 2026-10-28; awaiting approval)
+
+Goal: a local browser front end for the same agent, with the same rules. It is
+read-only, Strata-only and 19c-only, and audits every tool call. It adds no new
+dependencies: the server uses `node:http`, and the page is plain HTML, CSS and
+JavaScript served by the server. Nothing listens on a non-loopback address.
+
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-U | `wp-u-web-server` | codex | `src/web/server.ts`, `src/web/sessions.ts`, the `piagent web` command in `src/cli/index.ts`, their tests, `docs/web-ui.md` (server part) |
+| WP-V | `wp-v-web-page` | codex | `src/web/static/` (index.html, app.js, app.css), pure render helpers and their unit tests, `docs/web-ui.md` (page part) |
+| Review | — | antigravity | each branch, with a security focus (below) |
+
+API contract (fixed by the coordinator, so WP-U and WP-V can run in parallel):
+
+- `piagent web [--port N]` binds 127.0.0.1 only (default port 8765) and prints
+  `http://127.0.0.1:N/#token=<random>`. Every `/api` request needs that token in
+  an `Authorization: Bearer` header, and the `Host` header must be
+  `127.0.0.1:N` or `localhost:N`. The `Origin` header, when present, must match.
+  This protects against other local users, CSRF and DNS rebinding.
+- `GET /api/targets` → `[{ name, environment, description }]` from config. It
+  never includes DSNs, users or secrets.
+- `POST /api/sessions` `{ target? }` → `{ sessionId }`. A session is one agent
+  conversation; an optional target pins it, as `--target` does. There are at
+  most 4 sessions, closed after 30 minutes idle.
+- `POST /api/sessions/:id/ask` `{ question }` → a Server-Sent Events stream:
+  `text` (delta), `tool_start` (name, args cut to 300 chars), `tool_end` (name,
+  isError, first line of error, result bytes), `done` (answer, usage), and
+  `error` (generic message; never driver or provider text). A process-wide lock
+  keeps LLM calls one at a time; a busy server answers 409.
+- `DELETE /api/sessions/:id` closes the session and its DB connections.
+- `GET /api/sessions/:id/audit` → that session's audit records from
+  `var/audit.jsonl`, matched by runId: kind, tool, target, SQL hash, rows,
+  elapsed time. No SQL text beyond what the audit already stores, and never bind
+  values.
+- `GET /api/health` → Strata `/health` status and DB reachability, as reported
+  by `piagent doctor` (named checks, no connection details).
+- The page is chat on the left and the tool-call trace on the right, with a
+  target picker, an audit tab and a stop button. It renders all model and
+  database text with `textContent` (never `innerHTML`), and the server sends a
+  strict CSP: `default-src 'self'`, no inline script.
+
+Gate: `npm run typecheck`, `npm test`, filtered `npm run test:integration`, and
+an Antigravity review of each branch covering the loopback bind, token, Host and
+Origin checks, XSS, error and secret leakage, the LLM lock and session cleanup.
+Then the coordinator runs one end-to-end smoke test: start `piagent web`, ask one
+question per target and one refusal through the API, and check the audit
+records. Merge and push only if all of this passes.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
