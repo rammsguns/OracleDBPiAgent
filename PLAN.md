@@ -391,8 +391,9 @@ APPROVE on both. 336 unit tests and 20 filtered integration tests pass. The
 end-to-end smoke test passed: loopback-only bind; 401 without the token; 403 for
 a bad Host or Origin; CSP set; targets with no DSN or user; one question per
 target answered via db_overview with matching audit records; DML refused with no
-tool call; clean SIGTERM shutdown; token not in the audit. Open: `npm run build`
-does not copy `src/web/static/` into `dist/`, so use `npm run piagent -- web`.
+tool call; clean SIGTERM shutdown; token not in the audit. `npm run build` now
+copies `src/web/static/` into `dist/web/static/`, so the compiled `piagent web`
+serves the page too.
 
 ## MVP exit criteria
 
