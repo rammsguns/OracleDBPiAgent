@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import { createHash } from "node:crypto";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import type { ToolContext, QueryResult } from "../contracts.js";
+import type { ToolContext, QueryResult, OracleSession } from "../contracts.js";
 import { classifySql } from "../oracle/sqlPolicy.js";
 
 const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
@@ -101,6 +101,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
 						try { result = await session.query(sql, binds, { maxRows }); }
 						catch (error) {
+							if (name === "run_query") throw await queryErrorHint(error, sql, session, ctx);
 							if (!/ORA-00942/.test(String(error))) throw error;
 							if (name === "wait_events") throw new Error("ORA-00942: wait_events requires SELECT on SYS.V_$SYSTEM_EVENT (V$SYSTEM_EVENT); no granted equivalent is available", { cause: error });
 							if (name === "top_sql") {
@@ -254,4 +255,80 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 	}
 	if (Buffer.byteLength(JSON.stringify(output)) > cap) throw new Error("Tool result byte limit is too small");
 	return output;
+}
+
+// Deliberately conservative: only plain dictionary names in FROM/JOIN lists.
+// Literals, comments and quoted identifiers cannot introduce candidate views.
+function dictionaryViews(sql: string): string[] {
+	const tokens = (sql.replace(/'(?:''|[^'])*'|"(?:""|[^"])*"|--[^\n]*|\/\*[\s\S]*?\*\//g, token => token.startsWith("--") || token.startsWith("/*") ? " " : " ? ").toUpperCase()
+		.match(/[A-Z][A-Z0-9_$#]*|[^\s]/g) ?? []);
+	const from = new Map<number, boolean>();
+	const views = new Set<string>();
+	let depth = 0;
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (token === "(") { depth++; continue; }
+		if (token === ")") { from.delete(depth); depth--; continue; }
+		if (["WHERE", "GROUP", "ORDER", "HAVING", "UNION", "MINUS", "INTERSECT", "CONNECT", "START"].includes(token!)) from.delete(depth);
+		if (token === "FROM") from.set(depth, true);
+		if (token !== "FROM" && token !== "JOIN" && !(token === "," && from.get(depth))) continue;
+		let name = tokens[i + 1];
+		let end = i + 2;
+		if (name === "SYS" && tokens[end] === ".") { name = tokens[end + 1]; end += 2; }
+		if (tokens[end] === "." || tokens[end] === "@") continue;
+		if (name && /^(?:ALL_|USER_|DBA_|G?V\$)[A-Z0-9_$#]+$/.test(name)) views.add(name);
+	}
+	return [...views].slice(0, 3);
+}
+
+async function queryErrorHint(error: unknown, sql: string, session: OracleSession, ctx: ToolContext): Promise<unknown> {
+	if (!(error instanceof Error) || !/^ORA-(00904|01747|00942|00935):/.test(error.message)) return error;
+	let hint = "";
+	try {
+		const lookup = async (statement: string, binds: Record<string, unknown>) => {
+			const base = { at: new Date().toISOString(), runId: ctx.runId, target: session.target.name, tool: "run_query",
+				sqlSha256: createHash("sha256").update(statement).digest("hex") };
+			try {
+				const result = await session.query(classifySql(statement), binds, {
+					maxRows: Math.min(1000, ctx.config.limits.maxRows),
+					timeoutSeconds: Math.min(2, ctx.config.limits.statementTimeoutSeconds),
+				});
+				await ctx.audit.record({ ...base, kind: "tool_call", rows: result.rows.length, truncated: result.truncated, elapsedMs: result.elapsedMs });
+				return result;
+			} catch (failure) {
+				await ctx.audit.record({ ...base, kind: "tool_error", detail: failure instanceof Error ? failure.name : "Error" });
+				throw failure;
+			}
+		};
+		if (error.message.startsWith("ORA-00935:")) hint = "Hint: aggregates cannot nest in one SELECT level; aggregate in a subquery, then aggregate its result.";
+		else {
+			const views = dictionaryViews(sql);
+			const parts: string[] = [];
+			for (const view of views) {
+				if (error.message.startsWith("ORA-00942:")) {
+					if (!view.startsWith("DBA_")) continue;
+					const alternative = view.replace(/^DBA_/, "ALL_");
+					const result = await lookup("SELECT column_name FROM all_tab_columns WHERE owner=:owner AND table_name=:name AND ROWNUM=1", { owner: "SYS", name: alternative });
+					parts.push(`${view} is not granted; ${alternative} is ${result.rows.length ? "available (shows only objects this login can see)" : "not visible to this login"}.`);
+					break;
+				}
+				const result = await lookup("SELECT column_name, COUNT(*) OVER () total_columns FROM all_tab_columns WHERE owner=:owner AND table_name=:name ORDER BY column_id", { owner: "SYS", name: view.replace(/^(G?V)\$/, "$1_$") });
+				if (!result.rows.length) continue;
+				const columns = result.rows.map(row => String(row[0])).filter(column => /^[A-Z][A-Z0-9_$#]*$/.test(column));
+				const used = new Set((sql.toUpperCase().match(/[A-Z][A-Z0-9_$#]*/g) ?? []).filter(word => !columns.includes(word)));
+				const normalized = (word: string) => word.replace(/_/g, "");
+				const matches = columns.filter(column => [...used].some(word => normalized(word) === normalized(column) || word === column + "_X" || word + "D" === column));
+				const prefix = `${view}${matches.length ? ` close matches: ${matches.join(", ")};` : ""} columns: `;
+				const total = Number(result.rows[0]![1]);
+				const shown = [...columns];
+				const render = () => prefix + shown.join(", ") + (total > shown.length ? `; ${total - shown.length} columns omitted` : "");
+				const budget = Math.floor(1180 / Math.max(1, views.length));
+				while (shown.length && render().length > budget) shown.pop();
+				if (render().length <= budget) parts.push(render());
+			}
+			if (parts.length) hint = "Hint: " + parts.join("\n");
+		}
+	} catch { return error; }
+	if (hint && hint.length <= 1200) error.message += "\n" + hint;
+	return error;
 }
