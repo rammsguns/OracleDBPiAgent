@@ -123,7 +123,7 @@ it('runs selected cases and repeats strictly sequentially and aggregates failure
 		runtime: async () => ({ sessions: { closeAll: async () => { closed = true; } }, ask: async (question: string) => {
 			expect(active).toBe(false); active = true; calls++; seen.push(question);
 			await Promise.resolve(); active = false;
-			return { answer: calls === 3 ? 'fail' : 'pass', toolCalls: ['requested'], executedToolCalls: ['ran'], usage: { input: 10, output: 2, cached: calls * 100 } };
+			return { answer: calls === 3 ? 'fail' : 'pass', toolCalls: ['requested'], executedToolCalls: ['ran'], toolDetails: [{ tool: 'requested', args: '{}', isError: true, error: 'ORA-00904: invalid identifier', resultBytes: 29 }], usage: { input: 10, output: 2, cached: calls * 100 } };
 		} }), groundTruth: async () => [], score: (_test: unknown, result: { answer: string }) => ({ pass: result.answer === 'pass' }),
 	};
 	const result = await runEvals({ suite, split: 'dev', repeat: 2, ids: ['a', 'b'] }, dependencies as any);
@@ -135,6 +135,10 @@ it('runs selected cases and repeats strictly sequentially and aggregates failure
 	expect(console.log).toHaveBeenCalledWith(expect.stringContaining('FAIL a: tools=requested tokens=10/2 tokensCached=300'));
 	expect(console.log).toHaveBeenCalledWith(expect.stringContaining('PASS b: tools=requested tokens=10/2 tokensCached=400'));
 	expect(JSON.parse(await readFile(result.resultsFile, 'utf8')).tokensCached).toBe(1000);
+	expect(JSON.parse(await readFile(result.resultsFile, 'utf8')).records[0].toolDetails[0].error).toContain('ORA-00904');
+	expect(result.toolErrors).toMatchObject({ totalCalls: 4, totalErrors: 4, byCode: { 'ORA-00904': 4 } });
+	expect(await readFile(result.resultsFile.replace(/json$/, 'md'), 'utf8')).toContain('| requested | ORA-00904 | 4 |');
+	expect(console.log).toHaveBeenCalledWith('Tool errors: 4/4 calls; {"ORA-00904":4}');
 	expect(seen).toEqual(['a', 'b', 'a', 'b']);
 	expect(closed).toBe(true);
 	expect(result).toMatchObject({ passRate: 0.75, refusalsPass: false, perCase: [{ id: 'a', passes: 1 }, { id: 'b', passes: 2 }], tokensIn: 40, tokensOut: 8, tokensCached: 1000, toolCalls: 4 });
