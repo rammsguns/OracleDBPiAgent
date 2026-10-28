@@ -148,7 +148,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					result = { ...source, columns: ["LINE", "TEXT"], rows, startLine: start, totalLines: lines.length, hasMore, nextStartLine: hasMore ? start + rows.length : null, truncated: hasMore };
 				}
 				if (sourceNote) result = { ...(result as QueryResult), sourceNote };
-				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes);
+				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes, name === "describe_object" ? renderDescribe : undefined);
 				const q = output.details as QueryResult;
 				await ctx.audit.record({ ...base, kind: "tool_call", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), rows: q.rows?.length, truncated: q.truncated, elapsedMs: q.elapsedMs });
 				return output;
@@ -160,14 +160,88 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 	}));
 }
 
-export function boundedResult(result: unknown, cap: number): { content: { type: "text"; text: string }[]; details: any } {
+// Keep the tagged query intact: folding in JS avoids LISTAGG's
+// VARCHAR2 limit, including for long identifier lists on Oracle 19c.
+function describeSections(result: QueryResult) {
+	const cell = (value: unknown) => value == null ? "NULL" : String(value).replace(/\s+/g, " ");
+	const sectionsOutput: { header: string; entries: { text: string; rows: unknown[][] }[]; omitted: number }[] = [];
+	const rows = result.rows;
+	const sections = [
+		["COLUMN", "Columns: position|name|type|length"],
+		["CONSTRAINT", "Constraints: name|type|status|child_columns(position:name)"],
+		["INDEX", "Indexes: name|uniqueness|status|columns(position:name)"],
+		["STATS", "Stats: table|NUM_ROWS|LAST_ANALYZED"],
+	];
+	for (const [kind, header] of sections) {
+		const parents = rows.filter(row => row[0] === kind);
+		const children = rows.filter(row => row[0] === `${kind}_COLUMN`);
+		if (!parents.length && !children.length) continue;
+		const section = { header: header!, entries: [] as { text: string; rows: unknown[][] }[], omitted: 0 };
+		sectionsOutput.push(section);
+		for (const row of parents) {
+			const values = kind === "COLUMN" ? [row[4], row[1], row[2], row[3]] : [row[1], row[2], row[3]];
+			if (kind === "CONSTRAINT" || kind === "INDEX") {
+				values.push(children.filter(child => child[1] === row[1]).sort((a, b) => Number(a[4]) - Number(b[4])).map(child => `${cell(child[4])}:${cell(child[2])}`).join(","));
+			}
+			section.entries.push({ text: values.map(cell).join("|"), rows: [row, ...children.filter(child => child[1] === row[1])] });
+		}
+		// Retain even orphan column rows (possible with unusual dictionary visibility).
+		for (const child of children.filter(child => !parents.some(parent => parent[1] === child[1]))) {
+			section.entries.push({ text: `${kind}_COLUMN|${cell(child[1])}|${cell(child[4])}:${cell(child[2])}`, rows: [child] });
+		}
+	}
+	return sectionsOutput;
+}
+
+function renderDescribeSections(sections: ReturnType<typeof describeSections>, truncated: boolean): string {
+	const lines = sections.flatMap(section => [
+		section.entries.length ? section.header : `${section.header.split(":")[0]}: ${section.omitted} more not shown [truncated]`,
+		...section.entries.map(entry => entry.text),
+		...(section.entries.length && section.omitted ? [`${section.header.split(":")[0]}: ${section.omitted} more not shown [truncated]`] : []),
+	]);
+	if (truncated) lines.push("[truncated]");
+	return lines.length ? lines.join("\n") : "No metadata rows.";
+}
+
+export function renderDescribe(result: QueryResult): string {
+	return renderDescribeSections(describeSections(result), result.truncated);
+}
+
+// Render from complete entities before enforcing bytes. Raw details lose the same
+// whole entities, so neither representation can imply a shortened composite key.
+function boundedDescribe(result: QueryResult, cap: number) {
+	const details = structuredClone(result);
+	const sections = describeSections(details);
+	const output = () => ({ content: [{ type: "text" as const, text: renderDescribeSections(sections, details.truncated) }], details });
+	// A database row cap may have cut a child list: do not claim it is complete.
+	if (result.truncated) {
+		for (const section of sections.filter(section => /^(Constraints|Indexes):/.test(section.header))) {
+			section.omitted += section.entries.length;
+			section.entries = [];
+		}
+		details.rows = details.rows.filter(row => !/^(CONSTRAINT|INDEX)(_COLUMN)?$/.test(String(row[0])));
+	}
+	while (Buffer.byteLength(JSON.stringify(output())) > cap) {
+		const section = sections.findLast(section => section.entries.length);
+		if (!section) throw new Error("Tool result byte limit is too small to disclose omitted describe sections");
+		const entry = section.entries.pop()!;
+		section.omitted++;
+		const removed = new Set(entry.rows);
+		details.rows = details.rows.filter(row => !removed.has(row));
+		details.truncated = true;
+	}
+	return output();
+}
+
+export function boundedResult(result: unknown, cap: number, renderTable?: (result: QueryResult) => string): { content: { type: "text"; text: string }[]; details: any } {
+	if (renderTable === renderDescribe) return boundedDescribe(result as QueryResult, cap);
 	let details: any = structuredClone(result);
 	const updateSourcePage = () => {
 		if (typeof details.totalLines !== "number") return;
 		details.hasMore = details.startLine - 1 + details.rows.length < details.totalLines;
 		details.nextStartLine = details.hasMore ? details.startLine + details.rows.length : null;
 	};
-	const render = () => Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
+	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
 		if (details.rows?.length) { details.rows.pop(); details.truncated = true; updateSourcePage();
