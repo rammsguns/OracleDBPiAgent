@@ -8,6 +8,50 @@ import type { AskResult } from './types.js';
 export interface CachedAskResult extends AskResult {
 	usage: AskResult['usage'] & { cached: number };
 	toolDetails: ToolDetail[];
+	requests: RequestUsage[];
+}
+
+export interface RequestUsage {
+	/** One-based user turn; zero only for histories with no preceding user message. */
+	turn: number;
+	input: number;
+	cached: number;
+	output: number;
+	newUserChars: number;
+	newToolResultChars: number;
+	prevThinkingChars: number;
+	prevTextChars: number;
+	prevToolCallArgChars: number;
+}
+
+// Count text blocks only: images, signatures, metadata and framing are excluded.
+function textChars(content: any): number {
+	if (typeof content === 'string') return content.length;
+	return (content ?? []).reduce((n: number, part: any) => n + (part.type === 'text' ? part.text.length : 0), 0);
+}
+
+function collectRequests(messages: any[]): RequestUsage[] {
+	const requests: RequestUsage[] = [];
+	let turn = 0, newUserChars = 0, newToolResultChars = 0;
+	let prevThinkingChars = 0, prevTextChars = 0, prevToolCallArgChars = 0;
+	for (const message of messages) {
+		if (message.role === 'user') {
+			turn++;
+			newUserChars += textChars(message.content);
+		} else if (message.role === 'toolResult') {
+			newToolResultChars += textChars(message.content);
+		} else if (message.role === 'assistant') {
+			requests.push({ turn, input: message.usage?.input ?? 0, cached: message.usage?.cacheRead ?? 0,
+				output: message.usage?.output ?? 0, newUserChars, newToolResultChars,
+				prevThinkingChars, prevTextChars, prevToolCallArgChars });
+			newUserChars = newToolResultChars = 0;
+			prevThinkingChars = (message.content ?? []).reduce((n: number, part: any) => n + (part.type === 'thinking' ? part.thinking.length : 0), 0);
+			prevTextChars = textChars(message.content);
+			// Serialize only to measure length; never retain the arguments or bind values.
+			prevToolCallArgChars = (message.content ?? []).reduce((n: number, part: any) => n + (part.type === 'toolCall' ? JSON.stringify(part.arguments ?? {}).length : 0), 0);
+		}
+	}
+	return requests;
 }
 
 export interface ToolDetail {
@@ -96,7 +140,7 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 				...(result?.isError ? { error: text.split(/\r?\n/)[0]!.slice(0, 200) } : {}),
 				resultBytes: result ? Buffer.byteLength(text, 'utf8') : null };
 		}));
-	return { answer, toolDetails, toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
+	return { answer, toolDetails, requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 

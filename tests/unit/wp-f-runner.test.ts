@@ -30,7 +30,7 @@ it('scores the final reply but retains all turns, blocked calls and usage', () =
 		{ role: 'assistant', content: [{ type: 'toolCall', name: 'describe_object' }], usage: { input: 20, output: 3 } },
 		{ role: 'assistant', content: [{ type: 'text', text: 'Limit reached.' }], usage: { input: 30, output: 4 } },
 	], ['list_objects']);
-	expect(result).toEqual({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'], toolDetails: [
+	expect(result).toMatchObject({ answer: 'Limit reached.', toolCalls: ['list_objects', 'describe_object'], executedToolCalls: ['list_objects'], toolDetails: [
 		{ tool: 'list_objects', args: '{}', isError: null, resultBytes: null },
 		{ tool: 'describe_object', args: '{}', isError: null, resultBytes: null },
 	], usage: { input: 60, output: 9, cached: 0 } });

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { groundTruth, targets } from './ground-truth.js';
-import { requireStrata, runtime, type CachedAskResult, type ToolDetail } from './runtime.js';
+import { requireStrata, runtime, type CachedAskResult, type ToolDetail, type RequestUsage } from './runtime.js';
 import { score } from './scoring.js';
 import type { EvalCase } from './types.js';
 
@@ -32,6 +32,19 @@ export function parseArgs(args: string[]): RunOptions {
 }
 interface EvalRecord extends Omit<CachedAskResult, 'answer'> {
 	answer?: string; iteration: number; id: string; target: string; refusal: boolean; pass: boolean; wallMs: number; error?: string; checks?: { check: string; pass: boolean }[];
+}
+export function summarizeRequestUsage(records: { requests?: RequestUsage[] }[]) {
+	const summary = { count: 0, input: 0, cached: 0, output: 0, newUserChars: 0, newToolResultChars: 0,
+		prevThinkingChars: 0, prevTextChars: 0, prevToolCallArgChars: 0 };
+	for (const { requests } of records) for (const request of requests ?? []) {
+		summary.count++;
+		for (const key of ['input', 'cached', 'output', 'newUserChars', 'newToolResultChars', 'prevThinkingChars', 'prevTextChars', 'prevToolCallArgChars'] as const) summary[key] += request[key];
+	}
+	return summary;
+}
+export function requestUsageMarkdown(summary: ReturnType<typeof summarizeRequestUsage>): string {
+	return '\n## Request usage\n\n| Metric | Total |\n|---|---|\n'
+		+ Object.entries(summary).map(([key, value]) => `| ${key} | ${value} |`).join('\n') + '\n';
 }
 export function summarizeToolErrors(records: { toolDetails: ToolDetail[] }[]) {
 	const summary = { totalCalls: 0, totalErrors: 0,
@@ -83,7 +96,7 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {
 				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
+				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 			}
 			const record = records.at(-1)!;
 			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
@@ -98,12 +111,14 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
 	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
 	const toolErrors = summarizeToolErrors(records);
-	const report = { ...options, toolErrors, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+	const requestUsage = summarizeRequestUsage(records);
+	const report = { ...options, toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 	await mkdir('evals/results', { recursive: true });
 	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
 	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
 	const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
-	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors));
+	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors) + requestUsageMarkdown(requestUsage));
+	console.log(`Request usage: ${JSON.stringify(requestUsage)}`);
 	console.log(passCounts);
 	console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);
 	console.log(`Tool errors: ${toolErrors.totalErrors}/${toolErrors.totalCalls} calls; ${JSON.stringify(toolErrors.byCode)}`);
