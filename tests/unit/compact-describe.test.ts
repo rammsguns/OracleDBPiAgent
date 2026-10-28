@@ -46,3 +46,40 @@ it('uses compact rendering only for describe and keeps binds, audit and the FK n
 	expect(close).toHaveBeenCalledOnce();
 	expect(tool.description).toContain('Never infer a parent');
 });
+
+const headers = [
+	'Columns: position|name|type|length',
+	'Constraints: name|type|status|child_columns(position:name)',
+	'Indexes: name|uniqueness|status|columns(position:name)',
+];
+for (const [label, text, retained] of [
+	['Stats', `${headers[0]}\n1|ID|NUMBER|22\n2|NAME|VARCHAR2|80\n${headers[1]}\nPK_T|P|ENABLED|1:ID,2:NAME\nFK_T|R|DISABLED|1:ID\n${headers[2]}\nIX_T|UNIQUE|VALID|1:ID,2:NAME\nStats: 1 more not shown [truncated]\n[truncated]`, [0,1,2,3,4,5,6,7,8,9]],
+	['Indexes', `${headers[0]}\n1|ID|NUMBER|22\n2|NAME|VARCHAR2|80\n${headers[1]}\nPK_T|P|ENABLED|1:ID,2:NAME\nFK_T|R|DISABLED|1:ID\nIndexes: 1 more not shown [truncated]\nStats: 1 more not shown [truncated]\n[truncated]`, [0,1,2,3,4,5,6]],
+	['Constraints partly', `${headers[0]}\n1|ID|NUMBER|22\n2|NAME|VARCHAR2|80\n${headers[1]}\nPK_T|P|ENABLED|1:ID,2:NAME\nConstraints: 1 more not shown [truncated]\nIndexes: 1 more not shown [truncated]\nStats: 1 more not shown [truncated]\n[truncated]`, [0,1,2,4,5]],
+	['Constraints', `${headers[0]}\n1|ID|NUMBER|22\n2|NAME|VARCHAR2|80\nConstraints: 2 more not shown [truncated]\nIndexes: 1 more not shown [truncated]\nStats: 1 more not shown [truncated]\n[truncated]`, [0,1]],
+	['Columns partly', `${headers[0]}\n1|ID|NUMBER|22\nColumns: 1 more not shown [truncated]\nConstraints: 2 more not shown [truncated]\nIndexes: 1 more not shown [truncated]\nStats: 1 more not shown [truncated]\n[truncated]`, [0]],
+	['Columns', 'Columns: 2 more not shown [truncated]\nConstraints: 2 more not shown [truncated]\nIndexes: 1 more not shown [truncated]\nStats: 1 more not shown [truncated]\n[truncated]', []],
+] as const) {
+	it(`discloses ${label} omissions with exact text and whole composite entities`, () => {
+		const expected = { content: [{ type: 'text', text }], details: { ...result, rows: retained.map(i => result.rows[i]), truncated: true } };
+		const cap = Buffer.byteLength(JSON.stringify(expected));
+		const output = boundedResult(result, cap, renderDescribe);
+		expect(output).toEqual(expected);
+		expect(Buffer.byteLength(JSON.stringify(output))).toBeLessThanOrEqual(cap);
+		expect(output.details.truncated).toBe(true);
+	});
+}
+it('refuses a cap too small to retain section disclosures', () => {
+	expect(() => boundedResult(result, 100, renderDescribe)).toThrow('disclose omitted describe sections');
+});
+it('does not claim complete keys when the database row limit truncated metadata', () => {
+	const output = boundedResult({ ...result, truncated: true }, 10000, renderDescribe);
+	expect(output.content[0]!.text).toBe(`${headers[0]}\n1|ID|NUMBER|22\n2|NAME|VARCHAR2|80\nConstraints: 2 more not shown [truncated]\nIndexes: 1 more not shown [truncated]\nStats: table|NUM_ROWS|LAST_ANALYZED\nT|42|2026-10-27 12:34:56\n[truncated]`);
+	expect(output.details.rows.some((row: unknown[]) => row[0] === 'CONSTRAINT')).toBe(false);
+});
+it('preserves generic tools exact text including byte truncation', () => {
+	const input = { columns: ['A', 'B'], rows: [[1, null], [2, 'a  b']], elapsedMs: 1, truncated: false };
+	expect(boundedResult(input, 10000).content[0]!.text).toBe('A | B\n1 | NULL\n2 | a b');
+	const expected = { content: [{ type: 'text', text: 'A | B\n1 | NULL\n[truncated]' }], details: { ...input, rows: [[1, null]], truncated: true } };
+	expect(boundedResult(input, Buffer.byteLength(JSON.stringify(expected)))).toEqual(expected);
+});
