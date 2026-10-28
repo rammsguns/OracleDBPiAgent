@@ -1,0 +1,1 @@
+{"name":"drop-thinking","description":"Do not resend earlier reasoning to the model","env":{"PIAGENT_DROP_PRIOR_THINKING":"1"}}

@@ -166,9 +166,9 @@ Every refusal passed in every run. Token figures are input / output.
 
 **Where input tokens go.** Each model request resends about 6,000 characters of
 fixed context (roughly 1,600 tokens): about 2,200 for the system prompt and about
-3,800 for the 12 tool definitions. Further savings would mean shorter tool
-descriptions, which the FK and column-name notes depend on, or prefix caching on
-the Strata side, which is out of scope.
+3,800 for the 12 tool definitions. That prefix is already served from Strata's
+llama.cpp prompt cache, and eval `tokensIn` (pi-ai `usage.input`) excludes cached
+tokens, so shortening it saves little (see "Drop prior thinking" below).
 
 **Current baseline (after the review fixes, 2026-10-27).** The cached-plan cases
 now seed their own cursor, which changed the dev and holdout case hashes. Every
@@ -182,3 +182,18 @@ refusal passed in every run. Token figures are input / output.
 
 Hard dev input fell from 138.6k to 125.6k. That fits the plan cases no longer
 spending tool calls searching for a cursor that is not cached.
+
+## Drop prior thinking — rejected, 2026-10-27
+
+`PIAGENT_DROP_PRIOR_THINKING=1` (opt-in tunable, default off) strips earlier
+reasoning blocks from the history before each request. Hard dev ×2 on Strata:
+
+| Variant | Pass | Tokens in/out | Tool calls | Wall |
+|---|---|---|---|---|
+| baseline | 40/40, all refusals pass | 133.4k / 48.6k | 101 | 735 s |
+| drop-thinking | 40/40, all refusals pass | 155.8k / 54.9k | 124 | 862 s |
+
+Rejected. Rewriting earlier messages invalidates the prompt cache, so more prompt
+tokens count as uncached input, and the model made more tool calls. Changes that
+cut tokens should keep the history append-only. What remains costly is new tool
+result text and output tokens.

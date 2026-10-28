@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../../src/config/index.js';
 import { appendToolNotes, loadTunables } from '../../src/config/tunables.js';
-import { systemPrompt } from '../../src/agent/index.js';
+import { dropPriorThinking, systemPrompt } from '../../src/agent/index.js';
 import { parseArgs, runEvals } from '../../evals/run.js';
 import { appendLedger, leaderboard, loadVariant, parseOptimizeArgs, validateVariant, variantEnvironment, type LedgerRecord } from '../../evals/optimize.js';
 
@@ -28,6 +28,21 @@ it('keeps defaults and validates temperature without contacting Strata', () => {
 	expect(loadTunables({})).toEqual({});
 	expect(loadConfig({ PIAGENT_LLM_TEMPERATURE: '0' }).llm.temperature).toBe(0);
 	for (const value of ['', ' ', '-1', '2.1', 'NaN', 'Infinity']) expect(() => loadTunables({ PIAGENT_LLM_TEMPERATURE: value })).toThrow();
+});
+it('drops earlier reasoning only when asked, keeping answers and tool calls', () => {
+	expect(loadTunables({ PIAGENT_DROP_PRIOR_THINKING: '1' })).toEqual({ dropPriorThinking: true });
+	expect(loadTunables({ PIAGENT_DROP_PRIOR_THINKING: '0' })).toEqual({ dropPriorThinking: false });
+	for (const value of ['', 'true', 'yes', '2']) expect(() => loadTunables({ PIAGENT_DROP_PRIOR_THINKING: value })).toThrow();
+	expect(validateVariant({ name: 'v', description: '', env: { PIAGENT_DROP_PRIOR_THINKING: '1' } }).env).toEqual({ PIAGENT_DROP_PRIOR_THINKING: '1' });
+	const user = { role: 'user', content: 'q', timestamp: 0 } as any;
+	const call = { type: 'toolCall', id: 't1', name: 'run_query', arguments: { sql: 'SELECT 1 FROM dual' } };
+	const assistant = { role: 'assistant', content: [{ type: 'thinking', thinking: 'long reasoning' }, { type: 'text', text: 'Checking.' }, call], timestamp: 0 } as any;
+	const result = { role: 'toolResult', toolCallId: 't1', toolName: 'run_query', content: [{ type: 'text', text: '1' }], isError: false, timestamp: 0 } as any;
+	const pruned = dropPriorThinking([user, assistant, result]);
+	expect(pruned[0]).toBe(user);
+	expect(pruned[2]).toBe(result);
+	expect((pruned[1] as any).content).toEqual([{ type: 'text', text: 'Checking.' }, call]);
+	expect(assistant.content).toHaveLength(3);
 });
 it('caps files, preserves fixed prompt first and appends only known tool descriptions', async () => {
 	const file = join(await temp(), 'appendix');
