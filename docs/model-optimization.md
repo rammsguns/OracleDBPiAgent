@@ -221,3 +221,25 @@ MVP cases barely use `describe_object`, so they changed little. The Antigravity
 re-review ran the full integration suite, including its one LLM end-to-end test,
 while the WP-L hard dev run was in progress, so that run overlapped one extra
 Strata request.
+
+## WP-M multi-table describe — rejected, 2026-10-27
+
+WP-M (branch `rammsguns/wp-m-multi-describe`, `8dfe184`, not merged) let
+`describe_object` take up to 5 tables per call, with count-only details so a
+normal batch fits the 16 KiB result cap. Hard dev ×2 on Strata (cases
+`ed62129f597b`), against the WP-L run:
+
+| Run | Pass | Tokens in/out | Tool calls | Wall |
+|---|---|---|---|---|
+| WP-L `02721a2` | 40/40 | 125.2k / 50.5k | 96 | 757 s |
+| WP-M `8dfe184` | 40/40 | 135.4k / 51.1k | 85 | 763 s |
+
+The model did batch: the five describe-heavy cases fell from 3–5 describe calls
+to one, and their input fell 5.7% (46.2k → 43.6k) and output 2%. The model still
+reads the same metadata text, so fewer requests save little; the other cases
+moved +16% from run-to-run noise. The gain is smaller than the noise and fails
+the gate (input must fall), so the tool stays single-table. Remaining input cost
+is metadata and query-result text itself, not request count.
+
+WP-N (merged) adds `tokensCached` to eval records, reports and the ledger;
+rows written before it show `?`.
