@@ -386,5 +386,7 @@ At 94d0c11 (WP-S prompt), hard dev alternating 4 single-repeat runs per side:
 
 All refusals pass on both sides. The budget does not lower output tokens: the
 model rarely reaches 1,024 thinking tokens in one request, so the cap seldom
-applies. It stays opt-in and off by default; no further budget tests are
+applies. In the unset runs, only 6 of 239 requests went over 1,024 output tokens
+(median 286, p90 709, max 2,275); capping them could save at most about 0.8k
+tokens per run, about 1%. It stays opt-in and off by default; no further budget tests are
 planned.
