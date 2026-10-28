@@ -174,3 +174,78 @@ In the compact format:
   Foreign key rows in `describe_object` only list local child table columns, because parent tables require joining `ALL_CONSTRAINTS`. The compact line `FK_ORDERS_CUSTOMERS|R|ENABLED|1:CUSTOMER_ID` presents `columns(position:name)` on the same line as the constraint name, which models may misread as naming the parent table or parent column.
 - **Fix:**
   Clarify the header label to `Constraints: name|type|status|child_columns(position:name)` to reinforce that the columns listed belong to the described table, not the referenced table.
+
+---
+
+## Re-Review (2026-10-27)
+
+**Target:** Commit `02721a2` on branch `rammsguns/wp-l-compact-describe` (reviewed against `c6bdb50` and `needlefish`)  
+**Verdict:** **APPROVE**
+
+### Summary of Changes
+
+Commit `02721a2` refactors `renderDescribe` and introduces a dedicated `boundedDescribe` pipeline that operates on whole entities rather than popping arbitrary raw SQL rows:
+1. **Entity-Aware Section Parsing:** `describeSections` groups parent rows (`CONSTRAINT`, `INDEX`, `COLUMN`, `STATS`) with all corresponding child rows (`CONSTRAINT_COLUMN`, `INDEX_COLUMN`) into discrete entity records.
+2. **Atomic Entity Truncation:** When enforcing byte caps, `boundedDescribe` pops entire entities (`section.entries.pop()`) from the tail section and synchronously filters all constituent rows (`parent` + all `children`) from `details.rows`. Composite constraints and indexes can never have child columns stripped while keeping the parent.
+3. **Explicit Section Omission Disclosures:** `renderDescribeSections` tracks `section.omitted`. If entries are truncated (partially or entirely), it renders `${section.header.split(":")[0]}: ${section.omitted} more not shown [truncated]`. No section header is ever dropped silently. If a byte cap is too small to display omission notices, it fails closed by throwing an informative error.
+4. **Header Clarification:** Updated constraint header to `Constraints: name|type|status|child_columns(position:name)`.
+5. **Comprehensive Truncation Tests:** Added 6 parametric exact-match unit tests asserting entity integrity and disclosures across every section, plus DB row-cap handling, refusal of impossible caps, and generic tool pass-through byte fidelity.
+
+---
+
+### Verification Against Prior Findings
+
+| Prior Finding | Status | Verification & Resolution Details |
+|---|---|---|
+| **Finding 1 (HIGH):** Composite constraint/index columns stripped from right to left | **RESOLVED** | `describeSections` ties parents and children together in `entry.rows`. `boundedDescribe` removes whole entities atomically from both rendered output and `details.rows`. Probed across decreasing byte limits: composite PKs and indexes are either retained with all columns or cleanly omitted with a disclosure. No incomplete column list can be rendered. |
+| **Finding 2 (MEDIUM):** Sections dropped silently without section-level notice | **RESOLVED** | `renderDescribeSections` checks `section.omitted`. When all entries of a section are truncated (e.g. `Stats` or `Indexes`), the section header is retained with `${section.header.split(":")[0]}: ${section.omitted} more not shown [truncated]`. Silent drops are impossible. |
+| **Finding 3 (MEDIUM):** Test suite failed to assert truncation integrity | **RESOLVED** | `tests/unit/compact-describe.test.ts` now tests exact truncated strings and exact retained row sets for `Stats`, `Indexes`, `Constraints partly`, `Constraints`, `Columns partly`, and `Columns`, as well as overly small caps and DB row-cap behavior. |
+| **Finding 4 (LOW):** Single-line constraint header risks FK parent misinterpretation | **RESOLVED** | Header updated to `Constraints: name|type|status|child_columns(position:name)`. |
+
+---
+
+### Evaluation of Design Choice: Database Row Cap (`maxRows`) Handling
+
+**Design Question:** When the database row cap (`maxRows`) truncates the raw UNION ALL query, `boundedDescribe` drops all constraint and index entries and reports them as omitted (`Constraints: N more not shown [truncated]`, `Indexes: M more not shown [truncated]`), rather than attempting to keep seemingly complete ones. Is that acceptable, too lossy, or should it keep entities whose column lists are provably complete?
+
+**Judgment:** **ACCEPTABLE** (Recommended, sound engineering design).
+
+**Technical Analysis & Rationale:**
+1. **Unverifiability of Entity Completeness:**
+   The underlying query orders by `1, 5, 2` (`kind, position, name`). `CONSTRAINT_COLUMN` rows are sorted by `position` ascending across constraints. If `maxRows` (default 200) cuts off the query during `CONSTRAINT_COLUMN` or `INDEX_COLUMN`, column position 1 might be returned for all constraints while column position 2 or 3 is truncated. Because Oracle's `ALL_CONSTRAINTS` and `ALL_INDEXES` views do not provide a total column count column in the projection, the client has no way to prove whether a constraint returned with column 1 was a single-column constraint or an incomplete composite constraint.
+2. **Preservation of Soundness Invariants:**
+   Presenting an apparently "complete" constraint that is secretly missing columns truncated by the DB row cap would reintroduce the exact hazard flagged in Finding 1: models generating invalid single-column joins or unique assumptions on multi-column keys.
+3. **Lossiness Is Minimal and Contextual:**
+   - In normal schema introspection, tables rarely exceed 200 metadata rows.
+   - For wide tables exceeding `maxRows`, `Columns` (which are 1 row per column, each having explicit `column_id`) are preserved up to the row limit, and `Stats` is retained if reached.
+   - Constraints and indexes are omitted with explicit, prominent disclosures (`Constraints: N more not shown [truncated]`), clearly signaling to the agent that relational metadata was cut off and prompting it to query `ALL_CONSTRAINTS` directly via `run_query`.
+4. **Fail-Closed Robustness:**
+   Attempting heuristic entity preservation (e.g., keeping constraints only if the last fetched row was `INDEX_COLUMN` or `STATS`) would tightly couple TypeScript logic to the specific UNION ALL collation and Oracle null-ordering semantics, creating fragile failure modes. The all-or-nothing omission for relational sections under DB-level truncation is the right fail-closed default.
+
+---
+
+### Verification Results
+
+All tests executed cleanly against the worktree and live targets:
+
+| Test / Check | Result | Command & Output Details |
+|---|---|---|
+| TypeScript Typecheck | **PASS** | `npm run typecheck` (`tsc -p tsconfig.json --noEmit`) exited 0 |
+| Unit Test Suite | **PASS** | `npm test` (`vitest run tests/unit`): 264 passed across 11 files (657ms) |
+| Compact Describe Unit Tests | **PASS** | `tests/unit/compact-describe.test.ts`: 13/13 tests passed, covering all section truncation permutations |
+| Integration Tests (19c) | **PASS** | `tests/integration/compact-describe.test.ts`: 3/3 passed against `d1-19c-lab` (`SH.SALES`, `SH.CUSTOMERS`) and `p1-19c-prod` (`SHOPAPP.ORDERS`) (470ms) |
+| Full Integration Suite | **PASS** | 13/13 passed across 4 files against approved targets |
+| Git Formatting & Hygiene | **PASS** | `git diff --check needlefish..02721a2` returned 0 issues |
+| Generic Tools Pass-Through | **PASS** | Verified that `run_query`, `list_objects`, `get_source`, and other tools retain unchanged output, pagination, and byte truncation |
+
+---
+
+### Numbered Findings
+
+None. All previous findings have been completely resolved.
+
+---
+
+### Final Verdict
+
+**APPROVE**
