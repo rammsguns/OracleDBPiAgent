@@ -266,3 +266,26 @@ evidence does not support a new default, so the tunable stays opt-in.
 First `tokensCached` readings: Strata's prompt cache served about 70% of prompt
 tokens on hard dev (296k cached vs 125k uncached). The remaining cost is new
 tool-result text and the model's output; prompt and tool definitions are cached.
+
+## WP-Q run_query error hints — failed the token gate, not merged (2026-10-27)
+
+WP-Q (`rammsguns/wp-q-error-hints`, 2e118a4; Antigravity APPROVE after one fix
+round) appends a short hint to `run_query` errors: real column names and close
+matches for ORA-00904/01747 on dictionary and `V$` views, the `ALL_*` alternative
+for ungranted `DBA_*` views (ORA-00942), and a static ORA-00935 hint.
+
+Hard dev ×2 on Strata, with WP-P diagnostics on both sides:
+
+| Run | Pass | Tokens in | Tokens out | Tool calls | `run_query` errors |
+|---|---|---|---|---|---|
+| Baseline (3941be1) | 40/40 | 119,999 | 49,318 | 102 | 13 |
+| WP-Q (2e118a4) | 40/40 | 130,179 | 53,502 | 112 | 8 |
+
+Errors fell by 38%, but tokens rose by 8.5%, so WP-Q fails the gate. Most of the
+increase is in cases where no hint fired (`hard-region-channel` had 0 errors on
+both sides, but 7 → 12 calls; `hard-follow-plan` 7 → 15 calls), which is
+exploration noise. In the target case `hard-top-buffer-plan`, errors went 6 → 2
+and calls 18 → 15, but tokens still rose by about 2k, because the hint text adds
+input. Run-to-run noise (baseline input has ranged from 120k to 145k) is larger
+than the effect this measures. Proving a small gain would take more repeats on
+both sides.
