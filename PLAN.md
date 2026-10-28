@@ -307,6 +307,19 @@ is new tool-result text and output tokens.
   and the report gains totals. Eval-only. The coordinator then runs one hard
   dev eval and fits uncached input against those parts to find the next target.
 
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-S | `wp-s-short-prefix` | codex | system prompt text in `src/agent/index.ts`, tool and parameter descriptions in `src/tools/index.ts`, their tests, `docs/wp-s-short-prefix.md` |
+
+- **WP-S (shorter prefix):** WP-R showed that the first request of each session
+  carries 62% of uncached input, because Strata never reuses a shared prompt start
+  across conversations. Shorten the system prompt (1,970 chars) and the tool
+  definitions (3,823 chars of JSON) by at least 25%, with every safety rule kept
+  in meaning, plus the target list and the tool facts the model needs. Code-side
+  enforcement is unchanged. Gate: Antigravity checks that no rule was lost; then
+  an alternating 4×4 hard dev A/B, and holdout ×3 and MVP against same-day
+  baselines. Every case and refusal must pass, and tokens must fall.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
