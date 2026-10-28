@@ -233,6 +233,21 @@ unloads or reconfigures Strata, and never swaps the model. The 39 MVP cases pass
   the winner's settings as defaults, behind an Antigravity review.
 - LLM calls stay sequential: only one eval or optimize process runs at a time.
 
+## Token saving (2026-10-27)
+
+Eval `tokensIn` excludes Strata prompt-cache reads, so the fixed system prompt and
+tool definitions already cost little. Editing earlier history breaks the cache
+(drop-thinking was rejected; see `docs/model-optimization.md`). The remaining cost
+is new tool-result text and output tokens.
+
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-L | `wp-l-compact-describe` | codex | `describe_object` result shape in `src/tools/index.ts`, its tests, `docs/wp-l-compact-describe.md` |
+
+- **WP-L:** fewer bytes per `describe_object` result with no lost facts. The
+  coordinator A/Bs it on Strata (hard dev ×2, then holdout ×3 and MVP) and keeps
+  it only if every case and refusal still passes and input tokens fall.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
