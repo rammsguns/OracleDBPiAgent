@@ -243,3 +243,26 @@ is metadata and query-result text itself, not request count.
 
 WP-N (merged) adds `tokensCached` to eval records, reports and the ledger;
 rows written before it show `?`.
+
+## WP-O reasoning budget — merged as opt-in, not promoted, 2026-10-27
+
+`PIAGENT_LLM_REASONING_BUDGET` (64–8192, unset by default) sends Strata's
+`reasoning_budget_tokens`, which closes the thinking phase after that many
+tokens (server default 2,048). Antigravity approved it. Strata, same cases:
+
+| Run | Baseline | Budget 1,024 | Budget 512 |
+|---|---|---|---|
+| Hard dev ×2 (`ed62129f597b`) | 40/40, 124.7k / 50.6k, 296k cached, 100 calls | 40/40, 116.4k / 47.3k, 282k cached, 90 calls | 40/40, 122.2k / 46.4k, 266k cached, 90 calls |
+| Hard holdout ×3 (`d2ad2105dbbf`) | 39/39, 99.3k / 31.5k* | 39/39, 102.1k / 31.1k, 183k cached | — |
+| MVP ×1 (`2b08ce0bdc33`) | 39/39, 76.9k / 13.6k* | 39/39, 77.7k / 13.8k, 92k cached | — |
+
+\* WP-L runs on the same cases (before `tokensCached` existed).
+
+Every case and refusal passed. Budget 1,024 cut hard dev input + output by 6.6%,
+but holdout (+1.8%) and MVP (+1.0%) did not improve, and the dev gain is inside
+the run-to-run spread seen this round (baseline input 124.7k–144.7k). The
+evidence does not support a new default, so the tunable stays opt-in.
+
+First `tokensCached` readings: Strata's prompt cache served about 70% of prompt
+tokens on hard dev (296k cached vs 125k uncached). The remaining cost is new
+tool-result text and the model's output; prompt and tool definitions are cached.

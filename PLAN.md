@@ -263,7 +263,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-O | `wp-o-reasoning-budget` | codex | opt-in `PIAGENT_LLM_REASONING_BUDGET` tunable in `src/config/tunables.ts`, `src/llm/index.ts`, `evals/optimize.ts` (allowed keys), variants, tests |
 
-- **WP-O:** output (thinking) is now the larger cost. Strata accepts a per-request
+- **WP-O (merged opt-in 2026-10-27, not promoted):** output (thinking) is now the larger cost. Strata accepts a per-request
   `reasoning_budget_tokens` (default 2,048) that closes the thinking phase. Add it
   as an opt-in tunable (unset = unchanged requests); the coordinator A/Bs budgets
   of 1,024 and 512 under the usual gate (all cases and refusals pass; tokens fall).
