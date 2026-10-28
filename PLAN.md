@@ -395,6 +395,49 @@ tool call; clean SIGTERM shutdown; token not in the audit. `npm run build` now
 copies `src/web/static/` into `dist/web/static/`, so the compiled `piagent web`
 serves the page too.
 
+## More read-only DBA tools (phase draft, 2026-10-28; awaiting approval)
+
+Goal: add four read-only tools for common DBA questions that the current 12 tools
+answer only through free-form `run_query`. Blocking sessions and locks
+(`session_activity`) and top SQL (`top_sql`) already exist. The new tools must
+not make the agent worse or more expensive on the existing evals.
+
+Access probe on 2026-10-28 (SELECT ... WHERE 1=0 as the product accounts):
+- d1: V$PARAMETER, DBA_TAB_STATISTICS, DBA/ALL_INDEXES, V$SESSION_LONGOPS,
+  V$LOG, V$ARCHIVED_LOG, V$RMAN_BACKUP_JOB_DETAILS, *_SCHEDULER_JOBS and
+  *_JOB_RUN_DETAILS all readable. ALL_TAB_STATISTICS errored with no ORA code
+  (likely the call timeout), so use DBA_TAB_STATISTICS on d1.
+- p1: only ALL_TAB_STATISTICS, ALL_TAB_MODIFICATIONS, ALL_INDEXES,
+  ALL_IND_COLUMNS, V$SESSION_LONGOPS and the scheduler views. All V$ parameter,
+  log and backup views and DBA_ views return ORA-00942.
+
+| WP | Branch / worktree | Agent | Tools |
+|---|---|---|---|
+| WP-W | `wp-w-schema-health` | codex | `optimizer_stats` (owner and optional table: num_rows, last_analyzed, stale_stats, DML since last analyze where readable; DBA_ first, ALL_ fallback on ORA-00942 or timeout) and `index_health` (owner and table: index name, uniqueness, status including UNUSABLE partitions, visibility, columns in order, blevel, clustering factor vs table blocks, last_analyzed) |
+| WP-X | `wp-x-instance-ops` | codex | `db_parameters` (name pattern or non-default only; V$PARAMETER; on p1 fail naming the grant, like `wait_events`) and `ops_status` (topic: `long_ops` / `jobs` / `backups`; running long operations with % done; scheduler jobs with state, failures and last run status; last RMAN jobs and archive log rate, d1 only, naming the missing grant on p1) |
+| Review | — | antigravity | each branch |
+
+Rules for both WPs:
+- Each WP puts its SQL and definitions in its own module (`src/tools/schemaHealth.ts`,
+  `src/tools/instanceOps.ts`) and adds one import line to `src/tools/index.ts`,
+  so the merge is simple.
+- Fixed SQL only, bounded rows, bind variables for every input, owner and table
+  names validated like `describe_object`. Every call goes through the existing
+  SQL policy and audit. No ASH/AWR, DBMS_STATS or package calls.
+- Tool descriptions are at most 110 characters, with minimal schemas. The
+  coordinator raises the `short-prefix` test cap by the measured growth (budget:
+  700 characters for all four tools).
+- Each WP adds `evals/cases-hard/<wp>.json` with at least 3 dev and 2 holdout
+  cases that the existing tools answer poorly or expensively, with ground truth
+  checked against the live targets using read-only queries.
+
+Gate:
+- typecheck, `npm test`, filtered integration tests, and an Antigravity review.
+- On the merged branch: the new cases pass ×3. The existing hard dev 4×4 A/B,
+  holdout ×3 and MVP all pass (every refusal passes), and hard dev tokens rise
+  by no more than 3% against a same-day baseline.
+- Merge and push only if all of this passes.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
