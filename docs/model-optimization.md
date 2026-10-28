@@ -373,3 +373,18 @@ Confirmation runs, same day, all passing with every refusal:
 
 Beyond the shorter prefix itself, the shorter text also led to fewer tool calls
 and less thinking.
+
+## Reasoning budget re-tested on the WP-S prompt — still no saving (2026-10-28)
+
+At 94d0c11 (WP-S prompt), hard dev alternating 4 single-repeat runs per side:
+`PIAGENT_LLM_REASONING_BUDGET` unset vs 1024.
+
+| Per run (mean of 4) | Pass | Tokens in | Tokens out | Total | Tool calls |
+|---|---|---|---|---|---|
+| Unset | 80/80 | 58,077 | 23,107 | 81,185 | 48.5 |
+| 1024 | 80/80 | 59,921 | 23,277 | 83,198 (+2.5%) | 46.25 |
+
+All refusals pass on both sides. The budget does not lower output tokens: the
+model rarely reaches 1,024 thinking tokens in one request, so the cap seldom
+applies. It stays opt-in and off by default; no further budget tests are
+planned.
