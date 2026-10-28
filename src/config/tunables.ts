@@ -3,6 +3,7 @@ import type { AppConfig, LlmConfig } from '../contracts.js';
 
 export interface HarnessTunables {
 	temperature?: number;
+	reasoningBudgetTokens?: number;
 	promptAppendix?: string;
 	toolNotes?: Record<string, string>;
 	dropPriorThinking?: boolean;
@@ -26,6 +27,12 @@ export function readBoundedFile(path: string): Buffer {
 }
 export function loadTunables(env: NodeJS.ProcessEnv): HarnessTunables {
 	const result: HarnessTunables = {};
+	if (env.PIAGENT_LLM_REASONING_BUDGET !== undefined) {
+		const raw = env.PIAGENT_LLM_REASONING_BUDGET;
+		const n = Number(raw);
+		if (!raw.trim() || !Number.isInteger(n) || n < 64 || n > 8192) throw new Error('Invalid PIAGENT_LLM_REASONING_BUDGET');
+		result.reasoningBudgetTokens = n;
+	}
 	if (env.PIAGENT_LLM_TEMPERATURE !== undefined) {
 		const raw = env.PIAGENT_LLM_TEMPERATURE;
 		const n = Number(raw);

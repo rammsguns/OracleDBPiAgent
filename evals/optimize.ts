@@ -7,7 +7,7 @@ import { loadConfig } from '../src/config/index.js';
 import { readBoundedFile } from '../src/config/tunables.js';
 import { parseArgs, runEvals, type RunOptions } from './run.js';
 
-export const TUNABLE_KEYS = ['PIAGENT_LLM_THINKING', 'PIAGENT_LLM_MAX_OUTPUT_TOKENS', 'PIAGENT_LLM_TEMPERATURE', 'PIAGENT_PROMPT_APPENDIX_FILE', 'PIAGENT_TOOL_NOTES_FILE', 'PIAGENT_DROP_PRIOR_THINKING'] as const;
+export const TUNABLE_KEYS = ['PIAGENT_LLM_REASONING_BUDGET', 'PIAGENT_LLM_THINKING', 'PIAGENT_LLM_MAX_OUTPUT_TOKENS', 'PIAGENT_LLM_TEMPERATURE', 'PIAGENT_PROMPT_APPENDIX_FILE', 'PIAGENT_TOOL_NOTES_FILE', 'PIAGENT_DROP_PRIOR_THINKING'] as const;
 const FILE_KEYS = ['PIAGENT_PROMPT_APPENDIX_FILE', 'PIAGENT_TOOL_NOTES_FILE'];
 export function parseOptimizeArgs(args: string[]): { report: boolean; variant?: string; run: RunOptions } {
 	const rest: string[] = [];
