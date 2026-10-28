@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Oracle 19c · Database assistant</title>
+	<link rel="stylesheet" href="/app.css">
+	<script type="module" src="/app.js"></script>
+</head>
+<body>
+	<header>
+		<h1>Oracle 19c <span>Database assistant</span></h1>
+		<label for="target">Target</label>
+		<select id="target"><option value="">Default</option></select>
+		<p id="health" role="status">Checking health…</p>
+		<button id="refresh" type="button">Refresh health</button>
+		<button id="stop" type="button" disabled>Stop</button>
+	</header>
+	<p id="status" role="status">Connecting…</p>
+	<main>
+		<section aria-labelledby="chat-title" class="chat">
+			<h2 id="chat-title">Conversation</h2>
+			<div id="messages" role="log" aria-label="Conversation"></div>
+			<form id="ask">
+				<label for="question">Ask about your database</label>
+				<textarea id="question" rows="3" maxlength="16000" required disabled placeholder="What would you like to investigate?"></textarea>
+				<div class="compose-footer"><small>Read-only · Local Strata · Enter to send, Shift+Enter for a new line</small><button id="send" disabled>Send</button></div>
+			</form>
+		</section>
+		<section aria-label="Evidence" class="evidence">
+			<div role="tablist" aria-label="Evidence views">
+				<button id="trace-tab" role="tab" aria-selected="true" aria-controls="trace-panel" tabindex="0">Tool trace</button>
+				<button id="audit-tab" role="tab" aria-selected="false" aria-controls="audit-panel" tabindex="-1">Audit</button>
+			</div>
+			<div id="trace-panel" role="tabpanel" aria-labelledby="trace-tab"><p>Tool calls appear here as the answer streams.</p><div class="table-scroll"><table><caption>Tool calls</caption><thead><tr><th scope="col">Name</th><th scope="col">Arguments</th><th scope="col">Status</th><th scope="col">Result bytes</th></tr></thead><tbody id="trace"></tbody></table></div></div>
+			<div id="audit-panel" role="tabpanel" aria-labelledby="audit-tab" hidden><button id="audit-refresh" type="button">Refresh audit</button><p id="audit-status" role="status"></p><div class="table-scroll"><table><caption>Session audit records</caption><thead><tr><th scope="col">Kind</th><th scope="col">Tool</th><th scope="col">Target</th><th scope="col">SQL hash</th><th scope="col">Rows</th><th scope="col">Elapsed ms</th></tr></thead><tbody id="audit"></tbody></table></div></div>
+		</section>
+	</main>
+</body>
+</html>
