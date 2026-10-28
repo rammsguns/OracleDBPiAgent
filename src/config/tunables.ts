@@ -5,6 +5,7 @@ export interface HarnessTunables {
 	temperature?: number;
 	promptAppendix?: string;
 	toolNotes?: Record<string, string>;
+	dropPriorThinking?: boolean;
 }
 export type TunableLlmConfig = LlmConfig & HarnessTunables;
 export type TunableAppConfig = AppConfig & { llm: TunableLlmConfig };
@@ -30,6 +31,10 @@ export function loadTunables(env: NodeJS.ProcessEnv): HarnessTunables {
 		const n = Number(raw);
 		if (!raw.trim() || !Number.isFinite(n) || n < 0 || n > 2) throw new Error('Invalid PIAGENT_LLM_TEMPERATURE');
 		result.temperature = n;
+	}
+	if (env.PIAGENT_DROP_PRIOR_THINKING !== undefined) {
+		if (!['0', '1'].includes(env.PIAGENT_DROP_PRIOR_THINKING)) throw new Error('Invalid PIAGENT_DROP_PRIOR_THINKING');
+		result.dropPriorThinking = env.PIAGENT_DROP_PRIOR_THINKING === '1';
 	}
 	if (env.PIAGENT_PROMPT_APPENDIX_FILE) result.promptAppendix = readBoundedFile(env.PIAGENT_PROMPT_APPENDIX_FILE).toString('utf8');
 	if (env.PIAGENT_TOOL_NOTES_FILE) {
