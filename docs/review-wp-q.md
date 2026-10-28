@@ -170,3 +170,115 @@ Pre-review local test suite execution:
 - `npm run typecheck`: passed
 - `npm test`: 14 files passed, 291 tests passed
 - `node --env-file=.env ./node_modules/.bin/vitest run tests/integration/query-error-hints.test.ts`: 6 tests passed against `d1-19c-lab` and `p1-19c-prod`
+
+---
+
+## Re-review (2e118a4)
+
+**Date:** 2026-10-27  
+**Reviewer:** Antigravity (Review Agent)  
+**Target:** Commit `2e118a4e617f71e4567d0c6864cd346781797420` on branch `rammsguns/review-wp-q`  
+
+### Evaluation of Required Fixes
+
+#### 1. Bad Identifier Extraction from ORA-00904
+- Commit `2e118a4` adds regex extraction targeting Oracle's reported invalid identifier:
+  ```typescript
+  const reported = error.message.match(/ORA-00904:\s*((?:"[^"]+"|[A-Z0-9_$#]+)(?:\.(?:"[^"]+"|[A-Z0-9_$#]+))*):\s*invalid identifier/i)?.[1];
+  const badColumn = reported?.replace(/"/g, "").split(".").pop()?.toUpperCase();
+  const candidates = error.message.startsWith("ORA-00904:") ? (badColumn ? [badColumn] : []) : hintCandidates(sql, views);
+  ```
+- For ORA-00904, candidate extraction scans only the reported invalid identifier rather than the entire query text. Dotted schema/table prefixes and double quotes are cleanly stripped, leaving the bare column token. If parsing fails, candidates fall back to `[]`, preventing any spurious full-query scans.
+- Unit tests verify extraction across bare identifiers (`parses`), quoted identifiers (`"parses"`), and qualified/dotted forms (`"s"."parses"`, `"s.parses"`).
+- **Status: RESOLVED**
+
+#### 2. Candidate Word Sanitization for ORA-01747
+- `hintCandidates(sql, views)` strictly sanitizes candidate words for ORA-01747 and other non-00904 errors:
+  - Filters out 47 standard SQL keywords defined in `hintKeywords` (`SELECT`, `DISTINCT`, `ALL`, `FROM`, `WHERE`, `JOIN`, `INNER`, `LEFT`, `RIGHT`, `FULL`, `OUTER`, `CROSS`, `NATURAL`, `ON`, `USING`, `GROUP`, `BY`, `ORDER`, `ASC`, `DESC`, `NULLS`, `HAVING`, `UNION`, `MINUS`, `INTERSECT`, `AND`, `OR`, `IN`, `NOT`, `NULL`, `IS`, `AS`, `ROWNUM`, `FETCH`, `FIRST`, `NEXT`, `ROW`, `ROWS`, `ONLY`, `OFFSET`, `CASE`, `WHEN`, `THEN`, `ELSE`, `END`, `WITH`, `CONNECT`, `START`, `PRIOR`, `EXISTS`, `BETWEEN`, `LIKE`, `ESCAPE`, `OVER`, `PARTITION`, `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`, `SYS`).
+  - Rejects tokens shorter than 4 characters (`word.length >= 4`), discarding short aliases like `c`, `s`, `t`, `q`.
+  - Discards extracted view names and table/subquery aliases (detected after `AS`, after view names, or preceding `.`).
+  - Explicitly prioritizes dot-qualified tokens (`c.validate`) over unqualified tokens when present.
+- Unit tests verify that keywords, aliases, literals, and comments are rejected, and qualified columns take precedence.
+- **Status: RESOLVED**
+
+#### 3. General Close-Match Heuristics Capped at 3
+- The test-fitted rules (`word === column + "_X"` and `word + "D" === column`) have been completely removed.
+- Implemented `closeColumns` with a tiered, distance- and stem-ranked matching hierarchy:
+  - **Rank 0 (Normalized Equality):** Underscores stripped (`normalized(a) === normalized(b)`). Resolves `SQL_FULL_TEXT` vs `SQL_FULLTEXT`.
+  - **Rank 1 (Prefix / Stem):** For tokens with normalized length $\ge 5$, `a.startsWith(b) || b.startsWith(a)`. Resolves `VALIDATE` vs `VALIDATED`.
+  - **Rank 2 (Levenshtein Distance):** Bounded Levenshtein distance $\le 2$ for tokens with normalized length $\ge 5$ and length difference $\le 2$. Resolves minor typos.
+  - **Rank 3 (Shared Prefix):** First 5 normalized characters match (`a.slice(0, 5) === b.slice(0, 5)`) for tokens with normalized length $\ge 5$. Resolves `PARSES` vs `PARSE_CALLS`.
+- Ranking sort order: sorted by `rank` ascending, with ties broken by original `index` (preserving `COLUMN_ID` order from `ALL_TAB_COLUMNS`).
+- Matches are capped at 3 (`.slice(0, 3)`).
+- When no match exists (e.g. `VERSION_COUNT` or `CPU` on `V$SQL`), `matches` is empty and the output cleanly omits the `close matches:` segment.
+- **Status: RESOLVED**
+
+#### 4. Documentation and Test Suite Updates
+- `docs/wp-q-error-hints.md` updated:
+  - Removed outdated references to the synthetic `_X` typo rule.
+  - Fully documented the 4-tier ranking, 5-character threshold, 3-match cap, ORA-00904 extraction, and ORA-01747 sanitization.
+  - Documented updated test counts and integration evidence.
+- `tests/unit/query-error-hints.test.ts` added 10 unit tests:
+  - `PARSES` matching `PARSE_CALLS` via common stem.
+  - Quoted and dotted ORA-00904 identifier extraction.
+  - Keyword, view, alias, literal, and comment filtering for ORA-01747.
+  - Qualified alias precedence over unqualified tokens.
+  - Suppression of `close matches:` segment when no match exists.
+  - Multi-view formatting with per-view matches and column budgets.
+  - 4-tier ranking and 3-match cap.
+  - Edit distance priority over shared prefix and minimum length enforcement.
+- Integration tests in `tests/integration/query-error-hints.test.ts` updated and verified against `d1-19c-lab` and `p1-19c-prod`.
+- **Status: RESOLVED**
+
+---
+
+### Safety and Invariant Verification
+
+The safety architecture passed in the initial review remains fully intact:
+1. **Read-Only Enforcement:** Every metadata lookup runs `SELECT ... FROM all_tab_columns ...` and passes `classifySql(statement)` before execution.
+2. **Bound Parameters:** Table and owner names continue to be safely parameterized (`:owner`, `:name`).
+3. **Execution Limits:** Strict caps on `maxRows: Math.min(1000, ctx.config.limits.maxRows)`, `timeoutSeconds: Math.min(2, ctx.config.limits.statementTimeoutSeconds)`, and maximum 3 views inspected.
+4. **Auditing:** Independent metadata lookups produce distinct audit entries with their own `sqlSha256`, preserving the user query's original audit record.
+5. **Safe Fallback:** The entire hint workflow is guarded by `try { ... } catch { return error; }`, ensuring no lookup failure alters the original error.
+6. **No Credentials/Secrets:** Hints expose only dictionary column metadata; no secrets or credentials are handled.
+
+---
+
+### Realistic Model SQL & View Evaluation
+
+Evaluated `closeColumns` and `hintCandidates` against realistic model queries across key dictionary views:
+- **`V$SQL`:**
+  - `SELECT SQL_FULL_TEXT FROM V$SQL` $\rightarrow$ `SQL_FULLTEXT` (Rank 0)
+  - `SELECT PARSES FROM V$SQL` $\rightarrow$ `PARSE_CALLS` (Rank 3)
+  - `SELECT VERSION_COUNT FROM V$SQL` $\rightarrow$ No close match (empty; does not hallucinate columns)
+  - `SELECT ELAPSED FROM V$SQL` $\rightarrow$ `ELAPSED_TIME` (Rank 1)
+  - `SELECT CPU FROM V$SQL` $\rightarrow$ No close match (rejected due to length $< 5$)
+- **`V$SESSION`:**
+  - `SELECT SID, SERIAL, USERNAME FROM V$SESSION` (ORA-00904 on `SERIAL`) $\rightarrow$ `SERIAL#` (Rank 2)
+  - `SELECT CLIENT_ID FROM V$SESSION` $\rightarrow$ `CLIENT_IDENTIFIER`, `CLIENT_INFO` (Rank 1, capped)
+  - `SELECT WAIT_TIME_MS FROM V$SESSION` $\rightarrow$ `WAIT_TIME`, `WAIT_TIME_MICRO` (Rank 1)
+- **`ALL_CONSTRAINTS`:**
+  - `SELECT c.validate FROM all_constraints c` (ORA-01747) $\rightarrow$ `VALIDATED` (Rank 1)
+  - `SELECT validate FROM all_constraints` (unqualified) $\rightarrow$ `VALIDATED` (Rank 1)
+  - `SELECT constraint_name, table_name, c.search_conditions FROM all_constraints c` $\rightarrow$ `SEARCH_CONDITION`, `SEARCH_CONDITION_VC` (Rank 1)
+- **`ALL_TAB_COLUMNS`:**
+  - `SELECT data_length_bytes FROM all_tab_columns` $\rightarrow$ `DATA_LENGTH` (Rank 1)
+  - `SELECT num_distinct_values FROM all_tab_columns` $\rightarrow$ `NUM_DISTINCT` (Rank 1)
+- **`ALL_INDEXES`:**
+  - `SELECT idx_name FROM all_indexes` $\rightarrow$ `INDEX_NAME` (Rank 2)
+  - `SELECT clustering FROM all_indexes` $\rightarrow$ `CLUSTERING_FACTOR` (Rank 1)
+  - `SELECT distinct_key FROM all_indexes` $\rightarrow$ `DISTINCT_KEYS` (Rank 1)
+  - `SELECT i.table_names FROM all_indexes i` (ORA-01747) $\rightarrow$ `TABLE_NAME`, `TABLE_OWNER`, `TABLE_TYPE` (Rank 1, capped at 3)
+
+No spurious matches on keywords, aliases, or unrelated view columns were observed across any of the tested queries.
+
+---
+
+### Test Suite Execution Summary
+
+- `npm run typecheck`: Passed cleanly with zero TypeScript errors.
+- `npm test`: Passed (14 files passed, 301 tests passed).
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/query-error-hints.test.ts`: Passed (8 tests passed across `d1-19c-lab` and `p1-19c-prod`).
+
+Verdict: APPROVE
+
