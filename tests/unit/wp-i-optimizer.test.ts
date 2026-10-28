@@ -49,7 +49,7 @@ it('caps files, preserves fixed prompt first and appends only known tool descrip
 	await writeFile(file, 'Concise answer guidance.');
 	const config = loadConfig({ PIAGENT_PROMPT_APPENDIX_FILE: file });
 	const prompt = systemPrompt({ config } as any);
-	expect(prompt.indexOf('Use only read-only tools')).toBeLessThan(prompt.indexOf('Concise answer guidance.'));
+	expect(prompt.indexOf('Read-only:no')).toBeLessThan(prompt.indexOf('Concise answer guidance.'));
 	expect(prompt.endsWith('Concise answer guidance.')).toBe(true);
 	await writeFile(file, JSON.stringify({ list_targets: 'Extra guidance' }));
 	const notes = loadTunables({ PIAGENT_TOOL_NOTES_FILE: file }).toolNotes;
