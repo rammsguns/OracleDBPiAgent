@@ -267,7 +267,7 @@ First `tokensCached` readings: Strata's prompt cache served about 70% of prompt
 tokens on hard dev (296k cached vs 125k uncached). The remaining cost is new
 tool-result text and the model's output; prompt and tool definitions are cached.
 
-## WP-Q run_query error hints — failed the token gate, not merged (2026-10-27)
+## WP-Q run_query error hints — merged after a larger A/B (2026-10-28)
 
 WP-Q (`rammsguns/wp-q-error-hints`, 2e118a4; Antigravity APPROVE after one fix
 round) appends a short hint to `run_query` errors: real column names and close
@@ -289,3 +289,28 @@ and calls 18 → 15, but tokens still rose by about 2k, because the hint text ad
 input. Run-to-run noise (baseline input has ranged from 120k to 145k) is larger
 than the effect this measures. Proving a small gain would take more repeats on
 both sides.
+
+### Larger A/B (2026-10-28): passed, merged
+
+At the user's request, a larger test: hard dev, baseline (needlefish) and WP-Q
+alternating, 4 single-repeat runs per side.
+
+| Per run (mean of 4) | Tokens in | Tokens out | Total | Tool calls | `run_query` errors (sum) |
+|---|---|---|---|---|---|
+| Baseline | 64,423 | 27,348 | 91,772 | 56 | 16 |
+| WP-Q | 63,234 | 25,966 | 89,201 (−2.8%) | 53.5 | 10 |
+
+Every run passed 20/20 with all refusals. WP-Q totals were also steadier
+(88.4k–91.0k vs 88.0k–98.2k).
+
+Confirmation runs, all passed with every refusal:
+
+| Run | Baseline in/out | WP-Q in/out | Errors baseline → WP-Q |
+|---|---|---|---|
+| Hard holdout ×3 (same day) | 106,552 / 30,542 | 105,129 / 32,629 (+0.5% total) | 4 → 1 |
+| MVP ×1 | 76,881 / 13,607 (earlier run) | 76,880 / 13,363 | — |
+
+WP-Q is merged: hard dev uses about 3% fewer tokens with fewer failed queries,
+holdout and MVP are flat, and quality holds. The first dev ×2 result (+8.5%) was
+run-to-run noise; from now on, small effects need alternating runs with 4+
+repeats per side.

@@ -284,7 +284,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-Q | `wp-q-error-hints` | codex | `run_query` error hints in `src/tools/index.ts`, its tests, `docs/wp-q-error-hints.md` |
 
-- **WP-Q (error hints; failed the token gate 2026-10-27, not merged):** WP-P's first hard dev ×2 run (40/40, 120.0k in / 49.3k
+- **WP-Q (error hints; merged 2026-10-28 after an alternating 4×4 dev A/B, −2.8% tokens):** WP-P's first hard dev ×2 run (40/40, 120.0k in / 49.3k
   out) had 13 of 56 `run_query` calls fail: ORA-00904 ×3 (guessed `V$SQL`
   columns), ORA-01747 ×3 (`VALIDATE` for `VALIDATED`), ORA-00935 ×3 (nested
   aggregates), ORA-00942 ×4 (`DBA_*` not granted ×2; expected `PM` boundary ×2).
