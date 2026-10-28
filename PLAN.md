@@ -324,7 +324,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-T | `wp-t-plan-search` | codex | `explain_plan` cursor search in `src/tools/index.ts`, its tests, `docs/wp-t-plan-search.md` |
 
-- **WP-T (plan search):** the four cached-plan hard cases use about a third of
+- **WP-T (plan search; not merged 2026-10-28: the model never used `search` in the A/B):** the four cached-plan hard cases use about a third of
   hard dev tokens. Most of it goes on run_query searches of `V$SQL` to find a
   sql_id (`hard-follow-plan`: 8.3 requests and 5.3 run_query calls per run). One
   WP-S failure came from the model matching its own diagnostic query.

@@ -390,3 +390,26 @@ applies. In the unset runs, only 6 of 239 requests went over 1,024 output tokens
 (median 286, p90 709, max 2,275); capping them could save at most about 0.8k
 tokens per run, about 1%. It stays opt-in and off by default; no further budget tests are
 planned.
+
+## WP-T explain_plan cursor search — not merged: the model never used it (2026-10-28)
+
+WP-T (`rammsguns/review-wp-t`, 20bf606; Antigravity APPROVE) adds an optional
+`search` (text fragments plus an optional parsing schema) to `explain_plan`. It
+finds cached cursors in `V$SQL`, skips the agent's own login and diagnostic
+queries, and returns the candidates and the plan in one call. It adds 157
+characters to the fixed prefix.
+
+Hard dev, alternating, 4 single-repeat runs per side (mean per run):
+
+| | Pass | Tokens in | Tokens out | Total | Tool calls |
+|---|---|---|---|---|---|
+| Baseline (ce24564) | 80/80 | 60,469 | 24,200 | 84,669 | 47.5 |
+| WP-T | 80/80 | 56,904 | 22,023 | 78,928 (−6.8%) | 44.75 |
+
+The gate numbers pass, but none of WP-T's 14 `explain_plan` calls used `search`:
+the model still found sql_ids with `run_query` on `V$SQL`. The 6.8% therefore
+can't come from the feature. It is within run-to-run noise (baseline runs here
+ranged from 80.4k to 90.0k), and the plan cases moved in both directions
+(`hard-top-buffer-plan` −39%, `hard-orders-plan` +10%). Not merged; the branch
+is kept. To pay off, the model would need to be steered to `search`, for example
+by a usage hint in the system guidance, and then A/B tested again.
