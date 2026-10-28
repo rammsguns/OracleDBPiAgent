@@ -7,6 +7,16 @@ import type { AskResult } from './types.js';
 // Eval-local adapter keeps cached usage out of the shared product contracts.
 export interface CachedAskResult extends AskResult {
 	usage: AskResult['usage'] & { cached: number };
+	toolDetails: ToolDetail[];
+}
+
+export interface ToolDetail {
+	tool: string;
+	args: string;
+	// null means no matching result was present, rather than a successful call.
+	isError: boolean | null;
+	error?: string;
+	resultBytes: number | null;
 }
 
 export class DependencyUnavailable extends Error {}
@@ -72,7 +82,21 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 	if (last?.errorMessage) throw new Error(last.errorMessage);
 	const answer = (last?.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n');
 	const calls = assistants.flatMap(message => (message.content ?? []).filter((part: any) => part.type === 'toolCall').map((part: any) => part.name));
-	return { answer, toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
+	const results = new Map(messages.filter(message => message.role === 'toolResult' && typeof message.toolCallId === 'string').map(message => [message.toolCallId, message]));
+	const toolDetails: ToolDetail[] = assistants.flatMap(message => (message.content ?? [])
+		.filter((part: any) => part.type === 'toolCall')
+		.map((part: any): ToolDetail => {
+			const result = typeof part.id === 'string' ? results.get(part.id) : undefined;
+			const text = (result?.content ?? []).filter((content: any) => content.type === 'text').map((content: any) => content.text).join('\n');
+			// Arguments are SQL/object names/options. Omit sensitive fields defensively,
+			// including nested fields, before applying the whole-value text limit.
+			const args = JSON.stringify(part.arguments ?? {}, (key, value) =>
+				/bind|password|passwd|secret|api.?key|credential|token/i.test(key) ? undefined : value).slice(0, 300);
+			return { tool: part.name, args, isError: result ? result.isError === true : null,
+				...(result?.isError ? { error: text.split(/\r?\n/)[0]!.slice(0, 200) } : {}),
+				resultBytes: result ? Buffer.byteLength(text, 'utf8') : null };
+		}));
+	return { answer, toolDetails, toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 

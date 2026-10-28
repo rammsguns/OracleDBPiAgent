@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { groundTruth, targets } from './ground-truth.js';
-import { requireStrata, runtime, type CachedAskResult } from './runtime.js';
+import { requireStrata, runtime, type CachedAskResult, type ToolDetail } from './runtime.js';
 import { score } from './scoring.js';
 import type { EvalCase } from './types.js';
 
@@ -33,6 +33,29 @@ export function parseArgs(args: string[]): RunOptions {
 interface EvalRecord extends Omit<CachedAskResult, 'answer'> {
 	answer?: string; iteration: number; id: string; target: string; refusal: boolean; pass: boolean; wallMs: number; error?: string; checks?: { check: string; pass: boolean }[];
 }
+export function summarizeToolErrors(records: { toolDetails: ToolDetail[] }[]) {
+	const summary = { totalCalls: 0, totalErrors: 0,
+		byTool: Object.create(null) as Record<string, { calls: number; errors: number; byCode: Record<string, number> }>,
+		byCode: Object.create(null) as Record<string, number> };
+	for (const { toolDetails } of records) for (const detail of toolDetails) {
+		summary.totalCalls++;
+		const tool = summary.byTool[detail.tool] ??= { calls: 0, errors: 0, byCode: Object.create(null) };
+		tool.calls++;
+		if (!detail.isError) continue;
+		summary.totalErrors++;
+		tool.errors++;
+		const text = detail.error ?? '';
+		const code = text.match(/ORA-\d{5}/i)?.[0].toUpperCase() ?? text.replace(/\d/g, 'N').slice(0, 80);
+		tool.byCode[code] = (tool.byCode[code] ?? 0) + 1;
+		summary.byCode[code] = (summary.byCode[code] ?? 0) + 1;
+	}
+	return summary;
+}
+export function toolErrorsMarkdown(summary: ReturnType<typeof summarizeToolErrors>): string {
+	const escape = (value: string) => value.replace(/\|/g, '&#124;').replace(/[\r\n]/g, ' ');
+	return '\n## Tool errors\n\n' + summary.totalErrors + '/' + summary.totalCalls + ' calls returned errors.\n\n| Tool | Error code / text | Count |\n|---|---|---|\n'
+		+ Object.entries(summary.byTool).flatMap(([tool, counts]) => Object.entries(counts.byCode).map(([code, count]) => `| ${escape(tool)} | ${escape(code)} | ${count} |`)).join('\n') + '\n';
+}
 export async function runEvals(options: RunOptions, dependencies = { requireStrata, runtime, targets, groundTruth, score }) {
 	const runStart = performance.now();
 	const cases: EvalCase[] = [];
@@ -60,7 +83,7 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {
 				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
+				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 			}
 			const record = records.at(-1)!;
 			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
@@ -74,14 +97,16 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	const resultsFile = `evals/results/${stamp}.json`;
 	// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
 	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
-	const report = { ...options, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+	const toolErrors = summarizeToolErrors(records);
+	const report = { ...options, toolErrors, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 	await mkdir('evals/results', { recursive: true });
 	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
 	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
 	const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
-	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n');
+	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors));
 	console.log(passCounts);
 	console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);
+	console.log(`Tool errors: ${toolErrors.totalErrors}/${toolErrors.totalCalls} calls; ${JSON.stringify(toolErrors.byCode)}`);
 	return report;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
