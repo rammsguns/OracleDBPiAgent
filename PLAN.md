@@ -259,6 +259,15 @@ is new tool-result text and output tokens.
 - **WP-N (merged 2026-10-27):** record `usage.cacheRead` per case and per run (ledger field
   `tokensCached`, shown in `optimize:report`). Older rows show it as unknown.
 
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-O | `wp-o-reasoning-budget` | codex | opt-in `PIAGENT_LLM_REASONING_BUDGET` tunable in `src/config/tunables.ts`, `src/llm/index.ts`, `evals/optimize.ts` (allowed keys), variants, tests |
+
+- **WP-O:** output (thinking) is now the larger cost. Strata accepts a per-request
+  `reasoning_budget_tokens` (default 2,048) that closes the thinking phase. Add it
+  as an opt-in tunable (unset = unchanged requests); the coordinator A/Bs budgets
+  of 1,024 and 512 under the usual gate (all cases and refusals pass; tokens fall).
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
