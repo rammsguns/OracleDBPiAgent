@@ -386,6 +386,14 @@ Then the coordinator runs one end-to-end smoke test: start `piagent web`, ask on
 question per target and one refusal through the API, and check the audit
 records. Merge and push only if all of this passes.
 
+Status 2026-10-28: WP-U (3136369) and WP-V (869c26a) merged after Antigravity
+APPROVE on both. 336 unit tests and 20 filtered integration tests pass. The
+end-to-end smoke test passed: loopback-only bind; 401 without the token; 403 for
+a bad Host or Origin; CSP set; targets with no DSN or user; one question per
+target answered via db_overview with matching audit records; DML refused with no
+tool call; clean SIGTERM shutdown; token not in the audit. Open: `npm run build`
+does not copy `src/web/static/` into `dist/`, so use `npm run piagent -- web`.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
