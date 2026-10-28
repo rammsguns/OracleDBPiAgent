@@ -320,6 +320,19 @@ is new tool-result text and output tokens.
   an alternating 4×4 hard dev A/B, and holdout ×3 and MVP against same-day
   baselines. Every case and refusal must pass, and tokens must fall.
 
+| WP | Branch / worktree | Agent | Owns |
+|---|---|---|---|
+| WP-T | `wp-t-plan-search` | codex | `explain_plan` cursor search in `src/tools/index.ts`, its tests, `docs/wp-t-plan-search.md` |
+
+- **WP-T (plan search):** the four cached-plan hard cases use about a third of
+  hard dev tokens. Most of it goes on run_query searches of `V$SQL` to find a
+  sql_id (`hard-follow-plan`: 8.3 requests and 5.3 run_query calls per run). One
+  WP-S failure came from the model matching its own diagnostic query.
+  `explain_plan` only matches exact SQL text today. Add an optional text search:
+  case-insensitive fragments, optional parsing schema, and skip cursors from the
+  agent's own login. It returns the matching cursors and the plan of the best
+  one in a single call. Same gate as WP-S.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
