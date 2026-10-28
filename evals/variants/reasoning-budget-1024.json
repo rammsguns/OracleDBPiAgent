@@ -1,0 +1,5 @@
+{
+	"name": "reasoning-budget-1024",
+	"description": "Cap Strata thinking at 1024 tokens per request; answer quality awaits coordinator A/B",
+	"env": { "PIAGENT_LLM_REASONING_BUDGET": "1024" }
+}

@@ -35,7 +35,8 @@ export async function createStrataProvider(cfg: LlmConfig) {
 		streamQueue = new Promise<void>(resolve => { release = resolve; });
 		await previous;
 		try {
-			const stream = models.streamSimple(m, context, { ...options, ...((cfg as TunableLlmConfig).temperature === undefined ? {} : { temperature: (cfg as TunableLlmConfig).temperature }), fetch: strataFetch });
+			const reasoningBudget = (cfg as TunableLlmConfig).reasoningBudgetTokens;
+			const stream = models.streamSimple(m, context, { ...options, ...((cfg as TunableLlmConfig).temperature === undefined ? {} : { temperature: (cfg as TunableLlmConfig).temperature }), ...(reasoningBudget === undefined ? {} : { samplingParams: { ...options?.samplingParams, reasoning_budget_tokens: reasoningBudget } }), fetch: strataFetch });
 			void stream.result().then(release, release);
 			return stream;
 		} catch (error) { release(); throw error; }
