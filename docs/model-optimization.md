@@ -197,3 +197,27 @@ Rejected. Rewriting earlier messages invalidates the prompt cache, so more promp
 tokens count as uncached input, and the model made more tool calls. Changes that
 cut tokens should keep the history append-only. What remains costly is new tool
 result text and output tokens.
+
+## WP-L compact describe_object — promoted, 2026-10-27
+
+`describe_object` now folds constraint and index columns into their parent rows
+and drops always-NULL cells (48.7% fewer bytes over five measured tables; see
+`docs/wp-l-compact-describe.md`). Truncation keeps whole entities and discloses
+omissions per section. Antigravity approved it after one fix round
+(`docs/review-wp-l-2026-10-27.md`). Strata, thinking `low`, same case hashes:
+
+| Run | needlefish `4a28c90` | WP-L `02721a2` |
+|---|---|---|
+| Hard dev ×2 (`ed62129f597b`) | 40/40, 144.7k / 56.6k, 125 calls | 40/40, 125.2k / 50.5k, 96 calls |
+| Hard holdout ×3 (`d2ad2105dbbf`) | 39/39, 113.9k / 31.8k, 74 calls* | 39/39, 99.3k / 31.5k, 71 calls |
+| MVP ×1 (`2b08ce0bdc33`) | 39/39, 77.9k / 13.6k, 39 calls* | 39/39, 76.9k / 13.6k, 39 calls |
+
+\* From the post-review baseline above (same cases, earlier run).
+
+Every refusal passed in every run. Hard dev input fell 13.5% and holdout 12.8%;
+the savings came from describe-heavy cases (`hard-region-channel`, `hard-share`,
+`hard-follow-ratio`, `hard-yoy`) with the same number of `describe_object` calls.
+MVP cases barely use `describe_object`, so they changed little. The Antigravity
+re-review ran the full integration suite, including its one LLM end-to-end test,
+while the WP-L hard dev run was in progress, so that run overlapped one extra
+Strata request.

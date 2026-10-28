@@ -244,7 +244,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-L | `wp-l-compact-describe` | codex | `describe_object` result shape in `src/tools/index.ts`, its tests, `docs/wp-l-compact-describe.md` |
 
-- **WP-L:** fewer bytes per `describe_object` result with no lost facts. The
+- **WP-L (merged 2026-10-27, promoted):** fewer bytes per `describe_object` result with no lost facts. The
   coordinator A/Bs it on Strata (hard dev ×2, then holdout ×3 and MVP) and keeps
   it only if every case and refusal still passes and input tokens fall.
 
