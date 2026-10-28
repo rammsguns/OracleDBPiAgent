@@ -12,16 +12,18 @@ import { UnsupportedVersionError, type SessionProvider } from "../contracts.js";
 import type { AppConfig } from "../contracts.js";
 
 export interface DoctorDependencies {
+	report?: (name: string, ok: boolean) => void;
 	checkHealth?: typeof checkStrataHealth;
 	createSessions?: (config: AppConfig) => SessionProvider | Promise<SessionProvider>;
 }
 export async function doctor(config: AppConfig, dependencies: DoctorDependencies = {}): Promise<boolean> {
 	let ok = true;
-	try { await (dependencies.checkHealth ?? checkStrataHealth)(config.llm); console.log("Strata: loaded (loopback)"); }
-	catch { console.error("Strata: unavailable or unloaded; no configuration changes made"); return false; }
+	const report = dependencies.report;
+	try { await (dependencies.checkHealth ?? checkStrataHealth)(config.llm); if (report) report("Strata", true); else console.log("Strata: loaded (loopback)"); }
+	catch { if (report) report("Strata", false); else console.error("Strata: unavailable or unloaded; no configuration changes made"); return false; }
 	let sessions: SessionProvider;
 	try { sessions = await (dependencies.createSessions ?? createSessions)(config); }
-	catch { console.error("Session provider: initialization check failed"); return false; }
+	catch { if (report) report("Session provider", false); else console.error("Session provider: initialization check failed"); return false; }
 	try {
 		for (const target of config.targets) {
 			let check = "connection";
@@ -49,21 +51,28 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				const oracleOwners = "(SELECT username FROM all_users WHERE oracle_maintained = 'Y')";
 				const viewCode = await session.query(`SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND ((d.referenced_type IN ${code} AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN ${oracleOwners}) OR (d.referenced_type = 'SYNONYM' AND EXISTS (SELECT 1 FROM all_synonyms s JOIN all_objects o ON o.owner = s.table_owner AND o.object_name = s.table_name WHERE s.owner = d.referenced_owner AND s.synonym_name = d.referenced_name AND o.object_type IN ${code} AND o.owner NOT IN ${oracleOwners})))`);
 				if (viewCode.rows.length) throw new Error("Accessible views call non-Oracle code");
-				console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
+				if (report) report(target.name, true); else console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
 			} catch (error) {
 				ok = false;
 				if (error instanceof UnsupportedVersionError) check = "19c gate";
-				console.error(`${target.name}: ${check} check failed`);
+				if (report) report(`${target.name}: ${check}`, false); else console.error(`${target.name}: ${check} check failed`);
 			}
 		}
 	} finally {
 		try { await sessions.closeAll(); }
-		catch { console.error("Session cleanup: check failed"); ok = false; }
+		catch { if (report) report("Session cleanup", false); else console.error("Session cleanup: check failed"); ok = false; }
 	}
 	return ok;
 }
 export async function main(argv = process.argv, dependencies: DoctorDependencies = {}) {
 	const program = new Command().name("piagent").description("Read-only Oracle 19c assistant using local Strata");
+	program.command("web").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
+		const port = Number(options.port);
+		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid port");
+		const { createWebServer } = await import("../web/server.js");
+		const web = createWebServer({ port });
+		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
+	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
