@@ -162,4 +162,12 @@ database name, the 19.9.1 version and the grantee. All 31 SELECT grants succeede
 ## Next candidates
 
 
-- Larger input-token savings would need shorter tool descriptions (regression risk) or Strata prefix caching (a Strata change: needs the owner's approval).
+- Done on 2026-10-28: shorter system prompt and tool descriptions (WP-S, −9.4% hard
+  dev tokens), `run_query` error hints (WP-Q, −2.8%), and eval diagnostics
+  (WP-P per-call errors, WP-R per-request usage). See `docs/model-optimization.md`.
+- Largest remaining cost: Strata reuses a cached prompt only within one
+  conversation, so every new session re-reads the full prompt start (about 1.7k
+  tokens; the largest share of uncached input). Reusing a shared start across
+  conversations is a Strata change, outside this project; it needs the owner.
+- Output (thinking) is about 29% of tokens. An opt-in reasoning budget (WP-O)
+  showed no reliable saving.
