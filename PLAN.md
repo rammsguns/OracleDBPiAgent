@@ -272,7 +272,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-P | `wp-p-tool-error-diagnostics` | codex | per-call tool diagnostics in `evals/runtime.ts`, `evals/run.ts`, their tests, `docs/wp-p-tool-error-diagnostics.md` |
 
-- **WP-P (diagnostics):** about 8% of tool calls fail (90 of 1,137 in the latest
+- **WP-P (diagnostics, merged 2026-10-27):** about 8% of tool calls fail (90 of 1,137 in the latest
   hard and MVP runs, nearly all `run_query`), and each failure costs a round trip
   with thinking. The audit log records only the error class. Eval records gain
   per-call detail taken from the agent's messages (tool, short args/SQL text,
