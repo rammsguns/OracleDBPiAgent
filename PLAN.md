@@ -395,7 +395,7 @@ tool call; clean SIGTERM shutdown; token not in the audit. `npm run build` now
 copies `src/web/static/` into `dist/web/static/`, so the compiled `piagent web`
 serves the page too.
 
-## More read-only DBA tools (phase draft, 2026-10-28; awaiting approval)
+## More read-only DBA tools (phase approved 2026-10-28)
 
 Goal: add four read-only tools for common DBA questions that the current 12 tools
 answer only through free-form `run_query`. Blocking sessions and locks
