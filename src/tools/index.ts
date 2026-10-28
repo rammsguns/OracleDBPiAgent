@@ -9,18 +9,18 @@ const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
 const str = () => Type.Optional(Type.String());
 const integer = (max: number) => Type.Optional(Type.Integer({ minimum: 1, maximum: max }));
 const definitions = [
-	["list_targets", "Targets", {}],
-	["db_overview", "ID/start/charset/size/RAM", {}],
-	["list_schemas", "App schemas/counts/segment bytes", {}],
-	["list_objects", "Objects/paged", { schema: str(), type: str(), pattern: str(), page: integer(10000), pageSize: integer(100) }],
-	["describe_object", "Cols/constraints/indexes/stats. Keys:name/type/status;no FK parent table/column;never infer;run_query ALL_CONSTRAINTS(R_OWNER,R_CONSTRAINT_NAME) join ALL_CONS_COLUMNS.", { schema: str(), name: Type.String() }],
-	["get_source", "View/PLSQL source:paged<=200 lines", { schema: str(), name: Type.String(), type: str(), startLine: integer(1000000), lines: integer(200) }],
-	["run_query", "Read-only;1 statement;maxRows<=config. Cols:chat tool-seen only;describe_object unseen requested cols first;no similar/SUB-name swaps.", { sql: Type.String(), maxRows: integer(10000) }],
-	["explain_plan", "Cached sql_id/read-only SQL plan;no EXPLAIN PLAN", { sql: str(), sql_id: Type.Optional(Type.String({ pattern: "^[a-z0-9]{13}$" })) }],
-	["top_sql", "Top SQL/metric", { metric: Type.Optional(Type.Union([Type.Literal("elapsed_time"), Type.Literal("cpu_time"), Type.Literal("buffer_gets"), Type.Literal("executions")])), limit: integer(100) }],
-	["session_activity", "Active/waits/blockers/lock counts", {}],
-	["wait_events", "Nonidle waits", { limit: integer(100) }],
-	["tablespace_usage", "Tablespace bytes/free/autoextend", {}],
+	["list_targets", "List configured database targets", {}],
+	["db_overview", "DB identity, startup, charset, size, and memory", {}],
+	["list_schemas", "App schemas with object counts and segment bytes", {}],
+	["list_objects", "List schema objects with paging", { schema: str(), type: str(), pattern: str(), page: integer(10000), pageSize: integer(100) }],
+	["describe_object", "Columns, constraints, indexes, stats. Keys: name/type/status only, no FK parent table/column; never infer; resolve via ALL_CONSTRAINTS(R_OWNER,R_CONSTRAINT_NAME) join ALL_CONS_COLUMNS.", { schema: str(), name: Type.String() }],
+	["get_source", "Read view or PL/SQL source, at most 200 lines", { schema: str(), name: Type.String(), type: str(), startLine: integer(1000000), lines: integer(200) }],
+	["run_query", "Bounded read-only SQL (1 statement, maxRows<=config). Use only cols seen in tool results this conversation; describe_object unseen requested cols first; never substitute similar column names (e.g. SUB-prefixed).", { sql: Type.String(), maxRows: integer(10000) }],
+	["explain_plan", "Cached sql_id or matching read-only SQL plan; never executes EXPLAIN PLAN", { sql: str(), sql_id: Type.Optional(Type.String({ pattern: "^[a-z0-9]{13}$" })) }],
+	["top_sql", "Top SQL by elapsed time, CPU, buffer gets, or executions", { metric: Type.Optional(Type.Union([Type.Literal("elapsed_time"), Type.Literal("cpu_time"), Type.Literal("buffer_gets"), Type.Literal("executions")])), limit: integer(100) }],
+	["session_activity", "Active sessions, waits, blockers, and lock counts", {}],
+	["wait_events", "Top non-idle system wait events", { limit: integer(100) }],
+	["tablespace_usage", "Tablespace allocation, free bytes, and autoextend", {}],
 ] as const;
 
 export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
