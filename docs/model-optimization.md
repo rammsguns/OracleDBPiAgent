@@ -343,3 +343,33 @@ Hard dev ×2 at 704e8bd (40/40, all refusals pass): 121,171 tokens in, 49,902 ou
   answer quality. On the Strata side, reusing a shared prompt start across
   conversations would remove most of the 62%, but that is a Strata configuration
   or code change, which this project may not make.
+
+## WP-S shorter prefix — merged (2026-10-28)
+
+WP-S (b62bc1d; Antigravity APPROVE after a clarity fix round) cuts the system
+prompt and tool definitions from 5,793 to 4,908 characters (−15.3%), in plain
+English with every rule kept. The first, telegraphic cut of 25% was rejected in
+review as too hard for a small model to read.
+
+Hard dev, alternating, 4 single-repeat runs per side (mean per run):
+
+| | Pass | Tokens in | Tokens out | Total | First-request input | Tool calls |
+|---|---|---|---|---|---|---|
+| Baseline (62186c4) | 80/80 | 63,039 | 26,334 | 89,374 | 37,524 | 53.5 |
+| WP-S | 79/80 | 57,407 | 23,554 | 80,962 (−9.4%) | 34,584 | 46.5 |
+
+The one failure was `hard-follow-plan` in WP-S run 1: in turn 2, the model's
+`V$SQL` search matched its own turn-1 diagnostic query, and it explained that
+cursor's plan. At the user's request, a targeted retest alternated 8 runs per
+side: 8/8 on both. That case had also passed all 56 earlier runs, so this is
+treated as a one-off.
+
+Confirmation runs, same day, all passing with every refusal:
+
+| Run | Baseline in/out | WP-S in/out | Change in total |
+|---|---|---|---|
+| Hard holdout ×3 | 104,847 / 30,675 | 92,530 / 26,040 | −12.5% |
+| MVP ×1 | 76,868 / 14,323 | 74,865 / 14,175 | −2.4% |
+
+Beyond the shorter prefix itself, the shorter text also led to fewer tool calls
+and less thinking.

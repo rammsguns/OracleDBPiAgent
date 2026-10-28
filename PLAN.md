@@ -311,7 +311,7 @@ is new tool-result text and output tokens.
 |---|---|---|---|
 | WP-S | `wp-s-short-prefix` | codex | system prompt text in `src/agent/index.ts`, tool and parameter descriptions in `src/tools/index.ts`, their tests, `docs/wp-s-short-prefix.md` |
 
-- **WP-S (shorter prefix):** WP-R showed that the first request of each session
+- **WP-S (shorter prefix; merged 2026-10-28, −15% prefix, −9.4% hard dev tokens):** WP-R showed that the first request of each session
   carries 62% of uncached input, because Strata never reuses a shared prompt start
   across conversations. Shorten the system prompt (1,970 chars) and the tool
   definitions (3,823 chars of JSON) by at least 25%, with every safety rule kept
