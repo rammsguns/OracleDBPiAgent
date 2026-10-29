@@ -395,7 +395,7 @@ tool call; clean SIGTERM shutdown; token not in the audit. `npm run build` now
 copies `src/web/static/` into `dist/web/static/`, so the compiled `piagent web`
 serves the page too.
 
-## More read-only DBA tools (phase approved 2026-10-28)
+## More read-only DBA tools (phase approved 2026-10-28; closed, not merged)
 
 Goal: add four read-only tools for common DBA questions that the current 12 tools
 answer only through free-form `run_query`. Blocking sessions and locks
@@ -437,6 +437,26 @@ Gate:
   holdout ×3 and MVP all pass (every refusal passes), and hard dev tokens rise
   by no more than 3% against a same-day baseline.
 - Merge and push only if all of this passes.
+
+Result 2026-10-28/29: not merged, by the owner's decision. Each step was compared
+with same-day master (4d78e88) baselines:
+- WP-W + WP-X (four tools, both reviews APPROVE): every case passed, including
+  the 10 new DBA cases ×3. Hard dev tokens +1.3%, but holdout +15.4% and MVP
+  +14.5%: the larger prompt costs every new session about 300 uncached tokens
+  (first request 1,688 → 1,991).
+- WP-Y folded them into one `dba_check` tool (review APPROVE). The prefix fell
+  from 5,968 to 5,436 characters. Holdout +6.3%, MVP +8.2%, hard dev +2.2%, all
+  passing.
+- The DBA case questions named the old tools, so they were reworded in plain
+  DBA language (post-result edit, recorded in docs/wp-y-dba-check.md). After
+  that, the model chose `dba_check` in only 10/18 dev runs, and 0/6 for
+  parameters and backups. It wrote V$PARAMETER/RMAN SQL with `run_query` and
+  still got the facts right. As with WP-T, a tool the model does not choose
+  unprompted is not worth a per-session cost.
+- The work is kept on branches `rammsguns/wp-w-schema-health`,
+  `rammsguns/wp-x-instance-ops`, `rammsguns/wp-y-dba-check` and
+  `dba-tools-merged`. If revisited, consider loading DBA tools only on demand,
+  which needs prompt reuse across sessions or dynamic tool lists.
 
 ## MVP exit criteria
 

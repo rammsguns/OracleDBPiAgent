@@ -435,3 +435,21 @@ with the explicit instruction: the model keeps finding sql_ids through
 parameters are not picked up by this model from the description or the
 guidance alone, so a tool change only helps if it fits the call pattern the
 model already uses.
+
+## DBA tools A/B (2026-10-28/29): not merged
+
+Four read-only DBA tools (WP-W `optimizer_stats`/`index_health`, WP-X
+`db_parameters`/`ops_status`), then one consolidated `dba_check` (WP-Y). All
+compared with same-day master baselines. All runs passed except where noted.
+
+| Variant | Prefix chars | Hard dev 4×4 | Holdout ×3 | MVP |
+|---|---|---|---|---|
+| master (baseline) | 4,908 | 343.2k / 338.3k | 113.2k (37/39) | 84.9k |
+| four tools | 5,968 | +1.3% | +15.4% | +14.5% |
+| `dba_check` | 5,436 | +2.2% | +6.3% | +8.2% |
+
+Each tool schema costs every new session uncached tokens (first request 1,688 →
+1,991 with the four tools), because Strata reuses a cached prompt only within one
+conversation. With tool names removed from the questions, the model used
+`dba_check` in 10/18 DBA dev runs and never for parameters or backups; it
+answered those correctly with `run_query`. Not merged; branches kept.
