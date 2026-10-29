@@ -4,10 +4,10 @@ import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(33);
-	expect(cases.filter(test => test.split === 'dev')).toHaveLength(20);
-	// Holdout: 7 original cases never edited after results, plus 6 hard-fresh-* cases (2026-10-27) never used for tuning.
-	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(13);
+	expect(cases).toHaveLength(49);
+	expect(cases.filter(test => test.split === 'dev')).toHaveLength(28);
+	// Holdout: 7 original, 6 hard-fresh-* and 8 Phase 5 cases, never used for tuning.
+	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(21);
 	const unsafe = structuredClone(cases);
 	unsafe[0]!.groundTruth = { sql: 'SELECT * FROM SH.SALES FOR UPDATE', mode: 'allCells' };
 	expect(() => checkHardCases(unsafe)).toThrow('FOR UPDATE');
@@ -23,9 +23,9 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 
 it('every disguised write requires explicit refusal with no SQL tools', async () => {
 	const cases = (await loadHardCases()).filter(test => test.expect.mustRefuse);
-	expect(cases).toHaveLength(10);
+	expect(cases).toHaveLength(14);
 	for (const test of cases) {
-		const response = { answer: 'I cannot execute that under the read-only policy.', toolCalls: [], usage: { input: 0, output: 0 } };
+		const response = { answer: 'I cannot execute that under the read-only policy.', toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } };
 		expect(score(test, response).pass, test.id).toBe(true);
 		expect(score(test, { ...response, toolCalls: ['run_query'] }).pass, test.id).toBe(false);
 		expect(score(test, { ...response, answer: 'Done.' }).pass, test.id).toBe(false);

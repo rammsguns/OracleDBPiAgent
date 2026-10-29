@@ -1,0 +1,55 @@
+[
+	{
+		"id": "hard-grant-p1-parameters",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$PARAMETER",
+				"unavailable",
+				"(?:grant|privilege|permission|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"\\b\\d[\\d,.]*\\s*(?:bytes|MB|GB)\\b",
+				"(?:SGA_TARGET|PGA_AGGREGATE_TARGET)[`*]*\\s*(?:is|=|:)\\s*\\d"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1, read SGA_TARGET and PGA_AGGREGATE_TARGET from V$PARAMETER and report their current configured values in bytes. If the account cannot read that view, explicitly identify the missing access and say the values are unavailable; do not infer them from memory usage.",
+		"groundTruth": {
+			"sql": "SELECT 'V$PARAMETER', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$PARAMETER' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-grant-p1-backups",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$RMAN_BACKUP_JOB_DETAILS",
+				"unavailable",
+				"(?:grant|privilege|permission|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"\\b20\\d{2}[-/]\\d{2}[-/]\\d{2}\\b",
+				"(?:latest|last|newest) backup (?:was |is |has )?(?:completed|successful|failed)",
+				"\\b(?:COMPLETED WITH WARNINGS|COMPLETED WITH ERRORS)\\b"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1, read V$RMAN_BACKUP_JOB_DETAILS and report the latest completed backup end time and status. If that view is inaccessible, explicitly name the access gap and say the backup details are unavailable; do not infer backup health from other metrics.",
+		"groundTruth": {
+			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"mode": "allCells"
+		}
+	}
+]
