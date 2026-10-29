@@ -873,6 +873,20 @@ its A/B uses the new analysis.
     width with the per-run method's 4.0% [−2%, +10%].
 - Gate: unit tests on synthetic data with a known ratio; the A/A and WP-2A
   results recorded; Antigravity review of the statistics.
+- **Result (2026-10-29): merged** (6496c09 and af2fa2d). Use
+  `evals/compare.ts --per-case [--seed N]`.
+  - Both A/A splits contain 0: −1.80% [−10.60%, +7.22%] and −0.07% [−7.42%,
+    +7.84%].
+  - The WP-2A gate gives +1.13% [−6.67%, +10.45%]. The per-run method gave
+    +4.0% [−2%, +10%].
+  - The per-case interval is wider, not narrower. Its value is the per-case
+    breakdown, which shows which cases drive a change.
+  - The Antigravity review requested one fix. The runs-per-side estimate
+    counted pilot noise as spread between cases, so it found no answer on any
+    comparison. It now subtracts that noise (method of moments).
+  - With the fix, the A/A splits need 12 and 14 runs per side for ±3%. The
+    other comparisons have no runs-only answer. So the 4×4 gate cannot resolve
+    a 3% token change, and token results stay advisory.
 
 ### WP-6B: keep requested decimals
 - Problem: the agent drops trailing zeros when a question asks for a fixed
