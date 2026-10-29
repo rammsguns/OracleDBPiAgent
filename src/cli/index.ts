@@ -73,15 +73,27 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
 	});
-	program.command("report").requiredOption("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean }) => {
+	program.command("report").requiredOption("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
 		if (options.json && options.md) throw new Error("Choose --json or --md");
+		if (options.diffOnly && options.summarize) throw new Error("--diff-only cannot summarize");
 		const config = loadConfig();
 		const { generateReport, renderMarkdown } = await import("../report/index.js");
+		const { loadLatestReport, saveReport, validateReportTarget, DEFAULT_REPORT_DIRECTORY } = await import("../report/history.js");
+		const { diff, renderDiffMarkdown } = await import("../report/diff.js");
+		const compare = options.diff || options.diffOnly;
+		const out = options.out ?? (compare ? DEFAULT_REPORT_DIRECTORY : undefined);
+		validateReportTarget(options.target, config.targets);
+		const previous = compare ? await loadLatestReport(out!, options.target, config.targets) : null;
 		const sessions = await createSessions(config);
 		try {
 			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, sections: options.sections?.split(",").map(s => s.trim()) });
 			const markdown = renderMarkdown(report);
-			console.log(options.json ? JSON.stringify(report) : markdown);
+			const changes = compare ? diff(previous, report) : undefined;
+			if (out) await saveReport(out, report, config.targets);
+			if (options.diffOnly) {
+				console.log(options.json ? JSON.stringify({ diff: changes }) : renderDiffMarkdown(changes!));
+				process.exitCode = changes!.changes.length ? 3 : 0;
+			} else console.log(options.json ? JSON.stringify(changes ? { ...report, diff: changes } : report) : markdown + (changes ? "\n" + renderDiffMarkdown(changes) : ""));
 			if (options.summarize) {
 				const { summarizeReport, checkReportSummary } = await import("../report/summarize.js");
 				const summary = await summarizeReport(markdown, config.llm);
