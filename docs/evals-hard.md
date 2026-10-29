@@ -477,26 +477,26 @@ intervals; this implementation does not establish a cheaper promotion gate.
 
 ### Runs needed for a ±3% interval
 
-The planning output uses a conservative delta-method approximation. Let
-`s_between²` be the sample variance of the observed case log ratios, and let
-`w = mean(CV_A,c² + CV_B,c²)`, with sample variances for the within-case CVs.
+The planning output uses a method-of-moments de-noised delta-method approximation.
+Let `s_between²` be the sample variance of observed case log ratios, and let
+`w = mean(CV_A,c² + CV_B,c²)`, using sample variances for the within-case CVs.
+Pilot mean-estimation noise is
+`pilotNoise = mean(CV_A,c²/aRuns_c + CV_B,c²/bRuns_c)`; estimate the true
+between-case variance as `trueBetween = max(0, s_between² - pilotNoise)`.
+The JSON reports both `betweenLogVariance` and `denoisedBetweenLogVariance`.
 For n future runs per arm per case, approximate log-estimate variance as
-`(s_between² + w/n)/C`. Solve
-`1.96 * sqrt(variance) <= log(1.03)` for n, rounded up with a minimum of two.
-Using log(1.03) makes the upper multiplicative half-width at most 3%; its lower
-counterpart is slightly less than 3%. This is a local approximation, especially
-when the estimated effect is far from zero.
+`(trueBetween + w/n)/C`. Set
+`budget = C*(log(1.03)/1.96)² - trueBetween` and use
+`n = max(2, ceil(w/budget))`. A nonpositive budget or any case with fewer than
+two runs on either arm yields null, with an explicit reason.
 
-The between-case term is held fixed, matching the outer bootstrap's use of the
-observed case effects. It deliberately is not corrected for estimation noise;
-with only two or four observations per arm this can be substantially conservative.
-If that term already exceeds the target, `runsPerSide` is null with an explicit
-reason: **no finite runs-only estimate under this observed-variance model**.
-This is not proof of an irreducible population floor: more pilot repeats can
-change the case-effect estimates and their spread. More cases or a separately
-reviewed random-effects/de-noised planning model may change the conclusion.
-Unknown within-case variance (single observations) also yields null with a
-different reason. A finite estimate is a planning aid, not a power guarantee.
+Using log(1.03) targets an upper multiplicative half-width of 3%; its lower
+counterpart is slightly less than 3%. This is an approximation, especially
+away from zero effect: truncation at zero and small-sample noise can bias the
+variance estimates. A null estimate means **no finite runs-only estimate under
+the de-noised variance model**, not an irreducible population floor. More pilot
+runs may revise either component. A finite estimate is a planning aid, not a
+power guarantee; it does not alter the bootstrap or the promotion checks.
 
 ### Archived validation (no DB or LLM calls)
 
@@ -513,10 +513,10 @@ Phase 5's four full 28-case dev reports, numbered chronologically, have prefixes
 | Comparison | Cases | Runs/arm | Per-case change | Bootstrap 95% interval | Runs/arm for ±3% |
 |---|---:|---:|---:|---:|---|
 | Phase 5 A/A {1,2} vs {3,4} | 28 | 2 | −1.80% | [−10.60%, +7.22%] | No finite estimate under model |
-| Phase 5 A/A {1,3} vs {2,4} | 28 | 2 | −0.07% | [−7.42%, +7.84%] | No finite estimate under model |
+| Phase 5 A/A {1,3} vs {2,4} | 28 | 2 | −0.07% | [−7.42%, +7.84%] | 12 |
 | WP-2A baseline vs candidate | 20 | 4 | +1.13% | [−6.67%, +10.45%] | No finite estimate under model |
 | Phase 2 baseline A/A {1,2} vs {3,4} | 20 | 2 | +3.20% | [−6.80%, +15.44%] | No finite estimate under model |
-| Phase 2 candidate A/A {1,2} vs {3,4} | 20 | 2 | −5.72% | [−13.97%, +2.90%] | No finite estimate under model |
+| Phase 2 candidate A/A {1,2} vs {3,4} | 20 | 2 | −5.72% | [−13.97%, +2.90%] | 14 |
 
 Every A/A interval contains zero. WP-2A baseline files use timestamp prefixes
 `2026-10-29T16-22-25-041Z`, `16-34-48-402Z`, `16-47-28-605Z`,
@@ -528,22 +528,36 @@ The historical per-run result was **+4.0% [−2%, +10%]**, beside the new
 The largest WP-2A absolute log contributions are `hard-follow-plan` (+49.24%
 case ratio change), `hard-region-channel` (+47.75%), and `hard-share` (−22.47%).
 
-For the two Phase 5 comparisons, `(s_between², w)` are respectively
-`(0.05240172, 0.04512204)` and `(0.02386965, 0.07095932)`; WP-2A is
-`(0.02454669, 0.06497155)`. In all three, `s_between²/C` alone exceeds
-`(log(1.03)/1.96)²`, hence the null runs estimates. The same is true of both
-Phase 2 A/A checks. The observed variance does not support promising a ±3%
-interval by adding a particular finite number of runs.
+The variance components below reproduce the planning outputs (rounded to eight
+places). Pilot noise uses each case's actual arm counts.
 
-Verification: the fresh worker checkout initially lacked node_modules, so the
-first typecheck/test attempts could not locate tsc/vitest. `npm ci --ignore-scripts`
-installed the locked dependencies (0 vulnerabilities), without changing manifests.
-Subsequently `npm run typecheck` passed and `npm test` passed **592 tests in
-31 files**. A separate strict TypeScript check of `evals/compare.ts` and its new
-tests also passed, since the main tsconfig includes only product sources.
+| Comparison | Observed between variance | Pilot noise | De-noised between variance | Within relative variance |
+|---|---:|---:|---:|---:|
+| Phase 5 A/A {1,2} vs {3,4} | 0.05240172 | 0.02256102 | 0.02984070 | 0.04512204 |
+| Phase 5 A/A {1,3} vs {2,4} | 0.02386965 | 0.03547966 | 0 | 0.07095932 |
+| WP-2A baseline vs candidate | 0.02454669 | 0.01624289 | 0.00830380 | 0.06497155 |
+| Phase 2 baseline A/A {1,2} vs {3,4} | 0.04383640 | 0.02883616 | 0.01500024 | 0.05767232 |
+| Phase 2 candidate A/A {1,2} vs {3,4} | 0.02752739 | 0.03080668 | 0 | 0.06161335 |
+
+**The 4×4 gate does not establish ±3% precision.** The two finite A/A planning
+estimates call for **12 or 14 total runs per side**, rather than four (8 or 10
+additional runs per side if four have already been collected). These estimates
+come from different pilots and are not a guaranteed range. The actual WP-2A
+4×4 comparison still has no finite runs-only estimate: its de-noised between
+variance exceeds the 20-case budget. Phase 5's other A/A split and Phase 2's
+baseline A/A likewise return null; this sensitivity even on same-code runs
+shows the small-pilot uncertainty. More pilot runs or cases would be needed
+to reassess those estimates before promising ±3%.
+
+Verification after the review fix: `npm run typecheck` passed and `npm test`
+passed **593 tests in 31 files**. A separate strict TypeScript check of
+`evals/compare.ts` and its tests also passed, since the main tsconfig includes
+only product sources. All five archived comparisons above were rerun with
+seed 8129 and 10,000 draws; point estimates and bootstrap intervals are unchanged.
 Synthetic tests cover the 1.05 uniform ratio, A/A zero coverage, missing cases,
 seed reproducibility, unequal run counts, single-run behavior, contribution
-sorting, variance-floor planning, and invalid ratios/targets/hashes/seeds.
+sorting, finite planning for noisy equal true effects, null planning for genuine
+heterogeneity above budget, and invalid ratios/targets/hashes/seeds.
 No integration suite was needed: no DB or LLM implementation code changed.
-No contract changes are required. Statistical review by Antigravity remains
-with the coordinator; no eval runner or LLM calls were made.
+No contract changes are required; the planning JSON adds the de-noised variance
+field locally. No eval runner or LLM calls were made.

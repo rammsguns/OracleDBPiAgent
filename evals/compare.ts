@@ -112,20 +112,20 @@ export function comparePerCase(a: Report[], b: Report[], { seed = 8129, samples 
 	const count = cases.length;
 	const between = variance(cases.map(c => c.logRatio));
 	const within = mean(cases.map(c => c.withinA + c.withinB));
-	// Delta method: Var(log(mean B / mean A)) ~= CV_A²/n + CV_B²/n.
-	// The hierarchical bootstrap also resamples observed case effects, so planning
-	// Var(overall log ratio) ~= (s_between² + mean(CV_A² + CV_B²)/n) / C.
-	// Keep observed between-case variance as a conservative floor (no de-noising).
+	const pilotNoise = mean(cases.map(c => c.withinA / c.aRuns + c.withinB / c.bRuns));
+	const trueBetween = Math.max(0, between - pilotNoise);
+	// Method-of-moments removes pilot mean-estimation noise from between-case variance.
+	// Delta method: Var(overall log ratio) ~= (trueBetween + mean(CV_A² + CV_B²)/n) / C.
 	// Solve 1.96 * sqrt(V) <= log(1.03) for equal future runs per arm/case.
-	// With this fixed observed spread, null means no finite runs-only estimate.
-	// More pilot runs may revise that spread; this is not a population bound.
-	const budget = count * (Math.log(1.03) / 1.96) ** 2 - between;
+	// This is an approximation: truncation at zero and small-sample noise can bias
+	// the estimated variance components; more pilot runs may revise the estimate.
+	const budget = count * (Math.log(1.03) / 1.96) ** 2 - trueBetween;
 	const insufficient = cases.some(c => c.aRuns < 2 || c.bRuns < 2);
 	const runsPerSide = insufficient || budget <= 0 ? null : Math.max(2, Math.ceil(within / budget));
 	return { mode: 'per-case', direction: 'B / A; percent change in geometric mean of case mean-token ratios', seed, samples,
 		percentChange: pct(mean(cases.map(c => c.logRatio))), ci95: [draws[Math.floor(samples * .025)]!, draws[Math.ceil(samples * .975) - 1]!],
-		skipped, planning: { targetHalfWidthPercent: 3, runsPerSide, betweenLogVariance: between, meanWithinRelativeVariance: within,
-			reason: insufficient ? 'Within-case variance unknown with fewer than two runs on either side' : budget <= 0 ? 'No finite runs-only estimate under the fixed observed between-case variance model' : 'Conservative delta-method approximation; runs per arm per case' },
+		skipped, planning: { targetHalfWidthPercent: 3, runsPerSide, betweenLogVariance: between, denoisedBetweenLogVariance: trueBetween, meanWithinRelativeVariance: within,
+			reason: insufficient ? 'Within-case variance unknown with fewer than two runs on either side' : budget <= 0 ? 'No finite runs-only estimate under the de-noised between-case variance model' : 'Method-of-moments delta-method approximation; runs per arm per case' },
 		warnings: [...(insufficient ? ['Single-run cases have no estimable within-case variance; bootstrap conditions on those observations.'] : []),
 			...([...a, ...b].some(r => r.records.some(row => row.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),
 			...([...a, ...b].some(r => !r.casesSha256) ? ['Missing case hash: manually verify identical questions and scoring.'] : []),
