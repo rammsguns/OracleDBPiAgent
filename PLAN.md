@@ -1007,6 +1007,9 @@ product behaviour changes, so there is no eval A/B gate.
 3. Merge and push.
 4. Confirm CI is green, then tag `v1.0.0` and push the tag. Make a GitHub
    release only if the owner asks.
+- **Result (2026-10-29): released.** Version 1.0.0 and the MIT license field
+  were set in 8fd2554. CI run 40969636474 passed, and the `v1.0.0` tag was
+  pushed. Phase 7 is complete. No GitHub release was made.
 
 ### Not in phase 7
 New features, eval changes, dependency upgrades, publishing to npm, and
