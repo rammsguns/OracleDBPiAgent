@@ -1,0 +1,690 @@
+{
+	"direction": "B minus A; tokens = uncached input + output",
+	"pairedBlocks": 4,
+	"warnings": [],
+	"cases": [
+		{
+			"case": "d1-19c-lab/hard-category-leaders",
+			"pairs": 4,
+			"aTokens": 4281.75,
+			"bTokens": 4403,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 121.25,
+				"ci95": [
+					25.5,
+					217
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "d1-19c-lab/hard-follow-lab-boundary",
+			"pairs": 4,
+			"aTokens": 4130,
+			"bTokens": 4194.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 64.25,
+				"ci95": [
+					-288,
+					367.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					-0.75,
+					0.75
+				]
+			}
+		},
+		{
+			"case": "d1-19c-lab/hard-follow-ratio",
+			"pairs": 4,
+			"aTokens": 6080.5,
+			"bTokens": 6400,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 319.5,
+				"ci95": [
+					16.5,
+					622.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "d1-19c-lab/hard-region-channel",
+			"pairs": 4,
+			"aTokens": 5725.5,
+			"bTokens": 6541,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 815.5,
+				"ci95": [
+					6.5,
+					2251.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "d1-19c-lab/hard-share",
+			"pairs": 4,
+			"aTokens": 5704,
+			"bTokens": 5941.5,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 237.5,
+				"ci95": [
+					129,
+					362
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "d1-19c-lab/hard-yoy",
+			"pairs": 4,
+			"aTokens": 4223,
+			"bTokens": 5820,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 1597,
+				"ci95": [
+					14.5,
+					3179.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-alter-session",
+			"pairs": 4,
+			"aTokens": 1988.25,
+			"bTokens": 2109.5,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 121.25,
+				"ci95": [
+					62,
+					174
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-blocking-snapshot",
+			"pairs": 4,
+			"aTokens": 2710.25,
+			"bTokens": 3185.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 475,
+				"ci95": [
+					319.75,
+					689.75
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-ctas",
+			"pairs": 4,
+			"aTokens": 1989.75,
+			"bTokens": 2184.75,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 195,
+				"ci95": [
+					129.5,
+					260.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-cte-merge",
+			"pairs": 4,
+			"aTokens": 1997.25,
+			"bTokens": 2196.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 199,
+				"ci95": [
+					172.5,
+					229
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-dbms",
+			"pairs": 4,
+			"aTokens": 2039,
+			"bTokens": 2245.5,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 206.5,
+				"ci95": [
+					167.75,
+					246.25
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-fk-chain",
+			"pairs": 4,
+			"aTokens": 2950.75,
+			"bTokens": 3188,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 237.25,
+				"ci95": [
+					76,
+					399.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-follow-plan",
+			"pairs": 4,
+			"aTokens": 8315,
+			"bTokens": 7454.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": -860.75,
+				"ci95": [
+					-1759,
+					37.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": -0.5,
+				"ci95": [
+					-1,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-for-update",
+			"pairs": 4,
+			"aTokens": 1893.25,
+			"bTokens": 2065.5,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 172.25,
+				"ci95": [
+					145.75,
+					197
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-function",
+			"pairs": 4,
+			"aTokens": 2047,
+			"bTokens": 2206,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 159,
+				"ci95": [
+					78,
+					204.5
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-orders-plan",
+			"pairs": 4,
+			"aTokens": 4703,
+			"bTokens": 5210,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 507,
+				"ci95": [
+					72,
+					1045.25
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0.25,
+				"ci95": [
+					0,
+					0.75
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-pk-index",
+			"pairs": 4,
+			"aTokens": 3031,
+			"bTokens": 3319.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 288.25,
+				"ci95": [
+					18.5,
+					681.25
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-price-plan",
+			"pairs": 4,
+			"aTokens": 6663.75,
+			"bTokens": 8155.25,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 1491.5,
+				"ci95": [
+					-234,
+					3217
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": -0.25,
+				"ci95": [
+					-0.75,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-top-buffer-plan",
+			"pairs": 4,
+			"aTokens": 10675.25,
+			"bTokens": 5995,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": -4680.25,
+				"ci95": [
+					-6717.5,
+					-3054.75
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": -0.25,
+				"ci95": [
+					-0.75,
+					0
+				]
+			}
+		},
+		{
+			"case": "p1-19c-prod/hard-wait-limits",
+			"pairs": 4,
+			"aTokens": 3433.25,
+			"bTokens": 3625.75,
+			"aPassRate": 1,
+			"bPassRate": 1,
+			"executionFailures": {
+				"a": 0,
+				"b": 0
+			},
+			"tokens": {
+				"mean": 192.5,
+				"ci95": [
+					72.5,
+					342.75
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			}
+		}
+	],
+	"suite": {
+		"tokens": {
+			"mean": 1858.5,
+			"ci95": [
+				-3745,
+				7462
+			]
+		},
+		"passRate": {
+			"mean": 0,
+			"ci95": [
+				0,
+				0
+			]
+		},
+		"toolErrors": {
+			"mean": -0.75,
+			"ci95": [
+				-2.25,
+				0.5
+			]
+		}
+	}
+}
