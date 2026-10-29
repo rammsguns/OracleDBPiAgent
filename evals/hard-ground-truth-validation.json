@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-10-29T20:06:28.785Z",
-	"caseCount": 49,
+	"validatedAt": "2026-10-29T23:52:13.150Z",
+	"caseCount": 61,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -472,6 +472,175 @@
 			"rows": [
 				[
 					"0.0625"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-store-status",
+			"target": "d1-19c-lab",
+			"sql": "SELECT * FROM (SELECT s.store_name,o.order_status,COUNT(*) order_count FROM co.orders o JOIN co.stores s ON s.store_id=o.store_id GROUP BY s.store_name,o.order_status HAVING COUNT(*)>=100 ORDER BY COUNT(*) DESC,s.store_name,o.order_status) WHERE ROWNUM<=3",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"Online",
+					"COMPLETE",
+					1312
+				]
+			]
+		},
+		{
+			"id": "hard-p8-inventory-value",
+			"target": "d1-19c-lab",
+			"sql": "SELECT warehouse_name,product_count,TO_CHAR(ROUND(stock_value,2),'FM999999999990.00') FROM (SELECT w.warehouse_id,w.warehouse_name,COUNT(DISTINCT i.product_id) product_count,SUM(i.quantity_on_hand*p.list_price) stock_value FROM oe.inventories i JOIN oe.warehouses w ON w.warehouse_id=i.warehouse_id JOIN oe.product_information p ON p.product_id=i.product_id WHERE i.quantity_on_hand>0 AND p.list_price IS NOT NULL GROUP BY w.warehouse_id,w.warehouse_name ORDER BY stock_value DESC,w.warehouse_id) WHERE ROWNUM<=3",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"San Francisco",
+					175,
+					"7510324.00"
+				],
+				[
+					"Sydney",
+					206,
+					"5607002.00"
+				],
+				[
+					"Seattle, Washington",
+					107,
+					"4874557.00"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-jobs-plan",
+			"target": "d1-19c-lab",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE command_type=3 AND UPPER(sql_text)='SELECT JOB_ID,MAX_SALARY FROM HR.JOBS WHERE MAX_SALARY>12000' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='HR' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"TABLE ACCESS",
+					"FULL",
+					"JOBS"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-job-history-duration",
+			"target": "d1-19c-lab",
+			"sql": "SELECT job_id,TO_CHAR(ROUND(AVG(end_date-start_date),2),'FM999999990.00') FROM hr.job_history GROUP BY job_id ORDER BY job_id",
+			"mode": "allCells",
+			"rowCount": 8,
+			"rows": [
+				[
+					"AC_ACCOUNT",
+					"1570.50"
+				],
+				[
+					"AC_MGR",
+					"1234.00"
+				],
+				[
+					"AD_ASST",
+					"2100.00"
+				],
+				[
+					"IT_PROG",
+					"2018.00"
+				],
+				[
+					"MK_REP",
+					"1401.00"
+				],
+				[
+					"SA_MAN",
+					"364.00"
+				],
+				[
+					"SA_REP",
+					"282.00"
+				],
+				[
+					"ST_CLERK",
+					"505.50"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-archive-access",
+			"target": "p1-19c-prod",
+			"sql": "SELECT v.view_name,CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$ARCHIVED_LOG' view_name FROM dual UNION ALL SELECT 'V$LOG_HISTORY' FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"V$ARCHIVED_LOG",
+					"unavailable"
+				],
+				[
+					"V$LOG_HISTORY",
+					"unavailable"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-description-language",
+			"target": "d1-19c-lab",
+			"sql": "SELECT column_name,data_type,data_length FROM all_tab_columns WHERE owner='OE' AND table_name='PRODUCT_DESCRIPTIONS' AND column_name LIKE 'LANG%'",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"LANGUAGE_ID",
+					"VARCHAR2",
+					3
+				]
+			]
+		},
+		{
+			"id": "hard-p8-line-extension",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(unit_price*quantity),2),'FM999999999990.00') FROM oe.order_items",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"3668054.70"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-location-country",
+			"target": "d1-19c-lab",
+			"sql": "SELECT c.table_name,cc.column_name,p.table_name,pc.column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='HR' AND c.table_name IN ('LOCATIONS','COUNTRIES') AND c.constraint_type='R' ORDER BY c.table_name,cc.position",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"COUNTRIES",
+					"REGION_ID",
+					"REGIONS",
+					"REGION_ID"
+				],
+				[
+					"LOCATIONS",
+					"COUNTRY_ID",
+					"COUNTRIES",
+					"COUNTRY_ID"
+				]
+			]
+		},
+		{
+			"id": "hard-p8-jobs-decimal-mb",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1000000,6),'FM999999990.000000') FROM dba_segments WHERE owner='HR' AND segment_name='JOBS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"0.065536"
 				]
 			]
 		},

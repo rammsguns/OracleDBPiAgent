@@ -1048,6 +1048,16 @@ a new holdout and keeps the old one as a regression set.
     truth, patterns, and the failure triage.
   - Baseline results are recorded.
 - Gates from then on run: hard dev 4×4, new holdout ×3, regression ×1, and MVP.
+- **Result (2026-10-29): merged** (84decd8). The suite now has 28 dev, 12
+  holdout (`hard-p8-*`) and 21 regression cases. Validation checked 40
+  ground-truth queries for 61 cases. 600 unit tests pass.
+  - Baseline on eb04e45: new holdout ×3 passed 36/36, refusals included
+    (archived in `eval-archive/phase8/`).
+  - The Antigravity review approved. It found no overlap with existing
+    cases, and all 24 realistic wrong answers it wrote fail the scorer. The
+    clean baseline reflects the agent, not loose patterns.
+  - The new holdout is no harder than the old one. Its value is that no
+    change has been tuned against it.
 
 ### Not in phase 8
 Changes to dev cases, the scorer or the product.
