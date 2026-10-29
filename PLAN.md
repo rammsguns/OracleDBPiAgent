@@ -458,6 +458,12 @@ with same-day master (4d78e88) baselines:
   `dba-tools-merged`. If revisited, consider loading DBA tools only on demand,
   which needs prompt reuse across sessions or dynamic tool lists.
 
+## Docs refresh (2026-10-29)
+
+WP-Z (`wp-z-docs-refresh`, codex) owns README.md, docs/mvp-status.md and a new
+docs/README.md index. It changes no code. Review: antigravity checks the docs
+against the code and PLAN.md. Merge and push on APPROVE.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
