@@ -30,7 +30,7 @@ it.each(['?target=unknown', '?target=', '?sections=bad', '?sections=', '?section
 });
 it('returns report and optional summary, forwards selection and closes provider', async () => {
 	const f = await fixture(); const response = await f.call('?target=p1-19c-prod&sections=identity,tablespaces&summarize=1');
-	expect(response.status).toBe(200); expect(JSON.parse(response.text)).toMatchObject({ report: { sections: [] }, summary: 'summary' });
+	expect(response.status).toBe(200); expect(JSON.parse(response.text)).toMatchObject({ report: { sections: [] }, summary: 'summary', unverified: [] });
 	expect(f.report.mock.calls[0]).toMatchObject([{ pinnedTarget: 'p1-19c-prod' }, { target: 'p1-19c-prod', sections: ['identity', 'tablespaces'] }]);
 	expect(f.summarize).toHaveBeenCalledOnce(); expect(f.closeAll).toHaveBeenCalledOnce();
 });
@@ -55,4 +55,21 @@ it.each(['report', 'summary', 'provider', 'cleanup'])('scrubs %s failure and rel
 	const response = await f.call('?summarize=1');
 	expect(response).toEqual({ status: 500, text: JSON.stringify({ message: 'Report failed' }) });
 	const release = acquireLlm(); release();
+});
+
+it('returns unsupported summary numbers using the rendered report as evidence', async () => {
+	const f = await fixture({ summarize: async markdown => {
+		expect(markdown).toContain('# Oracle 19c report');
+		return 'Invented 98,765 rows in PROMO.';
+	} });
+	expect(JSON.parse((await f.call('?summarize=1')).text)).toMatchObject({ summary: 'Invented 98,765 rows in PROMO.', unverified: ['98,765'] });
+});
+it('omits summary and unverified when no summary was requested', async () => {
+	const f = await fixture(); const data = JSON.parse((await f.call()).text);
+	expect(data).not.toHaveProperty('summary'); expect(data).not.toHaveProperty('unverified');
+});
+
+it('returns an empty unverified list when the env grounding switch is disabled', async () => {
+	const f = await fixture({ config: loadConfig({ PIAGENT_GROUNDING_CHECK: '0' }), summarize: async () => 'Invented 98,765 rows.' });
+	expect(JSON.parse((await f.call('?summarize=1')).text)).toMatchObject({ summary: 'Invented 98,765 rows.', unverified: [] });
 });

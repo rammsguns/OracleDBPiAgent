@@ -150,6 +150,10 @@ $('report-run').addEventListener('click', async () => {
 		$('report-content').replaceChildren();
 		if (typeof data.summary === 'string') {
 			const summary = document.createElement('pre'); summary.className = 'answer'; summary.textContent = data.summary; $('report-content').append(summary);
+			if (Array.isArray(data.unverified) && data.unverified.length) {
+				const note = document.createElement('p'); note.className = 'unverified';
+				note.textContent = 'Unverified: ' + data.unverified.join(', '); $('report-content').append(note);
+			}
 		}
 		for (const section of data.report.sections) {
 			const heading = document.createElement('h3'); heading.textContent = section.name;
