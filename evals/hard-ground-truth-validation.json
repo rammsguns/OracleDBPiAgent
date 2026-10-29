@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-10-27T22:55:17.108Z",
-	"caseCount": 33,
+	"validatedAt": "2026-10-29T20:06:28.785Z",
+	"caseCount": 49,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -325,6 +325,153 @@
 			"rows": [
 				[
 					"System I/O"
+				]
+			]
+		},
+		{
+			"id": "hard-grant-p1-parameters",
+			"target": "p1-19c-prod",
+			"sql": "SELECT 'V$PARAMETER', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$PARAMETER' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"V$PARAMETER",
+					"unavailable"
+				]
+			]
+		},
+		{
+			"id": "hard-grant-p1-backups",
+			"target": "p1-19c-prod",
+			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"V$RMAN_BACKUP_JOB_DETAILS",
+					"unavailable"
+				]
+			]
+		},
+		{
+			"id": "hard-name-promo-parent",
+			"target": "d1-19c-lab",
+			"sql": "SELECT p.table_name, pc.column_name FROM all_constraints c JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name WHERE c.owner='SH' AND c.table_name='SALES' AND c.constraint_name='SALES_PROMO_FK' AND c.constraint_type='R'",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"PROMOTIONS",
+					"PROMO_ID"
+				]
+			]
+		},
+		{
+			"id": "hard-name-missing-archive",
+			"target": "d1-19c-lab",
+			"sql": "SELECT CASE WHEN COUNT(*)=0 THEN 'does not exist' ELSE 'exists' END FROM all_tables WHERE owner='SH' AND table_name='SALES_ARCHIVE_2099'",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"does not exist"
+				]
+			]
+		},
+		{
+			"id": "hard-precision-revenue-1998",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=1998",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"24083914.95"
+				]
+			]
+		},
+		{
+			"id": "hard-precision-revenue-2000",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=2000",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"23765506.62"
+				]
+			]
+		},
+		{
+			"id": "hard-precision-revenue-1999",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=1999",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"22219947.66"
+				]
+			]
+		},
+		{
+			"id": "hard-precision-revenue-2001",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=2001",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"28136461.98"
+				]
+			]
+		},
+		{
+			"id": "hard-units-sales-gb",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1073741824,6),'FM999999990.000000') FROM dba_segments WHERE owner='SH' AND segment_name='SALES' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"0.125000"
+				]
+			]
+		},
+		{
+			"id": "hard-units-customers-mb",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1048576,2),'FM999999990.00') FROM dba_segments WHERE owner='SH' AND segment_name='CUSTOMERS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"13.00"
+				]
+			]
+		},
+		{
+			"id": "hard-units-costs-gb",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1073741824,6),'FM999999990.000000') FROM dba_segments WHERE owner='SH' AND segment_name='COSTS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"0.125000"
+				]
+			]
+		},
+		{
+			"id": "hard-units-products-mb",
+			"target": "d1-19c-lab",
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1048576,4),'FM999999990.0000') FROM dba_segments WHERE owner='SH' AND segment_name='PRODUCTS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"0.0625"
 				]
 			]
 		},

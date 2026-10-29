@@ -819,6 +819,28 @@ real errors:
 - After merge, every future gate uses the expanded suite. Baselines are re-run
   each time, as now.
 
+- **Result (2026-10-29): merged** (96cedf2 and bdfd07f). The hard suite now has
+  49 cases: 28 dev and 21 holdout. Ground truth validates on both targets.
+  - The Antigravity review requested changes. 6 `forbiddenClaims` regexes would
+    have failed correct negations, such as "no change was committed" and "does
+    not reference PROMO". They now skip negations, with unit tests.
+  - Solvability baseline ×3 on the current code: 15 of 16 cases passed at least
+    once at first. `hard-units-sales-mb` failed 3 of 3: the value was right
+    (exactly 128 MB), but the agent wrote "128 MB", not "128.00 MB". It was
+    replaced by `hard-units-sales-gb` (0.125000 GB), which passed 2 of 3.
+    Known weakness: that is the same 128 MB, with the same expected value as
+    holdout `hard-units-costs-gb`.
+  - The agent drops trailing zeros. `hard-units-costs-gb` passed 2 of 3, and
+    its miss wrote "0.125".
+  - Expanded dev ×4: 27/28, then 28/28 ×3. Tokens averaged 109,393 per run,
+    with a CV of 5.0% and an approximate 4×4 half-width of ±6.9%. Old 20-case
+    dev on the same code: CV 4.0%, ±5.5%.
+  - **The goal of a tighter token interval was not met.** With 4 runs each,
+    the CV estimates are too noisy to separate the two suites. The spread comes
+    from single cases that vary widely: `hard-precision-revenue-1998` ranged
+    from 2,027 to 4,207 tokens. A narrower interval needs more runs per side,
+    or a per-case paired analysis, not more cases.
+
 ### Not in phase 5
 Scorer changes, new tools, prompt tuning to pass the new cases, and LLM-judged
 scoring.
