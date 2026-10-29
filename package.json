@@ -18,7 +18,8 @@
 		"eval": "tsx evals/run.ts",
 		"piagent": "tsx src/cli/index.ts",
 		"optimize": "tsx evals/optimize.ts",
-		"optimize:report": "tsx evals/optimize.ts --report"
+		"optimize:report": "tsx evals/optimize.ts --report",
+		"test:browser": "playwright test"
 	},
 	"dependencies": {
 		"@earendil-works/pi-agent-core": "1.4.0",
@@ -28,6 +29,7 @@
 		"typebox": "^1.4.3"
 	},
 	"devDependencies": {
+		"@playwright/test": "1.64.1",
 		"@types/node": "^26.6.5",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2",
