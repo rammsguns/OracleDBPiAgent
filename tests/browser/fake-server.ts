@@ -12,8 +12,11 @@ export async function startFakeServer() {
 	const config = { ...loadConfig({}), secretDir: dir, auditFile: join(dir, 'audit.jsonl') };
 	let now = 0;
 	const stats = { aborted: 0, prompts: 0 };
-	const web = createWebServer({ port: 0, config, now: () => now, idleMs: 1000,
-		report: async (_ctx, options) => ({ target: options?.target ?? 'd1-19c-lab', generatedAt: '2026-10-29', sections: [
+	const web = createWebServer({ port: 0, config, reportDirectory: join(dir, 'reports'),
+		loadReport: async (_dir, target) => target === 'p1-19c-prod' ? null : ({ target, generatedAt: '2026-10-28T00:00:00.000Z', sections: [{ name: 'top_sql', status: 'ok', source: 'fake', columns: ['SQL_ID'], rows: [], note: '' }] }),
+		now: () => now, idleMs: 1000,
+		report: async (_ctx, options) => ({ target: options?.target ?? 'd1-19c-lab', generatedAt: '2026-10-29T00:00:00.000Z', sections: [
+			{ name: 'top_sql', status: 'ok', source: 'fake', columns: ['SQL_ID'], rows: [[hostile]], note: '' },
 			{ name: 'identity', status: 'ok', source: 'fake', columns: ['VALUE'], rows: [[hostile + 'x'.repeat(500)]], note: 'Fake identity' },
 			{ name: 'backups', status: 'unavailable', source: 'fake', columns: [], rows: [], note: 'not available: needs SELECT on SYS.V_$RMAN_BACKUP_JOB_DETAILS' },
 		] }),
