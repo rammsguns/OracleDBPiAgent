@@ -1,11 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, createHash, timingSafeEqual } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SessionManager, WebError, acquireLlm, ask, type SessionOptions } from "./sessions.js";
 
+import { generateReport, renderMarkdown, sectionNames } from "../report/index.js";
+import { summarizeReport } from "../report/summarize.js";
+import { createSessions } from "../agent/dbToolsAdapter.js";
+import { JsonlAuditSink } from "../audit/index.js";
+
 export interface WebServerOptions extends SessionOptions {
+	report?: typeof generateReport;
+	summarize?: typeof summarizeReport;
 	port?: number;
 	token?: string;
 	manager?: SessionManager;
@@ -59,6 +66,24 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (raw === "/api/report" && req.method === "GET") {
+				const params = new URL(req.url!, "http://localhost").searchParams;
+				const target = params.get("target") ?? manager.config.defaultTarget;
+				const sections = params.has("sections") ? params.get("sections")!.split(",") : undefined;
+				if (!manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
+				if (sections?.some(name => !sectionNames.includes(name))) throw new WebError(400, "Invalid sections");
+				if (params.has("summarize") && params.get("summarize") !== "1") throw new WebError(400, "Invalid summary option");
+				const release = params.has("summarize") ? acquireLlm() : () => {};
+				let sessions;
+				try {
+					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
+					const report = await (options.report ?? generateReport)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target }, { target, sections });
+					const summary = params.has("summarize") ? await (options.summarize ?? summarizeReport)(renderMarkdown(report), manager.config.llm) : undefined;
+					const finished = sessions; sessions = undefined; await finished.closeAll();
+					return json(res, 200, { report, ...(summary === undefined ? {} : { summary }) });
+				} catch { throw new WebError(500, "Report failed"); }
+				finally { try { await sessions?.closeAll(); } catch { throw new WebError(500, "Report failed"); } finally { release(); } }
+			}
 			if (raw === "/api/health" && req.method === "GET") {
 				const release = acquireLlm();
 				try {

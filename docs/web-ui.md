@@ -40,9 +40,9 @@ Each SSE event has a JSON object in its `data:` line:
 | Event | Payload |
 | --- | --- |
 | `text` | `{ delta }` |
-| `tool_start` | `{ name, args }`, where args is serialized JSON cut to 300 characters |
+| `tool_start` | `{ name, args }`, where args contains only scalar target/owner/name/type/limit/sql_id fields, serialized and cut to 300 characters |
 | `tool_end` | `{ name, isError, error?, resultBytes }` |
-| `done` | `{ answer, usage }`, with usage an array of assistant-message usage objects |
+| `done` | `{ answer, unverified, usage }`, with usage an array of assistant-message usage objects |
 | `error` | `{ message: "Request failed" }` |
 
 Tool failure `error` is the generic first line `Tool execution failed`; raw driver,
@@ -122,3 +122,51 @@ The worktree initially lacked dependencies; validation used a temporary local
 No contract changes or additional dependencies are needed. No DB/LLM code was
 changed and no live database or model requests were made. Browser rendering,
 merged-server integration, and the end-to-end smoke test were not verified here.
+
+## Phase 2 report, export and grounding (WP-2C)
+
+`GET /api/report?target=<configured-name>[&sections=identity,tablespaces][&summarize=1]`
+returns `{ report, summary? }`. Omitted target uses the configured default; omitted
+sections selects all report sections. Names are validated against the report module's
+section list (including its grouped selection behavior). Invalid targets, empty or
+unknown sections and invalid summary flags return 400. Authentication, Host, Origin,
+CSP and no-store behavior match the other API routes. Report/provider/summary/cleanup
+failures return only `Report failed`, without driver details or connection settings.
+
+The route calls `generateReport` through a dedicated session provider with an audit
+run ID and pinned target, then closes the provider. Optional summaries call
+`renderMarkdown` and `summarizeReport` under the same process-wide lock as chat and
+health; a busy lock returns 409 before creating a provider. The lock stays held
+through report generation, summary and provider cleanup. Deterministic reports
+can run while chat is busy and never invoke the LLM. Test seams inject report,
+summary and provider implementations without Oracle or Strata.
+
+The Report tab runs for the selected target, optionally requests a summary, and
+renders tables and availability notes with DOM nodes and textContent. Tables scroll
+inside their panel on phone screens. Changing targets clears the displayed report.
+The SSE done payload carries `unverified: string[]`; nonempty values produce a
+visible Unverified note attached to that answer. WebAgent has a local optional
+property adapter, so no shared contract changes are required.
+
+Export Markdown downloads `piagent-conversation-<ISO timestamp>.md` entirely in the
+browser. Its conversation, grounding notes and trace cells come from displayed DOM
+text; HTML characters and table delimiters are escaped. The export never reads the
+token, API response metadata, audit, report, or agent state. Trace events now expose
+only scalar diagnostic argument fields (target, owner, name, type, limit, sql_id),
+omitting SQL text, binds and connection/credential fields before they reach the page.
+The export includes the current trace even when another evidence tab is selected.
+No dependencies or CSP changes were needed.
+
+Validation on 2026-10-29:
+
+- `npm run typecheck`: passed.
+- `npm test`: 25 files, 525 tests passed.
+- `npm run build && npm run test:browser`: build passed; 11 browser tests passed,
+  1 opt-in live smoke skipped. Fake report tests cover hostile cells and summary,
+  unavailable notes, phone overflow, export filename/content and grounding notes.
+- With the coordinator `.env` loaded,
+  `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`: 6 files passed,
+  22 tests passed, 1 live LLM end-to-end test skipped (7.32 seconds).
+- No LLM calls were made. Live summary/chat smoke and independent security review
+  remain coordinator gates. The existing coordinator node_modules installation was
+  linked locally for validation because this checkout initially had no installation.

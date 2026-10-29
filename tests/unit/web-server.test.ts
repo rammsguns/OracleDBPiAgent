@@ -103,11 +103,11 @@ describe("loopback web API", () => {
 		expect(result.headers["content-type"]).toContain("text/event-stream");
 		const events = result.text.trim().split("\n\n").map(block => ({ event: block.split("\n")[0]!.slice(7), data: JSON.parse(block.split("\n")[1]!.slice(6)) }));
 		expect(events.map(e => e.event)).toEqual(["tool_start", "tool_end", "text", "done"]);
-		expect(events[0]!.data.args).toHaveLength(300);
+		expect(events[0]!.data.args).toBe("{}");
 		expect(events[1]!.data).toMatchObject({ name: "run_query", isError: true, error: "Tool execution failed" });
 		expect(events[1]!.data.resultBytes).toBeGreaterThan(0);
 		expect(events[2]!.data).toEqual({ delta: "Answer" });
-		expect(events[3]!.data).toEqual({ answer: "Answer", usage: [{ input: 1, output: 2 }] });
+		expect(events[3]!.data).toEqual({ answer: "Answer", unverified: [], usage: [{ input: 1, output: 2 }] });
 		expect(result.text).not.toContain(secret);
 	});
 	it("serializes prompts across server instances with 409 and releases after completion", async () => {
