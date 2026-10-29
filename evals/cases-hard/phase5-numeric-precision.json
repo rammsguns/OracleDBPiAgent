@@ -45,7 +45,7 @@
 		"id": "hard-precision-revenue-1999",
 		"target": "d1-19c-lab",
 		"category": "numeric-precision",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"(?<![\\d.])22219947\\.66(?![\\d.])"
@@ -66,7 +66,7 @@
 		"id": "hard-precision-revenue-2001",
 		"target": "d1-19c-lab",
 		"category": "numeric-precision",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"(?<![\\d.])28136461\\.98(?![\\d.])"

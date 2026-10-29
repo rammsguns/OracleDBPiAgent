@@ -1,0 +1,22 @@
+[
+	{
+		"id": "hard-p8-scheduler-health",
+		"target": "p1-19c-prod",
+		"category": "diagnosis",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?:STATE|state)",
+				"(?:FAILURE_COUNT|failure count|failures)",
+				"(?:historical|history|cumulative)",
+				"(?:STATUS|status|no recent|no run)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On p1 inspect visible SHOPAPP scheduler job STATE, ENABLED, FAILURE_COUNT and the five most recent run statuses ordered by LOG_DATE descending. Does a cumulative failure count alone prove a job is failing now? Separate current state from historical runs and explain the limits if no recent run rows are visible. Do not execute or change jobs."
+	}
+]

@@ -1,0 +1,28 @@
+[
+	{
+		"id": "hard-p8-archive-access",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$ARCHIVED_LOG",
+				"unavailable",
+				"V(?:_)?\\$LOG_HISTORY",
+				"(?:grant|privilege|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:not|no|never)\\s+)(?:switch count|number of switches)\\s*(?:is|=|:)\\s*\\d+"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1, determine the number of archive log switches in the last 24 hours using V$LOG_HISTORY, with V$ARCHIVED_LOG as the fallback. If both are inaccessible, name both access gaps and explicitly say the switch count is unavailable. Do not infer archive activity from database mode or redo waits.",
+		"groundTruth": {
+			"sql": "SELECT v.view_name,CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$ARCHIVED_LOG' view_name FROM dual UNION ALL SELECT 'V$LOG_HISTORY' FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells"
+		}
+	}
+]

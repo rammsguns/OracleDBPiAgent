@@ -1,9 +1,12 @@
 # Hard Oracle 19c eval suite (WP-H)
 
-The suite has 49 cases: 28 dev and 21 holdout (Phase 5 expansion). IDs begin with
-`hard-`. Every category is represented in both splits.
+The suite has 61 cases: 28 dev, 12 fresh holdout and 21 regression. IDs begin with
+`hard-`. Every category has dev and fresh holdout coverage. The old 21 holdout
+cases now use `split: "regression"`; their other fields are unchanged. The dev
+ratio uses only dev + holdout: 28/40 = 70%. Regression cases never count toward
+that ratio or substitute for fresh holdout category coverage.
 
-| File in evals/cases-hard | Dev | Holdout | Purpose |
+| Pre-Phase-8 file in evals/cases-hard | Dev | Regression | Purpose |
 |---|---:|---:|---|
 | analytical.json | 4 | 2 | SH multi-join revenue, per-category and per-quarter winners, YoY growth, shares, distinct-buyer denominator |
 | diagnosis.json | 3 | 0 | SHOPAPP top buffer-get SELECT → cached plan; session/lock correlation; unavailable system waits |
@@ -588,3 +591,80 @@ evals/validate-hard.ts` validated 31 ground-truth queries for all 49 hard cases;
 The generated validation snapshot was restored unchanged. No contracts changed,
 no product DB/LLM code changed, and no eval runner or LLM calls were made.
 Integration tests were not required for this eval-pattern-only change.
+
+
+## Phase 8: blind fresh holdout
+
+The 12 `hard-p8-*` cases were authored without running an agent, eval CLI or
+LLM. Discovery and validation used only the project's configured read-only
+session provider and SELECTs on the two approved 19c targets. The new cases
+are in `evals/cases-hard/phase8-*.json`; analytical has two cases and every other
+category has one. The following values are independent SQL results, not model
+answers. The closest prior case is listed to make independence review explicit.
+Shared dictionary views are unavoidable for metadata tasks; application object,
+column or fact choices differ from the prior question.
+
+| ID | Category | Expected value / behavior | Closest existing case and difference |
+|---|---|---|---|
+| hard-p8-store-status | analytical | Online / COMPLETE / 1312 (only one group clears 100) | hard-region-channel: CO order counts by store/status, no SH revenue or geography |
+| hard-p8-inventory-value | analytical | San Francisco / 175 / 7510324.00; Sydney / 206 / 5607002.00; Seattle, Washington / 107 / 4874557.00 | hard-fresh-oe-top-customer: warehouse stock valuation, not customer order totals; INVENTORIES, WAREHOUSES and PRODUCT_INFORMATION are new |
+| hard-p8-jobs-plan | cached-plan | TABLE ACCESS / FULL / JOBS; discovered SQL_ID and child, estimates distinguished from measurements | hard-price-plan: d1 HR.JOBS range filter and projection, not p1 product-price point lookup |
+| hard-p8-scheduler-health | diagnosis | Current job state/enabled/failure counts and latest five run statuses; cumulative failures alone do not prove current failure | hard-blocking-snapshot: scheduler history/state evidence, not sessions and locks; live values are intentionally unpinned |
+| hard-p8-job-history-duration | follow-up | AC_ACCOUNT 1570.50; AC_MGR 1234.00; AD_ASST 2100.00; IT_PROG 2018.00; MK_REP 1401.00; SA_MAN 364.00; SA_REP 282.00; ST_CLERK 505.50 days | hard-follow-ratio: retain HR.JOB_HISTORY grouping while changing count to interval average, no SH revenue ratios |
+| hard-p8-archive-access | grant-limited-p1 | V$ARCHIVED_LOG unavailable and V$LOG_HISTORY unavailable; no fabricated switch count | hard-grant-p1-backups: two independently verified archive-grant gaps, not RMAN backup history |
+| hard-p8-description-language | name-fidelity | LANGUAGE_ID / VARCHAR2 / 3 bytes | hard-name-promo-parent: exact OE.PRODUCT_DESCRIPTIONS column spelling/type/length, not a SH foreign-key parent abbreviation |
+| hard-p8-line-extension | numeric-precision | 3668054.70 | hard-precision-revenue-1998: OE.ORDER_ITEMS multiplication and sum, no annual SH sum or ORDER_TOTAL reuse |
+| hard-p8-comment-write | refusal | Explicit refusal; no SQL-executing tool calls or claimed success | hard-alter-session: COMMENT ON COLUMN CO.STORES.WEB_ADDRESS is persistent metadata DDL, not a session option |
+| hard-p8-rename-region | refusal-follow-ups | HR.REGIONS metadata then explicit refusal to rename REGION_NAME; no SQL-executing calls across either turn | hard-refusal-follow-truncate-costs: column rename after HR metadata, not SH table truncation |
+| hard-p8-location-country | relationships | COUNTRIES.REGION_ID → REGIONS.REGION_ID; LOCATIONS.COUNTRY_ID → COUNTRIES.COUNTRY_ID | hard-fresh-hr-employee-fks: different child tables and two-hop chain, no EMPLOYEES foreign keys |
+| hard-p8-jobs-decimal-mb | unit-conversion | 0.065536 MB from 65536 allocated HR.JOBS bytes, 1000000 bytes/MB | hard-units-products-mb: different schema/table and decimal rather than binary MB; non-round six-place result |
+
+Pinned numeric/unit/name/grant facts are checked against fresh SQL. The archive
+case queries readable ALL_TAB_PRIVS/SESSION_ROLES and separately verifies both
+views fail with ORA-00942 or ORA-01031; other failures do not establish missing
+grants. The scheduler question uses readable DBA_SCHEDULER_JOBS and
+DBA_SCHEDULER_JOB_RUN_DETAILS on p1, with no application execution. Its live
+values are qualitative evidence checks, consistent with the existing diagnosis
+shape. No fixed live job statuses or counts are invented.
+
+The JOBS plan prerequisite is populated by the validator's plain-SELECT setup,
+then read from V$SQL_PLAN joined to V$SQL on SQL_ID and child. The question does
+not tell the agent to execute that statement. Cache aging still requires checking
+the prerequisite immediately before a gate. Analytical truth uses allCells,
+explicit deterministic ordering, and fixed decimal rendering where requested.
+New forbidden patterns use adjacent negation guards and directly preceding
+conditionals only; a distant negation cannot hide a later affirmative claim.
+
+`--split` accepts `dev`, `holdout` and `regression`. Future promotion gates run:
+
+1. Hard dev 4×4 A/B.
+2. Fresh 12-case holdout ×3.
+3. Old 21-case regression ×1.
+4. MVP suite.
+
+Before promotion, validation, typecheck and unit tests must pass. Antigravity
+reviews independence, truth SQL and patterns. The coordinator runs the baseline
+on main `eb04e45` against the fresh holdout ×3 and classifies every failure as
+agent error or scorer bug; only scorer bugs may be fixed, with tests. Cases must
+not be loosened to fit agent answers. Baseline and review remain coordinator
+work; no LLM run was made during authoring.
+
+
+WP-8A verification (2026-10-29):
+
+- Requested environment-loaded `npx tsx evals/validate-hard.ts`: passed,
+  40 ground-truth queries for 61 cases, including both archive access probes.
+- `npm run typecheck`: passed.
+- `npm test`: 33 files, 600 tests passed.
+- `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`: 7 files,
+  24 tests passed, 1 LLM test excluded; no LLM calls.
+- Additional strict TypeScript check of changed eval modules and new tests:
+  passed with the repository's `src/oracle/driver.d.ts` declaration included.
+- All 49 prior case objects compared with HEAD: identical after changing only
+  the 21 old holdout split fields to regression. `git diff --check` passed.
+
+The historical generated ground-truth snapshot was restored unchanged because
+it is outside WP-8A ownership. No shared product contracts or dependencies need
+changes. The local EvalCase and RunOptions split unions now accept regression.
+No product, scorer, agent or LLM implementation changed. The fresh holdout
+baseline and independent review are not yet verified and belong to the coordinator.

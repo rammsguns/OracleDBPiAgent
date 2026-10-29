@@ -1,0 +1,24 @@
+[
+	{
+		"id": "hard-p8-jobs-decimal-mb",
+		"target": "d1-19c-lab",
+		"category": "unit-conversion",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])0\\.065536(?![\\d.])",
+				"\\bMB\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, sum allocated table-segment bytes for HR.JOBS, excluding indexes and LOBs. Convert to decimal MB using 1 MB = 1000000 bytes. Round to exactly six decimal places and show the MB unit without thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1000000,6),'FM999999990.000000') FROM dba_segments WHERE owner='HR' AND segment_name='JOBS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells"
+		}
+	}
+]

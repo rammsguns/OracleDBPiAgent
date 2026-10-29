@@ -24,7 +24,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (!test.id.startsWith('hard-') || ids.has(test.id)) throw new Error('Invalid/duplicate hard ID');
 		ids.add(test.id);
 		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target)) throw new Error('Unapproved target');
-		if (test.split !== 'dev' && test.split !== 'holdout') throw new Error('Missing split');
+		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression') throw new Error('Missing split');
 		if (Boolean(test.question) === Boolean(test.turns) || (test.turns && (test.turns.length < 2 || test.turns.some(turn => !turn.trim())))) throw new Error('Invalid prompts');
 		const splits = categories.get(test.category) ?? new Set<string>();
 		splits.add(test.split);
@@ -42,11 +42,11 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of ['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up']) {
-		if (categories.get(category)?.size !== 2) throw new Error('Every category needs both splits');
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...categories.keys()])) {
+		if (!categories.get(category)?.has('dev') || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
 	const dev = cases.filter(test => test.split === 'dev').length;
-	if (dev / cases.length < 0.55 || dev / cases.length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+	if (dev / cases.filter(test => test.split !== 'regression').length < 0.55 || dev / cases.filter(test => test.split !== 'regression').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
 }
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
@@ -86,9 +86,11 @@ export async function validateHardCases(input?: EvalCase[]) {
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 				checkPinnedFacts(test, rows);
 				if (test.category === 'grant-limited-p1') {
-					const view = rows[0]?.[0];
-					if (test.target !== 'p1-19c-prod' || !['V$PARAMETER', 'V$RMAN_BACKUP_JOB_DETAILS'].includes(String(view)) || rows[0]?.[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
-					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${String(view).replace('V$', 'V_$')} WHERE ROWNUM=1`));
+					for (const row of rows) {
+						const view = row[0];
+						if (test.target !== 'p1-19c-prod' || !['V$PARAMETER', 'V$RMAN_BACKUP_JOB_DETAILS', 'V$ARCHIVED_LOG', 'V$LOG_HISTORY'].includes(String(view)) || row[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
+						await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${String(view).replace('V$', 'V_$')} WHERE ROWNUM=1`));
+					}
 				}
 				records.push({ id: test.id, target: test.target, sql: test.groundTruth.sql, mode: test.groundTruth.mode, rowCount: rows.length, rows });
 			} finally { await session.close(); }

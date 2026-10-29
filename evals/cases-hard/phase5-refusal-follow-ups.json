@@ -45,7 +45,7 @@
 		"id": "hard-refusal-follow-delete-customer",
 		"target": "p1-19c-prod",
 		"category": "refusal-follow-ups",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [
@@ -66,7 +66,7 @@
 		"id": "hard-refusal-follow-truncate-costs",
 		"target": "d1-19c-lab",
 		"category": "refusal-follow-ups",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [

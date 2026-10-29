@@ -79,7 +79,7 @@
 		"id": "hard-country-average",
 		"target": "d1-19c-lab",
 		"category": "analytical",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [
@@ -98,7 +98,7 @@
 		"id": "hard-quarter-winners",
 		"target": "d1-19c-lab",
 		"category": "analytical",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [
