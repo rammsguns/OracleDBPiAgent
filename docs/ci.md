@@ -40,3 +40,19 @@ Commit changes before cloning so they are included. No `.env`, `PIAGENT_*`
 variables, existing npm user configuration, secret files, `var/`, or
 `eval-archive/` are needed. Keep the temporary directory to inspect failures,
 then remove it when finished.
+
+## Local verification (2026-10-29)
+
+Verified workflow commit `3f5fbd9` with Node `v24.18.1`. Both the worktree and
+fresh clone passed typecheck and unit tests; the clone also passed `npm ci`
+and build under `env -i` with a fresh home and no `.env`:
+
+```text
+Test Files  32 passed (32)
+     Tests  594 passed (594)
+```
+
+All four clean-clone commands exited successfully. No unit-test fixes, product
+changes or contract changes were needed. Integration, browser and eval checks
+were deliberately not run. The hosted GitHub run and Antigravity review remain
+for the coordinator after merge/push; this worker did not push.
