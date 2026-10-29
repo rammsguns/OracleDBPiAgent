@@ -1,6 +1,6 @@
 # Project status — 2026-10-29
 
-The MVP and local web UI are merged. Token-saving work is finished for now.
+The MVP, phase 2 and WP-3A are merged. Token-saving work is finished for now.
 The DBA-tool and plan-search experiments are closed without merging.
 Results below are historical checks on this host (z4g5), not a fresh live run.
 See [PLAN.md](../PLAN.md) for scope and [the index](README.md) for related docs.
@@ -202,8 +202,7 @@ tests. The coordinator's end-to-end API smoke test confirmed:
 - Clean SIGTERM shutdown and no token in the audit.
 
 `npm run build` compiles TypeScript and copies `src/web/static/` into
-`dist/web/static/`. The compiled CLI serves the page too. The manual-copy
-instruction in the original [web UI notes](web-ui.md) predates this build fix.
+`dist/web/static/`. The compiled CLI serves the page too; see [web UI notes](web-ui.md).
 These are recorded API smoke results; they do not establish a fresh visual
 browser check. See also the [server report](wp-u-web-server-report.md).
 
@@ -240,3 +239,48 @@ Only the project README, this status page and the documentation index changed.
 Fresh checks passed: `npm run typecheck` and `npm test` (18 files, 336 tests).
 Every local Markdown link resolves, and the index covers every file in `docs/`.
 No live integration tests, evals or browser checks were rerun for this docs-only change.
+
+## Phase 2 and phase 3 — 2026-10-29
+
+Phase 2 is complete, with no new LLM tools. All work below received Antigravity
+approval before merge; the results are recorded coordinator gates from PLAN.md.
+
+- **WP-2A first attempt:** not merged. The lexical checker flagged 6/13 correct
+  holdout answers (46%). Corrections reduced hard dev from 20/20 to 16/20,
+  firing on 9/20 answers and damaging two correct refusals; the full A/B stopped.
+- **WP-2A redesign:** merged with numeric-only corrections, refusal and
+  no-successful-tool exemptions, and identifiers retained only as unverified.
+  Offline correct-answer correction rates were 0/20 dev, 0/13 holdout and 1/39
+  MVP. Hard dev 4×4 passed 80/80 with corrections on 5/80 (6%); holdout ×3
+  passed 39/39 (baseline 38/39), MVP 39/39. Hard-dev tokens rose 4.0%
+  (95% interval −2% to +10%), with 1.2% attributable to corrections; the owner
+  approved that cost. MVP tokens fell 0.3%.
+- **WP-2B:** merged 14 fixed report sections. d1 returned all 14; p1 returned
+  11 with three named grant notes. Reviews verified SQL safety, secret scrubbing,
+  row/time caps and independent DBA facts. The summary prompt was restricted to
+  read-only diagnostic advice after initially suggesting changes and a restart.
+  Live summaries passed on both targets (d1 24 s).
+- **WP-2C:** merged the Report tab, Markdown conversation/trace export and chat
+  unverified notes. Security review approved all seven checks. Live smoke confirmed
+  401 without authentication, 403 for bad origin, 400 for invalid target/section,
+  both targets' section results, read-only summary advice (d1 42 s), an empty chat
+  unverified list and no token in the audit.
+- **WP-3A:** merged summary numeric grounding without a correction call. The first
+  live run falsely flagged 5 correct d1 values and 1 p1 value: Oracle error codes
+  and timings converted to seconds. Header-first table evidence, microsecond
+  aliases for SQL timings and ignoring ORA codes fixed these in the summary
+  adapter; the shared checker is unchanged. A wrong 1,206 s value still flags.
+  Both live reruns produced **0 flags** and both reviews approved.
+
+Current recorded checks: typecheck passes; **541 unit tests pass**, **22 integration
+tests pass with 1 skipped**, and **11 browser tests pass with 1 skipped**. See
+[report](report.md), [grounding](grounding.md) and [web UI](web-ui.md) for behavior
+and evidence. WP-3B refreshes these docs; no shared contract changes are needed.
+
+WP-3B fresh validation: `npm run typecheck` exited 0; `npm test` passed 25 files
+and 541 tests. Validation used a temporary symlink to the coordinator's installed
+dependencies because this checkout had none; it was removed afterward. Local
+Markdown links resolve and the index covers every docs file. CLI options and the
+grounding switch were checked against `src/`; npm scripts against package.json.
+Integration, browser and live LLM checks were not rerun for this docs-only change.
+No contract changes or outstanding verification blockers.

@@ -14,9 +14,11 @@ revision they checked; use the status page and current code for today's behavior
 - [evals-hard.md](evals-hard.md) — Hard-suite cases, splits and ground-truth checks.
 - [model-optimization.md](model-optimization.md) — Variant results, promotions and rejected token-saving experiments.
 
-## Web UI
+## Reports, grounding and web UI
 
-- [web-ui.md](web-ui.md) — Local server API, authentication, session controls and page behavior; its manual asset-copy note predates the build fix.
+- [report.md](report.md) — Read-only DBA report sections, CLI options, summary grounding and live verification.
+- [grounding.md](grounding.md) — Evidence checks, numeric-only corrections, unverified facts and measurement results.
+- [web-ui.md](web-ui.md) — Local server API, authentication, chat, Report tab and Markdown export.
 
 ## Compatibility and grants
 
@@ -36,6 +38,7 @@ revision they checked; use the status page and current code for today's behavior
 - [wp-q-error-hints.md](wp-q-error-hints.md) — Bounded dictionary-column and query-error hints.
 - [wp-r-request-usage.md](wp-r-request-usage.md) — Per-request token and message-size diagnostics.
 - [wp-s-short-prefix.md](wp-s-short-prefix.md) — Shorter system prompt and tool definitions.
+- [wp-ab-browser-tests.md](wp-ab-browser-tests.md) — Browser coverage, phone layout fix and opt-in live smoke.
 - [wp-u-web-server-report.md](wp-u-web-server-report.md) — Web-server implementation and validation report.
 
 ## Reviews

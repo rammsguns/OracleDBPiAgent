@@ -3,7 +3,7 @@
 The coordinator runs model evaluations. This implementation was verified with fakes
 and DB-only integration checks; no LLM calls were made during development.
 
-Commands, pending coordinator-owned package.json script additions:
+Commands (the npm eval and optimizer scripts are now installed):
 
 ```sh
 npx tsx evals/run.ts --suite evals/cases-hard --split dev --repeat 3

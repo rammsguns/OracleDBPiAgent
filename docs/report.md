@@ -167,8 +167,7 @@ Live summaries were verified by the coordinator on both targets on 2026-10-29.
   conversion, identifier exclusion and the disabled grounding switch. Route
   tests cover populated/empty lists and omission without a summary; Playwright
   checks the visible note with a fake report and hostile summary text.
-- No LLM calls were made for WP-3A. Live summary grounding smoke and counts of
-  flagged numbers on both targets remain coordinator verification.
+- Coordinator live verification subsequently completed on both targets; see below.
 - No shared contract, dependency or grounding checker changes are needed.
 
 ### WP-3A live false-positive fix (2026-10-29)
@@ -185,5 +184,6 @@ Live summaries were verified by the coordinator on both targets on 2026-10-29.
 - `npm test`: 25 files, 541 tests passed.
 - `npm run build && npm run test:browser`: build passed; 11 browser tests passed,
   1 opt-in live smoke skipped.
-- No DB or LLM calls were made. Live summary reruns remain coordinator
-  verification; no contract or dependency changes are needed.
+- Coordinator live reruns on both targets produced **0 flags** after the fix
+  (the first run had flagged 5 correct values on d1 and 1 on p1). Both Antigravity
+  reviews approved. No contract or dependency changes were needed.
