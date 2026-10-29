@@ -673,6 +673,15 @@ WP-3A merges, so the docs describe the final behavior.
   byte-converted values), browser test for the note, Antigravity review, and a
   live `--summarize` on both targets. Report how many numbers were flagged. No
   agent prompt change, so no token A/B is needed.
+- **Result (2026-10-29): merged.** The first live run flagged only correct
+  values: 5 on d1 and 1 on p1. These were ORA-01653/01654 error codes and
+  microsecond values correctly shown in seconds. The checker's `_MICRO`
+  header rule only reads the first line of each evidence text, and the report
+  is one long document. The fix (6acf171) is in `summarize.ts` only: each
+  table becomes its own evidence text, `ELAPSED_TIME` and `CPU_TIME` are
+  tagged as microseconds, and ORA codes are ignored. A wrong value (1,206 s)
+  is still flagged. Re-run on both targets: 0 flags. Both Antigravity reviews
+  approved. `grounding.ts` is unchanged.
 
 ### WP-3B: docs refresh for phase 2
 - Update `README.md`, the `docs/README.md` index and `docs/mvp-status.md` for
