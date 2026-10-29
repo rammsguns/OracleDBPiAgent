@@ -522,6 +522,89 @@ fake-agent tests (Playwright 1.64.1, Chromium) plus the opt-in live test, which
 passed once against d1. The tests found and fixed one real bug: the target
 picker overflowed at phone width (`select { min-width: 0; max-width: 100%; }`).
 
+## Phase 2 (draft 2026-10-29; awaiting approval)
+
+Theme: **trustworthy answers and DBA reports, without making every session more
+expensive.** Phase 1 left three lessons:
+1. The remaining agent errors are invented facts: a table name (`PROMO` for
+   `PROMOTIONS`) and transposed digits (3,313,394.74 → 3,331,394.74).
+2. Every tool schema costs every session about 75–150 uncached tokens, and the
+   model rarely picks a new tool unprompted (WP-T, DBA tools).
+3. Cross-session prompt reuse would be the biggest saving, but it is a Strata
+   change, outside this project.
+
+So phase 2 adds no new LLM tools. It checks answers after they are written, and
+it runs fixed DBA checks without the LLM.
+
+All hard rules stay: 19c only, read-only, Strata only, one LLM call at a time,
+secrets only from `PIAGENT_SECRET_DIR`. Each WP follows the usual flow: an Orca
+codex worker, then an Antigravity review (told to use grep/jq on large JSON),
+then the coordinator gate, then merge and push.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-2A Answer grounding check | `wp-2a-grounding` | `src/agent/grounding.ts`, hook in `src/agent/index.ts`, eval capture of tool result text, tests | — |
+| WP-2B Read-only DBA report | `wp-2b-report` | `src/report/`, `piagent report` in `src/cli/index.ts`, tests, docs/report.md | — |
+| WP-2C Web UI: report tab and export | `wp-2c-web-report` | `src/web/` routes and page, browser tests | WP-2A, WP-2B |
+
+### WP-2A: answer grounding check
+- After the final answer, a deterministic, LLM-free check extracts the "hard
+  facts" from the answer: quoted or upper-case Oracle identifiers
+  (OWNER.TABLE, columns, SQL_IDs) and numbers with 4 or more significant digits.
+  It checks each one against the text of this run's tool results. It accepts
+  case changes, thousands separators, rounding to the precision shown, and
+  bytes↔KB/MB/GB.
+- On unsupported facts it allows **one** correction turn: "These values do not
+  appear in tool results: …; fix or remove them." That turn uses the existing
+  evidence and no new tools unless needed. Facts still unsupported after it are
+  listed as "unverified" in the CLI (`--json` field) and the audit (a count
+  only, never the values).
+- Step 1, offline: add the tool result text (capped) to eval records. Then
+  measure the false-positive rate on one hard dev and one holdout run before the
+  correction turn is switched on. Target: flags on at most 5% of correct
+  answers.
+- Gate: hard dev 4×4 A/B, holdout ×3 and MVP all pass. Fact failures do not
+  increase. Tokens rise by at most 3% on hard dev and at most 5% on MVP. The
+  correction turn fires on fewer than 10% of answers. `evals/compare.ts`
+  reports the paired intervals.
+
+### WP-2B: read-only DBA report
+- `piagent report --target <t> [--json|--md] [--sections ...]` runs fixed,
+  bounded, read-only SQL with **no LLM**: identity and version; tablespace
+  usage; top waits; top SQL; stale or locked optimizer stats; unusable or
+  invisible indexes; non-default parameters; failed scheduler jobs; long
+  operations; and RMAN backups and archive rate.
+- It reuses the SQL, ORA-00942 fallbacks and grant-naming errors from the closed
+  branches `rammsguns/wp-w-schema-health` and `rammsguns/wp-x-instance-ops`,
+  and the existing tools' SQL. It goes through the same session provider, SQL
+  policy and audit. A section that needs a missing grant (p1 parameters,
+  backups) reports "not available: needs SELECT on SYS.V_$…" and the report
+  still completes.
+- An optional `--summarize` sends one LLM call with the report as input and
+  asks for a short prioritised summary. It cites section names only, and the
+  grounding check from WP-2A applies to it when that WP is merged.
+- Gate: unit tests with fake sessions; an integration run against both targets
+  (every section either returns data or a named grant error, under a time
+  budget); Antigravity review of the SQL and read-only safety; and the DBA
+  facts checked against independent read-only queries. No change to the agent
+  prompt, so no token A/B is needed.
+
+### WP-2C: web UI report tab and export
+- A "Report" tab runs WP-2B for the selected target (`GET /api/report?target=`),
+  with the same token, Host/Origin checks and the LLM lock for `--summarize`.
+  It renders with `textContent` only.
+- Export downloads the conversation and trace as Markdown. Shown text only: no
+  token, DSN, user or bind values.
+- Unverified facts from WP-2A are flagged in the chat.
+- Gate: unit tests, browser tests (Playwright, fake agent), including the XSS
+  and phone-width cases for the new tab, an Antigravity security review, and
+  one live smoke test.
+
+### Not in phase 2
+Writes and runbooks that change anything, ASH/AWR, non-19c targets, cloud
+LLMs, multi-user auth and new LLM tools. Cross-session prompt reuse is recorded
+as a request to the Strata owner, with no work in this repo.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
