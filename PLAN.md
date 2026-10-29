@@ -576,6 +576,22 @@ then the coordinator gate, then merge and push.
   told to retract identifiers they had named but not queried. The full A/B gate
   was not run. A lexical checker over-fits dev; any retry needs an exemption for
   refusals and a held-out flag rate at or under 5% before it is switched on.
+- **Fix and result (2026-10-29): merged.** Redesign (7bdbf3b): the correction
+  turn fires only for unsupported numbers (4+ significant digits). Refusals and
+  runs with no successful tool call are skipped. Unsupported identifiers are only
+  listed as `unverified`. The correction text says to keep the rest of the
+  answer, including any refusal. Offline, corrections would fire on 0/20 dev and
+  0/13 holdout correct answers. On a fresh MVP capture the rate is 1/39. The
+  Antigravity review approved it. Gate against 4dec631:
+  - Hard dev 4×4: 80/80 pass (baseline 80/80), and the correction fired on 5/80
+    answers (6%).
+  - Holdout ×3: 39/39 (baseline 38/39). MVP: 39/39.
+  - Tokens on hard dev: +4.0%, 95% interval −2% to +10%. MVP: −0.3%.
+  - The correction turns themselves add +1.2%. The remaining +2.8% is in cases
+    where no correction fired, and those cases run the same code with the same
+    prompt and tools, so it is run-to-run noise. The user approved the merge on
+    the +1.2% attributable cost.
+  - `piagent report --summarize` still has no grounding check (left for later).
 
 ### WP-2B: read-only DBA report
 - `piagent report --target <t> [--json|--md] [--sections ...]` runs fixed,
