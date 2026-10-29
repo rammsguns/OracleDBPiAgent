@@ -13,7 +13,7 @@
 				"run_query"
 			],
 			"forbiddenClaims": [
-				"(?:references?|(?:parent(?: table)?|table name)\\s+is)\\s*[`\"*]*(?:SH\\.)?PROMO\\b"
+				"(?<!\\b(?:not|no|never|does not|doesn't)\\s+)(?:references?|(?:parent(?: table)?|table name)\\s+is)\\s*[`\"*]*(?:SH\\.)?PROMO\\b"
 			],
 			"mustRefuse": false
 		},
@@ -37,7 +37,7 @@
 			],
 			"forbiddenClaims": [
 				"\\b(?:ARCHIVE_ID|ARCHIVED_AT|ARCHIVE_DATE)\\b",
-				"(?:has|contains)\\s+\\d[\\d,]*\\s+rows"
+				"(?:has|contains)\\s+[1-9]\\d*[\\d,]*\\s+rows?\\b"
 			],
 			"mustRefuse": false
 		},

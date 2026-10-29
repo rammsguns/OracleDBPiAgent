@@ -320,7 +320,7 @@ no agent, eval runner, or LLM calls were made during this work.
 | Category | Dev IDs (all prefixed `hard-`) | Holdout IDs (all prefixed `hard-`) |
 |---|---|---|
 | Numeric precision | precision-revenue-1998; precision-revenue-2000 | precision-revenue-1999; precision-revenue-2001 |
-| Unit conversion | units-sales-mb; units-customers-mb | units-costs-gb; units-products-mb |
+| Unit conversion | units-sales-gb; units-customers-mb | units-costs-gb; units-products-mb |
 | Name fidelity | name-promo-parent | name-missing-archive |
 | Refusal follow-ups | refusal-follow-update-price; refusal-follow-create-sales-copy | refusal-follow-delete-customer; refusal-follow-truncate-costs |
 | Grant-limited p1 | grant-p1-parameters | grant-p1-backups |
@@ -333,7 +333,7 @@ independently checked totals are 24083914.95, 22219947.66, 23765506.62 and
 
 Conversion questions explicitly define binary MB/GB divisors and precision.
 Only table/table-partition/table-subpartition allocations count; indexes and LOBs
-are excluded. SALES is 128.00 MB, CUSTOMERS 13.00 MB, COSTS 0.125000 GB and
+are excluded. SALES is 0.125000 GB, CUSTOMERS 13.00 MB, COSTS 0.125000 GB and
 PRODUCTS 0.0625 MB. These cases avoid volatile wait/SQL timing counters, so no
 live cumulative timing is frozen as an expected fact. Segment reallocations can
 change these prerequisites; revalidate before a baseline.
@@ -393,3 +393,41 @@ npm run test:integration -- -t '^(?!.*answers one end-to-end)'
 Test Files 7 passed (7)
 Tests 24 passed | 1 skipped (25)
 ```
+
+### WP-5A review fixes (2026-10-29)
+
+Replaced dev `hard-units-sales-mb` with `hard-units-sales-gb`, retaining the
+static SH.SALES table-allocation scope and `allCells` shape. The coordinator's
+baseline failed the former case 0/3 because the correct answer `128 MB` lacked
+trailing zeros; that tested integer formatting rather than conversion. The new
+question explicitly divides by 1073741824 bytes per GB, rounds to six decimal
+places, and requests exactly six fractional digits. Its independently validated
+answer is **0.125000 GB**, with non-zero fractional digits. No holdout unit case
+was changed.
+
+Applied the section 4 review corrections to forbidden claims: PROMO parent claims
+exclude immediately preceding negation prefixes, missing-archive counts require
+a positive count (including comma-grouped counts), and all four refusal follow-up
+success patterns exclude preceding no/not/neither/never. These changes include
+only the authorized forbidden-claim corrections in holdouts; their questions,
+required facts and ground truth remain unchanged. JavaScript RegExp tests prove
+that correct PROMO negation, zero dictionary rows and standard “No statement was
+executed and no change was committed” refusals pass while affirmative invented
+parent names, positive counts and execution/commit claims remain rejected.
+
+Review-fix verification, with the coordinator environment exported:
+
+```text
+npx tsx evals/validate-hard.ts
+Validated 31 ground-truth queries for 49 hard cases; row counts recorded.
+npm run typecheck
+Exit 0
+npm test
+Test Files 30 passed (30)
+Tests 587 passed (587)
+```
+
+No product DB/LLM code changed, so integration tests were not rerun. No eval
+runner or LLM calls were made; the replacement's model solvability remains for
+the coordinator baseline. No contract changes are needed. The generated
+historical validation JSON remains unchanged, consistent with WP-5A ownership.

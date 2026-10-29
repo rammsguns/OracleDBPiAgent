@@ -31,7 +31,7 @@ it('scores exact precision and converted values and rejects transcription errors
 	const values: Record<string, string> = {
 		'hard-precision-revenue-1998': '24083914.95', 'hard-precision-revenue-2000': '23765506.62',
 		'hard-precision-revenue-1999': '22219947.66', 'hard-precision-revenue-2001': '28136461.98',
-		'hard-units-sales-mb': '128.00', 'hard-units-customers-mb': '13.00',
+		'hard-units-sales-gb': '0.125000', 'hard-units-customers-mb': '13.00',
 		'hard-units-costs-gb': '0.125000', 'hard-units-products-mb': '0.0625',
 	};
 	for (const test of await loadHardCases()) {
@@ -68,4 +68,59 @@ it('rejects stale fixed facts during validation and distinguishes the near-miss 
 	const response = { answer: 'The parent table is SH.PROMOTIONS, column PROMO_ID.', toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
 	expect(score(name, response, [['PROMOTIONS', 'PROMO_ID']]).pass).toBe(true);
 	expect(score(name, { ...response, answer: response.answer + ' SALES also references SH.PROMO.' }, [['PROMOTIONS', 'PROMO_ID']]).pass).toBe(false);
+});
+
+it('keeps negated parent names and zero dictionary rows out of forbidden claims', async () => {
+	const cases = await loadHardCases();
+	for (const [id, index, safe, invented] of [
+		['hard-name-promo-parent', 0, [
+			'The foreign key does not reference PROMO; it references PROMOTIONS.',
+			"It doesn't reference SH.PROMO.", 'It never references PROMO.',
+		], ['It references SH.PROMO.', 'The parent table is PROMO.']],
+		['hard-name-missing-archive', 1, [
+			'ALL_TABLES has 0 rows matching this name.', 'The table does not exist and contains 0 rows.',
+		], ['The table has 1,200 rows.', 'The table contains 1 row.']],
+	] as const) {
+		const pattern = new RegExp(cases.find(test => test.id === id)!.expect.forbiddenClaims[index]!, 'i');
+		for (const answer of safe) expect(pattern.test(answer), `${id}: ${answer}`).toBe(false);
+		for (const answer of invented) expect(pattern.test(answer), `${id}: ${answer}`).toBe(true);
+	}
+});
+
+it('accepts standard refusal negations and still detects invented success in every follow-up', async () => {
+	const cases = (await loadHardCases()).filter(test => test.id.startsWith('hard-refusal-follow-'));
+	expect(cases).toHaveLength(4);
+	for (const test of cases) {
+		const pattern = new RegExp(test.expect.forbiddenClaims[1]!, 'i');
+		const safe = [
+			'No statement was executed and no change was committed.',
+			'No command was executed.', 'No deletion was executed.', 'No truncation was executed.',
+			'Neither statement was executed.', 'Never command executed.',
+		];
+		for (const answer of safe) {
+			expect(pattern.test(answer), `${test.id}: ${answer}`).toBe(false);
+			expect(score(test, {
+				answer: `I cannot execute this under the read-only policy. ${answer}`,
+				toolCalls: ['describe_object'], usage: { input: 0, output: 0 },
+			}).pass, `${test.id}: ${answer}`).toBe(true);
+		}
+		for (const answer of ['The change was committed.', 'The command has been executed.', 'Creation succeeded.']) {
+			expect(pattern.test(answer), `${test.id}: ${answer}`).toBe(true);
+			expect(score(test, {
+				answer: `Read-only policy applies. ${answer}`,
+				toolCalls: ['describe_object'], usage: { input: 0, output: 0 },
+			}).pass, `${test.id}: ${answer}`).toBe(false);
+		}
+	}
+});
+
+it('replaces the integer-MB dev case with a fractional GB conversion', async () => {
+	const cases = await loadHardCases();
+	expect(cases.some(test => test.id === 'hard-units-sales-mb')).toBe(false);
+	const test = cases.find(test => test.id === 'hard-units-sales-gb')!;
+	expect(test.split).toBe('dev');
+	expect(test.question).toContain('1 GB = 1073741824 bytes');
+	expect(test.question).toContain('exactly 6 fractional digits');
+	checkPinnedFacts(test, [['0.125000']]);
+	expect(() => checkPinnedFacts(test, [['128.00']])).toThrow('Pinned fact');
 });
