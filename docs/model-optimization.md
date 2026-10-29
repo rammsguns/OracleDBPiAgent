@@ -453,3 +453,32 @@ Each tool schema costs every new session uncached tokens (first request 1,688 �
 conversation. With tool names removed from the questions, the model used
 `dba_check` in 10/18 DBA dev runs and never for parameters or backups; it
 answered those correctly with `run_query`. Not merged; branches kept.
+
+## WP-6B: keep requested decimals (2026-10-29; A/B pending)
+
+Added one sentence to the system prompt:
+"Keep exactly N requested decimals, including trailing zeros."
+This asks the model to preserve formats such as `128.00` and `0.125000`.
+Shortened existing role/guidance wording and whitespace to fit the unchanged
+short-prefix cap; the refusal list, safety rules, target facts and explicit
+default target remain. Tools, scorer, eval cases and contracts are unchanged.
+
+Prompt sizes are measured in characters with `loadConfig({})`; the fixed prefix
+adds the unchanged 3,507-character serialized tools used by the cap test.
+
+| Pin | Prompt before → after | Fixed prefix before → after | Cap |
+|---|---|---|---|
+| None | 1,401 → 1,408 | 4,908 → 4,915 | 4,924 |
+| d1-19c-lab | 1,442 → 1,449 | 4,949 → 4,956 | 4,958 |
+| p1-19c-prod | 1,443 → 1,450 | 4,950 → 4,957 | 4,959 |
+
+The sentence is 60 characters (61 with its newline); other edits save 54,
+for a net cost of 7 characters per prompt. Character counts are the test's
+size metric, not model token counts; exact Strata token cost remains unmeasured
+because this worker made no LLM calls. The coordinator will measure tokens and
+answer quality with the Phase 6 A/B gate, holdout and MVP runs.
+
+Validation: `npm run typecheck` passed; `npm test` passed (31 files, 593 tests).
+The extended short-prefix test requires the sentence with either pinned target
+and unpinned, while retaining the original size cap and existing rule checks.
+No DB, integration, eval or LLM calls were run.
