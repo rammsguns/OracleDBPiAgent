@@ -61,9 +61,9 @@ Static assets are resolved from `src/web/static/` relative to `import.meta.url`
 (`dist/web/static/` when compiled). Allowed extensions are HTML, JS, CSS, JSON,
 SVG, PNG, ICO and TXT. Decoded traversal segments, backslashes, NULs and symlinks
 escaping the static root are rejected. An absent index gets a tiny HTML placeholder.
-The TypeScript build does not copy assets: compiled deployments must copy the
-static directory alongside the compiled server; `npm run piagent -- web` serves
-source assets directly. No dependency or build-script change is required here.
+`npm run build` copies `src/web/static/` to `dist/web/static/`, so the compiled
+`piagent web` serves the page too; `npm run piagent -- web` serves source assets
+directly.
 
 ## Server validation
 

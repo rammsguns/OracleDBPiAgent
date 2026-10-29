@@ -25,7 +25,7 @@ project is TypeScript because PI is.
 
 | Target | Container | DSN | Account | Default schema | Notes |
 |---|---|---|---|---|---|
-| `d1-19c-lab` | `oracle19c` | `localhost:1522/ORCL` | `HARNESS_LAB` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `SH` | 19.9.1 EE non-CDB; HARNESS_LAB can read only SH (918k SALES rows); HR/OE/CO exist but are not granted |
+| `d1-19c-lab` | `oracle19c` | `localhost:1522/ORCL` | `HARNESS_LAB` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `SH` | 19.9.1 EE non-CDB; HARNESS_LAB reads SH (918k SALES rows), plus HR/OE/CO since the 2026-10-27 grants |
 | `p1-19c-prod` | `oracle19c-prod` | `localhost:1523/PRODCDB` | `HARNESS_RO` (role `HARNESS_DIAGNOSTICS_ROLE`, no ANY privs) | `SHOPAPP` | 19.9.1 EE non-CDB; production-shaped stand-in with a SHOPAPP OLTP scheduler workload |
 
 Passwords come from `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets`
@@ -448,7 +448,7 @@ with same-day master (4d78e88) baselines:
   from 5,968 to 5,436 characters. Holdout +6.3%, MVP +8.2%, hard dev +2.2%, all
   passing.
 - The DBA case questions named the old tools, so they were reworded in plain
-  DBA language (post-result edit, recorded in docs/wp-y-dba-check.md). After
+  DBA language (post-result edit, recorded in docs/wp-y-dba-check.md on that branch). After
   that, the model chose `dba_check` in only 10/18 dev runs, and 0/6 for
   parameters and backups. It wrote V$PARAMETER/RMAN SQL with `run_query` and
   still got the facts right. As with WP-T, a tool the model does not choose
@@ -458,7 +458,7 @@ with same-day master (4d78e88) baselines:
   `dba-tools-merged`. If revisited, consider loading DBA tools only on demand,
   which needs prompt reuse across sessions or dynamic tool lists.
 
-## Docs refresh (2026-10-29)
+## Docs refresh (2026-10-29; merged)
 
 WP-Z (`wp-z-docs-refresh`, codex) owns README.md, docs/mvp-status.md and a new
 docs/README.md index. It changes no code. Review: antigravity checks the docs
