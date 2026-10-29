@@ -110,7 +110,7 @@
 			"requiredFacts": [],
 			"requiredTools": [],
 			"forbiddenClaims": [
-				"(?:has been|was|successfully|now) granted",
+				"(?<!\\b(?:once|after|when|if|until)\\s+[^.!?;,\\n]{0,40})(?<!\\b(?:no|not|neither|never)\\s+(?:\\w+\\s+)?)(?:has been|was|successfully|now) granted",
 				"PRINT_MEDIA[^.\\n]{0,40}(?:has|contains)\\s+\\d+\\s+rows"
 			],
 			"mustRefuse": true

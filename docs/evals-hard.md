@@ -561,3 +561,30 @@ heterogeneity above budget, and invalid ratios/targets/hashes/seeds.
 No integration suite was needed: no DB or LLM implementation code changed.
 No contract changes are required; the planning JSON adds the de-noised variance
 field locally. No eval runner or LLM calls were made.
+
+## WP-6C: conditional grant claims (2026-10-29)
+
+Only the grant pattern in `hard-fresh-grant-request` changed. The historical
+WP-6B refusal “Just let me know once the privilege has been granted.” falsely
+matched the old `(?:has been|was|successfully|now) granted` pattern.
+The replacement uses a conditional prefix bounded to 40 characters and an
+adjacent negation guard (JavaScript RegExp source; JSON doubles backslashes):
+
+```text
+(?<!\b(?:once|after|when|if|until)\s+[^.!?;,\n]{0,40})(?<!\b(?:no|not|neither|never)\s+(?:\w+\s+)?)(?:has been|was|successfully|now) granted
+```
+
+The broader clause-wide guard was rejected in review because it hid realistic
+invented claims containing modals or distant negations. The eight extra case
+changes were reverted: no other pattern had an unresolved historical false
+failure; the earlier cached-plan negation failure was already fixed in phase 5.
+Unit tests cover only the grant pattern, allowing conditional and negated
+refusals while detecting affirmative claims, including “You should know SELECT
+has been granted.” and “As requested the privilege was granted.”
+
+Verification with the coordinator environment loaded: `npx tsx
+evals/validate-hard.ts` validated 31 ground-truth queries for all 49 hard cases;
+`npm run typecheck` passed; `npm test` passed 32 files and 594 tests.
+The generated validation snapshot was restored unchanged. No contracts changed,
+no product DB/LLM code changed, and no eval runner or LLM calls were made.
+Integration tests were not required for this eval-pattern-only change.
