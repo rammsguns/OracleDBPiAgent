@@ -38,9 +38,22 @@ and requests prioritised findings citing sections and read-only diagnostic next
 steps (what to query or check, and what to ask a DBA to review), explicitly
 forbidding parameter changes, ALTER/DDL/DML, PL/SQL, restarts or any other database
 modifications.
-The caller must share the LLM slot with other eval/report processes. WP-2A's future
-grounding integration must also wrap this standalone summary path; no shared
-contract change is requested by WP-2B.
+The caller must share the LLM slot with other eval/report processes. After the one
+summary call, the deterministic `checkFacts` checker compares numeric claims with
+the exact rendered Markdown sent to the model. Unsupported numbers with four or
+more significant digits appear after the CLI summary as `Unverified: ...`; there
+is no correction call. Rounded values and byte conversions follow the existing
+grounding checker rules. Identifiers are not flagged for report summaries.
+`PIAGENT_GROUNDING_CHECK=0` skips this check and produces an empty unverified list.
+With `--json --summarize`, the report remains one JSON line followed by summary
+text and, when needed, the Unverified line.
+
+The web `/api/report?...&summarize=1` response includes `summary: string` and
+`unverified: string[]` alongside `report`, including an empty list when supported
+or checking is disabled. Without `summarize=1`, both summary fields are omitted.
+The Report tab displays a visible Unverified note below the summary using only
+`textContent`. This lexical check does not prove row attribution or reasoning;
+small numbers and nonnumeric claims remain outside its summary scope.
 
 ## Safety and interpretation
 
@@ -131,4 +144,22 @@ into this document.
 - Unit coverage includes every fixed SQL shape, owner binds, bounds, policy,
   missing grants, timeout/generic error sanitization, every fallback, stable JSON,
   Markdown, grouped selection and CLI summary sequencing with a fake summary.
-- Live summary: not verified. The coordinator reserved Strata for WP-2A and did not release the slot during this worker session. The existing follow-up question (`msg_da29361c97ab`) was resumed after repeated ten-minute timeouts and the blocker was escalated (`msg_c90af886caad`); no LLM calls were made. A coordinator-owned live smoke remains required.
+
+Live summaries were verified by the coordinator on both targets on 2026-10-29.
+
+## WP-3A summary grounding validation (2026-10-29)
+
+- `npm run typecheck`: passed.
+- `npm test`: 25 files, 534 tests passed.
+- `npm run build && npm run test:browser`: build passed; 11 tests passed,
+  1 opt-in live smoke skipped.
+- With `/home/kiwi/orca/workspaces/OracleDBPiAgent/needlefish/.env` loaded,
+  `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`:
+  6 files passed; 22 tests passed, 1 live LLM test excluded.
+- Fake summaries cover supported and unsupported numbers, rounding, byte
+  conversion, identifier exclusion and the disabled grounding switch. Route
+  tests cover populated/empty lists and omission without a summary; Playwright
+  checks the visible note with a fake report and hostile summary text.
+- No LLM calls were made for WP-3A. Live summary grounding smoke and counts of
+  flagged numbers on both targets remain coordinator verification.
+- No shared contract, dependency or grounding checker changes are needed.

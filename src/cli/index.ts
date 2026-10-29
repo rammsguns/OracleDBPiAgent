@@ -83,8 +83,11 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			const markdown = renderMarkdown(report);
 			console.log(options.json ? JSON.stringify(report) : markdown);
 			if (options.summarize) {
-				const { summarizeReport } = await import("../report/summarize.js");
-				console.log(await summarizeReport(markdown, config.llm));
+				const { summarizeReport, checkReportSummary } = await import("../report/summarize.js");
+				const summary = await summarizeReport(markdown, config.llm);
+				const unverified = checkReportSummary(summary, markdown, config.llm);
+				console.log(summary);
+				if (unverified.length) console.log(`Unverified: ${unverified.join(", ")}`);
 			}
 		} finally { await sessions.closeAll(); }
 	});

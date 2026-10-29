@@ -146,7 +146,9 @@ test('report renders tables, unavailable notes and hostile summary as text on a 
 	await page.locator('#report-run').click();
 	await expect(page.locator('#report-status')).toHaveText('Report complete.');
 	await expect(page.locator('#report-content td')).toContainText(hostile);
-	await expect(page.locator('#report-content pre')).toHaveText(hostile);
+	await expect(page.locator('#report-content pre')).toHaveText(hostile + ' Invented 98,765 rows.');
+	await expect(page.locator('#report-content .unverified')).toHaveText('Unverified: 98,765');
+	await expect(page.locator('#report-content .unverified')).toBeVisible();
 	await expect(page.locator('#report-content')).toContainText('not available: needs SELECT');
 	await expect(page.locator('#report-content img, #report-content script')).toHaveCount(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

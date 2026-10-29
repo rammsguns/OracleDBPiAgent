@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { SessionManager, WebError, acquireLlm, ask, type SessionOptions } from "./sessions.js";
 
 import { generateReport, renderMarkdown, sectionNames } from "../report/index.js";
-import { summarizeReport } from "../report/summarize.js";
+import { summarizeReport, checkReportSummary } from "../report/summarize.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
 import { JsonlAuditSink } from "../audit/index.js";
 
@@ -78,9 +78,11 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const report = await (options.report ?? generateReport)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target }, { target, sections });
-					const summary = params.has("summarize") ? await (options.summarize ?? summarizeReport)(renderMarkdown(report), manager.config.llm) : undefined;
+					const markdown = renderMarkdown(report);
+					const summary = params.has("summarize") ? await (options.summarize ?? summarizeReport)(markdown, manager.config.llm) : undefined;
+					const unverified = summary === undefined ? [] : checkReportSummary(summary, markdown, manager.config.llm);
 					const finished = sessions; sessions = undefined; await finished.closeAll();
-					return json(res, 200, { report, ...(summary === undefined ? {} : { summary }) });
+					return json(res, 200, { report, ...(summary === undefined ? {} : { summary, unverified }) });
 				} catch { throw new WebError(500, "Report failed"); }
 				finally { try { await sessions?.closeAll(); } catch { throw new WebError(500, "Report failed"); } finally { release(); } }
 			}

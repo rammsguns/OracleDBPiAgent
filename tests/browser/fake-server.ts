@@ -17,7 +17,7 @@ export async function startFakeServer() {
 			{ name: 'identity', status: 'ok', source: 'fake', columns: ['VALUE'], rows: [[hostile + 'x'.repeat(500)]], note: 'Fake identity' },
 			{ name: 'backups', status: 'unavailable', source: 'fake', columns: [], rows: [], note: 'not available: needs SELECT on SYS.V_$RMAN_BACKUP_JOB_DETAILS' },
 		] }),
-		summarize: async () => hostile,
+		summarize: async () => hostile + ' Invented 98,765 rows.',
 		checkHealth: async () => {},
 		health: async () => [{ name: 'Fake Strata', status: 'ok' }, { name: 'Fake Oracle', status: 'fail' }],
 		sessionFactory: async () => ({ get: async () => { throw new Error('Database access forbidden in browser tests'); }, closeAll: async () => {} }),

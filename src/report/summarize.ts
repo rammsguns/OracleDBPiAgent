@@ -1,3 +1,5 @@
+import { checkFacts } from '../agent/grounding.js';
+import type { TunableLlmConfig } from '../config/tunables.js';
 import { normalizeContext } from '@earendil-works/pi-ai';
 import type { LlmConfig } from '../contracts.js';
 import { createStrataProvider } from '../llm/index.js';
@@ -16,4 +18,10 @@ export async function summarizeReport(markdown: string, config: LlmConfig): Prom
 	const result = await stream.result();
 	if (result.stopReason === 'error' || result.stopReason === 'aborted' || result.content.some(c => c.type === 'toolCall')) throw new Error('Local report summary failed');
 	return result.content.filter(c => c.type === 'text').map(c => c.text).join('');
+}
+
+/** Check only numeric summary claims against the exact Markdown sent to the model. */
+export function checkReportSummary(summary: string, markdown: string, config: LlmConfig): string[] {
+	return (config as TunableLlmConfig).groundingCheck === false
+		? [] : checkFacts(summary, [markdown]).unsupportedNumbers;
 }
