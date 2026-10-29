@@ -1,7 +1,9 @@
-# MVP status — 2026-10-26 (round 2)
+# Project status — 2026-10-29
 
-The MVP is built, reviewed and passing on this host (z4g5). An AI coordinator
-(Claude) and AI agents did all of the work and verification; no human has signed off.
+The MVP and local web UI are merged. Token-saving work is finished for now.
+The DBA-tool and plan-search experiments are closed without merging.
+Results below are historical checks on this host (z4g5), not a fresh live run.
+See [PLAN.md](../PLAN.md) for scope and [the index](README.md) for related docs.
 
 ## How it was built
 
@@ -12,9 +14,9 @@ The MVP is built, reviewed and passing on this host (z4g5). An AI coordinator
 | WP-B Oracle sessions, SQL policy, 12 tools | Codex, Orca worktree `wp-b-oracle-tools` | `540ef03`, `c1df41c` |
 | WP-C evals, integration tests | Codex, Orca worktree `wp-c-evals` | `36eae4d` |
 | Review | Antigravity (Gemini 3.8 Flash), Orca worktree `review-mvp` | REQUEST CHANGES, [report](review-mvp-2026-10-26.md) |
-| Integration fixes and review fixes | Claude | `ee4c345`, `8e3c432`, `7f529b9`, and this commit |
+| Integration fixes and review fixes | Claude | `ee4c345`, `8e3c432`, `7f529b9`, plus the initial status update |
 
-## Verification
+## Initial MVP verification — 2026-10-26
 
 | Check | Result |
 |---|---|
@@ -57,12 +59,15 @@ Found during the eval runs:
 Round 2 verification: typecheck passes, 133 unit tests, 7 integration tests, and `doctor` exits 0 on both targets.
 The eval suite has 33 cases. The full run scored 32/33; the miss was a scorer regex for `prod-overview`, not the agent's answer. After the fix, `prod-overview` passed on rerun, so the suite stands at 33/33 across the two runs with the same agent code.
 
-## Known limits (accepted)
+## Current limits
 
-- **d1 data.** `HARNESS_LAB` can read only SH. The grant script covers HR, OE and CO.
-- **p1 waits.** `wait_events` and full SGA/PGA/startup details need the p1 grants in the grant script.
-- **Plans.** `explain_plan` shows cached plans only, because `EXPLAIN PLAN` writes to `PLAN_TABLE`.
-- **View source.** It is limited to a 4 KB preview.
+- **Access.** d1 can read SH, HR, OE and CO. PM and IX remain ungranted.
+  p1 still lacks some views, including V$PARAMETER, RMAN views and
+  V$SQL_PLAN_STATISTICS_ALL. The 2026-10-27 grants resolved the earlier
+  wait-event and overview limits.
+- **Plans.** `explain_plan` shows cached plans only, because `EXPLAIN PLAN` writes to `PLAN_TABLE`. It accepts a SQL ID or exact SQL text, not fragment search.
+- **View source.** Full text is paged by line, at most 200 lines per call.
+  Views over 1 MiB or with an unsupported character set are refused.
 - **Builders vs product.** The product uses only local Strata. The builder agents (Codex, Antigravity) are cloud services.
 
 ## Round 3 — 2026-10-27
@@ -159,15 +164,79 @@ database name, the 19.9.1 version and the grantee. All 31 SELECT grants succeede
 - **Tests:** typecheck passes, 249 unit tests and 10 integration tests pass, and
   `doctor` passes.
 
+## Token-saving work — finished for now, 2026-10-28
+
+- **WP-L:** compact `describe_object` results merged and promoted.
+- **WP-M:** multi-table describe rejected and not merged.
+- **WP-N:** cached-token accounting merged.
+- **WP-O:** reasoning budget merged as opt-in; it showed no reliable saving
+  and was not promoted.
+- **WP-P/WP-R:** per-call errors and per-request usage diagnostics merged.
+- **WP-Q:** `run_query` error hints merged after an alternating 4×4 dev A/B
+  (−2.8% tokens).
+- **WP-S:** shorter prompt and tool descriptions merged (−15% fixed prefix,
+  −9.4% hard-dev tokens). Its dev A/B passed 79/80; the plan-follow-up miss
+  and follow-up checks are recorded in [model optimization](model-optimization.md).
+
+## Cached-plan search — WP-T closed, not merged
+
+The first A/B passed, but none of the model's `explain_plan` calls used the new
+`search` parameter. A second round added a steering sentence. Search was still
+unused, and total tokens rose 2.7%. Both rounds are closed; the current tool
+still matches exact SQL text or a SQL ID. See [the experiment history](model-optimization.md).
+
+## Local web UI — WP-U/WP-V merged, 2026-10-28
+
+WP-U added the loopback HTTP server, session lifecycle and `piagent web` command.
+WP-V added the plain HTML/CSS/JavaScript page: streamed chat, target picker,
+tool trace, audit tab, health checks and Stop button. Both received Antigravity
+APPROVE before merging (`3136369`, `869c26a`). No dependencies were added.
+
+The recorded gate passed typecheck, 336 unit tests and 20 filtered integration
+tests. The coordinator's end-to-end API smoke test confirmed:
+
+- Loopback-only binding, 401 without a token, and 403 for a bad Host or Origin.
+- CSP headers and target output without DSNs or login names.
+- One question per target answered through `db_overview`, with matching audit records.
+- A DML request refused without a tool call.
+- Clean SIGTERM shutdown and no token in the audit.
+
+`npm run build` compiles TypeScript and copies `src/web/static/` into
+`dist/web/static/`. The compiled CLI serves the page too. The manual-copy
+instruction in the original [web UI notes](web-ui.md) predates this build fix.
+These are recorded API smoke results; they do not establish a fresh visual
+browser check. See also the [server report](wp-u-web-server-report.md).
+
+## DBA tools — WP-W/WP-X/WP-Y closed, not merged, 2026-10-28/29
+
+WP-W/WP-X added four read-only checks for statistics, indexes, parameters and
+operations. Reviews approved them and all cases passed, including the ten new
+DBA cases ×3. The larger prefix cost about 300 extra uncached tokens per session:
+hard dev rose 1.3%, holdout 15.4% and MVP 14.5%.
+
+WP-Y combined them into one `dba_check` tool. All cases passed, but holdout still
+rose 6.3% and MVP 8.2% (hard dev +2.2%). After questions were changed to plain
+DBA language, the model chose the tool in only 10/18 dev runs, and never in the
+six parameter/backup runs. It used `run_query` successfully instead.
+
+The owner closed the phase. A rarely chosen tool did not justify its per-session
+prefix cost. The branches remain available, as recorded in [PLAN.md](../PLAN.md);
+the product still has 12 tools. The referenced WP-Y report is not present in
+this checkout.
+
 ## Next candidates
 
+- The largest remaining token cost is cross-session prompt reuse in Strata.
+  Each new conversation re-reads about 1.7k prefix tokens. Shared-prefix reuse
+  needs a Strata change outside this project and requires the owner.
+- Token saving is finished for now. The opt-in reasoning budget showed no
+  reliable saving. WP-T and the DBA-tool phase are closed, not pending merges.
+- Loading DBA tools only on demand is a possible future experiment, not an
+  approved implementation. It would need dynamic tool lists or shared prompt reuse.
 
-- Done on 2026-10-28: shorter system prompt and tool descriptions (WP-S, −9.4% hard
-  dev tokens), `run_query` error hints (WP-Q, −2.8%), and eval diagnostics
-  (WP-P per-call errors, WP-R per-request usage). See `docs/model-optimization.md`.
-- Largest remaining cost: Strata reuses a cached prompt only within one
-  conversation, so every new session re-reads the full prompt start (about 1.7k
-  tokens; the largest share of uncached input). Reusing a shared start across
-  conversations is a Strata change, outside this project; it needs the owner.
-- Output (thinking) is about 29% of tokens. An opt-in reasoning budget (WP-O)
-  showed no reliable saving.
+## Docs refresh — WP-Z
+
+Only the project README, this status page and the documentation index changed.
+Fresh checks passed: `npm run typecheck` and `npm test` (18 files, 336 tests).
+Every local Markdown link resolves, and the index covers every file in `docs/`.
+No live integration tests, evals or browser checks were rerun for this docs-only change.
