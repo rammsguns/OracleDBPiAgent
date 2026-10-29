@@ -495,6 +495,28 @@ and there is no evidence for a fixed temperature or seed, so gates keep the 4×4
 alternating method. `evals/compare.ts` reports paired per-case differences with
 a bootstrap 95% interval. Evidence is in docs/evals-hard.md.
 
+## Web UI browser tests (2026-10-29)
+
+The owner approved `@playwright/test` as a dev-only dependency on 2026-10-29.
+
+WP-AB (`wp-ab-browser-tests`, codex) owns `tests/browser/`, a
+`playwright.config.ts`, and, as a coordinator-approved exception for this WP
+only, the `@playwright/test` devDependency, a `test:browser` script in
+package.json, and the lockfile. Product code changes only if a test finds a real
+bug, and each one is reported.
+- The tests start the real server from `src/web/server.ts` on 127.0.0.1 with an
+  injected fake agent (`agentFactory`), so they need no DB or LLM. They drive the
+  page in headless Chromium: token taken from the hash and removed from the URL;
+  target picker; streamed answer; tool trace rows; stop; 409 busy; session
+  expiry; audit tab; health. Hostile model text (`<img onerror>`, `<script>`)
+  must render as text, with no CSP violations in the console. The layout must
+  work at phone width.
+- One optional live smoke test (`PIAGENT_BROWSER_LIVE=1`) asks one d1 question
+  through the real agent. It is skipped by default and never runs in parallel.
+- `npm test` and `npm run test:integration` stay unchanged and must not pick up
+  the browser tests.
+Review: antigravity. Merge and push on APPROVE, if `npm run test:browser` passes.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
