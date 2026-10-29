@@ -28,7 +28,7 @@ async function api(path, options = {}) {
 function sessionPath(suffix = '') { return `/api/sessions/${encodeURIComponent(sessionId)}${suffix}`; }
 function clearSessionView() {
 	$('messages').replaceChildren(); $('trace').replaceChildren(); $('audit').replaceChildren();
-	$('report-content').replaceChildren(); $('report-status').textContent = '';
+	$('report-save').disabled = true; $('report-content').replaceChildren(); $('report-status').textContent = '';
 	rows = []; $('audit-status').textContent = '';
 }
 async function newSession() {
@@ -140,13 +140,13 @@ function tab(selected) {
 	}
 	if (selected === 'audit') void audit();
 }
-$('report-run').addEventListener('click', async () => {
+async function runReport(saving = false) {
 	const target = $('target').value;
 	const params = new URLSearchParams(target ? { target } : {});
 	if ($('report-summarize').checked) params.set('summarize', '1');
-	$('report-run').disabled = true; $('target').disabled = true; $('report-status').textContent = 'Running report…';
+	$('report-run').disabled = true; $('report-save').disabled = true; $('target').disabled = true; $('report-status').textContent = 'Running report…';
 	try {
-		const data = await (await api('/api/report?' + params)).json();
+		const data = await (await api('/api/report' + (saving ? '/save' : '') + '?' + params, saving ? { method: 'POST' } : {})).json();
 		$('report-content').replaceChildren();
 		if (typeof data.summary === 'string') {
 			const summary = document.createElement('pre'); summary.className = 'answer'; summary.textContent = data.summary; $('report-content').append(summary);
@@ -167,10 +167,26 @@ $('report-run').addEventListener('click', async () => {
 			head.append(tr); const body = document.createElement('tbody'); body.append(...section.rows.map(tableRow));
 			table.append(head, body); wrap.append(table); $('report-content').append(wrap);
 		}
-		$('report-status').textContent = 'Report complete.';
+		const panel = document.createElement('section'); panel.id = 'report-changes';
+		const heading = document.createElement('h3');
+		heading.textContent = 'Changes since last saved run' + (data.diff.previousGeneratedAt ? ' (' + data.diff.previousGeneratedAt + ')' : ''); panel.append(heading);
+		if (!data.diff.previousGeneratedAt || !data.diff.changes.length) {
+			const note = document.createElement('p'); note.textContent = data.diff.previousGeneratedAt ? 'No changes.' : 'No saved run yet.'; panel.append(note);
+		} else {
+			const list = document.createElement('ul');
+			for (const change of data.diff.changes) {
+				const item = document.createElement('li'); item.textContent = change.rule + ' — ' + change.key + ': ' + change.before + ' → ' + change.after; list.append(item);
+			}
+			panel.append(list);
+		}
+		for (const text of data.diff.notes) { const note = document.createElement('p'); note.textContent = text; panel.append(note); }
+		$('report-content').append(panel); $('report-save').disabled = false;
+		$('report-status').textContent = saving ? 'Report saved (' + data.savedAt + ').' : 'Report complete.';
 	} catch (error) { $('report-status').textContent = error.message; }
 	finally { $('report-run').disabled = false; $('target').disabled = running; }
-});
+}
+$('report-run').addEventListener('click', () => runReport());
+$('report-save').addEventListener('click', () => runReport(true));
 $('export').addEventListener('click', () => {
 	const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;');
 	const conversation = [...$('messages').children].map(article => '### ' + escape(article.querySelector('h3').textContent) + '\n\n' + [...article.children].slice(1).map(node => escape(node.textContent)).join('\n\n')).join('\n\n');

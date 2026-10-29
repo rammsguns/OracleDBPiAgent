@@ -33,7 +33,7 @@
 				<button id="audit-tab" role="tab" aria-selected="false" aria-controls="audit-panel" tabindex="-1">Audit</button>
 				<button id="report-tab" role="tab" aria-selected="false" aria-controls="report-panel" tabindex="-1">Report</button>
 			</div>
-			<div id="report-panel" role="tabpanel" aria-labelledby="report-tab" hidden><button id="report-run" type="button">Run report</button><label><input id="report-summarize" type="checkbox"> Summarize with Strata</label><p id="report-status" role="status"></p><div id="report-content"></div></div>
+			<div id="report-panel" role="tabpanel" aria-labelledby="report-tab" hidden><button id="report-run" type="button">Run report</button><button id="report-save" type="button" disabled>Save this run</button><label><input id="report-summarize" type="checkbox"> Summarize with Strata</label><p id="report-status" role="status"></p><div id="report-content"></div></div>
 			<div id="trace-panel" role="tabpanel" aria-labelledby="trace-tab"><p>Tool calls appear here as the answer streams.</p><div class="table-scroll"><table><caption>Tool calls</caption><thead><tr><th scope="col">Name</th><th scope="col">Arguments</th><th scope="col">Status</th><th scope="col">Result bytes</th></tr></thead><tbody id="trace"></tbody></table></div></div>
 			<div id="audit-panel" role="tabpanel" aria-labelledby="audit-tab" hidden><button id="audit-refresh" type="button">Refresh audit</button><p id="audit-status" role="status"></p><div class="table-scroll"><table><caption>Session audit records</caption><thead><tr><th scope="col">Kind</th><th scope="col">Tool</th><th scope="col">Target</th><th scope="col">SQL hash</th><th scope="col">Rows</th><th scope="col">Elapsed ms</th></tr></thead><tbody id="audit"></tbody></table></div></div>
 		</section>

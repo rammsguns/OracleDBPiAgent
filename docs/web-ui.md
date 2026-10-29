@@ -175,3 +175,53 @@ Validation on 2026-10-29:
   authentication and input refusals, all 14 d1 sections, 11 p1 sections plus three
   named grant notes, a read-only d1 summary (42 s), chat `unverified: []`, and no
   token in the audit. WP-3A summary reruns on both targets produced zero flags.
+
+## Phase 4 saved-run comparison (WP-4B)
+
+`GET /api/report` also returns `diff`, comparing the generated report against the
+newest saved report for the selected target. History defaults to `var/reports`;
+there is currently no report-directory field in AppConfig. Loading history never
+creates directories, changes file modes, or saves a run. An absent baseline has
+`previousGeneratedAt: null`. The response preserves the shared diff fields and
+adds web-local `before` and `after` display strings to each change, using matching
+snapshot rows (or availability/backup states). No shared contract change is needed.
+
+`POST /api/report/save?target=<name>` generates a fresh report, compares it to the
+previous saved run, and then saves JSON and Markdown using the shared history API
+(private 0600 files, atomic publication and retention of 30 runs). It returns
+`{ report, diff, savedAt, summary?, unverified? }`; `savedAt` is the newly saved
+report's generation timestamp. It accepts the same selection and summary options
+as GET. Authentication and Host/Origin protections are identical to the existing
+POST routes: a bearer token is required and any supplied Origin must match Host.
+Invalid targets are rejected before database/history access; history errors return
+only `Report failed`. Provider cleanup completes before persistence. No paths are
+returned to the browser. Existing summary locking and grounding checks are retained.
+
+The Report tab displays a Changes since last saved run panel, with baseline time,
+rule, item key and before → after values. It shows No changes. for an unchanged
+baseline and No saved run yet. when none exists; comparison notes remain visible.
+Save this run is enabled after a successful report and explicitly runs/saves a
+fresh report (it does not persist a client-supplied snapshot). Target changes clear
+the report and disable saving. All values use DOM nodes and textContent, including
+hostile values. The panel wraps long strings on phone screens.
+
+Tests use fake database/report seams and temporary history directories, never the
+repository's report history. Route tests cover authorization, Host/Origin, bad
+targets, side-effect-free reads, private saves, pre-save comparisons and scrubbed
+history failures. Browser fixtures supply fake history and cover changes, no
+baseline, no changes, hostile values, phone overflow and explicit saving.
+
+WP-4B validation (2026-10-29):
+
+- `npm run typecheck`: passed.
+- `npm test`: 29 files / 579 tests passed.
+- `npm run build && npm run test:browser`: passed; 14 browser tests passed,
+  1 opt-in live smoke test skipped. An initial existing assertion needed to select
+  one cell after the fake report gained a second table; the final suite passed.
+- With the coordinator environment loaded,
+  `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`: passed;
+  7 files / 24 tests passed, 1 LLM test skipped (8.35 seconds).
+- No LLM calls were made. Antigravity review and the live web smoke remain
+  coordinator gates. No shared contract, config or dependency changes are needed.
+  Validation used a temporary node_modules symlink to the coordinator worktree's
+  installed dependencies; the symlink was removed afterward.

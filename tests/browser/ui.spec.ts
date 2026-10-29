@@ -145,7 +145,7 @@ test('report renders tables, unavailable notes and hostile summary as text on a 
 	await page.locator('#report-summarize').check();
 	await page.locator('#report-run').click();
 	await expect(page.locator('#report-status')).toHaveText('Report complete.');
-	await expect(page.locator('#report-content td')).toContainText(hostile);
+	await expect(page.locator('#report-content td').first()).toContainText(hostile);
 	await expect(page.locator('#report-content pre')).toHaveText(hostile + ' Invented 98,765 rows.');
 	await expect(page.locator('#report-content .unverified')).toHaveText('Unverified: 98,765');
 	await expect(page.locator('#report-content .unverified')).toBeVisible();
@@ -167,4 +167,34 @@ test('exports visible conversation and trace as Markdown with unverified note', 
 	expect(text).toContain('Final answer'); expect(text).toContain('UNSUPPORTED_TABLE'); expect(text).toContain('run_query');
 	expect(text).not.toContain(new URL(tokenUrl()).hash.slice(7));
 	expect(text).not.toMatch(/never-export-bind|never-export-sql|HARNESS_|1522|1523/);
+});
+
+test('last saved changes render hostile values as text without phone overflow and save explicitly', async ({ page }) => {
+	await page.setViewportSize({ width: 375, height: 812 });
+	await ready(page); await page.locator('#report-tab').click();
+	await expect(page.locator('#report-save')).toBeDisabled();
+	await page.locator('#report-run').click();
+	await expect(page.locator('#report-changes')).toContainText('Changes since last saved run (2026-10-28T00:00:00.000Z)');
+	await expect(page.locator('#report-changes li')).toContainText('new_top_sql');
+	await expect(page.locator('#report-changes li')).toContainText('Not present → SQL_ID: ' + hostile);
+	await expect(page.locator('#report-changes img, #report-changes script')).toHaveCount(0);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+	const saved = page.waitForResponse(r => r.url().includes('/api/report/save?') && r.request().method() === 'POST');
+	await page.locator('#report-save').click(); expect((await saved).status()).toBe(200);
+	await expect(page.locator('#report-status')).toHaveText('Report saved (2026-10-29T00:00:00.000Z).');
+});
+test('target without saved history shows the no saved run state', async ({ page }) => {
+	await ready(page); await page.locator('#target').selectOption('p1-19c-prod');
+	await expect(page.locator('#question')).toBeEnabled();
+	await page.locator('#report-tab').click(); await page.locator('#report-run').click();
+	await expect(page.locator('#report-changes')).toContainText('No saved run yet.');
+});
+test('unchanged history shows no changes', async ({ page }) => {
+	await ready(page);
+	await page.route('**/api/report?*', async route => {
+		const response = await route.fetch(); const data = await response.json(); data.diff.changes = [];
+		await route.fulfill({ response, json: data });
+	});
+	await page.locator('#report-tab').click(); await page.locator('#report-run').click();
+	await expect(page.locator('#report-changes')).toContainText('No changes.');
 });

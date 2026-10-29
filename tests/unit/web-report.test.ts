@@ -1,4 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, readdir, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { request } from 'node:http';
 import { loadConfig } from '../../src/config/index.js';
 import { createWebServer, type WebServerOptions } from '../../src/web/server.js';
@@ -6,18 +9,19 @@ import { acquireLlm } from '../../src/web/sessions.js';
 const cleanups: (() => Promise<unknown>)[] = [];
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close(); });
 async function fixture(overrides: Partial<WebServerOptions> = {}) {
+	const dir = await mkdtemp(join(tmpdir(), 'web-report-')); cleanups.push(() => rm(dir, { recursive: true, force: true }));
 	const closeAll = vi.fn(async () => {});
-	const report = vi.fn(async () => ({ target: 'd1-19c-lab', generatedAt: 'now', sections: [] }));
+	const report = vi.fn(async () => ({ target: 'd1-19c-lab', generatedAt: '2026-10-29T12:00:00.000Z', sections: [] }));
 	const summarize = vi.fn(async () => 'summary');
-	const web = createWebServer({ port: 0, token: 'test', config: loadConfig({}), report, summarize,
+	const web = createWebServer({ port: 0, token: 'test', config: loadConfig({}), reportDirectory: dir, report, summarize,
 		sessionFactory: async () => ({ get: vi.fn(), closeAll }), ...overrides });
 	const url = new URL(await web.listen()); cleanups.push(web.close);
-	const call = (query = '', headers: Record<string, string> = {}) => new Promise<{ status: number; text: string }>((resolve, reject) => {
-		const req = request({ hostname: '127.0.0.1', port: url.port, path: '/api/report' + query, headers: { Authorization: 'Bearer test', ...headers } }, res => {
+	const call = (query = '', headers: Record<string, string> = {}, method = 'GET') => new Promise<{ status: number; text: string }>((resolve, reject) => {
+		const req = request({ hostname: '127.0.0.1', port: url.port, path: '/api/report' + query, method, headers: { Authorization: 'Bearer test', ...headers } }, res => {
 			let text = ''; res.on('data', chunk => { text += chunk; }); res.on('end', () => resolve({ status: res.statusCode!, text }));
 		}); req.on('error', reject); req.end();
 	});
-	return { call, report, summarize, closeAll };
+	return { call, report, summarize, closeAll, dir };
 }
 it('authenticates report and checks Host and Origin before generating', async () => {
 	const f = await fixture();
@@ -72,4 +76,37 @@ it('omits summary and unverified when no summary was requested', async () => {
 it('returns an empty unverified list when the env grounding switch is disabled', async () => {
 	const f = await fixture({ config: loadConfig({ PIAGENT_GROUNDING_CHECK: '0' }), summarize: async () => 'Invented 98,765 rows.' });
 	expect(JSON.parse((await f.call('?summarize=1')).text)).toMatchObject({ summary: 'Invented 98,765 rows.', unverified: [] });
+});
+
+it('GET never creates history and POST saves private files then GET compares the saved run', async () => {
+	const f = await fixture();
+	expect(JSON.parse((await f.call()).text).diff.previousGeneratedAt).toBeNull();
+	expect(await readdir(f.dir)).toEqual([]);
+	const saved = await f.call('/save?target=d1-19c-lab', {}, 'POST');
+	expect(saved.status).toBe(200); expect(JSON.parse(saved.text).savedAt).toBe('2026-10-29T12:00:00.000Z');
+	const files = await readdir(join(f.dir, 'd1-19c-lab')); expect(files).toHaveLength(2);
+	for (const file of files) expect((await stat(join(f.dir, 'd1-19c-lab', file))).mode & 0o777).toBe(0o600);
+	const data = JSON.parse((await f.call()).text); expect(data.diff.previousGeneratedAt).toBe('2026-10-29T12:00:00.000Z'); expect(data.diff.changes).toEqual([]);
+	expect(await readdir(join(f.dir, 'd1-19c-lab'))).toEqual(files);
+});
+it('protects save with bearer, Host and Origin checks and validates targets before writing', async () => {
+	const f = await fixture();
+	for (const [headers, status] of [[{ Authorization: '' }, 401], [{ Host: 'evil.test' }, 403], [{ Origin: 'null' }, 403], [{ Origin: 'http://evil.test' }, 403]] as const) expect((await f.call('/save', headers, 'POST')).status).toBe(status);
+	for (const target of ['unknown', '', '../etc']) expect((await f.call('/save?target=' + encodeURIComponent(target), {}, 'POST')).status).toBe(400);
+	expect(f.report).not.toHaveBeenCalled(); expect(await readdir(f.dir)).toEqual([]);
+});
+it.each(['read', 'write'])('scrubs history %s errors', async operation => {
+	const fail = async (): Promise<never> => { throw new Error('secret DSN ORA-123'); };
+	const f = await fixture(operation === 'read' ? { loadReport: fail } : { saveReport: fail });
+	expect(await f.call(operation === 'read' ? '' : '/save', {}, operation === 'read' ? 'GET' : 'POST')).toEqual({ status: 500, text: JSON.stringify({ message: 'Report failed' }) });
+});
+
+it('returns the pre-save comparison and reads existing history without changing files', async () => {
+	const f = await fixture(); await f.call('/save', {}, 'POST');
+	const directory = join(f.dir, 'd1-19c-lab');
+	const files = await readdir(directory); const times = await Promise.all(files.map(async file => (await stat(join(directory, file))).mtimeMs));
+	await f.call();
+	expect(await Promise.all(files.map(async file => (await stat(join(directory, file))).mtimeMs))).toEqual(times);
+	const saved = JSON.parse((await f.call('/save', {}, 'POST')).text);
+	expect(saved.diff.previousGeneratedAt).toBe('2026-10-29T12:00:00.000Z'); expect(saved.diff.changes).toEqual([]);
 });
