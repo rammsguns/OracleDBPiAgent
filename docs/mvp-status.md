@@ -1,6 +1,8 @@
 # Project status — 2026-10-29
 
-The MVP, phase 2 and WP-3A are merged. Token-saving work is finished for now.
+The MVP and phases 1–6 are complete; phase 7 CI is merged and green.
+Release documentation is being prepared; versioning and tagging belong to the coordinator.
+Token-saving work is finished for now.
 The DBA-tool and plan-search experiments are closed without merging.
 Results below are historical checks on this host (z4g5), not a fresh live run.
 See [PLAN.md](../PLAN.md) for scope and [the index](README.md) for related docs.
@@ -272,7 +274,7 @@ approval before merge; the results are recorded coordinator gates from PLAN.md.
   adapter; the shared checker is unchanged. A wrong 1,206 s value still flags.
   Both live reruns produced **0 flags** and both reviews approved.
 
-Current recorded checks: typecheck passes; **541 unit tests pass**, **22 integration
+Phase 3 recorded checks: typecheck passes; **541 unit tests pass**, **22 integration
 tests pass with 1 skipped**, and **11 browser tests pass with 1 skipped**. See
 [report](report.md), [grounding](grounding.md) and [web UI](web-ui.md) for behavior
 and evidence. WP-3B refreshes these docs; no shared contract changes are needed.
@@ -284,3 +286,67 @@ Markdown links resolve and the index covers every docs file. CLI options and the
 grounding switch were checked against `src/`; npm scripts against package.json.
 Integration, browser and live LLM checks were not rerun for this docs-only change.
 No contract changes or outstanding verification blockers.
+
+## Phases 4–6 and CI — 2026-10-29
+
+These are recorded results from [PLAN.md](../PLAN.md), rather than new live runs.
+
+- **Phase 4:** saved reports and deterministic diffs merged, with private file
+  modes, retention and CLI diff-only exit codes (0 unchanged, 3 changed).
+  Live back-to-back reports on both targets returned no changes; exit 3 is
+  unit-tested. The web UI reads history and saves only on explicit request.
+  See [reports](report.md) and [web UI](web-ui.md).
+- **Phase 5:** the hard suite expanded to **49 cases (28 dev, 21 holdout)**.
+  Ground truth validates on both targets. Expanded dev ×4 passed 27/28 then
+  28/28 three times. More cases did not tighten the token interval; known
+  formatting sensitivity and related unit cases are recorded in the plan.
+- **Phase 6A:** per-case geometric-mean token comparisons and bootstrap intervals
+  merged. Both A/A intervals contain zero. Per-case intervals were wider, with
+  useful case breakdowns; the 4×4 gate cannot resolve a 3% token change, so
+  token results remain advisory. See [eval methodology](evals-hard.md).
+- **Phase 6B:** requested decimal preservation merged. Hard dev passed **112/112**
+  versus 107/112, with zero format failures versus four. MVP passed **39/39**
+  on both sides. Holdout was **62/63** on both sides; the candidate miss was
+  a correct conditional grant refusal falsely matched by a forbidden pattern.
+  A narrow follow-up fixed that pattern; all three archived gate answers now
+  pass. No fresh full holdout run is claimed after that fix.
+- **Phase 7A CI:** Node 24 clean-clone install, typecheck, **594 unit tests** and
+  build passed with a scrubbed environment. Antigravity approved the pinned
+  actions, read-only permissions and credential handling; the first hosted run
+  **40968486748 passed**. CI needs no DB, LLM or secrets. The coordinator's
+  history secret scan found no matches. See [CI](ci.md) for workflow details
+  (its worker-local verification predates the hosted result).
+
+The product retains 12 agent tools. Report checks add no tool-schema cost.
+See the [changelog](../CHANGELOG.md) for the release overview. Release version,
+license metadata and tagging remain coordinator-owned; no contract changes are
+requested by this documentation work.
+
+## Phase 7B quick-start verification — 2026-10-29
+
+A temporary clean clone of branch commit `5c50f05` verified the README with
+Node 24.18.1. `npm ci` passed (137 packages, zero reported vulnerabilities),
+`.env.example` was copied and set to mode 600, then the existing configured
+`.env` was privately installed with mode 600. No credential contents were printed.
+
+- `npm run build` passed.
+- `node --env-file=.env dist/cli/index.js report --target d1-19c-lab`
+  exited 0 with all 14 sections and no unavailable sections.
+- `curl --fail --silent --show-error http://127.0.0.1:8080/health`
+  reported loaded Strata before the single ask command.
+- `node --env-file=.env dist/cli/index.js ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab`
+  exited 0 and answered 5 rows. No other ask, summary or eval was run.
+- `node --env-file=.env dist/cli/index.js web` served HTTP 200 at the
+  loopback root, then shut down with exit 0 on SIGTERM. This verifies serving,
+  rather than an interactive browser session.
+
+The earlier README's NODE_OPTIONS approach failed before starting the CLI:
+Node rejects --env-file in NODE_OPTIONS. The quick start now passes the flag
+directly to Node; no product-code fix was needed. The temporary clone and its
+private `.env` were deleted after verification.
+
+Fresh worktree checks: `npm run typecheck` exited 0; `npm test` passed **32 files,
+594 tests**. A small script checked 37 Markdown files (README, CHANGELOG and
+docs), excluding code examples; all local file links resolve, and the index
+lists every file in docs. Integration, full browser and eval suites were not
+rerun for this docs-only work. No contract changes or product bugs were found.

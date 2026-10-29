@@ -9,6 +9,11 @@ revision they checked; use the status page and current code for today's behavior
 - [Project plan](../PLAN.md) — Scope, hard rules, architecture and work-package ownership.
 - [README.md](README.md) — This documentation index.
 
+## Development
+
+- [ci.md](ci.md) — Node 24 CI, clean-clone checks and local verification.
+- [Changelog](../CHANGELOG.md) — Release history.
+
 ## Evals and optimization
 
 - [evals-hard.md](evals-hard.md) — Hard-suite cases, splits and ground-truth checks.

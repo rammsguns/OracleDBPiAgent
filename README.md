@@ -13,33 +13,70 @@ local Strata LLM at `http://127.0.0.1:8080/v1`.
 
 See [PLAN.md](PLAN.md) for scope and [AGENTS.md](AGENTS.md) for contributor rules.
 
-## Setup and commands
+## Quick start
 
-Use Node 24, npm, loaded Strata, and the two local 19c containers:
-`d1-19c-lab` and `p1-19c-prod`.
+Use Node 24 and npm. Have the two approved Oracle 19c targets in
+[config/targets.json](config/targets.json) available: `d1-19c-lab` on
+`localhost:1522/ORCL` and `p1-19c-prod` on `localhost:1523/PRODCDB`, with their
+configured read-only accounts and grants. The local OpenAI-compatible LLM endpoint
+must be loaded Strata at `http://127.0.0.1:8080/v1`, with the model named in
+[.env.example](.env.example). A generic cloud endpoint is not supported.
+
+From a clone of this repository:
 
 ```bash
 npm ci
 cp .env.example .env
-# Edit .env with local paths, then load it for npm commands:
-export NODE_OPTIONS="--env-file=.env"
-npm run piagent -- targets
-npm run piagent -- doctor
-npm run piagent -- ask "Which SH channels had the highest sales amount in 2001?" --target d1-19c-lab
-npm run piagent -- chat --target p1-19c-prod
-npm run piagent -- web
-npm run piagent -- report --target d1-19c-lab --sections identity,tablespaces --md
+chmod 600 .env
 ```
 
-Set `PIAGENT_SECRET_DIR` to the directory containing the password files named in
-`config/targets.json`. `PIAGENT_LLM_API_KEY_FILE` points to Strata's existing key
-file. `.env` holds settings and paths, not secrets; never commit secrets.
-The CLI reads process environment settings, so copying `.env` alone does not load it.
+Edit `.env` before continuing: replace the example machine paths with your own
+absolute paths, such as `PIAGENT_SECRET_DIR=/absolute/path/to/db-secrets` and
+`PIAGENT_LLM_API_KEY_FILE=/absolute/path/to/strata-api-key`. Keep the loopback URL
+and approved target definitions. `.env` holds settings and file paths, never
+passwords or the API key, and must stay uncommitted.
 
-`ask` accepts `--json`. After `npm run build`, run the compiled CLI with
-`node --env-file=.env dist/cli/index.js targets`. The package's `piagent` executable
-points to that file; after `npm link`, use `piagent targets|doctor|ask|chat|web|report`
-(choose one command, with the same arguments as above).
+Provision these existing credentials outside the repository; setup does not
+create accounts or change database grants:
+
+| File | Format |
+|---|---|
+| `<PIAGENT_SECRET_DIR>/d1_lab.pw` | Plain UTF-8 password for the configured `HARNESS_LAB` account on d1. |
+| `<PIAGENT_SECRET_DIR>/p1_harness_ro.pw` | Plain UTF-8 password for the configured `HARNESS_RO` account on p1. |
+| `<PIAGENT_LLM_API_KEY_FILE>` | Plain UTF-8 Strata API key. |
+
+Each file contains only its credential, with an optional trailing newline (the
+reader trims surrounding whitespace); use mode `600` and a private directory.
+Do not put credentials into commands, docs or git.
+
+Load the settings explicitly; copying `.env` alone does not load it:
+
+```bash
+npm run build
+node --env-file=.env dist/cli/index.js report --target d1-19c-lab
+```
+
+The report runs bounded read-only checks without the LLM. Before asking a
+question, check Strata:
+
+```bash
+curl --fail --silent --show-error http://127.0.0.1:8080/health
+```
+
+Continue only if health reports the model loaded. If it is unloaded or
+unavailable, stop and ask its operator; do not restart or reconfigure it.
+Run requests one at a time:
+
+```bash
+node --env-file=.env dist/cli/index.js ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab
+node --env-file=.env dist/cli/index.js web
+```
+
+Open the private loopback URL printed by `web`, then stop the server with
+Ctrl-C when finished. Starting the UI does not itself ask the LLM a question.
+The compiled CLI needs no global installation. `ask` also accepts `--json`;
+`targets`, `doctor` and `chat` are available through the same Node invocation. See the [documentation index](docs/README.md)
+and [changelog](CHANGELOG.md) for more.
 
 `report` requires `--target` and runs 14 bounded read-only DBA checks without the
 LLM. Markdown is the default (`--md`); `--json` emits one report object.
