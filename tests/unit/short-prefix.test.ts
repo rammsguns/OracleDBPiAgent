@@ -38,6 +38,7 @@ it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTa
 		'State why briefly and offer a read-only alternative.',
 		'Fewest tool calls',
 		'run one query over describing',
-		'Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.'
+		'Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.',
+		'Keep exactly N requested decimals, including trailing zeros.'
 	]) expect(prompt).toContain(rule);
 });
