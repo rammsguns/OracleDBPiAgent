@@ -52,8 +52,8 @@ Do not put credentials into commands, docs or git.
 Load the settings explicitly; copying `.env` alone does not load it:
 
 ```bash
-export NODE_OPTIONS="--env-file=.env"
-npm run piagent -- report --target d1-19c-lab
+npm run build
+node --env-file=.env dist/cli/index.js report --target d1-19c-lab
 ```
 
 The report runs bounded read-only checks without the LLM. Before asking a
@@ -68,15 +68,14 @@ unavailable, stop and ask its operator; do not restart or reconfigure it.
 Run requests one at a time:
 
 ```bash
-npm run piagent -- ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab
-npm run piagent -- web
+node --env-file=.env dist/cli/index.js ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab
+node --env-file=.env dist/cli/index.js web
 ```
 
 Open the private loopback URL printed by `web`, then stop the server with
 Ctrl-C when finished. Starting the UI does not itself ask the LLM a question.
-These npm commands run the source CLI, so no global installation is required.
-`ask` also accepts `--json`; `targets`, `doctor` and `chat` are available through
-`npm run piagent -- <command>`. See the [documentation index](docs/README.md)
+The compiled CLI needs no global installation. `ask` also accepts `--json`;
+`targets`, `doctor` and `chat` are available through the same Node invocation. See the [documentation index](docs/README.md)
 and [changelog](CHANGELOG.md) for more.
 
 `report` requires `--target` and runs 14 bounded read-only DBA checks without the
