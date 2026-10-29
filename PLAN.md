@@ -907,8 +907,9 @@ its A/B uses the new analysis.
   the prefix cap; the Antigravity review found no weakened rule and approved.
   Gate results, baseline c84a745 (archived in `eval-archive/phase6/`):
   - Hard dev 4×4: 112/112 against 107/112.
-  - Format cases: 0 failures against 5 (`hard-units-customers-mb` 3,
-    `hard-units-sales-gb` 1, plus `hard-top-buffer-plan` once).
+  - Format cases: 0 failures against 4 (`hard-units-customers-mb` 3,
+    `hard-units-sales-gb` 1). The baseline's fifth miss was
+    `hard-top-buffer-plan`, which is not a format case.
   - Tokens: hard dev −1.8% per run [−6.4%, +4.7%] and −2.4% per case
     [−9.2%, +5.0%]. Holdout −6.0% per case [−11.5%, −1.7%]. MVP +0.3% per case
     [−1.0%, +1.8%], 39/39 on both sides.
