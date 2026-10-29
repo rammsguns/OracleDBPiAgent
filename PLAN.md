@@ -567,6 +567,15 @@ then the coordinator gate, then merge and push.
   increase. Tokens rise by at most 3% on hard dev and at most 5% on MVP. The
   correction turn fires on fewer than 10% of answers. `evals/compare.ts`
   reports the paired intervals.
+- **Result (2026-10-29): gate failed, not merged.** Branch kept at
+  `rammsguns/wp-2a-grounding` (fcae196). The checker was tuned on dev to flag
+  1/20 correct answers, but on the frozen holdout it flagged 6/13 (46%). With
+  the correction turn on, live hard dev fell from 20/20 to 16/20 and the turn
+  fired on 9/20 (45%, limit 10%). Two refusal cases (`hard-function`,
+  `hard-dbms`) refused correctly, then lost their refusal wording after being
+  told to retract identifiers they had named but not queried. The full A/B gate
+  was not run. A lexical checker over-fits dev; any retry needs an exemption for
+  refusals and a held-out flag rate at or under 5% before it is switched on.
 
 ### WP-2B: read-only DBA report
 - `piagent report --target <t> [--json|--md] [--sections ...]` runs fixed,
@@ -588,6 +597,14 @@ then the coordinator gate, then merge and push.
   budget); Antigravity review of the SQL and read-only safety; and the DBA
   facts checked against independent read-only queries. No change to the agent
   prompt, so no token A/B is needed.
+- **Result (2026-10-29): merged.** 14 sections; d1 returns all 14, p1 returns 11
+  plus three named grant errors. The Antigravity review passed SQL safety,
+  secret scrubbing and the row and time caps. It asked for one change: the
+  summary prompt suggested `audit_trail` changes and a restart, so it now allows
+  only read-only diagnostic next steps (3626174). Live `--summarize` passed on
+  d1 (24 s) and on p1 after the fix. After the merge: typecheck, 419 unit
+  tests, 22 integration tests (1 skipped) and 9 browser tests all pass. The
+  summary has no grounding check because WP-2A did not merge.
 
 ### WP-2C: web UI report tab and export
 - A "Report" tab runs WP-2B for the selected target (`GET /api/report?target=`),
