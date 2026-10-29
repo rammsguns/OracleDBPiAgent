@@ -40,7 +40,14 @@ forbidding parameter changes, ALTER/DDL/DML, PL/SQL, restarts or any other datab
 modifications.
 The caller must share the LLM slot with other eval/report processes. After the one
 summary call, the deterministic `checkFacts` checker compares numeric claims with
-the exact rendered Markdown sent to the model. Unsupported numbers with four or
+the full rendered Markdown sent to the model plus one header-first evidence copy
+per Markdown table (including tables with blank lines between rows). Only in those
+copies, exact `ELAPSED_TIME` and `CPU_TIME` header cells become
+`ELAPSED_TIME_MICRO` and `CPU_TIME_MICRO`, allowing the existing microsecond
+conversion rules to apply to V$SQL timings as well as `TIME_WAITED_MICRO`.
+The summary copy checked excludes `ORA-` followed by exactly five digits: Oracle
+error codes are not numeric report facts. The displayed summary and Markdown
+sent to Strata remain unchanged. Unsupported numbers with four or
 more significant digits appear after the CLI summary as `Unverified: ...`; there
 is no correction call. Rounded values and byte conversions follow the existing
 grounding checker rules. Identifiers are not flagged for report summaries.
@@ -163,3 +170,20 @@ Live summaries were verified by the coordinator on both targets on 2026-10-29.
 - No LLM calls were made for WP-3A. Live summary grounding smoke and counts of
   flagged numbers on both targets remain coordinator verification.
 - No shared contract, dependency or grounding checker changes are needed.
+
+### WP-3A live false-positive fix (2026-10-29)
+
+- Added header-first table evidence and exact V$SQL timing aliases without
+  changing `src/agent/grounding.ts`; stripped Oracle error codes only from the
+  summary copy passed to the checker.
+- Regression fixtures reproduce `ORA-01653/ORA-01654`, d1's 1105786158 µs wait
+  as 1,106 s, p1's 1537388159 µs wait as 1,537 s, and SQL `4xm1ruvkx3awx`
+  elapsed/CPU 1421306349/1402265374 µs as 1,421/1,402 s. All six formerly flagged
+  values are accepted; an incorrect 1,206 s remains flagged. Tests also verify
+  exact header matching and table boundaries.
+- `npm run typecheck`: passed.
+- `npm test`: 25 files, 541 tests passed.
+- `npm run build && npm run test:browser`: build passed; 11 browser tests passed,
+  1 opt-in live smoke skipped.
+- No DB or LLM calls were made. Live summary reruns remain coordinator
+  verification; no contract or dependency changes are needed.

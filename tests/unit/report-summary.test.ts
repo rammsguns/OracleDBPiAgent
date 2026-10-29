@@ -40,3 +40,49 @@ it('skips the check when grounding is disabled through the configured env switch
 	const { loadTunables } = await import('../../src/config/tunables.js');
 	expect(checkReportSummary('Invented 98,765 rows.', '# Empty', { ...config, ...loadTunables({ PIAGENT_GROUNDING_CHECK: '0' }) })).toEqual([]);
 });
+
+const liveReport = `# Oracle 19c report: d1-19c-lab
+
+## waits
+
+Source: V$SYSTEM_EVENT
+
+| EVENT | WAIT_CLASS | TOTAL_WAITS | TIME_WAITED_MICRO |
+
+| --- | --- | --- | --- |
+
+| control file parallel write | System I/O | 238016 | 1105786158 |
+
+## top_sql
+
+Source: V$SQL
+
+| SQL_ID | EXECUTIONS | ELAPSED_TIME | CPU_TIME | BUFFER_GETS | SQL_TEXT |
+
+| --- | --- | --- | --- | --- | --- |
+
+| 4xm1ruvkx3awx | 7 | 1421306349 | 1402265374 | 0 | SELECT ... |
+`;
+
+it.each([
+	['Oracle errors ORA-01653/ORA-01654.', liveReport],
+	['Control file parallel write waited ~1,106 s.', liveReport],
+	['SQL 4xm1ruvkx3awx used ~1,421 s elapsed and ~1,402 s CPU.', liveReport],
+	['Control file parallel write waited ~1,537 s.', liveReport.replace('1105786158', '1537388159')],
+])('accepts the live summary facts: %s', (summary, markdown) => {
+	expect(checkReportSummary(summary, markdown, config)).toEqual([]);
+});
+
+it('still flags a genuinely wrong converted wait time', () => {
+	expect(checkReportSummary('Control file parallel write waited ~1,206 s.', liveReport, config)).toEqual(['1,206']);
+});
+
+it('does not apply a table timing header to numbers in later sections', () => {
+	const markdown = `${liveReport}\n## Notes\n\nObserved counter: 1206000000.\n`;
+	expect(checkReportSummary('Waited ~1,206 s.', markdown, config)).toEqual(['1,206']);
+});
+
+it('aliases only exact known timing header cells', () => {
+	const markdown = liveReport.replace('ELAPSED_TIME | CPU_TIME', 'OTHER_ELAPSED_TIME | CPU_TIME_TOTAL');
+	expect(checkReportSummary('Elapsed ~1,421 s; CPU ~1,402 s.', markdown, config)).toEqual(['1,421', '1,402']);
+});
