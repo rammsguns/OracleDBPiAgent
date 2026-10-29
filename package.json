@@ -1,6 +1,6 @@
 {
 	"name": "oracledb-pi-agent",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"private": true,
 	"description": "Oracle 19c DBA/developer agent harness built on the PI agent SDK, using only the local Strata LLM",
 	"type": "module",
@@ -34,5 +34,6 @@
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.5"
-	}
+	},
+	"license": "MIT"
 }

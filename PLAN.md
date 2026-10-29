@@ -991,6 +991,12 @@ product behaviour changes, so there is no eval A/B gate.
   resolve.
 - Gate: the Antigravity review of accuracy and of setup steps that leak paths
   or secrets; typecheck and tests pass.
+- **Result (2026-10-29): merged** (38eb743, 5c50f05, 651da0c). The Antigravity
+  review approved.
+  - On a clean clone, the build, a d1 report (14 sections), one Strata
+    question and the web UI all worked. All 89 local links resolve.
+  - The old README loaded `.env` through `NODE_OPTIONS`, which Node rejects.
+    The quick start now uses `node --env-file=.env dist/cli/index.js`.
 
 ### Coordinator release steps
 1. Set `package.json` version to 1.0.0 and `"license": "MIT"` to match
