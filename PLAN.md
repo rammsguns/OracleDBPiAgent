@@ -762,6 +762,17 @@ cron; this repo adds no scheduler or daemon.
 - Gate: unit tests for the route, browser tests (diff rendering, an XSS
   payload in a changed value, phone width), Antigravity security review and a
   live smoke test.
+- **Result (2026-10-29): merged** (e0dc8b1 and 57040a3). The Antigravity
+  security review approved it with no findings. Live smoke through the real
+  server on both targets:
+  - Reading before any save wrote 0 files.
+  - `POST /api/report/save` returned 401 without the token, 403 for a bad
+    origin and 400 for a bad target.
+  - Save and then read gave a diff against the saved run with 0 changes.
+  - The saved files were 0600, and the token did not appear in the audit log.
+  One fix came from the smoke test. The read path said "baseline established"
+  even though nothing was saved; it now says "No saved run yet." The CLI
+  wording is unchanged. **Phase 4 is complete.**
 
 ### Not in phase 4
 A scheduler or daemon in this repo, notifications (email or Slack), LLM
