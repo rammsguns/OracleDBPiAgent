@@ -99,7 +99,7 @@ However, a blocking issue was discovered during verification:
 ## Numbered Findings
 
 ### Finding 1: Integration test failure in `tests/integration/hard-evals.test.ts` caused by ephemeral cursor cache dependency in `hard-orders-plan`
-- **File & Line:** [`tests/integration/hard-evals.test.ts:7`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-fixes/tests/integration/hard-evals.test.ts#L7), [`evals/validate-hard.ts:57`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-fixes/evals/validate-hard.ts#L57), [`evals/cases-hard/cached-plan.json:53`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-fixes/evals/cases-hard/cached-plan.json#L53)
+- **File & Line:** [`tests/integration/hard-evals.test.ts:7`](../tests/integration/hard-evals.test.ts#L7), [`evals/validate-hard.ts:57`](../evals/validate-hard.ts#L57), [`evals/cases-hard/cached-plan.json:53`](../evals/cases-hard/cached-plan.json#L53)
 - **Severity:** **MEDIUM**
 - **Evidence:**
   Running `npm run test:integration -- -t "^(?!.*answers one end-to-end)"` fails with:
@@ -118,7 +118,7 @@ However, a blocking issue was discovered during verification:
 ---
 
 ### Finding 2: `doctor` `ALL_DEPENDENCIES` check does not detect code dependencies accessed via SYNONYMs or private intermediate views
-- **File & Line:** [`src/cli/index.ts:47`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-fixes/src/cli/index.ts#L47)
+- **File & Line:** [`src/cli/index.ts:47`](../src/cli/index.ts#L47)
 - **Severity:** **LOW**
 - **Evidence:**
   `doctor` checks:
@@ -138,7 +138,7 @@ However, a blocking issue was discovered during verification:
 ---
 
 ### Finding 3: Concurrently enlarged view source returns empty result instead of throwing
-- **File & Line:** [`src/tools/index.ts:63, 96-98, 133`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-fixes/src/tools/index.ts#L63)
+- **File & Line:** [`src/tools/index.ts:63, 96-98, 133`](../src/tools/index.ts#L63)
 - **Severity:** **LOW**
 - **Evidence:**
   In `src/tools/index.ts`:

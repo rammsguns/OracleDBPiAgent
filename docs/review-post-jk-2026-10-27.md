@@ -105,7 +105,7 @@ The three commits following the WP-J/K review successfully address previous find
 ## Numbered Findings
 
 ### Finding 1: False rejection of signed INTERVAL literals with explicit precision
-- **File & Line:** [`src/oracle/sqlPolicy.ts:50`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-post-jk/src/oracle/sqlPolicy.ts#L50)
+- **File & Line:** [`src/oracle/sqlPolicy.ts:50`](../src/oracle/sqlPolicy.ts#L50)
 - **Severity:** **LOW**
 - **Exact Probe SQL & Results:**
   - Probe 1: `SELECT INTERVAL + '1' DAY(3) FROM dual`  
@@ -132,7 +132,7 @@ The three commits following the WP-J/K review successfully address previous find
 ---
 
 ### Finding 2: False rejection of ANSI character datatype synonyms with length in `CAST`
-- **File & Line:** [`src/oracle/sqlPolicy.ts:28-31`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-post-jk/src/oracle/sqlPolicy.ts#L28-L31), [`src/oracle/sqlPolicy.ts:51`](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-post-jk/src/oracle/sqlPolicy.ts#L51)
+- **File & Line:** [`src/oracle/sqlPolicy.ts:28-31`](../src/oracle/sqlPolicy.ts#L28-L31), [`src/oracle/sqlPolicy.ts:51`](../src/oracle/sqlPolicy.ts#L51)
 - **Severity:** **LOW**
 - **Exact Probe SQL & Results:**
   - Probe 1: `SELECT CAST(1 AS CHARACTER(10)) FROM dual`  
