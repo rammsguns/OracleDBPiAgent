@@ -174,3 +174,14 @@ it('normalizes currency for question exemptions and avoids digits inside Oracle 
 it.each(['-$1,234.50', '$-1,234.50'])('preserves the sign on currency values %s', answer => {
 	expect(checkFacts(answer, ['-1234.50']).unsupported).toEqual([]);
 });
+it.each([
+	['Growth 25.00%', '1000 1250'],
+	['Growth -25.00%', '1000 750'],
+	['Free 25.00%', '750 1000'],
+	['Growth -100.0%', '1000 0'],
+])('derives growth and complement percentages from two values: %s', (answer, evidence) => {
+	expect(checkFacts(answer, [evidence]).unsupported).toEqual([]);
+});
+it('rejects growth percentages outside the shown precision', () => {
+	expect(checkFacts('Growth 25.01%', ['1000 1250']).unsupported).toEqual(['25.01%']);
+});

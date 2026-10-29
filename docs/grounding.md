@@ -13,7 +13,8 @@ Direct numeric comparisons use exact decimal coefficients, retaining Oracle NUMB
 digits beyond JavaScript floating-point precision. Derived ratios use floating point
 and conservatively refuse to certify precision below its numeric resolution.
 Byte conversions accept both decimal and binary KB/MB/GB/TB (explicit KiB etc. use
-binary only). Percentages can match directly or be derived from two tool values.
+binary only). Percentages can match directly or be derived from two tool values, including
+ratios, growth and complements.
 SQL vocabulary, units, years and Oracle 19c are exempt. An explicit list of standard
 Oracle dictionary views and column names is also exempt: referring to `V$SESSION`
 or `ALL_CONSTRAINTS` as a source does not assert that the view returned that name.
@@ -45,7 +46,7 @@ grants. It remains flagged. This metric is flags on scorer-passing answers, not
 an independent proof that every flag is false.
 
 The detector was frozen before holdout measurement at SHA-256
-`4c340325109d8aaa22e56bd2b38d80d6456fc6faa2ce81e7d86ae0558631f82c`.
+`8a75ab2e39528c1ef6eb14f3911362d4fac78b98a3f09c9fb504badb7c923456`.
 No failed dev answers were observed, so measured true-positive rate is unavailable.
 The two known real misses are both caught by exact regression fixtures: `PROMO`
 versus `PROMOTIONS`, and `3,331,394.74` versus `3,313,394.74`.

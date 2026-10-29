@@ -26,7 +26,7 @@ function scales(unit: string): number[] {
 	if (!exponent || !/^[KMGT]I?B$/.test(unit)) return [1];
 	return unit.includes('I') ? [1024 ** exponent] : [1024 ** exponent, 1000 ** exponent];
 }
-function rounded(actual: number, shown: Numeric): boolean {
+function rounded(actual: number, shown: Pick<Numeric, "value" | "precision">): boolean {
 	// Ratios use doubles; do not let floating-point uncertainty certify fine digits.
 	if (shown.precision <= Math.max(Math.abs(actual), Math.abs(shown.value)) * Number.EPSILON * 8) return false;
 	return Math.abs(actual - shown.value) < shown.precision / 2 + Math.max(Math.abs(actual), Math.abs(shown.value), 1) * Number.EPSILON * 8;
@@ -44,7 +44,7 @@ function exactRounded(value: Numeric, shown: Numeric, sourceScale = 1, displaySc
 	return (delta < 0n ? -delta : delta) * 2n <= displayQuantum;
 }
 // Find a numerator near each denominator's required value, without an O(n²) scan.
-function ratioSupported(shown: Numeric, values: readonly number[], multiplier: number): boolean {
+function ratioSupported(shown: Pick<Numeric, "value" | "precision">, values: readonly number[], multiplier: number): boolean {
 	return values.some(denominator => {
 		if (denominator === 0) return false;
 		const target = shown.value * denominator / multiplier;
@@ -119,7 +119,8 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		const supported = values.some(value => {
 			if (shown.unit === '%' || value.unit === '%') return shown.unit === '%' && (!value.unit || value.unit === '%') && exactRounded(value, shown);
 			return scales(shown.unit).some(scale => scales(value.unit).some(source => exactRounded(value, shown, source, scale)));
-		}) || ((shown.unit === '%' || !shown.unit) && ratioSupported(shown, ratioValues, shown.unit === '%' ? 100 : 1));
+		}) || ((shown.unit === '%' || !shown.unit) && ratioSupported(shown, ratioValues, shown.unit === '%' ? 100 : 1))
+			|| (shown.unit === '%' && [100 + shown.value, 100 - shown.value].some(value => ratioSupported({ value, precision: shown.precision }, ratioValues, 100)));
 		add(shown.text, supported);
 	}
 	return { facts, unsupported };
