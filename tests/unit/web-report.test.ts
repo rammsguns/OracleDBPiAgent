@@ -80,10 +80,11 @@ it('returns an empty unverified list when the env grounding switch is disabled',
 
 it('GET never creates history and POST saves private files then GET compares the saved run', async () => {
 	const f = await fixture();
-	expect(JSON.parse((await f.call()).text).diff.previousGeneratedAt).toBeNull();
+	expect(JSON.parse((await f.call()).text).diff).toMatchObject({ previousGeneratedAt: null, notes: ['No saved run yet.'] });
 	expect(await readdir(f.dir)).toEqual([]);
 	const saved = await f.call('/save?target=d1-19c-lab', {}, 'POST');
 	expect(saved.status).toBe(200); expect(JSON.parse(saved.text).savedAt).toBe('2026-10-29T12:00:00.000Z');
+	expect(JSON.parse(saved.text).diff.notes).toEqual(['No previous saved run; baseline established.']);
 	const files = await readdir(join(f.dir, 'd1-19c-lab')); expect(files).toHaveLength(2);
 	for (const file of files) expect((await stat(join(f.dir, 'd1-19c-lab', file))).mode & 0o777).toBe(0o600);
 	const data = JSON.parse((await f.call()).text); expect(data.diff.previousGeneratedAt).toBe('2026-10-29T12:00:00.000Z'); expect(data.diff.changes).toEqual([]);

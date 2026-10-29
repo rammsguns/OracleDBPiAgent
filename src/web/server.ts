@@ -88,6 +88,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 					const directory = options.reportDirectory ?? DEFAULT_REPORT_DIRECTORY;
 					const previous = await (options.loadReport ?? loadLatestReport)(directory, target, manager.config.targets);
 					const diff = webReportDiff(previous, report);
+					if (!saving && !previous) diff.notes = ['No saved run yet.'];
 					const markdown = renderMarkdown(report);
 					const summary = params.has("summarize") ? await (options.summarize ?? summarizeReport)(markdown, manager.config.llm) : undefined;
 					const unverified = summary === undefined ? [] : checkReportSummary(summary, markdown, manager.config.llm);

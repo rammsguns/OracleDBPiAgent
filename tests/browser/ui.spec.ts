@@ -188,6 +188,7 @@ test('target without saved history shows the no saved run state', async ({ page 
 	await expect(page.locator('#question')).toBeEnabled();
 	await page.locator('#report-tab').click(); await page.locator('#report-run').click();
 	await expect(page.locator('#report-changes')).toContainText('No saved run yet.');
+	await expect(page.locator('#report-changes')).not.toContainText('baseline established');
 });
 test('unchanged history shows no changes', async ({ page }) => {
 	await ready(page);
