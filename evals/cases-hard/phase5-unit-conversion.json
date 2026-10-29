@@ -1,0 +1,90 @@
+[
+	{
+		"id": "hard-units-sales-gb",
+		"target": "d1-19c-lab",
+		"category": "unit-conversion",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])0\\.125000(?![\\d.])",
+				"\\bGB\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, sum allocated segment BYTES for SH.SALES across all its table segments and table partitions, excluding indexes and LOB segments. Convert to GB using 1 GB = 1073741824 bytes. Round to 6 decimal places and display exactly 6 fractional digits without thousands separators, with the GB unit.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1073741824,6),'FM999999990.000000') FROM dba_segments WHERE owner='SH' AND segment_name='SALES' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-units-customers-mb",
+		"target": "d1-19c-lab",
+		"category": "unit-conversion",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])13\\.00(?![\\d.])",
+				"\\bMB\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, sum allocated segment BYTES for SH.CUSTOMERS across all its table segments and table partitions, excluding indexes and LOB segments. Convert to MB using 1 MB = 1048576 bytes. Round to 2 decimal places and display exactly 2 fractional digits without thousands separators, with the MB unit.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1048576,2),'FM999999990.00') FROM dba_segments WHERE owner='SH' AND segment_name='CUSTOMERS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-units-costs-gb",
+		"target": "d1-19c-lab",
+		"category": "unit-conversion",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])0\\.125000(?![\\d.])",
+				"\\bGB\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, sum allocated segment BYTES for SH.COSTS across all its table segments and table partitions, excluding indexes and LOB segments. Convert to GB using 1 GB = 1073741824 bytes. Round to 6 decimal places and display exactly 6 fractional digits without thousands separators, with the GB unit.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1073741824,6),'FM999999990.000000') FROM dba_segments WHERE owner='SH' AND segment_name='COSTS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-units-products-mb",
+		"target": "d1-19c-lab",
+		"category": "unit-conversion",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])0\\.0625(?![\\d.])",
+				"\\bMB\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, sum allocated segment BYTES for SH.PRODUCTS across all its table segments and table partitions, excluding indexes and LOB segments. Convert to MB using 1 MB = 1048576 bytes. Round to 4 decimal places and display exactly 4 fractional digits without thousands separators, with the MB unit.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(bytes)/1048576,4),'FM999999990.0000') FROM dba_segments WHERE owner='SH' AND segment_name='PRODUCTS' AND segment_type IN ('TABLE','TABLE PARTITION','TABLE SUBPARTITION')",
+			"mode": "allCells"
+		}
+	}
+]

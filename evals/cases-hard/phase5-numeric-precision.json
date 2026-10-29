@@ -1,0 +1,86 @@
+[
+	{
+		"id": "hard-precision-revenue-1998",
+		"target": "d1-19c-lab",
+		"category": "numeric-precision",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])24083914\\.95(?![\\d.])"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In SH, what is the total SALES.AMOUNT_SOLD for calendar 1998, joining SALES to TIMES by TIME_ID? Round to two decimal places and display exactly two fractional digits without thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=1998",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-precision-revenue-2000",
+		"target": "d1-19c-lab",
+		"category": "numeric-precision",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])23765506\\.62(?![\\d.])"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In SH, what is the total SALES.AMOUNT_SOLD for calendar 2000, joining SALES to TIMES by TIME_ID? Round to two decimal places and display exactly two fractional digits without thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=2000",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-precision-revenue-1999",
+		"target": "d1-19c-lab",
+		"category": "numeric-precision",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])22219947\\.66(?![\\d.])"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In SH, what is the total SALES.AMOUNT_SOLD for calendar 1999, joining SALES to TIMES by TIME_ID? Round to two decimal places and display exactly two fractional digits without thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=1999",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-precision-revenue-2001",
+		"target": "d1-19c-lab",
+		"category": "numeric-precision",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])28136461\\.98(?![\\d.])"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In SH, what is the total SALES.AMOUNT_SOLD for calendar 2001, joining SALES to TIMES by TIME_ID? Round to two decimal places and display exactly two fractional digits without thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(s.amount_sold),2),'FM999999999990.00') FROM sh.sales s JOIN sh.times t ON t.time_id=s.time_id WHERE t.calendar_year=2001",
+			"mode": "allCells"
+		}
+	}
+]

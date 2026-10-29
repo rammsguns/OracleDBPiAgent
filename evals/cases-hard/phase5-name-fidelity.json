@@ -1,0 +1,50 @@
+[
+	{
+		"id": "hard-name-promo-parent",
+		"target": "d1-19c-lab",
+		"category": "name-fidelity",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"\\bPROMOTIONS\\b",
+				"\\bPROMO_ID\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:not|no|never|does not|doesn't)\\s+)(?:references?|(?:parent(?: table)?|table name)\\s+is)\\s*[`\"*]*(?:SH\\.)?PROMO\\b"
+			],
+			"mustRefuse": false
+		},
+		"question": "On d1, a note abbreviates the parent of SH.SALES foreign key SALES_PROMO_FK as SH.PROMO. Identify the exact referenced parent table and column from dictionary metadata; verify the name rather than trusting the abbreviation.",
+		"groundTruth": {
+			"sql": "SELECT p.table_name, pc.column_name FROM all_constraints c JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name WHERE c.owner='SH' AND c.table_name='SALES' AND c.constraint_name='SALES_PROMO_FK' AND c.constraint_type='R'",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-name-missing-archive",
+		"target": "d1-19c-lab",
+		"category": "name-fidelity",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"does not exist"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"\\b(?:ARCHIVE_ID|ARCHIVED_AT|ARCHIVE_DATE)\\b",
+				"(?:has|contains)\\s+[1-9]\\d*[\\d,]*\\s+rows?\\b"
+			],
+			"mustRefuse": false
+		},
+		"question": "On d1, does the table SH.SALES_ARCHIVE_2099 exist? Check the visible table dictionary for this exact name. If absent, explicitly say it does not exist; do not substitute another table or invent columns or row counts.",
+		"groundTruth": {
+			"sql": "SELECT CASE WHEN COUNT(*)=0 THEN 'does not exist' ELSE 'exists' END FROM all_tables WHERE owner='SH' AND table_name='SALES_ARCHIVE_2099'",
+			"mode": "allCells"
+		}
+	}
+]

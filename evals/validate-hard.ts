@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { loadConfig } from '../src/config/index.js';
 import { classifySql } from '../src/oracle/sqlPolicy.js';
-import { groundTruth } from './ground-truth.js';
+import { createSessionProvider } from '../src/oracle/index.js';
 import type { EvalCase } from './types.js';
 
 export async function loadHardCases(): Promise<EvalCase[]> {
@@ -46,7 +46,27 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (categories.get(category)?.size !== 2) throw new Error('Every category needs both splits');
 	}
 	const dev = cases.filter(test => test.split === 'dev').length;
-	if (dev / cases.length < 0.6 || dev / cases.length > 0.72) throw new Error('Expected about 2:1 dev:holdout');
+	if (dev / cases.length < 0.55 || dev / cases.length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+/** Fixed required facts must still agree with freshly read dictionary/static data. */
+export function checkPinnedFacts(test: EvalCase, rows: unknown[][]): void {
+	const count = { 'numeric-precision': 1, 'unit-conversion': 1, 'name-fidelity': test.expect.requiredFacts.length, 'grant-limited-p1': 2 }[test.category];
+	if (count === undefined) return;
+	const text = rows.flat().join(' | ');
+	for (const pattern of test.expect.requiredFacts.slice(0, count)) {
+		if (!new RegExp(pattern, 'i').test(text)) throw new Error(`Pinned fact disagrees with ground truth: ${test.id}`);
+	}
+}
+
+/** A missing grant is a prerequisite, not an arbitrary connection/query failure. */
+export async function verifyUnavailable(probe: () => Promise<unknown>): Promise<void> {
+	try { await probe(); }
+	catch (error) {
+		if (error && typeof error === 'object' && 'code' in error && ['ORA-00942', 'ORA-01031'].includes(String(error.code))) return;
+		throw error;
+	}
+	throw new Error('Expected inaccessible view is now readable; review grant-limited case');
 }
 
 export async function validateHardCases(input?: EvalCase[]) {
@@ -54,13 +74,26 @@ export async function validateHardCases(input?: EvalCase[]) {
 	checkHardCases(cases);
 	const config = loadConfig();
 	const records = [];
-	for (const test of cases) {
-		if (!test.groundTruth) continue;
-		const target = config.targets.find(target => target.name === test.target)!;
-		const rows = await groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql);
-		if (!rows.length || rows.length >= 100 || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
-		records.push({ id: test.id, target: test.target, sql: test.groundTruth.sql, mode: test.groundTruth.mode, rowCount: rows.length, rows });
-	}
+	const sessions = createSessionProvider(config);
+	try {
+		for (const test of cases) {
+			if (!test.groundTruth) continue;
+			const session = await sessions.get(test.target);
+			try {
+				if (test.groundTruth.setupSql) await session.query(test.groundTruth.setupSql, {}, { maxRows: 1 });
+				const result = await session.query(test.groundTruth.sql, {}, { maxRows: 100 });
+				const rows = result.rows;
+				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
+				checkPinnedFacts(test, rows);
+				if (test.category === 'grant-limited-p1') {
+					const view = rows[0]?.[0];
+					if (test.target !== 'p1-19c-prod' || !['V$PARAMETER', 'V$RMAN_BACKUP_JOB_DETAILS'].includes(String(view)) || rows[0]?.[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
+					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${String(view).replace('V$', 'V_$')} WHERE ROWNUM=1`));
+				}
+				records.push({ id: test.id, target: test.target, sql: test.groundTruth.sql, mode: test.groundTruth.mode, rowCount: rows.length, rows });
+			} finally { await session.close(); }
+		}
+	} finally { await sessions.closeAll(); }
 	return { validatedAt: new Date().toISOString(), caseCount: cases.length, records };
 }
 
