@@ -3,14 +3,15 @@
  */
 export interface FactCheck { facts: string[]; unsupported: string[] }
 interface Numeric { text: string; value: number; precision: number; coefficient: bigint; exponent: number; unit: string; start: number; end: number }
-const numberPattern = /(?<![\w$.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:[KMGT]i?B|[KMGT]|bytes|%))?(?![\w]|\.\d|,\d)/gi;
+const numberPattern = /(?<![\w$#.])(?:[-+]?[$€£]\s*)?[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:[KMGT]i?B|[KMGT]|bytes|%))?(?![\w]|\.\d|,\d)/gi;
 const identifierPattern = /(?<![\w])(?:[A-Za-z_$#][\w$#]*)(?:\.[A-Za-z_$#][\w$#]*)*/g;
 const constants = new Set(('SQL SQL_ID ID DBA DB DML DDL PL SQL SELECT FROM WHERE JOIN ON AS AND OR NOT NULL WITH BY GROUP ORDER HAVING DESC ASC UNION ALL DISTINCT CASE WHEN THEN ELSE END IN IS LIKE EXISTS COUNT SUM AVG MIN MAX ROUND OVER PARTITION ROWS FETCH FIRST ONLY OFFSET LIMIT INSERT UPDATE DELETE MERGE DROP CREATE ALTER TABLE VIEW INDEX COMMIT ROLLBACK EXPLAIN PLAN FOR NEXTVAL SYS SYSTEM DBMS_ UTL_ KB MB GB TB KIB MIB GIB TIB CPU SGA PGA IO IOPS TEMP UNDO RMAN ASH AWR ORA JSON CSV UTC GMT TRUE FALSE N A OK PK FK UK Y N READ CTAS LIST_TARGETS DB_OVERVIEW LIST_SCHEMAS LIST_OBJECTS DESCRIBE_OBJECT GET_SOURCE RUN_QUERY EXPLAIN_PLAN TOP_SQL SESSION_ACTIVITY WAIT_EVENTS TABLESPACE_USAGE ROW_NUMBER DENSE_RANK RANK TO_CHAR TO_DATE TRUNC NVL NULLIF COALESCE PRIMARY KEY NO ACTION DBWR LGWR OLTP TX TM AE FIRST_ROWS FM DBA_ R C P U V O V$SQL V$SQLSTATS V$SQL_PLAN V$SQL_PLAN_MONITOR V$SESSION V$LOCK V$ACTIVE_SESSION_HISTORY DBA_HIST_ACTIVE_SESS_HISTORY ALL_CONSTRAINTS ALL_CONS_COLUMNS ALL_INDEXES ALL_IND_COLUMNS ALL_TAB_COLUMNS ALL_TABLES ALL_OBJECTS ALL_USERS ALL_SYNONYMS EXECUTIONS ELAPSED_TIME BUFFER_GETS CPU_TIME BLOCKING_SESSION R_OWNER R_CONSTRAINT_NAME').split(' '));
 const norm = (text: string) => text.toLowerCase().replace(/["'`]/g, '').replace(/,/g, '');
 function numbers(text: string): Numeric[] {
 	return [...text.matchAll(numberPattern)].flatMap(match => {
 		const raw = match[0];
-		const parts = raw.match(/^([-+\d,.]+(?:e[-+]?\d+)?)(?:\s*(.*))?$/i)!;
+		const parts = raw.replace(/^([-+]?)[€$£]\s*/, '$1').match(/^([-+\d,.]+(?:e[-+]?\d+)?)(?:\s*(.*))?$/i)!;
+		if (!parts) return [];
 		const literal = parts[1]!.replace(/,/g, '');
 		const [mantissa, exponent] = literal.toLowerCase().split('e');
 		const value = Number(literal);
@@ -78,7 +79,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		}
 	}
 	const ratioValues = [...new Set(values.filter(n => !n.unit).map(n => n.value))].sort((a, b) => a - b);
-	const questionNumbers = new Set(numbers(question).map(n => norm(n.text).replace(/\s+/g, '')));
+	const questionNumbers = new Set(numbers(question).map(n => norm(n.text).replace(/[$€£\s]+/g, '')));
 	const facts: string[] = [], unsupported: string[] = [];
 	const seen = new Set<string>();
 	const add = (fact: string, supported: boolean) => {
@@ -91,7 +92,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 	for (const match of answer.matchAll(identifierPattern)) {
 		const fact = match[0];
 		const isQuoted = quoted.some(q => match.index! > q.index! && match.index! < q.index! + q[0].length);
-		const sqlId = /^[0-9abcdfghjkmnpqrstuvwxyz]{13}$/i.test(fact);
+		const sqlId = /^[a-z0-9]{13}$/i.test(fact) && (/\d/.test(fact) || /^[abcdfghjkmnpqrstuvwxyz]{13}$/i.test(fact));
 		if (!isQuoted && !sqlId && !(fact.length > 1 && fact === fact.toUpperCase() && /[A-Z]/.test(fact))) continue;
 		if (constants.has(fact.toUpperCase()) || fact.split('.').every(part => constants.has(part.toUpperCase())) || /^FM[09]+$/i.test(fact) || identifierSupported(fact, questionEvidence)) continue;
 		// Hyphenated prose (e.g. SHOPAPP-style) is not an unquoted Oracle identifier.
@@ -99,9 +100,9 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		add(fact, identifierSupported(fact, evidence));
 	}
 	// SQL IDs can begin with a digit; identifier scanning above cannot capture those.
-	for (const match of answer.matchAll(/(?<![\w])[0-9abcdfghjkmnpqrstuvwxyz]{13}(?![\w])/gi)) {
-		if (/^\d+$/.test(match[0])) continue;
-		if (questionEvidence.has(norm(match[0])) || question.toLowerCase().includes(match[0].toLowerCase())) continue;
+	for (const match of answer.matchAll(/(?<![\w])[0-9a-z]{13}(?![\w])/gi)) {
+		if (/^\d+$/.test(match[0]) || /^FM[09]+$/i.test(match[0]) || (!/\d/.test(match[0]) && !/^[abcdfghjkmnpqrstuvwxyz]{13}$/i.test(match[0]))) continue;
+		if (questionEvidence.has(norm(match[0])) || new RegExp(`(?<![\\w])${match[0]}(?![\\w])`, 'i').test(question)) continue;
 		add(match[0], new RegExp(`(?<![\\w])${match[0]}(?![\\w])`, 'i').test(evidenceText));
 	}
 	for (const match of answer.matchAll(/(?<![\w.])\d+(?:\.\d+){2,4}(?![\w]|\.\d)/g)) {
@@ -111,7 +112,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 	for (const shown of numbers(answer)) {
 		if (shown.text.replace(/e[-+]?\d+/i, '').replace(/[^\d]/g, '').replace(/^0+/, '').length < 4) continue;
 		if (!shown.unit && Number.isInteger(shown.value) && shown.value >= 1900 && shown.value <= 2099) continue;
-		if (questionNumbers.has(norm(shown.text).replace(/\s+/g, ''))) continue;
+		if (questionNumbers.has(norm(shown.text).replace(/[$€£\s]+/g, ''))) continue;
 		if (shown.value === 100 && /percent(?:age)?s?[^.!?]*sum[^.!?]*$/i.test(answer.slice(Math.max(0, shown.start - 100), shown.start))) continue;
 		// Avoid treating digits inside quoted identifiers or SQL_IDs as quantities.
 		if (quoted.some(q => shown.start >= q.index! && shown.end <= q.index! + q[0].length)) continue;

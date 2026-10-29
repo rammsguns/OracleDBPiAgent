@@ -152,3 +152,25 @@ it('handles adversarial exponent lengths without allocating huge integers or thr
 	expect(checkFacts(literal, [literal]).unsupported).toEqual([]);
 	expect(checkFacts(literal, ['2.345e-' + exponent]).unsupported).toEqual([literal]);
 });
+it('checks claimed 13-character SQL IDs even when hallucinated characters are invalid in Oracle', () => {
+	expect(checkFacts('SQL_ID abc123def456g', ['9abcdfgh12345']).unsupported).toEqual(['abc123def456g']);
+	expect(checkFacts('SQL_ID abc123def456g', ['ABC123DEF456G']).unsupported).toEqual([]);
+});
+it('does not confuse a 13-character format mask with a SQL ID', () => {
+	expect(checkFacts("TO_CHAR(total, 'FM99999999990.00')", []).unsupported).toEqual([]);
+});
+it('requires a whole SQL ID in question exemptions', () => {
+	expect(checkFacts('SQL_ID 9abcdfgh12345', [], 'What is x9abcdfgh12345y?').unsupported).toEqual(['9abcdfgh12345']);
+});
+it.each(['$3,313,394.74', '€3,313,394.74', '£ 3,313,394.74'])('recognizes the entire currency amount %s', answer => {
+	expect(checkFacts(answer, ['3313394.74']).unsupported).toEqual([]);
+	expect(checkFacts(answer.replace('313', '331'), ['3313394.74']).unsupported).toEqual([answer.replace('313', '331')]);
+});
+it('normalizes currency for question exemptions and avoids digits inside Oracle names', () => {
+	expect(checkFacts('$12,345', [], 'Does it cost 12345?').unsupported).toEqual([]);
+	expect(checkFacts('`SYS$1234`', ['SYS$1234']).unsupported).toEqual([]);
+	expect(checkFacts('`SYS#1234`', ['SYS#1234']).unsupported).toEqual([]);
+});
+it.each(['-$1,234.50', '$-1,234.50'])('preserves the sign on currency values %s', answer => {
+	expect(checkFacts(answer, ['-1234.50']).unsupported).toEqual([]);
+});

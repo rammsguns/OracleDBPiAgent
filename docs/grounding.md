@@ -45,7 +45,7 @@ grants. It remains flagged. This metric is flags on scorer-passing answers, not
 an independent proof that every flag is false.
 
 The detector was frozen before holdout measurement at SHA-256
-`5ce216024241dabcc1e5aaa3ca3f926be88b77b80f99c2386261d8e2bb1a651f`.
+`4c340325109d8aaa22e56bd2b38d80d6456fc6faa2ce81e7d86ae0558631f82c`.
 No failed dev answers were observed, so measured true-positive rate is unavailable.
 The two known real misses are both caught by exact regression fixtures: `PROMO`
 versus `PROMOTIONS`, and `3,331,394.74` versus `3,313,394.74`.
