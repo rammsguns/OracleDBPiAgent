@@ -128,4 +128,4 @@ into this document.
 - Unit coverage includes every fixed SQL shape, owner binds, bounds, policy,
   missing grants, timeout/generic error sanitization, every fallback, stable JSON,
   Markdown, grouped selection and CLI summary sequencing with a fake summary.
-- Live summary: pending coordinator's Strata slot; no LLM calls made yet.
+- Live summary: not verified. The coordinator reserved Strata for WP-2A and did not release the slot during this worker session. The existing follow-up question (`msg_da29361c97ab`) was resumed after repeated ten-minute timeouts and the blocker was escalated (`msg_c90af886caad`); no LLM calls were made. A coordinator-owned live smoke remains required.
