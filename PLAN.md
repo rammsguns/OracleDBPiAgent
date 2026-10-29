@@ -464,6 +464,29 @@ WP-Z (`wp-z-docs-refresh`, codex) owns README.md, docs/mvp-status.md and a new
 docs/README.md index. It changes no code. Review: antigravity checks the docs
 against the code and PLAN.md. Merge and push on APPROVE.
 
+## Eval reliability (2026-10-29)
+
+Goal: make A/B gates cheaper and more trustworthy. Two problems:
+- Ground-truth misses: the master baseline failed `hard-sh-fks` ("fresh ground
+  truth: PROMOTIONS") and `hard-quarter-winners` ("3313394.74") once each in
+  holdout ×3. Decide whether each is a real agent miss or a brittle check.
+- Noise: the same code varies about ±5% in tokens between hard dev runs, so each
+  gate needs 4×4 alternating runs (about 1 hour).
+
+WP-AA (`wp-aa-eval-reliability`, codex) owns `evals/` (scoring, runner,
+ground truth) and docs/evals-hard.md. It does not change `src/` or product
+prompts, and holdout questions and splits stay fixed. It may change only the
+scoring of a check proven brittle, with the evidence in the docs.
+1. Diagnose both misses from archived results
+   (`~/orca/workspaces/OracleDBPiAgent/eval-archive/`) and live read-only
+   ground-truth queries.
+2. Measure noise from the archived A/B runs: per-case token variance and which
+   cases dominate it. Propose and implement a cheaper comparison, for example a
+   per-case paired comparison with a bootstrap interval in a `compare` script,
+   or an optional fixed eval temperature/seed if Strata honours it.
+   Verify with at most 4 sequential eval runs.
+Review: antigravity. Merge and push on APPROVE, if the unit tests pass.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
