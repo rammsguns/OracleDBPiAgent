@@ -73,6 +73,21 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
 	});
+	program.command("report").requiredOption("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean }) => {
+		if (options.json && options.md) throw new Error("Choose --json or --md");
+		const config = loadConfig();
+		const { generateReport, renderMarkdown } = await import("../report/index.js");
+		const sessions = await createSessions(config);
+		try {
+			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, sections: options.sections?.split(",").map(s => s.trim()) });
+			const markdown = renderMarkdown(report);
+			console.log(options.json ? JSON.stringify(report) : markdown);
+			if (options.summarize) {
+				const { summarizeReport } = await import("../report/summarize.js");
+				console.log(await summarizeReport(markdown, config.llm));
+			}
+		} finally { await sessions.closeAll(); }
+	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
