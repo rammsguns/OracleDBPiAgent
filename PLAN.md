@@ -1015,6 +1015,43 @@ product behaviour changes, so there is no eval A/B gate.
 New features, eval changes, dependency upgrades, publishing to npm, and
 running integration or LLM tests in CI.
 
+## Phase 8: fresh holdout set (approved 2026-10-29)
+
+Every gate since phase 2 has used the same 21 holdout cases. Changes may now be
+tuned to them, so a holdout pass means less than it should. This phase writes
+a new holdout and keeps the old one as a regression set.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-8A New holdout cases | `wp-8a-fresh-holdout` | `evals/cases-hard/` (new `phase8-*.json` files and the `split` field of old holdout cases), `evals/types.ts`, `evals/run.ts` (split option only), `evals/validate-hard.ts`, their tests, `docs/evals-hard.md` | — |
+
+### WP-8A: new holdout cases
+- Write 12 new holdout cases: one per hard category (11), plus a second
+  analytical case. Each case must use different tables, columns or facts from
+  every existing case. Add no near-copies of current questions.
+- Keep the current case shapes and rules: ground truth from plain SELECT,
+  `allCells` for analytical cases, pinned facts checked by `validate-hard.ts`,
+  negation-aware `forbiddenClaims`, and only views that p1 can read.
+- Move the 21 old holdout cases to a new split, `regression`. Update:
+  - the types;
+  - `evals/run.ts --split`;
+  - the validator. Every category needs dev and holdout. The 55–72% dev
+    ratio counts dev and holdout only.
+- No agent or LLM runs while writing cases, so they are written blind. Ground
+  truth is checked only with `validate-hard.ts`.
+- Coordinator baseline on main (eb04e45): new holdout ×3. Every failure is
+  sorted into agent error or scorer bug. Only scorer bugs are fixed, with
+  tests. Cases are never loosened to make the agent pass.
+- Gate:
+  - Validation passes, typecheck and tests pass.
+  - The Antigravity review checks independence from existing cases, ground
+    truth, patterns, and the failure triage.
+  - Baseline results are recorded.
+- Gates from then on run: hard dev 4×4, new holdout ×3, regression ×1, and MVP.
+
+### Not in phase 8
+Changes to dev cases, the scorer or the product.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
