@@ -72,8 +72,8 @@ loopback binding, random tokens, authentication, Host/Origin checks, headers, sa
 target output, SSE ordering/metadata, cross-server prompt serialization, disconnect
 abort, failure recovery, session limits/expiry/cleanup, target pinning, audit
 filtering, static content types, traversal and escaping symlinks. Unit tests require
-neither Oracle nor Strata. The coordinator performs the live browser/API smoke test
-and security review before merging WP-U and WP-V.
+neither Oracle nor Strata. The coordinator completed the live API smoke test
+and Antigravity approved WP-U and WP-V before merge.
 
 ## Page
 
@@ -113,21 +113,22 @@ layout support accessible use. Health is checked on entry and with Refresh healt
 matching and immutability, argument bounds, and static restrictions against HTML
 execution sinks, inline handlers/styles/scripts, dynamic evaluation and external
 URLs. These tests need neither a browser, Oracle nor Strata. End-to-end browser
-and merged server checks remain the coordinator's integration gate.
+and merged server checks subsequently passed; see the phase 2 results below.
 
 Page validation (2026-10-28): `npm run typecheck` passed; `npm test` passed
 17 files / 315 tests; `node --check` passed for both JavaScript modules.
 The worktree initially lacked dependencies; validation used a temporary local
 `node_modules` symlink to the coordinator worktree's installed dependencies, removed after testing.
 No contract changes or additional dependencies are needed. No DB/LLM code was
-changed and no live database or model requests were made. Browser rendering,
-merged-server integration, and the end-to-end smoke test were not verified here.
+changed and no live database or model requests were made during that work.
+Subsequent browser and merged-server checks passed, including a live smoke test.
 
 ## Phase 2 report, export and grounding (WP-2C)
 
 `GET /api/report?target=<configured-name>[&sections=identity,tablespaces][&summarize=1]`
-returns `{ report, summary? }`. Omitted target uses the configured default; omitted
-sections selects all report sections. Names are validated against the report module's
+returns `{ report, summary?, unverified? }`. Summary requests include
+`unverified: string[]`, empty when supported or checking is disabled. Omitted
+target uses the configured default; omitted sections selects all report sections. Names are validated against the report module's
 section list (including its grouped selection behavior). Invalid targets, empty or
 unknown sections and invalid summary flags return 400. Authentication, Host, Origin,
 CSP and no-store behavior match the other API routes. Report/provider/summary/cleanup
@@ -144,6 +145,9 @@ summary and provider implementations without Oracle or Strata.
 The Report tab runs for the selected target, optionally requests a summary, and
 renders tables and availability notes with DOM nodes and textContent. Tables scroll
 inside their panel on phone screens. Changing targets clears the displayed report.
+WP-3A checks summary numbers against report evidence after the single LLM call,
+without a correction turn. A nonempty list adds an Unverified note below the
+summary using textContent; `PIAGENT_GROUNDING_CHECK=0` disables this check.
 The SSE done payload carries `unverified: string[]`; nonempty values produce a
 visible Unverified note attached to that answer. WebAgent has a local optional
 property adapter, so no shared contract changes are required.
@@ -167,6 +171,7 @@ Validation on 2026-10-29:
 - With the coordinator `.env` loaded,
   `npm run test:integration -- -t '^(?!.*answers one end-to-end)'`: 6 files passed,
   22 tests passed, 1 live LLM end-to-end test skipped (7.32 seconds).
-- No LLM calls were made. Live summary/chat smoke and independent security review
-  remain coordinator gates. The existing coordinator node_modules installation was
-  linked locally for validation because this checkout initially had no installation.
+- Antigravity approved all seven security checks. Coordinator live smoke verified
+  authentication and input refusals, all 14 d1 sections, 11 p1 sections plus three
+  named grant notes, a read-only d1 summary (42 s), chat `unverified: []`, and no
+  token in the audit. WP-3A summary reruns on both targets produced zero flags.

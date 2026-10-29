@@ -14,7 +14,7 @@ the user; the agent supplies user messages from the conversation, excluding its 
 correction instructions.
 
 Correction hook in `src/agent/index.ts`:
-- Enabled by default; `PIAGENT_GROUNDING_CHECK=0` disables it (`HarnessTunables.groundingCheck`).
+- Enabled by default; `PIAGENT_GROUNDING_CHECK=0` disables it; `=1` enables it (`HarnessTunables.groundingCheck`).
 - **Gating**: The check and correction turn are skipped entirely when:
   1. The run made no successful tool calls (`successfulCalls === 0`), or
   2. The answer is a refusal (`isRefusal(answer)`).
@@ -113,3 +113,16 @@ Changed files:
 - `tests/unit/grounding.test.ts`
 - `tests/unit/grounding-hook.test.ts`
 - `docs/grounding.md`
+
+## Final merged gate — 2026-10-29
+
+The first design was rejected after flagging 6/13 correct holdout answers and
+reducing hard dev to 16/20. The numeric-only redesign above passed the final
+hard dev 4×4 gate (80/80; 5/80 corrections), holdout ×3 (39/39) and MVP (39/39).
+Hard-dev tokens rose 4.0% overall, with 1.2% attributable to correction turns;
+the owner approved that cost. MVP tokens fell 0.3%. Earlier measurements and
+test counts above describe implementation checkpoints, not the final gate.
+
+Report summaries now use the same checker through a numeric-only adapter, with
+one LLM call and no correction turn. See [report.md](report.md) for evidence
+normalization and the verified zero-flag live reruns on both targets.
