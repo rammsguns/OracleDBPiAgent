@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { renderMarkdown, type DatabaseReport } from './index.js';
 export const HISTORY_RETENTION = 30;
-export const DEFAULT_REPORT_DIRECTORY = 'var/reports';
+export { reportDirectory } from "../config/paths.js";
 type Targets = readonly { name: string }[];
 export function validateReportTarget(target: string, targets: Targets): void {
 	if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(target) || !targets.some(t => t.name === target)) throw new Error('Invalid or unknown report target');

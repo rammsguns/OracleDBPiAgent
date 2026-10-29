@@ -9,6 +9,8 @@ revision they checked; use the status page and current code for today's behavior
 - [Project plan](../PLAN.md) — Scope, hard rules, architecture and work-package ownership.
 - [README.md](README.md) — This documentation index.
 
+- [install.md](install.md) — Global CLI installation and private configuration.
+
 ## Development
 
 - [ci.md](ci.md) — Node 24 CI, clean-clone checks and local verification.

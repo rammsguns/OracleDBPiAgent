@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { SessionManager, WebError, acquireLlm, ask, type SessionOptions } from "./sessions.js";
 
 import { generateReport, renderMarkdown, sectionNames } from "../report/index.js";
-import { loadLatestReport, saveReport, DEFAULT_REPORT_DIRECTORY, validateReportTarget } from "../report/history.js";
+import { loadLatestReport, saveReport, reportDirectory, validateReportTarget } from "../report/history.js";
 import { webReportDiff } from "./reportDiff.js";
 import { summarizeReport, checkReportSummary } from "../report/summarize.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
@@ -85,7 +85,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const report = await (options.report ?? generateReport)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target }, { target, sections });
-					const directory = options.reportDirectory ?? DEFAULT_REPORT_DIRECTORY;
+					const directory = options.reportDirectory ?? reportDirectory();
 					const previous = await (options.loadReport ?? loadLatestReport)(directory, target, manager.config.targets);
 					const diff = webReportDiff(previous, report);
 					if (!saving && !previous) diff.notes = ['No saved run yet.'];

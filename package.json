@@ -19,7 +19,8 @@
 		"piagent": "tsx src/cli/index.ts",
 		"optimize": "tsx evals/optimize.ts",
 		"optimize:report": "tsx evals/optimize.ts --report",
-		"test:browser": "playwright test"
+		"test:browser": "playwright test",
+		"prepare": "npm run build"
 	},
 	"dependencies": {
 		"@earendil-works/pi-agent-core": "1.4.0",
@@ -35,5 +36,12 @@
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.5"
 	},
-	"license": "MIT"
+	"license": "MIT",
+	"files": [
+		"dist/",
+		"config/targets.json",
+		".env.example",
+		"LICENSE",
+		"README.md"
+	]
 }
