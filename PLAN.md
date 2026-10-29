@@ -778,6 +778,51 @@ cron; this repo adds no scheduler or daemon.
 A scheduler or daemon in this repo, notifications (email or Slack), LLM
 summaries of diffs, and history charts.
 
+## Phase 5: eval suite expansion (approved 2026-10-29)
+
+Goal: a larger, harder eval suite that tightens the token gate and guards the
+phase 2 grounding check against regressions. No product change.
+
+The hard suite has 33 cases today: 20 dev and 13 holdout. The 4×4 dev token
+interval is about ±6%, so a real cost change of 3% cannot be told apart from
+noise. Add **16 cases (8 dev, 8 holdout)** across the categories that caused
+real errors:
+
+| Category | Dev | Holdout | What it tests |
+|---|---:|---:|---|
+| Numeric precision | 2 | 2 | Large SH sums and counts with 7 or more significant digits, where transposed digits fail (the 3,313,394.74 miss) |
+| Unit conversion | 2 | 2 | Wait and SQL times in µs shown in seconds; segment and tablespace sizes in bytes shown in MB or GB |
+| Name fidelity | 1 | 1 | Near-miss names (PROMOTIONS vs PROMO) and objects that do not exist, where the answer must say "not found" rather than invent |
+| Refusal follow-ups | 2 | 2 | A normal first turn, then a request to change data or run DDL: the agent must refuse and keep the refusal wording |
+| Grant-limited p1 | 1 | 1 | Questions p1 cannot answer for lack of a grant: the answer must name the gap and invent nothing |
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-5A New hard cases | `wp-5a-eval-cases` | new files under `evals/cases-hard/`, `evals/validate-hard.ts`, `docs/evals-hard.md` | — |
+
+### WP-5A: new hard cases
+- Same EvalCase contract and scorer, no scorer changes. Every factual case has
+  read-only ground-truth SQL that `evals/validate-hard.ts` checks on its
+  target. Questions must not name tools or give away the answer.
+- Holdout cases are written before any agent run, and are never tuned on agent
+  answers. Their wording may change only if a review finds the question
+  ambiguous or the ground truth wrong.
+- Gate:
+  1. `validate-hard.ts` passes on both targets: ground truth only, no LLM.
+  2. An Antigravity review of ground truth, ambiguity and answer leaks.
+  3. Coordinator baseline on current main: new dev cases ×3 and new holdout
+     cases ×3. Every case must pass at least once in 3 runs, so it is
+     solvable. A case that never passes is fixed (for a real ambiguity) or
+     dropped, and recorded.
+  4. Record per-case pass rates and the new dev token CV, and re-estimate the
+     4×4 interval width with `evals/compare.ts`.
+- After merge, every future gate uses the expanded suite. Baselines are re-run
+  each time, as now.
+
+### Not in phase 5
+Scorer changes, new tools, prompt tuning to pass the new cases, and LLM-judged
+scoring.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
