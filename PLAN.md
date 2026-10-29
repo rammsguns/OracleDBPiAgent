@@ -961,6 +961,15 @@ product behaviour changes, so there is no eval A/B gate.
     permissions and unpinned actions.
   - After the coordinator pushes, the first GitHub run is green
     (`gh run list`).
+- **Result (2026-10-29): merged** (3f5fbd9 and 6c9fa00). `actions/checkout`
+  v7.0.1 and `actions/setup-node` v7.1.0 are pinned to SHAs that match their
+  tags. The workflow has `contents: read` and `persist-credentials: false`.
+  - The scrubbed clean clone passed 594 tests and the build; no test fixes
+    were needed.
+  - The Antigravity review approved.
+  - The first GitHub run (40968486748) passed.
+  - The coordinator's history secret scan (by count only) found no secret
+    files, keys, token patterns, Strata key or secret-directory values.
 
 ### WP-7B: changelog and quick start
 - `CHANGELOG.md`, in Keep a Changelog format: one 1.0.0 entry that summarizes
