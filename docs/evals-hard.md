@@ -431,3 +431,119 @@ No product DB/LLM code changed, so integration tests were not rerun. No eval
 runner or LLM calls were made; the replacement's model solvability remains for
 the coordinator baseline. No contract changes are needed. The generated
 historical validation JSON remains unchanged, consistent with WP-5A ownership.
+
+## WP-6A: per-case token gate (2026-10-29)
+
+The default command and its JSON output remain unchanged. Opt in with:
+
+```sh
+node --import tsx evals/compare.ts --per-case --seed 8129 --a <files...> --b <files...>
+```
+
+`--seed` is an unsigned 32-bit analysis seed, not an LLM setting. The default is
+8129. Each record contributes `usage.input + usage.output` (uncached tokens).
+Group records by `records[].id` across files and iterations, retaining each
+side's own observations; unequal arm sizes are supported. A case ID must have
+one consistent target on both sides. Record validation, duplicate detection
+within each iteration, and known case-hash checks still apply. Cases absent
+from either arm are excluded and listed in `skipped.missingFromA/B`; no common
+cases is an error. Positive arm means are required for log ratios. A bootstrap
+sample with zero mean is rejected rather than silently inventing a ratio.
+Execution failures generate a warning and must be investigated before promotion.
+
+For C common cases, let r_c = mean(tokens B_c) / mean(tokens A_c). The reported
+percent change is `100 * (exp(mean(log(r_c))) - 1)`. Each case weighs equally,
+regardless of its token count. This is a different estimand from a percentage
+change in total tokens; the two need not agree. `cases` includes arm means,
+counts, ratios, percentage changes and signed contributions `log(r_c)/C`.
+Rows are sorted by absolute contribution, largest first, with ID breaking ties.
+Contributions add in log space, not percentage points.
+
+The percentile 95% interval uses 10,000 two-level bootstrap draws. Each draw
+samples C case IDs with replacement; for every selected occurrence, independently
+resample its A observations and its B observations with replacement, preserving
+those arm sample sizes, then recompute the geometric mean. Repeated occurrences
+of one case get fresh inner draws. One observation per arm is supported, but
+its within-case uncertainty is unidentifiable; the output explicitly warns and
+leaves the runs estimate unknown. Identical single-run ratios can therefore
+produce a point interval without establishing certainty about future runs.
+
+This bootstrap assumes independent cases and independent runs within each case;
+it does not retain shared whole-run covariance or experimental pairing. Keep
+the default whole-run comparison alongside it, and retain the existing refusal,
+factual accuracy and promotion checks. Small samples and repeated inspection
+still have the reliability limits described above. These are descriptive
+intervals; this implementation does not establish a cheaper promotion gate.
+
+### Runs needed for a ±3% interval
+
+The planning output uses a conservative delta-method approximation. Let
+`s_between²` be the sample variance of the observed case log ratios, and let
+`w = mean(CV_A,c² + CV_B,c²)`, with sample variances for the within-case CVs.
+For n future runs per arm per case, approximate log-estimate variance as
+`(s_between² + w/n)/C`. Solve
+`1.96 * sqrt(variance) <= log(1.03)` for n, rounded up with a minimum of two.
+Using log(1.03) makes the upper multiplicative half-width at most 3%; its lower
+counterpart is slightly less than 3%. This is a local approximation, especially
+when the estimated effect is far from zero.
+
+The between-case term is held fixed, matching the outer bootstrap's use of the
+observed case effects. It deliberately is not corrected for estimation noise;
+with only two or four observations per arm this can be substantially conservative.
+If that term already exceeds the target, `runsPerSide` is null with an explicit
+reason: **no finite runs-only estimate under this observed-variance model**.
+This is not proof of an irreducible population floor: more pilot repeats can
+change the case-effect estimates and their spread. More cases or a separately
+reviewed random-effects/de-noised planning model may change the conclusion.
+Unknown within-case variance (single observations) also yields null with a
+different reason. A finite estimate is a planning aid, not a power guarantee.
+
+### Archived validation (no DB or LLM calls)
+
+All results below use seed 8129 and 10,000 draws. Every selected file has one
+record per case, with no missing cases across the compared arms and matching
+case hashes. Files were loaded programmatically; full archived JSON was never
+printed. Paths are relative to
+`/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive/`.
+
+Phase 5's four full 28-case dev reports, numbered chronologically, have prefixes
+`2026-10-29T19-41-51-562Z`, `19-50-06-884Z`, `19-58-17-714Z`, and
+`20-05-49-619Z` (the latter three share the same date). They used identical code.
+
+| Comparison | Cases | Runs/arm | Per-case change | Bootstrap 95% interval | Runs/arm for ±3% |
+|---|---:|---:|---:|---:|---|
+| Phase 5 A/A {1,2} vs {3,4} | 28 | 2 | −1.80% | [−10.60%, +7.22%] | No finite estimate under model |
+| Phase 5 A/A {1,3} vs {2,4} | 28 | 2 | −0.07% | [−7.42%, +7.84%] | No finite estimate under model |
+| WP-2A baseline vs candidate | 20 | 4 | +1.13% | [−6.67%, +10.45%] | No finite estimate under model |
+| Phase 2 baseline A/A {1,2} vs {3,4} | 20 | 2 | +3.20% | [−6.80%, +15.44%] | No finite estimate under model |
+| Phase 2 candidate A/A {1,2} vs {3,4} | 20 | 2 | −5.72% | [−13.97%, +2.90%] | No finite estimate under model |
+
+Every A/A interval contains zero. WP-2A baseline files use timestamp prefixes
+`2026-10-29T16-22-25-041Z`, `16-34-48-402Z`, `16-47-28-605Z`,
+`16-59-43-914Z`; candidate files use `16-29-15-963Z`, `16-41-03-823Z`,
+`16-53-39-755Z`, `17-06-15-143Z`, all under `phase2/` on that date.
+The historical per-run result was **+4.0% [−2%, +10%]**, beside the new
+**+1.13% [−6.67%, +10.45%]**. Width increases from approximately 12 to
+17.12 percentage points; this validation does not show a tighter interval.
+The largest WP-2A absolute log contributions are `hard-follow-plan` (+49.24%
+case ratio change), `hard-region-channel` (+47.75%), and `hard-share` (−22.47%).
+
+For the two Phase 5 comparisons, `(s_between², w)` are respectively
+`(0.05240172, 0.04512204)` and `(0.02386965, 0.07095932)`; WP-2A is
+`(0.02454669, 0.06497155)`. In all three, `s_between²/C` alone exceeds
+`(log(1.03)/1.96)²`, hence the null runs estimates. The same is true of both
+Phase 2 A/A checks. The observed variance does not support promising a ±3%
+interval by adding a particular finite number of runs.
+
+Verification: the fresh worker checkout initially lacked node_modules, so the
+first typecheck/test attempts could not locate tsc/vitest. `npm ci --ignore-scripts`
+installed the locked dependencies (0 vulnerabilities), without changing manifests.
+Subsequently `npm run typecheck` passed and `npm test` passed **592 tests in
+31 files**. A separate strict TypeScript check of `evals/compare.ts` and its new
+tests also passed, since the main tsconfig includes only product sources.
+Synthetic tests cover the 1.05 uniform ratio, A/A zero coverage, missing cases,
+seed reproducibility, unequal run counts, single-run behavior, contribution
+sorting, variance-floor planning, and invalid ratios/targets/hashes/seeds.
+No integration suite was needed: no DB or LLM implementation code changed.
+No contract changes are required. Statistical review by Antigravity remains
+with the coordinator; no eval runner or LLM calls were made.
