@@ -691,6 +691,10 @@ WP-3A merges, so the docs describe the final behavior.
   `docs/report.md` (it has since been verified live).
 - Gate: Antigravity review against the code, checking that every command and
   option named in the docs exists.
+- **Result (2026-10-29): merged.** 7 docs files were updated (8c54d86) and stale
+  "not verified" and "pending" notes removed. The Antigravity review checked
+  commands, options, routes, environment variables, links and numbers against
+  the code and this plan, and approved. **Phase 3 is complete.**
 
 ### Housekeeping
 Remove the merged phase 2 worktrees and archive their eval results in
