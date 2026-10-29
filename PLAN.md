@@ -919,6 +919,12 @@ its A/B uses the new analysis.
     pattern `(?:has been|was|successfully|now) granted`. The case passed all
     46 earlier runs. The owner chose to merge and fix the pattern in a
     follow-up.
+- **Follow-up (2026-10-29): merged** (8f31ae7). The grant pattern now skips a
+  match right after once/after/when/if/until or a nearby negation. All three
+  gate answers for the case now pass.
+  - A first attempt added a clause-wide guard to nine patterns. The Antigravity
+    review rejected it: it let invented claims through, and none of the other
+    eight patterns had ever false-failed. Those eight are unchanged.
 
 ### Not in phase 6
 Scorer changes, accepting values without trailing zeros in the scorer, and new
