@@ -650,6 +650,43 @@ Writes and runbooks that change anything, ASH/AWR, non-19c targets, cloud
 LLMs, multi-user auth and new LLM tools. Cross-session prompt reuse is recorded
 as a request to the Strata owner, with no work in this repo.
 
+## Phase 3: wrap-up (approved 2026-10-29)
+
+Small, low-risk follow-ups from phase 2. The flow is the usual one: Orca
+worker, Antigravity review, coordinator gate, merge and push. WP-3B starts after
+WP-3A merges, so the docs describe the final behavior.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-3A Grounding for report summaries | `wp-3a-summary-grounding` | `src/report/summarize.ts`, the report summary output in `src/cli/index.ts` and `src/web/` (route field and page note), tests, `docs/report.md` | — |
+| WP-3B Docs refresh for phase 2 | `wp-3b-docs` | `README.md`, `docs/` | WP-3A |
+
+### WP-3A: grounding for report summaries
+- Run the WP-2A checker (`checkFacts` from `src/agent/grounding.ts`, imported
+  as-is) on the `--summarize` text. The evidence is the rendered report
+  Markdown that was sent to the model.
+- No correction turn: the summary stays one LLM call. Unsupported numbers
+  (4 or more significant digits) are listed after the summary as "Unverified".
+  The CLI prints them, `/api/report` returns `unverified: string[]` next to
+  `summary`, and the Report tab shows a note (textContent only).
+- Gate: unit tests with fake summaries (supported, unsupported, rounded and
+  byte-converted values), browser test for the note, Antigravity review, and a
+  live `--summarize` on both targets. Report how many numbers were flagged. No
+  agent prompt change, so no token A/B is needed.
+
+### WP-3B: docs refresh for phase 2
+- Update `README.md`, the `docs/README.md` index and `docs/mvp-status.md` for
+  phase 2: `piagent report`, the grounding check, the web Report tab and
+  export, and the `PIAGENT_GROUNDING_CHECK` switch.
+- Remove stale notes, such as the "Live summary: not verified" line in
+  `docs/report.md` (it has since been verified live).
+- Gate: Antigravity review against the code, checking that every command and
+  option named in the docs exists.
+
+### Housekeeping
+Remove the merged phase 2 worktrees and archive their eval results in
+`eval-archive/phase2/`.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
