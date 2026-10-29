@@ -13,6 +13,11 @@ export async function startFakeServer() {
 	let now = 0;
 	const stats = { aborted: 0, prompts: 0 };
 	const web = createWebServer({ port: 0, config, now: () => now, idleMs: 1000,
+		report: async (_ctx, options) => ({ target: options?.target ?? 'd1-19c-lab', generatedAt: '2026-10-29', sections: [
+			{ name: 'identity', status: 'ok', source: 'fake', columns: ['VALUE'], rows: [[hostile + 'x'.repeat(500)]], note: 'Fake identity' },
+			{ name: 'backups', status: 'unavailable', source: 'fake', columns: [], rows: [], note: 'not available: needs SELECT on SYS.V_$RMAN_BACKUP_JOB_DETAILS' },
+		] }),
+		summarize: async () => hostile,
 		checkHealth: async () => {},
 		health: async () => [{ name: 'Fake Strata', status: 'ok' }, { name: 'Fake Oracle', status: 'fail' }],
 		sessionFactory: async () => ({ get: async () => { throw new Error('Database access forbidden in browser tests'); }, closeAll: async () => {} }),
@@ -24,7 +29,7 @@ export async function startFakeServer() {
 			let release = () => {}, idle = Promise.resolve(), aborted = false;
 			const state = { messages: [] as any[] };
 			const agent: WebAgent = {
-				state: state as WebAgent['state'],
+				state: state as WebAgent['state'], unverified: ['UNSUPPORTED_TABLE'],
 				subscribe: fn => { listeners.add(fn); return () => { listeners.delete(fn); }; },
 				abort: () => { if (!aborted) stats.aborted++; aborted = true; release(); },
 				waitForIdle: () => idle,
@@ -37,7 +42,7 @@ export async function startFakeServer() {
 						else await Promise.race([idle, new Promise(resolve => setTimeout(resolve, 350))]);
 						if (aborted) return;
 						for (const isError of [false, true]) {
-							emit({ type: 'tool_execution_start', toolName: isError ? 'failed_query' : 'run_query', args: { sql: hostile } });
+							emit({ type: 'tool_execution_start', toolName: isError ? 'failed_query' : 'run_query', args: { name: hostile, binds: { secret: "never-export-bind" }, sql: "never-export-sql" } });
 							await new Promise(resolve => setTimeout(resolve, 100));
 							emit({ type: 'tool_execution_end', toolName: isError ? 'failed_query' : 'run_query', isError, result: { content: [{ type: 'text', text: 'fake result' }] } });
 						}

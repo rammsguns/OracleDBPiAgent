@@ -28,6 +28,7 @@ async function api(path, options = {}) {
 function sessionPath(suffix = '') { return `/api/sessions/${encodeURIComponent(sessionId)}${suffix}`; }
 function clearSessionView() {
 	$('messages').replaceChildren(); $('trace').replaceChildren(); $('audit').replaceChildren();
+	$('report-content').replaceChildren(); $('report-status').textContent = '';
 	rows = []; $('audit-status').textContent = '';
 }
 async function newSession() {
@@ -76,6 +77,10 @@ async function ask(question, retry = true) {
 			if (event === 'tool_start' || event === 'tool_end') { rows = updateTrace(rows, event, payload); renderTrace(); }
 			if (event === 'done') {
 				if (typeof payload.answer === 'string') answer.textContent = payload.answer;
+				if (Array.isArray(payload.unverified) && payload.unverified.length) {
+					const note = document.createElement('p'); note.className = 'unverified';
+					note.textContent = 'Unverified: ' + payload.unverified.join(', '); answer.parentElement.append(note);
+				}
 				completed = true; status('Answer complete.');
 			}
 			if (event === 'error') throw new Error('The assistant could not complete this request. Please try again.');
@@ -128,13 +133,49 @@ async function audit() {
 		$('audit-status').textContent = [404, 410].includes(error.status) ? 'Session expired. Send a question to start a new session.' : 'Could not load audit records.';
 	}
 }
-function tab(auditSelected) {
-	for (const [id, selected] of [['audit', auditSelected], ['trace', !auditSelected]]) {
-		$(`${id}-tab`).setAttribute('aria-selected', String(selected));
-		$(`${id}-tab`).tabIndex = selected ? 0 : -1; $(`${id}-panel`).hidden = !selected;
+function tab(selected) {
+	for (const id of ['audit', 'trace', 'report']) {
+		$(`${id}-tab`).setAttribute('aria-selected', String(id === selected));
+		$(`${id}-tab`).tabIndex = id === selected ? 0 : -1; $(`${id}-panel`).hidden = id !== selected;
 	}
-	if (auditSelected) void audit();
+	if (selected === 'audit') void audit();
 }
+$('report-run').addEventListener('click', async () => {
+	const target = $('target').value;
+	const params = new URLSearchParams(target ? { target } : {});
+	if ($('report-summarize').checked) params.set('summarize', '1');
+	$('report-run').disabled = true; $('target').disabled = true; $('report-status').textContent = 'Running report…';
+	try {
+		const data = await (await api('/api/report?' + params)).json();
+		$('report-content').replaceChildren();
+		if (typeof data.summary === 'string') {
+			const summary = document.createElement('pre'); summary.className = 'answer'; summary.textContent = data.summary; $('report-content').append(summary);
+		}
+		for (const section of data.report.sections) {
+			const heading = document.createElement('h3'); heading.textContent = section.name;
+			const note = document.createElement('p'); note.textContent = section.note;
+			$('report-content').append(heading, note);
+			if (section.status !== 'ok') continue;
+			const wrap = document.createElement('div'); wrap.className = 'table-scroll';
+			const table = document.createElement('table'); const head = document.createElement('thead');
+			const tr = document.createElement('tr');
+			for (const column of section.columns) { const th = document.createElement('th'); th.scope = 'col'; th.textContent = column; tr.append(th); }
+			head.append(tr); const body = document.createElement('tbody'); body.append(...section.rows.map(tableRow));
+			table.append(head, body); wrap.append(table); $('report-content').append(wrap);
+		}
+		$('report-status').textContent = 'Report complete.';
+	} catch (error) { $('report-status').textContent = error.message; }
+	finally { $('report-run').disabled = false; $('target').disabled = running; }
+});
+$('export').addEventListener('click', () => {
+	const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;');
+	const conversation = [...$('messages').children].map(article => '### ' + escape(article.querySelector('h3').textContent) + '\n\n' + [...article.children].slice(1).map(node => escape(node.textContent)).join('\n\n')).join('\n\n');
+	const trace = [...$('trace').rows].map(row => '| ' + [...row.cells].map(cell => escape(cell.textContent).replace(/[\r\n]+/g, ' ')).join(' | ') + ' |').join('\n');
+	const text = '# Conversation\n\n' + conversation + '\n\n## Tool trace\n\n| Name | Arguments | Status | Result bytes |\n| --- | --- | --- | --- |\n' + trace + '\n';
+	const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }));
+	const link = document.createElement('a'); link.href = url; link.download = 'piagent-conversation-' + new Date().toISOString().replace(/[:.]/g, '-') + '.md';
+	link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
 $('ask').addEventListener('submit', event => {
 	event.preventDefault(); const question = $('question').value.trim();
 	if (!question || running || !sessionId) return;
@@ -149,14 +190,16 @@ $('target').addEventListener('change', async () => {
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
-$('trace-tab').addEventListener('click', () => tab(false));
-$('audit-tab').addEventListener('click', () => tab(true));
-for (const id of ['trace-tab', 'audit-tab']) $(id).addEventListener('keydown', event => {
-	if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-		event.preventDefault(); const selected = event.key === 'End' || (event.key !== 'Home' && id === 'trace-tab');
-		tab(selected); $(selected ? 'audit-tab' : 'trace-tab').focus();
-	}
-});
+const tabs = ['trace', 'audit', 'report'];
+for (const [index, id] of tabs.entries()) {
+	$(`${id}-tab`).addEventListener('click', () => tab(id));
+	$(`${id}-tab`).addEventListener('keydown', event => {
+		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+		event.preventDefault();
+		const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length;
+		tab(tabs[next]); $(`${tabs[next]}-tab`).focus();
+	});
+}
 async function init() {
 	if (!token) { status('Open the token URL printed by piagent web to connect.'); return; }
 	try {

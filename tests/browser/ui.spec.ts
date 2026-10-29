@@ -138,3 +138,31 @@ test('390x844 viewport has no horizontal overflow and supports typing and Enter 
 	const box = await page.locator('#question').boundingBox();
 	expect(box!.width).toBeGreaterThan(200); expect(box!.x + box!.width).toBeLessThanOrEqual(390);
 });
+
+test('report renders tables, unavailable notes and hostile summary as text on a phone', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 }); await ready(page);
+	await page.locator('#report-tab').click();
+	await page.locator('#report-summarize').check();
+	await page.locator('#report-run').click();
+	await expect(page.locator('#report-status')).toHaveText('Report complete.');
+	await expect(page.locator('#report-content td')).toContainText(hostile);
+	await expect(page.locator('#report-content pre')).toHaveText(hostile);
+	await expect(page.locator('#report-content')).toContainText('not available: needs SELECT');
+	await expect(page.locator('#report-content img, #report-content script')).toHaveCount(0);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('exports visible conversation and trace as Markdown with unverified note', async ({ page }) => {
+	await ready(page); await ask(page);
+	await expect(page.locator('#status')).toHaveText('Answer complete.');
+	await expect(page.locator('.unverified')).toHaveText('Unverified: UNSUPPORTED_TABLE');
+	const pending = page.waitForEvent('download'); await page.locator('#export').click();
+	const download = await pending;
+	expect(download.suggestedFilename()).toMatch(/^piagent-conversation-.*\.md$/);
+	const stream = await download.createReadStream(); const chunks = [];
+	for await (const chunk of stream!) chunks.push(chunk);
+	const text = Buffer.concat(chunks).toString();
+	expect(text).toContain('Final answer'); expect(text).toContain('UNSUPPORTED_TABLE'); expect(text).toContain('run_query');
+	expect(text).not.toContain(new URL(tokenUrl()).hash.slice(7));
+	expect(text).not.toMatch(/never-export-bind|never-export-sql|HARNESS_|1522|1523/);
+});

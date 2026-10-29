@@ -8,7 +8,7 @@ import { createOracleAgent } from "../agent/index.js";
 import { JsonlAuditSink } from "../audit/index.js";
 import type { AppConfig, ToolContext } from "../contracts.js";
 
-export type WebAgent = Pick<Agent, "prompt" | "subscribe" | "abort" | "waitForIdle" | "state">;
+export type WebAgent = Pick<Agent, "prompt" | "subscribe" | "abort" | "waitForIdle" | "state"> & { readonly unverified?: string[] };
 export interface Conversation {
 	id: string;
 	runId: string;
@@ -117,7 +117,7 @@ export async function ask(entry: Conversation, question: string, emit: (event: S
 	const offset = entry.agent.state.messages.length;
 	const unsubscribe = entry.agent.subscribe((event: AgentEvent) => {
 		if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") emit("text", { delta: event.assistantMessageEvent.delta });
-		if (event.type === "tool_execution_start") emit("tool_start", { name: event.toolName, args: JSON.stringify(event.args).slice(0, 300) });
+		if (event.type === "tool_execution_start") emit("tool_start", { name: event.toolName, args: JSON.stringify(Object.fromEntries(Object.entries(event.args ?? {}).filter(([key, value]) => ["target", "owner", "name", "type", "limit", "sql_id"].includes(key) && ["string", "number", "boolean"].includes(typeof value)))).slice(0, 300) });
 		if (event.type === "tool_execution_end") emit("tool_end", { name: event.toolName, isError: event.isError, error: event.isError ? "Tool execution failed" : undefined, resultBytes: Buffer.byteLength(JSON.stringify(event.result)) });
 	});
 	try {
@@ -125,6 +125,6 @@ export async function ask(entry: Conversation, question: string, emit: (event: S
 		if (entry.agent.state.errorMessage) throw new Error("Agent failed");
 		const replies = entry.agent.state.messages.slice(offset).filter(m => m.role === "assistant");
 		const answer = replies.at(-1)?.content.filter(c => c.type === "text").map(c => c.text).join("") ?? "";
-		emit("done", { answer, usage: replies.map(m => m.usage) });
+		emit("done", { answer, unverified: entry.agent.unverified ?? [], usage: replies.map(m => m.usage) });
 	} finally { unsubscribe(); }
 }
