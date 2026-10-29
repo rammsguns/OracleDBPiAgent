@@ -495,7 +495,7 @@ and there is no evidence for a fixed temperature or seed, so gates keep the 4×4
 alternating method. `evals/compare.ts` reports paired per-case differences with
 a bootstrap 95% interval. Evidence is in docs/evals-hard.md.
 
-## Web UI browser tests (2026-10-29)
+## Web UI browser tests (2026-10-29; merged)
 
 The owner approved `@playwright/test` as a dev-only dependency on 2026-10-29.
 
@@ -516,6 +516,11 @@ bug, and each one is reported.
 - `npm test` and `npm run test:integration` stay unchanged and must not pick up
   the browser tests.
 Review: antigravity. Merge and push on APPROVE, if `npm run test:browser` passes.
+
+Result: merged after Antigravity APPROVE. `npm run test:browser` covers 9
+fake-agent tests (Playwright 1.64.1, Chromium) plus the opt-in live test, which
+passed once against d1. The tests found and fixed one real bug: the target
+picker overflowed at phone width (`select { min-width: 0; max-width: 100%; }`).
 
 ## MVP exit criteria
 
