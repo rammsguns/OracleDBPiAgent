@@ -58,7 +58,7 @@
 		"id": "hard-lines-plan",
 		"target": "p1-19c-prod",
 		"category": "cached-plan",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"[0-9a-z]{13}",

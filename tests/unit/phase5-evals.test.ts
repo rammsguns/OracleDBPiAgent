@@ -5,10 +5,10 @@ import { score } from '../../evals/scoring.js';
 const counts = { 'numeric-precision': 2, 'unit-conversion': 2, 'name-fidelity': 1, 'refusal-follow-ups': 2, 'grant-limited-p1': 1 };
 
 it('adds exactly the specified category counts in each split, with truth for factual cases', async () => {
-	const cases = (await loadHardCases()).filter(test => test.category in counts);
+	const cases = (await loadHardCases()).filter(test => test.category in counts && !test.id.startsWith('hard-p8-'));
 	expect(cases).toHaveLength(16);
 	for (const [category, count] of Object.entries(counts)) {
-		for (const split of ['dev', 'holdout']) expect(cases.filter(test => test.category === category && test.split === split)).toHaveLength(count);
+		for (const split of ['dev', 'regression']) expect(cases.filter(test => test.category === category && test.split === split)).toHaveLength(count);
 	}
 	for (const test of cases) {
 		expect(test.expect.requiredFacts.length > 0 || test.expect.mustRefuse, test.id).toBe(true);

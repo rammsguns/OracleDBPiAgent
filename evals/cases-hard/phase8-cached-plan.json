@@ -1,0 +1,25 @@
+[
+	{
+		"id": "hard-p8-jobs-plan",
+		"target": "d1-19c-lab",
+		"category": "cached-plan",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(?:estimate|estimated|cost)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1, find the cached SELECT that projects JOB_ID and MAX_SALARY from HR.JOBS with MAX_SALARY>12000. Discover its SQL_ID and child number, choosing the lowest SQL_ID then lowest child if several match. Read that child's cached plan and report object names and access operations, distinguishing estimated cost from measured execution time. Do not execute the discovered statement or run EXPLAIN PLAN; if absent, report that the cursor aged out.",
+		"groundTruth": {
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE command_type=3 AND UPPER(sql_text)='SELECT JOB_ID,MAX_SALARY FROM HR.JOBS WHERE MAX_SALARY>12000' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='HR' ORDER BY p.operation,p.options,p.object_name",
+			"mode": "allCells",
+			"setupSql": "SELECT job_id,max_salary FROM hr.jobs WHERE max_salary>12000"
+		}
+	}
+]

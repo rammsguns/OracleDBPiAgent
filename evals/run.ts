@@ -8,7 +8,7 @@ import type { EvalCase } from './types.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export interface RunOptions { suite: string; split?: 'dev' | 'holdout'; repeat: number; ids: string[] }
+export interface RunOptions { suite: string; split?: 'dev' | 'holdout' | 'regression'; repeat: number; ids: string[] }
 export function parseArgs(args: string[]): RunOptions {
 	const options: RunOptions = { suite: 'evals/cases', repeat: 1, ids: [] };
 	for (let i = 0; i < args.length; i++) {
@@ -18,7 +18,7 @@ export function parseArgs(args: string[]): RunOptions {
 			if (!value || value.startsWith('--')) throw new Error(`Missing value for ${arg}`);
 			if (arg === '--suite') options.suite = value;
 			if (arg === '--split') {
-				if (value !== 'dev' && value !== 'holdout') throw new Error('Split must be dev or holdout');
+				if (value !== 'dev' && value !== 'holdout' && value !== 'regression') throw new Error('Split must be dev, holdout or regression');
 				options.split = value;
 			}
 			if (arg === '--repeat') {

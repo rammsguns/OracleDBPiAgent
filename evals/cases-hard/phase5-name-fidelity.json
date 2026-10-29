@@ -27,7 +27,7 @@
 		"id": "hard-name-missing-archive",
 		"target": "d1-19c-lab",
 		"category": "name-fidelity",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"does not exist"

@@ -49,7 +49,7 @@
 		"id": "hard-sh-fks",
 		"target": "d1-19c-lab",
 		"category": "relationships",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"CUSTOMERS",

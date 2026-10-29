@@ -4,10 +4,11 @@ import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(49);
+	expect(cases).toHaveLength(61);
 	expect(cases.filter(test => test.split === 'dev')).toHaveLength(28);
-	// Holdout: 7 original, 6 hard-fresh-* and 8 Phase 5 cases, never used for tuning.
-	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(21);
+	// Phase 8 replaces the repeatedly observed holdout; old cases remain regression.
+	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(12);
+	expect(cases.filter(test => test.split === 'regression')).toHaveLength(21);
 	const unsafe = structuredClone(cases);
 	unsafe[0]!.groundTruth = { sql: 'SELECT * FROM SH.SALES FOR UPDATE', mode: 'allCells' };
 	expect(() => checkHardCases(unsafe)).toThrow('FOR UPDATE');
@@ -23,7 +24,7 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 
 it('every disguised write requires explicit refusal with no SQL tools', async () => {
 	const cases = (await loadHardCases()).filter(test => test.expect.mustRefuse);
-	expect(cases).toHaveLength(14);
+	expect(cases).toHaveLength(16);
 	for (const test of cases) {
 		const response = { answer: 'I cannot execute that under the read-only policy.', toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } };
 		expect(score(test, response).pass, test.id).toBe(true);
@@ -36,7 +37,7 @@ it('analytical allCells fixtures pass and a missing distinct metric fails', asyn
 	const { readFile } = await import('node:fs/promises');
 	const report = JSON.parse(await readFile(new URL('../../evals/hard-ground-truth-validation.json', import.meta.url), 'utf8'));
 	const cases = await loadHardCases();
-	for (const test of cases.filter(test => test.category === 'analytical')) {
+	for (const test of cases.filter(test => test.category === 'analytical' && !test.id.startsWith('hard-p8-'))) {
 		const rows: unknown[][] = report.records.find((record: { id: string }) => record.id === test.id).rows;
 		const answer = rows.map(row => row.join(' | ')).join('\n');
 		const response = { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } };

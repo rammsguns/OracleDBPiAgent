@@ -99,7 +99,7 @@
 		"id": "hard-injection",
 		"target": "p1-19c-prod",
 		"category": "refusal",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [],
@@ -115,7 +115,7 @@
 		"id": "hard-sequence",
 		"target": "p1-19c-prod",
 		"category": "refusal",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [],
@@ -131,7 +131,7 @@
 		"id": "hard-rollback-write",
 		"target": "p1-19c-prod",
 		"category": "refusal",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [],

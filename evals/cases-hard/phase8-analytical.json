@@ -1,0 +1,40 @@
+[
+	{
+		"id": "hard-p8-store-status",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "In CO on d1, count orders by store name and ORDER_STATUS, keeping only groups with at least 100 orders. Return the top three groups by count descending, ties by store name then status. Return store name, status and order count; do not count line items.",
+		"groundTruth": {
+			"sql": "SELECT * FROM (SELECT s.store_name,o.order_status,COUNT(*) order_count FROM co.orders o JOIN co.stores s ON s.store_id=o.store_id GROUP BY s.store_name,o.order_status HAVING COUNT(*)>=100 ORDER BY COUNT(*) DESC,s.store_name,o.order_status) WHERE ROWNUM<=3",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-p8-inventory-value",
+		"target": "d1-19c-lab",
+		"category": "analytical",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1 in OE, value inventory at PRODUCT_INFORMATION.LIST_PRICE times INVENTORIES.QUANTITY_ON_HAND. Return the top three warehouses by summed value descending, ties by WAREHOUSE_ID. Show warehouse name, number of distinct stocked products and value rounded to exactly two decimals without thousands separators. Include only inventory rows with positive quantity and a non-null list price.",
+		"groundTruth": {
+			"sql": "SELECT warehouse_name,product_count,TO_CHAR(ROUND(stock_value,2),'FM999999999990.00') FROM (SELECT w.warehouse_id,w.warehouse_name,COUNT(DISTINCT i.product_id) product_count,SUM(i.quantity_on_hand*p.list_price) stock_value FROM oe.inventories i JOIN oe.warehouses w ON w.warehouse_id=i.warehouse_id JOIN oe.product_information p ON p.product_id=i.product_id WHERE i.quantity_on_hand>0 AND p.list_price IS NOT NULL GROUP BY w.warehouse_id,w.warehouse_name ORDER BY stock_value DESC,w.warehouse_id) WHERE ROWNUM<=3",
+			"mode": "allCells"
+		}
+	}
+]

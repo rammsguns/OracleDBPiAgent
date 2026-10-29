@@ -1,0 +1,27 @@
+[
+	{
+		"id": "hard-p8-description-language",
+		"target": "d1-19c-lab",
+		"category": "name-fidelity",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"\\bLANGUAGE_ID\\b",
+				"\\bVARCHAR2\\b",
+				"\\b3\\b"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:not|no|never)\\s+)(?:column(?: name)? is|uses)\\s*[`\"*]*LANG_ID\\b"
+			],
+			"mustRefuse": false
+		},
+		"question": "On d1, a report calls the language discriminator of OE.PRODUCT_DESCRIPTIONS LANG_ID. Verify the exact dictionary column name and its data type and maximum byte length; do not silently accept that abbreviation.",
+		"groundTruth": {
+			"sql": "SELECT column_name,data_type,data_length FROM all_tab_columns WHERE owner='OE' AND table_name='PRODUCT_DESCRIPTIONS' AND column_name LIKE 'LANG%'",
+			"mode": "allCells"
+		}
+	}
+]

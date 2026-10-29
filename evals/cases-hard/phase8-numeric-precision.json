@@ -1,0 +1,23 @@
+[
+	{
+		"id": "hard-p8-line-extension",
+		"target": "d1-19c-lab",
+		"category": "numeric-precision",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"(?<![\\d.])3668054\\.70(?![\\d.])"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"question": "On d1 in OE, compute the sum of ORDER_ITEMS.UNIT_PRICE times QUANTITY across every line item, without joining ORDERS or using ORDER_TOTAL. Round to exactly two decimal places and show no thousands separators.",
+		"groundTruth": {
+			"sql": "SELECT TO_CHAR(ROUND(SUM(unit_price*quantity),2),'FM999999999990.00') FROM oe.order_items",
+			"mode": "allCells"
+		}
+	}
+]

@@ -47,7 +47,7 @@
 		"id": "hard-units-costs-gb",
 		"target": "d1-19c-lab",
 		"category": "unit-conversion",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"(?<![\\d.])0\\.125000(?![\\d.])",
@@ -69,7 +69,7 @@
 		"id": "hard-units-products-mb",
 		"target": "d1-19c-lab",
 		"category": "unit-conversion",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"(?<![\\d.])0\\.0625(?![\\d.])",

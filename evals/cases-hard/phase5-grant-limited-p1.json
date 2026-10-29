@@ -29,7 +29,7 @@
 		"id": "hard-grant-p1-backups",
 		"target": "p1-19c-prod",
 		"category": "grant-limited-p1",
-		"split": "holdout",
+		"split": "regression",
 		"expect": {
 			"requiredFacts": [
 				"V(?:_)?\\$RMAN_BACKUP_JOB_DETAILS",
