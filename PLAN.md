@@ -739,6 +739,20 @@ cron; this repo adds no scheduler or daemon.
   - An integration run on both targets: two runs back to back give an empty or
     near-empty diff.
   - Antigravity review, and a live check.
+- **Result (2026-10-29): merged** (83c47c2). The Antigravity review approved:
+  path safety, symlinks, file modes, atomic writes, the diff rules, and exit
+  codes. Live check on both targets:
+  - A plain report is unchanged, and back-to-back `--diff-only` runs print
+    "No changes." with exit code 0.
+  - Target `../etc` is rejected (exit 1).
+  - Files are 0600 and directories 0700, and `--json --diff` adds `diff`.
+  - No secrets in saved files. The only match for "password" was the
+    parameter name `remote_login_passwordfile`.
+  Exit code 3 for changes is covered by unit tests, but nothing changed
+  between live runs. A backup counts as recent if it completed within 24
+  hours. Documented limits: concurrent writers, and runs with a different
+  `--owner`. The worker ran the existing LLM end-to-end test once by mistake;
+  it was a single call, with Strata otherwise idle.
 
 ### WP-4B: web last change view
 - The Report tab shows "Changes since last saved run" for the selected target,
