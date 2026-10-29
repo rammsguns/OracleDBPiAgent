@@ -464,7 +464,7 @@ WP-Z (`wp-z-docs-refresh`, codex) owns README.md, docs/mvp-status.md and a new
 docs/README.md index. It changes no code. Review: antigravity checks the docs
 against the code and PLAN.md. Merge and push on APPROVE.
 
-## Eval reliability (2026-10-29)
+## Eval reliability (2026-10-29; merged)
 
 Goal: make A/B gates cheaper and more trustworthy. Two problems:
 - Ground-truth misses: the master baseline failed `hard-sh-fks` ("fresh ground
@@ -486,6 +486,14 @@ scoring of a check proven brittle, with the evidence in the docs.
    or an optional fixed eval temperature/seed if Strata honours it.
    Verify with at most 4 sequential eval runs.
 Review: antigravity. Merge and push on APPROVE, if the unit tests pass.
+
+Result: both baseline misses were real agent errors, not scorer bugs (it
+invented `PROMO` for `PROMOTIONS`, and transposed 3,313,394.74 to
+3,331,394.74). Token CV between runs of the same code is about 4.4%; five cases
+give 86% of the variance. Pairing by case narrows the interval only about 6%,
+and there is no evidence for a fixed temperature or seed, so gates keep the 4×4
+alternating method. `evals/compare.ts` reports paired per-case differences with
+a bootstrap 95% interval. Evidence is in docs/evals-hard.md.
 
 ## MVP exit criteria
 
