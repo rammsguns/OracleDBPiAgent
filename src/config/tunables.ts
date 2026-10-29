@@ -2,6 +2,7 @@ import { openSync, readSync, closeSync, fstatSync } from 'node:fs';
 import type { AppConfig, LlmConfig } from '../contracts.js';
 
 export interface HarnessTunables {
+	groundingCheck?: boolean;
 	temperature?: number;
 	reasoningBudgetTokens?: number;
 	promptAppendix?: string;
@@ -27,6 +28,10 @@ export function readBoundedFile(path: string): Buffer {
 }
 export function loadTunables(env: NodeJS.ProcessEnv): HarnessTunables {
 	const result: HarnessTunables = {};
+	if (env.PIAGENT_GROUNDING_CHECK !== undefined) {
+		if (!['0', '1'].includes(env.PIAGENT_GROUNDING_CHECK)) throw new Error('Invalid PIAGENT_GROUNDING_CHECK');
+		result.groundingCheck = env.PIAGENT_GROUNDING_CHECK === '1';
+	}
 	if (env.PIAGENT_LLM_REASONING_BUDGET !== undefined) {
 		const raw = env.PIAGENT_LLM_REASONING_BUDGET;
 		const n = Number(raw);

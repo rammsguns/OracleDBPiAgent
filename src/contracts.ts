@@ -122,6 +122,7 @@ export interface SessionProvider {
 // Audit (WP-A implements a JSONL sink in src/audit/)
 
 export interface AuditEvent {
+	unverifiedCount?: number;
 	at: string; // ISO timestamp
 	runId: string;
 	kind: "run_start" | "tool_call" | "tool_blocked" | "tool_error" | "run_end";

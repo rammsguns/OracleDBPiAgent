@@ -96,7 +96,7 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {
 				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
+				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], toolResultTexts: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 			}
 			const record = records.at(-1)!;
 			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
