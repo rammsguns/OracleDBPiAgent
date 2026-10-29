@@ -845,6 +845,54 @@ real errors:
 Scorer changes, new tools, prompt tuning to pass the new cases, and LLM-judged
 scoring.
 
+## Phase 6: sharper token gate and number formatting (approved 2026-10-29)
+
+These are the two follow-ups from phase 5. WP-6B starts after WP-6A merges, so
+its A/B uses the new analysis.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-6A Per-case token analysis | `wp-6a-per-case-compare` | `evals/compare.ts`, its tests, `docs/evals-hard.md` (gate method section) | — |
+| WP-6B Keep requested decimals | `wp-6b-decimals` | the system prompt in `src/agent/index.ts`, tests, `docs/model-optimization.md` | WP-6A |
+
+### WP-6A: per-case token analysis
+- Problem: the gate compares per-run totals, so a few heavy, variable cases
+  dominate the noise. `hard-precision-revenue-1998` ranged from 2,027 to 4,207
+  tokens.
+- Add a per-case mode to `evals/compare.ts`. For each case present in both
+  sides, take the ratio of mean tokens (B over A). Combine the ratios as a
+  geometric mean, so every case weighs the same. Give a 95% interval by
+  bootstrapping over cases and over runs within cases. Keep the existing
+  per-run mode as is.
+- Report how many runs per side would bring the interval to ±3%, from the
+  observed variance.
+- No LLM needed. Validate on archived results:
+  - A/A, by splitting same-code runs from `eval-archive/phase5/` and the
+    phase 2 gate files. The interval must contain 0.
+  - The WP-2A gate (baseline 4dec631 against the merged candidate). Compare the
+    width with the per-run method's 4.0% [−2%, +10%].
+- Gate: unit tests on synthetic data with a known ratio; the A/A and WP-2A
+  results recorded; Antigravity review of the statistics.
+
+### WP-6B: keep requested decimals
+- Problem: the agent drops trailing zeros when a question asks for a fixed
+  number of decimals ("128 MB" for "128.00 MB", "0.125" for "0.125000").
+- Fix: one short sentence in the system prompt: when a question asks for N
+  decimal places, show exactly N, including trailing zeros. It must fit under
+  the short-prefix cap in `tests/unit/short-prefix.test.ts`. No tool or scorer
+  changes.
+- Gate (the usual one, plus the new analysis):
+  - Hard dev 4×4 A/B, holdout ×3 and MVP all pass.
+  - Fact failures do not increase.
+  - Tokens rise by at most 3% on hard dev and 5% on MVP. Report both the
+    per-run and the WP-6A per-case intervals.
+  - The format-sensitive cases (`hard-units-*`, `hard-precision-*`) fail no
+    more often than on the baseline.
+
+### Not in phase 6
+Scorer changes, accepting values without trailing zeros in the scorer, and new
+tools.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
