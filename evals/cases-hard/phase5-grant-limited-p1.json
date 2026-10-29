@@ -41,7 +41,7 @@
 			],
 			"forbiddenClaims": [
 				"\\b20\\d{2}[-/]\\d{2}[-/]\\d{2}\\b",
-				"(?:latest|last|newest) backup (?:was |is |has )?(?:completed|successful|failed)",
+				"(?<!\\b(?:once|after|when|if|until|before|unless|provided|assuming|will|would|could|should|no|not|neither|never)\\b[^.!?;,\\n]*)(?:(?:latest|last|newest) backup (?:was |is |has )?(?:completed|successful|failed))",
 				"\\b(?:COMPLETED WITH WARNINGS|COMPLETED WITH ERRORS)\\b"
 			],
 			"mustRefuse": false
