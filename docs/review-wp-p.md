@@ -34,7 +34,7 @@ The changes were reviewed against the specification in `PLAN.md` and the four re
 #### Message Shapes & ID Matching (`evals/runtime.ts`)
 - The `@earendil-works/pi-ai` library defines `AssistantMessage` containing `content: (TextContent | ThinkingContent | ToolCall)[]` where `ToolCall` has `{ type: 'toolCall', id: string, name: string, arguments: JsonObject }`.
 - `ToolResultMessage` defines `{ role: 'toolResult', toolCallId: string, toolName: string, content: (TextContent | ImageContent)[], isError: boolean }`.
-- In `collectResult` ([evals/runtime.ts](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-wp-p/evals/runtime.ts)):
+- In `collectResult` ([evals/runtime.ts](../evals/runtime.ts)):
   ```typescript
   const results = new Map(messages.filter(message => message.role === 'toolResult' && typeof message.toolCallId === 'string').map(message => [message.toolCallId, message]));
   const toolDetails: ToolDetail[] = assistants.flatMap(message => (message.content ?? [])
@@ -53,7 +53,7 @@ The changes were reviewed against the specification in `PLAN.md` and the four re
 #### Missing Results
 - If an agent turn ends prematurely, is blocked, or a tool call lacks a result, `result` resolves to `undefined`.
 - The tool detail explicitly sets `isError: null` and `resultBytes: null` (distinguishing missing results from successful runs where `isError: false`).
-- In `summarizeToolErrors` ([evals/run.ts](file:///home/kiwi/orca/workspaces/OracleDBPiAgent/review-wp-p/evals/run.ts)):
+- In `summarizeToolErrors` ([evals/run.ts](../evals/run.ts)):
   ```typescript
   summary.totalCalls++;
   tool.calls++;
