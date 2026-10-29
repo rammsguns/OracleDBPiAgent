@@ -96,7 +96,7 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 			} catch {
 				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
+				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 			}
 			const record = records.at(-1)!;
 			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
@@ -112,7 +112,7 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
 	const toolErrors = summarizeToolErrors(records);
 	const requestUsage = summarizeRequestUsage(records);
-	const report = { ...options, toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+	const report = { ...options, groundingCorrections: records.reduce((n, r) => n + (r.groundingCorrections ?? 0), 0), toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 	await mkdir('evals/results', { recursive: true });
 	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
 	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');

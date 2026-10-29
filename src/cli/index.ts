@@ -119,7 +119,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				const replies = agent.state.messages.slice(offset).filter(m => m.role === "assistant");
 				const last = replies.at(-1);
 				const answer = last?.content.filter(c => c.type === "text").map(c => c.text).join("") ?? "";
-				if (options.json) console.log(JSON.stringify({ answer, toolCalls, usage: replies.map(m => m.usage) }));
+				if (options.json) console.log(JSON.stringify({ answer, toolCalls, unverified: agent.unverified, usage: replies.map(m => m.usage) }));
 				else process.stdout.write("\n");
 			};
 			if (question !== undefined) await ask(question);

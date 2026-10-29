@@ -7,7 +7,7 @@ export class JsonlAuditSink implements AuditSink {
 	private pending: Promise<void> = Promise.resolve();
 	constructor(readonly file: string) {}
 	record(event: AuditEvent): Promise<void> {
-		const safe = Object.fromEntries(["at", "runId", "kind", "target", "tool", "sqlSha256", "rows", "truncated", "elapsedMs"].filter(key => event[key as keyof AuditEvent] !== undefined).map(key => [key, event[key as keyof AuditEvent]]));
+		const safe = Object.fromEntries(["at", "runId", "kind", "target", "tool", "sqlSha256", "rows", "truncated", "elapsedMs", "unverifiedCount"].filter(key => event[key as keyof AuditEvent] !== undefined).map(key => [key, event[key as keyof AuditEvent]]));
 		// Deliberately omit free-form detail and SQL text: SQL literals can contain secrets.
 		const next = this.pending.then(async () => {
 			await mkdir(dirname(this.file), { recursive: true, mode: 0o700 });

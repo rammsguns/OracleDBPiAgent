@@ -3,11 +3,16 @@ import { dirname, resolve } from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
 import type { AppConfig, AuditSink, SessionProvider, ToolContext, Limits } from '../src/contracts.js';
 import type { AskResult } from './types.js';
+import { truncateUtf8 } from '../src/agent/index.js';
 
 // Eval-local adapter keeps cached usage out of the shared product contracts.
 export interface CachedAskResult extends AskResult {
 	usage: AskResult['usage'] & { cached: number };
 	toolDetails: ToolDetail[];
+	/** Text only, at most 4096 UTF-8 bytes per tool result; no arguments/details. */
+	toolResultTexts: string[];
+	groundingCorrections: number;
+	unverified?: string[];
 	requests: RequestUsage[];
 }
 
@@ -81,8 +86,8 @@ export async function runtime() {
 	const audit: AuditSink = { record: async event => {
 		await mkdir(dirname(config.auditFile), { recursive: true });
 		// Deliberately omit detail and SQL text: no bind values or credentials.
-		const { at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs } = event;
-		await appendFile(config.auditFile, JSON.stringify({ at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs }) + '\n');
+		const { at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs, unverifiedCount } = event;
+		await appendFile(config.auditFile, JSON.stringify({ at, runId, kind, target, tool, sqlSha256, rows, truncated, elapsedMs, unverifiedCount }) + '\n');
 	} };
 	return { config, sessions, async ask(question: string | string[], target: string, limits: Partial<Limits> = {}): Promise<CachedAskResult> {
 		const events: string[] = [];
@@ -99,7 +104,7 @@ export async function runtime() {
 		const agent = await agentModule.createOracleAgent({ ...ctx, tools });
 		try {
 			await promptTurns(agent, question);
-			return collectResult(agent.state.messages, events);
+			return { ...collectResult(agent.state.messages, events), unverified: agent.unverified ?? [] };
 		} finally { await agent.dispose?.(); }
 	} };
 }
@@ -140,7 +145,10 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 				...(result?.isError ? { error: text.split(/\r?\n/)[0]!.slice(0, 200) } : {}),
 				resultBytes: result ? Buffer.byteLength(text, 'utf8') : null };
 		}));
-	return { answer, toolDetails, requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
+	const groundingCorrections = messages.filter(message => message.role === 'user' && typeof message.content === 'string'
+		&& (message.content.startsWith("These numbers do not appear in this conversation's tool results: ") || message.content.startsWith("These values do not appear in this conversation's tool results: "))
+		&& (message.content.endsWith('. Correct or remove them; use tools only if needed.') || message.content.includes('only fix or remove the listed numbers'))).length;
+	return { answer, toolDetails, groundingCorrections, toolResultTexts: messages.filter(message => message.role === 'toolResult').map(message => truncateUtf8((message.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n'), 4096)), requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 
