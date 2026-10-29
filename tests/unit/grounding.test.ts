@@ -123,3 +123,32 @@ it('persists only the residual count in the allowlisted audit event', async () =
 		expect(JSON.parse(text)).toEqual({ at: 'now', runId: 'test', kind: 'run_end', unverifiedCount: 2 });
 	} finally { await rm(dir, { recursive: true }); }
 });
+it('counts correction follow-ups separately from ordinary questions in eval records', () => {
+	expect(collectResult([
+		{ role: 'user', content: 'What is the total?' },
+		{ role: 'assistant', content: [{ type: 'text', text: 'PROMO' }] },
+		{ role: 'user', content: "These values do not appear in this conversation's tool results: PROMO. Correct or remove them; use tools only if needed." },
+		{ role: 'assistant', content: [{ type: 'text', text: 'PROMOTIONS' }] },
+	]).groundingCorrections).toBe(1);
+	expect(collectResult([]).groundingCorrections).toBe(0);
+});
+it.each([
+	['9007199254740993', '9007199254740992'],
+	['1.2345678901234567', '1.2345678901234568'],
+	['12345678901234567890123456789012345678', '12345678901234567890123456789012345679'],
+])('does not certify digits lost by JavaScript floating point: %s', (answer, evidence) => {
+	expect(checkFacts(answer, [evidence]).unsupported).toEqual([answer]);
+});
+it.each([
+	['9007199254740993', '9007199254740992.6'],
+	['1.2345678901234567', '1.23456789012345671'],
+	['12345678901234567890123456789012345678', '12345678901234567890123456789012345678'],
+])('supports precise Oracle decimals and rounding: %s', (answer, evidence) => {
+	expect(checkFacts(answer, [evidence]).unsupported).toEqual([]);
+});
+it('handles adversarial exponent lengths without allocating huge integers or throwing', () => {
+	const exponent = '9'.repeat(400);
+	const literal = '1.234e-' + exponent;
+	expect(checkFacts(literal, [literal]).unsupported).toEqual([]);
+	expect(checkFacts(literal, ['2.345e-' + exponent]).unsupported).toEqual([literal]);
+});

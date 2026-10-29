@@ -2,7 +2,7 @@
  * Question text is an optional third argument so callers can exempt user-supplied facts.
  */
 export interface FactCheck { facts: string[]; unsupported: string[] }
-interface Numeric { text: string; value: number; precision: number; unit: string; start: number; end: number }
+interface Numeric { text: string; value: number; precision: number; coefficient: bigint; exponent: number; unit: string; start: number; end: number }
 const numberPattern = /(?<![\w$.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:[KMGT]i?B|[KMGT]|bytes|%))?(?![\w]|\.\d|,\d)/gi;
 const identifierPattern = /(?<![\w])(?:[A-Za-z_$#][\w$#]*)(?:\.[A-Za-z_$#][\w$#]*)*/g;
 const constants = new Set(('SQL SQL_ID ID DBA DB DML DDL PL SQL SELECT FROM WHERE JOIN ON AS AND OR NOT NULL WITH BY GROUP ORDER HAVING DESC ASC UNION ALL DISTINCT CASE WHEN THEN ELSE END IN IS LIKE EXISTS COUNT SUM AVG MIN MAX ROUND OVER PARTITION ROWS FETCH FIRST ONLY OFFSET LIMIT INSERT UPDATE DELETE MERGE DROP CREATE ALTER TABLE VIEW INDEX COMMIT ROLLBACK EXPLAIN PLAN FOR NEXTVAL SYS SYSTEM DBMS_ UTL_ KB MB GB TB KIB MIB GIB TIB CPU SGA PGA IO IOPS TEMP UNDO RMAN ASH AWR ORA JSON CSV UTC GMT TRUE FALSE N A OK PK FK UK Y N READ CTAS LIST_TARGETS DB_OVERVIEW LIST_SCHEMAS LIST_OBJECTS DESCRIBE_OBJECT GET_SOURCE RUN_QUERY EXPLAIN_PLAN TOP_SQL SESSION_ACTIVITY WAIT_EVENTS TABLESPACE_USAGE ROW_NUMBER DENSE_RANK RANK TO_CHAR TO_DATE TRUNC NVL NULLIF COALESCE PRIMARY KEY NO ACTION DBWR LGWR OLTP TX TM AE FIRST_ROWS FM DBA_ R C P U V O V$SQL V$SQLSTATS V$SQL_PLAN V$SQL_PLAN_MONITOR V$SESSION V$LOCK V$ACTIVE_SESSION_HISTORY DBA_HIST_ACTIVE_SESS_HISTORY ALL_CONSTRAINTS ALL_CONS_COLUMNS ALL_INDEXES ALL_IND_COLUMNS ALL_TAB_COLUMNS ALL_TABLES ALL_OBJECTS ALL_USERS ALL_SYNONYMS EXECUTIONS ELAPSED_TIME BUFFER_GETS CPU_TIME BLOCKING_SESSION R_OWNER R_CONSTRAINT_NAME').split(' '));
@@ -15,7 +15,8 @@ function numbers(text: string): Numeric[] {
 		const [mantissa, exponent] = literal.toLowerCase().split('e');
 		const value = Number(literal);
 		if (!Number.isFinite(value)) return [];
-		return [{ text: raw, value, precision: 10 ** (Number(exponent ?? 0) - (mantissa!.split('.')[1]?.length ?? 0)), unit: (parts[2] ?? '').toUpperCase(), start: match.index!, end: match.index! + raw.length }];
+		const decimalExponent = Number(exponent ?? 0) - (mantissa!.split('.')[1]?.length ?? 0);
+		return [{ text: raw, value, coefficient: BigInt(mantissa!.replace('.', '')), exponent: decimalExponent, precision: 10 ** decimalExponent, unit: (parts[2] ?? '').toUpperCase(), start: match.index!, end: match.index! + raw.length }];
 	});
 }
 function scales(unit: string): number[] {
@@ -25,7 +26,21 @@ function scales(unit: string): number[] {
 	return unit.includes('I') ? [1024 ** exponent] : [1024 ** exponent, 1000 ** exponent];
 }
 function rounded(actual: number, shown: Numeric): boolean {
+	// Ratios use doubles; do not let floating-point uncertainty certify fine digits.
+	if (shown.precision <= Math.max(Math.abs(actual), Math.abs(shown.value)) * Number.EPSILON * 8) return false;
 	return Math.abs(actual - shown.value) < shown.precision / 2 + Math.max(Math.abs(actual), Math.abs(shown.value), 1) * Number.EPSILON * 8;
+}
+// Compare decimal values at the displayed precision without losing Oracle NUMBER digits.
+function exactRounded(value: Numeric, shown: Numeric, sourceScale = 1, displayScale = 1): boolean {
+	if (!Number.isFinite(value.exponent) || !Number.isFinite(shown.exponent)) return norm(value.text) === norm(shown.text) && sourceScale === displayScale;
+	const common = Math.min(value.exponent, shown.exponent);
+	const sourcePower = value.exponent - common, displayPower = shown.exponent - common;
+	// Oracle NUMBER exponents are bounded; avoid huge allocations on arbitrary prose.
+	if (sourcePower > 1000 || displayPower > 1000) return false;
+	const source = value.coefficient * BigInt(sourceScale) * 10n ** BigInt(sourcePower);
+	const displayQuantum = BigInt(displayScale) * 10n ** BigInt(displayPower);
+	const delta = source - shown.coefficient * displayQuantum;
+	return (delta < 0n ? -delta : delta) * 2n <= displayQuantum;
 }
 // Find a numerator near each denominator's required value, without an O(n²) scan.
 function ratioSupported(shown: Numeric, values: readonly number[], multiplier: number): boolean {
@@ -58,7 +73,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 			const cells = line.split('|');
 			headers.forEach((header, i) => {
 				if (!/(?:_MICRO|_MICROSECONDS)$/.test(header) || !cells[i]) return;
-				for (const value of numbers(cells[i]!)) values.push({ ...value, value: value.value / 1e6 });
+				for (const value of numbers(cells[i]!)) values.push({ ...value, value: value.value / 1e6, exponent: value.exponent - 6 });
 			});
 		}
 	}
@@ -101,8 +116,8 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		// Avoid treating digits inside quoted identifiers or SQL_IDs as quantities.
 		if (quoted.some(q => shown.start >= q.index! && shown.end <= q.index! + q[0].length)) continue;
 		const supported = values.some(value => {
-			if (shown.unit === '%' || value.unit === '%') return shown.unit === '%' && (!value.unit || value.unit === '%') && rounded(value.value, shown);
-			return scales(shown.unit).some(scale => scales(value.unit).some(source => rounded(value.value * source / scale, shown)));
+			if (shown.unit === '%' || value.unit === '%') return shown.unit === '%' && (!value.unit || value.unit === '%') && exactRounded(value, shown);
+			return scales(shown.unit).some(scale => scales(value.unit).some(source => exactRounded(value, shown, source, scale)));
 		}) || ((shown.unit === '%' || !shown.unit) && ratioSupported(shown, ratioValues, shown.unit === '%' ? 100 : 1));
 		add(shown.text, supported);
 	}

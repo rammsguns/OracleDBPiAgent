@@ -9,6 +9,9 @@ It checks quoted identifiers, uppercase Oracle identifiers, SQL IDs, and numbers
 at least four significant digits. Identifier matching uses case-insensitive whole
 names, with owner and object components accepted when tools show them separately.
 Numeric matching removes thousands separators and rounds to the displayed precision.
+Direct numeric comparisons use exact decimal coefficients, retaining Oracle NUMBER
+digits beyond JavaScript floating-point precision. Derived ratios use floating point
+and conservatively refuse to certify precision below its numeric resolution.
 Byte conversions accept both decimal and binary KB/MB/GB/TB (explicit KiB etc. use
 binary only). Percentages can match directly or be derived from two tool values.
 SQL vocabulary, units, years and Oracle 19c are exempt. An explicit list of standard
@@ -42,7 +45,7 @@ grants. It remains flagged. This metric is flags on scorer-passing answers, not
 an independent proof that every flag is false.
 
 The detector was frozen before holdout measurement at SHA-256
-`5f6784d5dcb0f125e1411e6953a8c2f8a3e8b7a7d38f72470daeb5c9db7d1003`.
+`5ce216024241dabcc1e5aaa3ca3f926be88b77b80f99c2386261d8e2bb1a651f`.
 No failed dev answers were observed, so measured true-positive rate is unavailable.
 The two known real misses are both caught by exact regression fixtures: `PROMO`
 versus `PROMOTIONS`, and `3,331,394.74` versus `3,313,394.74`.

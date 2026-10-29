@@ -11,6 +11,8 @@ export interface CachedAskResult extends AskResult {
 	toolDetails: ToolDetail[];
 	/** Text only, at most 4096 UTF-8 bytes per tool result; no arguments/details. */
 	toolResultTexts: string[];
+	groundingCorrections: number;
+	unverified?: string[];
 	requests: RequestUsage[];
 }
 
@@ -102,7 +104,7 @@ export async function runtime() {
 		const agent = await agentModule.createOracleAgent({ ...ctx, tools });
 		try {
 			await promptTurns(agent, question);
-			return collectResult(agent.state.messages, events);
+			return { ...collectResult(agent.state.messages, events), unverified: agent.unverified ?? [] };
 		} finally { await agent.dispose?.(); }
 	} };
 }
@@ -143,7 +145,10 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 				...(result?.isError ? { error: text.split(/\r?\n/)[0]!.slice(0, 200) } : {}),
 				resultBytes: result ? Buffer.byteLength(text, 'utf8') : null };
 		}));
-	return { answer, toolDetails, toolResultTexts: messages.filter(message => message.role === 'toolResult').map(message => truncateUtf8((message.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n'), 4096)), requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
+	const groundingCorrections = messages.filter(message => message.role === 'user' && typeof message.content === 'string'
+		&& message.content.startsWith("These values do not appear in this conversation's tool results: ")
+		&& message.content.endsWith('. Correct or remove them; use tools only if needed.')).length;
+	return { answer, toolDetails, groundingCorrections, toolResultTexts: messages.filter(message => message.role === 'toolResult').map(message => truncateUtf8((message.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n'), 4096)), requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }
 
