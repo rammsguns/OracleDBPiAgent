@@ -1,0 +1,106 @@
+{
+	"sources": [
+		"2026-10-29T04-54-04-626Z-04ca8b15-8730-4058-905f-858deced0672.json",
+		"2026-10-29T04-55-31-877Z-49a52034-8f6d-4c2a-bd85-9bf0e2044ca3.json",
+		"2026-10-29T04-56-57-986Z-7d3ea2b8-369b-41d1-b2e0-fce101a93a7a.json",
+		"2026-10-29T04-58-05-190Z-5b65833b-ef9f-4d1d-b92d-d9b52c47d743.json"
+	],
+	"result": {
+		"direction": "B minus A; tokens = uncached input + output",
+		"pairedBlocks": 2,
+		"warnings": [
+			"Fewer than four pairs: intervals are exploratory, not an acceptance gate."
+		],
+		"cases": [
+			{
+				"case": "p1-19c-prod/hard-price-plan",
+				"pairs": 2,
+				"aTokens": 6422.5,
+				"bTokens": 6763,
+				"aPassRate": 1,
+				"bPassRate": 1,
+				"executionFailures": {
+					"a": 0,
+					"b": 0
+				},
+				"tokens": {
+					"mean": 340.5,
+					"ci95": [
+						306,
+						375
+					]
+				},
+				"passRate": {
+					"mean": 0,
+					"ci95": [
+						0,
+						0
+					]
+				},
+				"toolErrors": {
+					"mean": -0.5,
+					"ci95": [
+						-1,
+						0
+					]
+				}
+			},
+			{
+				"case": "p1-19c-prod/hard-top-buffer-plan",
+				"pairs": 2,
+				"aTokens": 7273,
+				"bTokens": 6986.5,
+				"aPassRate": 1,
+				"bPassRate": 1,
+				"executionFailures": {
+					"a": 0,
+					"b": 0
+				},
+				"tokens": {
+					"mean": -286.5,
+					"ci95": [
+						-2961,
+						2388
+					]
+				},
+				"passRate": {
+					"mean": 0,
+					"ci95": [
+						0,
+						0
+					]
+				},
+				"toolErrors": {
+					"mean": 0,
+					"ci95": [
+						0,
+						0
+					]
+				}
+			}
+		],
+		"suite": {
+			"tokens": {
+				"mean": 54,
+				"ci95": [
+					-2655,
+					2763
+				]
+			},
+			"passRate": {
+				"mean": 0,
+				"ci95": [
+					0,
+					0
+				]
+			},
+			"toolErrors": {
+				"mean": -0.5,
+				"ci95": [
+					-1,
+					0
+				]
+			}
+		}
+	}
+}
