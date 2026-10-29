@@ -1062,6 +1062,58 @@ a new holdout and keeps the old one as a regression set.
 ### Not in phase 8
 Changes to dev cases, the scorer or the product.
 
+## Phase 9: global CLI install (requested 2026-10-29)
+
+The owner asked for a CLI install like the PI agent's (`npm install -g`, then
+run the command anywhere). Today `piagent` only works from a clone:
+
+- `dist/` is not in git.
+- `config/targets.json` and `var/` are resolved from the current directory.
+- Settings load only through `node --env-file=.env`.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-9A Global install | `wp-9a-global-install` | `src/cli/`, `src/config/` (default paths and env loading only), `package.json` (`prepare` script and `files` field only, granted by the coordinator), tests, `README.md` install section, `docs/install.md` | — |
+
+### WP-9A: global install
+- Install paths, with no npm publish:
+  - `npm install -g github:rammsguns/OracleDBPiAgent`;
+  - `npm install -g .` from a clone.
+  - A `prepare` script builds `dist/`. The `files` field ships `dist/`, the
+    default `config/targets.json`, `.env.example`, `LICENSE` and `README.md`.
+- A per-user home, `~/.piagent/` (override with `PIAGENT_HOME`), created
+  0700:
+  - `piagent init` creates it and writes `.env` (0600) from `.env.example`
+    with placeholders. It never overwrites, and never writes or asks for
+    passwords or keys.
+  - On start, the CLI loads `PIAGENT_ENV_FILE` or `~/.piagent/.env` if
+    present. Variables already set win. It never auto-loads `.env` from the
+    current directory.
+  - It refuses an env file that group or others can read. Values are never
+    printed.
+- Defaults when the variables are unset:
+  - the targets file comes from the installed package's `config/targets.json`
+    (resolved from the module, not the current directory);
+  - the audit file and reports go under `~/.piagent/`.
+  - Explicit variables still win, and the clone workflow
+    (`node --env-file=.env dist/cli/index.js`) keeps working.
+- `piagent --version` prints the package version.
+- No change to the safety model: same approved targets, loopback Strata only,
+  read-only tools.
+- Verify with a temporary prefix and HOME only (never the real global
+  install):
+  - `npm pack`, then `npm install -g --prefix <tmp>` from the tarball and from
+    a local git clone;
+  - then `piagent --version`, `piagent init`, `piagent targets`, and one
+    read-only `piagent report --target d1-19c-lab` run from an unrelated
+    directory.
+- Gate: unit tests for env loading, permissions, precedence and path
+  defaults; typecheck, unit and integration tests; the Antigravity security
+  review; CI green.
+
+### Not in phase 9
+Publishing to npm, installer scripts piped from curl, and Windows support.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
