@@ -34,7 +34,10 @@ its own source, columns and availability, including when a related grant is abse
 `--summarize` prints a short Strata summary **after** the report (including after
 the JSON line with `--json`). Omit it when consuming stdout as a single JSON value.
 It sends the rendered Markdown to the existing local provider once, with no tools,
-and requests prioritised findings citing sections and read-only suggestions.
+and requests prioritised findings citing sections and read-only diagnostic next
+steps (what to query or check, and what to ask a DBA to review), explicitly
+forbidding parameter changes, ALTER/DDL/DML, PL/SQL, restarts or any other database
+modifications.
 The caller must share the LLM slot with other eval/report processes. WP-2A's future
 grounding integration must also wrap this standalone summary path; no shared
 contract change is requested by WP-2B.
