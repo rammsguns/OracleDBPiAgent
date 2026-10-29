@@ -698,7 +698,60 @@ WP-3A merges, so the docs describe the final behavior.
 
 ### Housekeeping
 Remove the merged phase 2 worktrees and archive their eval results in
-`eval-archive/phase2/`.
+`eval-archive/phase2/`. Done. The broken `file:///` links in three older
+review docs were also made repo-relative (f252bf7).
+
+## Phase 4: scheduled report diffs (approved 2026-10-29)
+
+Goal: let a DBA run `piagent report` on a schedule and see what changed since
+the last run. Read-only, no LLM, no token cost. The user runs it from their own
+cron; this repo adds no scheduler or daemon.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-4A Saved reports and diff | `wp-4a-report-diff` | `src/report/history.ts`, `src/report/diff.ts`, the `report` options in `src/cli/index.ts`, tests, `docs/report.md` | — |
+| WP-4B Web: last change view | `wp-4b-web-diff` | `src/web/` (route and Report tab), browser tests, `docs/web-ui.md` | WP-4A |
+
+### WP-4A: saved reports and diff
+- `piagent report --target <t> --out <dir>` also writes
+  `<dir>/<target>/<UTC timestamp>.json` and `.md`. The default directory is
+  `var/reports`, which git ignores. Files are written atomically (temp file,
+  then rename) with mode 0600. Target names are validated before use in a
+  path, and the newest 30 runs per target are kept.
+- `--diff` compares this run with the newest saved run for the same target
+  and prints a "Changes since <timestamp>" section. `--json` adds a `diff`
+  object. Deterministic rules, with thresholds in one place:
+  - new failed scheduler runs;
+  - tablespace used % up 5 or more points, or crossing 85%;
+  - new SQL_IDs in top SQL;
+  - tables newly stale or locked;
+  - indexes newly unusable or invisible;
+  - the newest backup no longer recent;
+  - sections that changed between ok and unavailable.
+- `piagent report --target <t> --diff-only` prints only the changes, for cron
+  mail. The exit code is 0 for no changes and 3 for changes, so cron can
+  react.
+- No secrets, binds or DSNs in saved files: they hold the same data as the
+  `--json` output.
+- Gate:
+  - Unit tests: the diff rules on fixture reports, retention, atomic writes,
+    path validation and exit codes.
+  - An integration run on both targets: two runs back to back give an empty or
+    near-empty diff.
+  - Antigravity review, and a live check.
+
+### WP-4B: web last change view
+- The Report tab shows "Changes since last saved run" for the selected target,
+  using the WP-4A diff. The web UI reads saved reports; saving from the web
+  happens only with an explicit "Save this run" button. Same token and
+  Host/Origin checks as the other routes, and textContent rendering only.
+- Gate: unit tests for the route, browser tests (diff rendering, an XSS
+  payload in a changed value, phone width), Antigravity security review and a
+  live smoke test.
+
+### Not in phase 4
+A scheduler or daemon in this repo, notifications (email or Slack), LLM
+summaries of diffs, and history charts.
 
 ## MVP exit criteria
 
