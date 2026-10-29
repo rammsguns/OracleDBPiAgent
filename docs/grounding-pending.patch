@@ -1,0 +1,161 @@
+--- a/src/agent/index.ts
++++ b/src/agent/index.ts
+@@ -1,5 +1,6 @@
+ import { appendToolNotes, type TunableLlmConfig } from "../config/tunables.js";
+ import { Agent, type AgentMessage, type StreamFn } from "@earendil-works/pi-agent-core";
++import { checkFacts } from "./grounding.js";
+ import { createHash } from "node:crypto";
+ import type { ToolContext } from "../contracts.js";
+ import { createStrataProvider } from "../llm/index.js";
+@@ -47,11 +48,12 @@
+ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<ReturnType<typeof createStrataProvider>>) {
+ 	const tools = appendToolNotes(await createDbTools(ctx), (ctx.config.llm as TunableLlmConfig).toolNotes);
+ 	const llm = wiring ?? await createStrataProvider(ctx.config.llm);
+-	let calls = 0, started = 0, exhausted = false, finalScheduled = false;
++	let calls = 0, started = 0, exhausted = false, finalScheduled = false, correctionScheduled = false;
++	const correctionMessages = new Set<string>();
+ 	const starts = new Map<string, number>();
+ 	const record = (kind: Parameters<typeof ctx.audit.record>[0]["kind"], extra = {}) => ctx.audit.record({ at: new Date().toISOString(), runId: ctx.runId, kind, ...extra });
+ 	const streamFn: StreamFn = (model, context, options) => llm.streamFn(model, context, { ...options, signal: AbortSignal.any([...(options?.signal ? [options.signal] : []), AbortSignal.timeout(ctx.config.llm.requestTimeoutSeconds * 1000)]) });
+-	const agent = new Agent({
++	const agent: Agent & { unverified: string[] } = Object.assign(new Agent({
+ 		initialState: { systemPrompt: systemPrompt(ctx), model: llm.model, tools, thinkingLevel: ctx.config.llm.thinking },
+ 		streamFn, identity: { attribution: null }, toolExecution: "sequential",
+ 		transformContext: async messages => pruneContext((ctx.config.llm as TunableLlmConfig).dropPriorThinking ? dropPriorThinking(messages) : messages, ctx.config.llm.contextWindow),
+@@ -91,18 +93,33 @@
+ 			return undefined;
+ 		},
+ 		prepareRequest: ({ context }) => exhausted ? { context: { ...context, tools: [], messages: context.messages.map(m => m.role === "system" ? { ...m, tools: [] } : m) } } : undefined,
+-		finishTurn: () => {
++		finishTurn: ({ message, context }) => {
++			if (message.stopReason === "error" || message.stopReason === "aborted") return;
+ 			if (exhausted && !finalScheduled) { finalScheduled = true; return { action: "continue" }; }
++			if (message.content.some(c => c.type === "toolCall")) return finalScheduled ? { action: "end" } : undefined;
++			if ((ctx.config.llm as TunableLlmConfig).groundingCheck !== false) {
++				const answer = message.content.filter(c => c.type === "text").map(c => c.text).join("\n");
++				const toolTexts = context.messages.filter(m => m.role === "toolResult").map(m => m.content.filter(c => c.type === "text").map(c => c.text).join("\n"));
++				const questions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text)).join("\n");
++				agent.unverified = checkFacts(answer, toolTexts, questions).unsupported;
++				if (agent.unverified.length && !correctionScheduled) {
++					correctionScheduled = true;
++					const text = `These values do not appear in this conversation's tool results: ${agent.unverified.join(", ")}. Correct or remove them; use tools only if needed.`;
++					correctionMessages.add(text);
++					agent.followUp({ role: "user", content: text, timestamp: Date.now() });
++					return { action: "continue" };
++				}
++			}
+ 			if (finalScheduled) return { action: "end" };
+ 			return undefined;
+ 		},
+-	});
++	}), { unverified: [] as string[] });
+ 	agent.subscribe(async event => {
+ 		if (event.type === "agent_start") {
+-			calls = 0; started = Date.now(); exhausted = false; finalScheduled = false;
++			calls = 0; started = Date.now(); exhausted = false; finalScheduled = false; correctionScheduled = false; agent.unverified = [];
+ 			await record("run_start");
+ 		}
+-		if (event.type === "agent_end") await record("run_end", { elapsedMs: Date.now() - started });
++		if (event.type === "agent_end") await record("run_end", { elapsedMs: Date.now() - started, unverifiedCount: agent.unverified.length });
+ 	});
+ 	return agent;
+ }
+--- a/src/cli/index.ts
++++ b/src/cli/index.ts
+@@ -104,7 +104,7 @@
+ 				const replies = agent.state.messages.slice(offset).filter(m => m.role === "assistant");
+ 				const last = replies.at(-1);
+ 				const answer = last?.content.filter(c => c.type === "text").map(c => c.text).join("") ?? "";
+-				if (options.json) console.log(JSON.stringify({ answer, toolCalls, usage: replies.map(m => m.usage) }));
++				if (options.json) console.log(JSON.stringify({ answer, toolCalls, unverified: agent.unverified, usage: replies.map(m => m.usage) }));
+ 				else process.stdout.write("\n");
+ 			};
+ 			if (question !== undefined) await ask(question);
+--- /dev/null
++++ b/tests/unit/grounding-hook.test.ts
+@@ -0,0 +1,85 @@
++import { expect, it } from 'vitest';
++import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream';
++import { createOracleAgent } from '../../src/agent/index.js';
++import { loadConfig } from '../../src/config/index.js';
++
++async function fixture(replies: string[], enabled = true, maxCalls = 20) {
++	const config = loadConfig({ PIAGENT_GROUNDING_CHECK: enabled ? '1' : '0', PIAGENT_MAX_TOOL_CALLS: String(maxCalls) });
++	config.targets[0]!.description = 'PROMOTIONS 3313394.74';
++	const audit: any[] = [], contexts: any[] = [];
++	const agent = await createOracleAgent({ config, runId: 'grounding-test', sessions: { get: async () => { throw Error('No DB'); }, closeAll: async () => {} }, audit: { record: async e => { audit.push(e); } } }, {
++		model: { id: 'test', name: 'test', api: 'openai-completions', provider: 'strata', baseUrl: config.llm.baseUrl, reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 10000, maxTokens: 1000 },
++		streamFn: (_m, context) => {
++			contexts.push(structuredClone(context));
++			const next = replies.shift();
++			if (next === undefined) throw Error('Unexpected additional request');
++			const content = next === 'TOOL' ? [{ type: 'toolCall' as const, id: String(contexts.length), name: 'list_targets', arguments: {} }] : [{ type: 'text' as const, text: next }];
++			const message = { role: 'assistant' as const, api: 'openai-completions' as const, provider: 'strata', model: 'test', content, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: next === 'TOOL' ? 'toolUse' as const : 'stop' as const, timestamp: Date.now() };
++			const stream = createAssistantMessageEventStream();
++			stream.push({ type: 'done', reason: message.stopReason, message }); stream.end(message);
++			return stream;
++		},
++	});
++	return { agent, audit, contexts };
++}
++
++it('corrects both real misses once using the exact follow-up, then exposes no unverified facts', async () => {
++	const { agent, audit, contexts } = await fixture(['TOOL', '`PROMO`: 3,331,394.74', '`PROMOTIONS`: 3,313,394.74']);
++	await agent.prompt('What is the table total?');
++	expect(contexts).toHaveLength(3);
++	expect(JSON.stringify(contexts[2].messages)).toContain("These values do not appear in this conversation's tool results: PROMO, 3,331,394.74. Correct or remove them; use tools only if needed.");
++	expect(agent.unverified).toEqual([]);
++	expect(audit.filter(e => e.kind === 'run_end')).toMatchObject([{ unverifiedCount: 0 }]);
++	expect(JSON.stringify(audit)).not.toContain('PROMO');
++});
++it('reports residual facts, never schedules a second correction and resets per user run', async () => {
++	const { agent, audit, contexts } = await fixture(['TOOL', '`PROMO`', '`PROMO`', 'No data available.']);
++	await agent.prompt('Find the table.');
++	expect(contexts).toHaveLength(3);
++	expect(agent.unverified).toEqual(['PROMO']);
++	expect(audit.filter(e => e.kind === 'run_end')).toMatchObject([{ unverifiedCount: 1 }]);
++	await agent.prompt('Anything else?');
++	expect(agent.unverified).toEqual([]);
++});
++it('performs no extra requests for supported answers or disabled checks', async () => {
++	for (const [replies, enabled] of [[['TOOL', 'PROMOTIONS 3,313,394.74'], true], [['PROMO 98765'], false]] as const) {
++		const { agent, contexts } = await fixture([...replies], enabled);
++		await agent.prompt('Find the table.');
++		expect(contexts).toHaveLength(replies.length);
++		expect(agent.unverified).toEqual([]);
++	}
++});
++it('ignores question facts, but does not treat its correction instruction as evidence', async () => {
++	const { agent } = await fixture(['`PROMO` is unknown; UNKNOWN_TABLE is unknown.', 'UNKNOWN_TABLE is unknown.']);
++	await agent.prompt('Does PROMO exist?');
++	expect(agent.unverified).toEqual(['UNKNOWN_TABLE']);
++});
++it('permits tools during correction and checks the final reply with new evidence', async () => {
++	const { agent, contexts } = await fixture(['PROMOTIONS 3313394.74', 'TOOL', 'PROMOTIONS 3313394.74']);
++	await agent.prompt('Find the total.');
++	expect(contexts).toHaveLength(3);
++	expect(agent.unverified).toEqual([]);
++});
++it('keeps the existing budget final turn and corrects without restoring tools', async () => {
++	const { agent, contexts } = await fixture(['TOOL', 'TOOL', 'PROMO 3331394.74', 'PROMOTIONS 3313394.74'], true, 1);
++	await agent.prompt('Find the table.');
++	expect(contexts).toHaveLength(4);
++	expect(contexts[3].messages.filter((m: any) => m.role === 'system').flatMap((m: any) => m.tools ?? [])).toEqual([]);
++	expect(contexts[3].messages.filter((m: any) => m.role === 'system').at(-1).toolsRemoved).toContainEqual({ name: 'list_targets' });
++	expect(agent.unverified).toEqual([]);
++});
++it('retains flags if the correction request fails, without looping', async () => {
++	const { agent, audit, contexts } = await fixture(['PROMO']);
++	await agent.prompt('Find the table.');
++	expect(contexts).toHaveLength(2);
++	expect(agent.state.errorMessage).toBeDefined();
++	expect(agent.unverified).toEqual(['PROMO']);
++	expect(audit.filter(e => e.kind === 'run_end')).toMatchObject([{ unverifiedCount: 1 }]);
++});
++it('never exempts a fact merely because a previous correction instruction named it', async () => {
++	const { agent, contexts } = await fixture(['PROMO', 'PROMO', 'PROMO', 'PROMO']);
++	await agent.prompt('First lookup.');
++	await agent.prompt('Second lookup.');
++	expect(contexts).toHaveLength(4);
++	expect(agent.unverified).toEqual(['PROMO']);
++});
