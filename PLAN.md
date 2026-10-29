@@ -930,6 +930,73 @@ its A/B uses the new analysis.
 Scorer changes, accepting values without trailing zeros in the scorer, and new
 tools.
 
+## Phase 7: release readiness (approved 2026-10-29)
+
+The repo is public, but nothing checks pushes. This phase adds CI, checks the
+setup steps on a clean clone, writes a changelog and tags v1.0.0. There are no
+product behaviour changes, so there is no eval A/B gate.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-7A CI and clean-clone check | `wp-7a-ci` | `.github/workflows/ci.yml`; fixes to unit tests that only pass on this machine; `docs/ci.md` | — |
+| WP-7B Changelog and quick start | `wp-7b-release-docs` | `CHANGELOG.md`, `README.md`, `docs/mvp-status.md`, `docs/README.md` (index) | WP-7A |
+| Coordinator | `needlefish` | `package.json` (version 1.0.0, `"license": "MIT"`), secret scan, tag | WP-7B |
+
+### WP-7A: CI and clean-clone check
+- Add a GitHub Actions workflow on push and pull request to `main`. It uses
+  Node 24 and `npm ci`, then runs `npm run typecheck`, `npm test` and
+  `npm run build`. No database, no LLM, no secrets, and no integration,
+  browser or eval runs.
+  - Pin actions to full commit SHAs and give the workflow
+    `permissions: contents: read`.
+- Prove it locally first:
+  - Clone the repo into a temporary folder.
+  - Run the same steps with a scrubbed environment (`env -i`, no `.env`, no
+    `PIAGENT_*` variables).
+  - Any unit test that reads this machine's paths, secrets, `var/` or
+    `eval-archive/` is a bug. Fix the test, not the product.
+- Gate:
+  - The clean-clone run passes.
+  - The Antigravity review checks the workflow for secret exposure, write
+    permissions and unpinned actions.
+  - After the coordinator pushes, the first GitHub run is green
+    (`gh run list`).
+
+### WP-7B: changelog and quick start
+- `CHANGELOG.md`, in Keep a Changelog format: one 1.0.0 entry that summarizes
+  the MVP and phases 1–6 from this file. Keep it short; link docs rather than
+  repeat them.
+- `README.md`: a quick start that a new reader can follow:
+  - prerequisites (Node 24, Oracle 19c targets, an OpenAI-compatible local
+    LLM endpoint);
+  - `npm ci`;
+  - `.env` from `.env.example`;
+  - the secret files;
+  - the first commands (`piagent report --target d1-19c-lab`, `piagent ask`,
+    the web UI).
+  - State the safety model up front: read-only, 19c only, local LLM only.
+- Verify every command in the quick start on a clean clone. A read-only
+  report against d1 and at most one `piagent ask` against Strata are allowed,
+  one call at a time.
+- Refresh `docs/mvp-status.md` and the docs index. Every local link must
+  resolve.
+- Gate: the Antigravity review of accuracy and of setup steps that leak paths
+  or secrets; typecheck and tests pass.
+
+### Coordinator release steps
+1. Set `package.json` version to 1.0.0 and `"license": "MIT"` to match
+   `LICENSE`.
+2. Scan the full git history for secrets (password files, API keys, `.env`
+   contents, private keys) with grep over `git log -p`. Stop and report if
+   anything is found.
+3. Merge and push.
+4. Confirm CI is green, then tag `v1.0.0` and push the tag. Make a GitHub
+   release only if the owner asks.
+
+### Not in phase 7
+New features, eval changes, dependency upgrades, publishing to npm, and
+running integration or LLM tests in CI.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
