@@ -1,5 +1,6 @@
 import { appendToolNotes, type TunableLlmConfig } from "../config/tunables.js";
 import { Agent, type AgentMessage, type StreamFn } from "@earendil-works/pi-agent-core";
+import { checkFacts } from "./grounding.js";
 import { createHash } from "node:crypto";
 import type { ToolContext } from "../contracts.js";
 import { createStrataProvider } from "../llm/index.js";
@@ -47,11 +48,12 @@ DB facts: cite tool result and target; never guess; if tools cannot answer, say 
 export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<ReturnType<typeof createStrataProvider>>) {
 	const tools = appendToolNotes(await createDbTools(ctx), (ctx.config.llm as TunableLlmConfig).toolNotes);
 	const llm = wiring ?? await createStrataProvider(ctx.config.llm);
-	let calls = 0, started = 0, exhausted = false, finalScheduled = false;
+	let calls = 0, started = 0, exhausted = false, finalScheduled = false, correctionScheduled = false;
+	const correctionMessages = new Set<string>();
 	const starts = new Map<string, number>();
 	const record = (kind: Parameters<typeof ctx.audit.record>[0]["kind"], extra = {}) => ctx.audit.record({ at: new Date().toISOString(), runId: ctx.runId, kind, ...extra });
 	const streamFn: StreamFn = (model, context, options) => llm.streamFn(model, context, { ...options, signal: AbortSignal.any([...(options?.signal ? [options.signal] : []), AbortSignal.timeout(ctx.config.llm.requestTimeoutSeconds * 1000)]) });
-	const agent = new Agent({
+	const agent: Agent & { unverified: string[] } = Object.assign(new Agent({
 		initialState: { systemPrompt: systemPrompt(ctx), model: llm.model, tools, thinkingLevel: ctx.config.llm.thinking },
 		streamFn, identity: { attribution: null }, toolExecution: "sequential",
 		transformContext: async messages => pruneContext((ctx.config.llm as TunableLlmConfig).dropPriorThinking ? dropPriorThinking(messages) : messages, ctx.config.llm.contextWindow),
@@ -91,18 +93,33 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 			return undefined;
 		},
 		prepareRequest: ({ context }) => exhausted ? { context: { ...context, tools: [], messages: context.messages.map(m => m.role === "system" ? { ...m, tools: [] } : m) } } : undefined,
-		finishTurn: () => {
+		finishTurn: ({ message, context }) => {
+			if (message.stopReason === "error" || message.stopReason === "aborted") return;
 			if (exhausted && !finalScheduled) { finalScheduled = true; return { action: "continue" }; }
+			if (message.content.some(c => c.type === "toolCall")) return finalScheduled ? { action: "end" } : undefined;
+			if ((ctx.config.llm as TunableLlmConfig).groundingCheck !== false) {
+				const answer = message.content.filter(c => c.type === "text").map(c => c.text).join("\n");
+				const toolTexts = context.messages.filter(m => m.role === "toolResult").map(m => m.content.filter(c => c.type === "text").map(c => c.text).join("\n"));
+				const questions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text)).join("\n");
+				agent.unverified = checkFacts(answer, toolTexts, questions).unsupported;
+				if (agent.unverified.length && !correctionScheduled) {
+					correctionScheduled = true;
+					const text = `These values do not appear in this conversation's tool results: ${agent.unverified.join(", ")}. Correct or remove them; use tools only if needed.`;
+					correctionMessages.add(text);
+					agent.followUp({ role: "user", content: text, timestamp: Date.now() });
+					return { action: "continue" };
+				}
+			}
 			if (finalScheduled) return { action: "end" };
 			return undefined;
 		},
-	});
+	}), { unverified: [] as string[] });
 	agent.subscribe(async event => {
 		if (event.type === "agent_start") {
-			calls = 0; started = Date.now(); exhausted = false; finalScheduled = false;
+			calls = 0; started = Date.now(); exhausted = false; finalScheduled = false; correctionScheduled = false; agent.unverified = [];
 			await record("run_start");
 		}
-		if (event.type === "agent_end") await record("run_end", { elapsedMs: Date.now() - started });
+		if (event.type === "agent_end") await record("run_end", { elapsedMs: Date.now() - started, unverifiedCount: agent.unverified.length });
 	});
 	return agent;
 }
