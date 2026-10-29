@@ -146,8 +146,8 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 				resultBytes: result ? Buffer.byteLength(text, 'utf8') : null };
 		}));
 	const groundingCorrections = messages.filter(message => message.role === 'user' && typeof message.content === 'string'
-		&& message.content.startsWith("These values do not appear in this conversation's tool results: ")
-		&& message.content.endsWith('. Correct or remove them; use tools only if needed.')).length;
+		&& (message.content.startsWith("These numbers do not appear in this conversation's tool results: ") || message.content.startsWith("These values do not appear in this conversation's tool results: "))
+		&& (message.content.endsWith('. Correct or remove them; use tools only if needed.') || message.content.includes('only fix or remove the listed numbers'))).length;
 	return { answer, toolDetails, groundingCorrections, toolResultTexts: messages.filter(message => message.role === 'toolResult').map(message => truncateUtf8((message.content ?? []).filter((part: any) => part.type === 'text').map((part: any) => part.text).join('\n'), 4096)), requests: collectRequests(messages), toolCalls: calls.length ? calls : events, executedToolCalls: [...events],
 		usage: { cached: assistants.reduce((n, message) => n + (message.usage?.cacheRead ?? 0), 0), input: assistants.reduce((n, message) => n + (message.usage?.input ?? 0), 0), output: assistants.reduce((n, message) => n + (message.usage?.output ?? 0), 0) } };
 }

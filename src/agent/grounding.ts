@@ -1,7 +1,7 @@
 /** Deterministic evidence check, deliberately limited to lexical hard facts.
  * Question text is an optional third argument so callers can exempt user-supplied facts.
  */
-export interface FactCheck { facts: string[]; unsupported: string[] }
+export interface FactCheck { facts: string[]; unsupported: string[]; unsupportedNumbers: string[] }
 interface Numeric { text: string; value: number; precision: number; coefficient: bigint; exponent: number; unit: string; start: number; end: number }
 const numberPattern = /(?<![\w$#.])(?:[-+]?[$€£]\s*)?[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:[KMGT]i?B|[KMGT]|bytes|%))?(?![\w]|\.\d|,\d)/gi;
 const identifierPattern = /(?<![\w])(?:[A-Za-z_$#][\w$#]*)(?:\.[A-Za-z_$#][\w$#]*)*/g;
@@ -74,19 +74,25 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 			const cells = line.split('|');
 			headers.forEach((header, i) => {
 				if (!/(?:_MICRO|_MICROSECONDS)$/.test(header) || !cells[i]) return;
-				for (const value of numbers(cells[i]!)) values.push({ ...value, value: value.value / 1e6, exponent: value.exponent - 6 });
+				for (const value of numbers(cells[i]!)) {
+					values.push({ ...value, value: value.value / 1e6, exponent: value.exponent - 6 });
+					values.push({ ...value, value: value.value / 1e3, exponent: value.exponent - 3 });
+				}
 			});
 		}
 	}
 	const ratioValues = [...new Set(values.filter(n => !n.unit).map(n => n.value))].sort((a, b) => a - b);
 	const questionNumbers = new Set(numbers(question).map(n => norm(n.text).replace(/[$€£\s]+/g, '')));
-	const facts: string[] = [], unsupported: string[] = [];
+	const facts: string[] = [], unsupported: string[] = [], unsupportedNumbers: string[] = [];
 	const seen = new Set<string>();
-	const add = (fact: string, supported: boolean) => {
+	const add = (fact: string, supported: boolean, isNumeric = false) => {
 		const key = norm(fact);
 		if (seen.has(key)) return;
 		seen.add(key); facts.push(fact);
-		if (!supported) unsupported.push(fact);
+		if (!supported) {
+			unsupported.push(fact);
+			if (isNumeric) unsupportedNumbers.push(fact);
+		}
 	};
 	const quoted = [...answer.matchAll(/([`"'])([A-Za-z_$#][\w$#]*(?:\.[A-Za-z_$#][\w$#]*)*)\1/g)];
 	for (const match of answer.matchAll(identifierPattern)) {
@@ -107,7 +113,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 	}
 	for (const match of answer.matchAll(/(?<![\w.])\d+(?:\.\d+){2,4}(?![\w]|\.\d)/g)) {
 		if (match[0].replace(/\D/g, '').length < 4 || evidenceText.includes(match[0]) || question.includes(match[0])) continue;
-		add(match[0], false);
+		add(match[0], false, true);
 	}
 	for (const shown of numbers(answer)) {
 		if (shown.text.replace(/e[-+]?\d+/i, '').replace(/[^\d]/g, '').replace(/^0+/, '').length < 4) continue;
@@ -121,7 +127,13 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 			return scales(shown.unit).some(scale => scales(value.unit).some(source => exactRounded(value, shown, source, scale)));
 		}) || ((shown.unit === '%' || !shown.unit) && ratioSupported(shown, ratioValues, shown.unit === '%' ? 100 : 1))
 			|| (shown.unit === '%' && [100 + shown.value, 100 - shown.value].some(value => ratioSupported({ value, precision: shown.precision }, ratioValues, 100)));
-		add(shown.text, supported);
+		add(shown.text, supported, true);
 	}
-	return { facts, unsupported };
+	return { facts, unsupported, unsupportedNumbers };
+}
+
+export function isRefusal(text: string): boolean {
+	const prefix = text.trim().slice(0, 300);
+	return /^\s*(?:#+\s*)?(?:\*{0,2}(?:refus\w*|decline\w*|i\s*(?:(?:can(?:'t|not)|won't|must decline)|(?:(?:'m|am)\s+)?(?:unable|not able))|prohibit\w*)\b)/i.test(prefix)
+		|| /\b(refus\w*|cannot execute|can't execute|unable to execute|won't execute|must decline|not permitted|not allowed|prohibited)\b/i.test(prefix);
 }

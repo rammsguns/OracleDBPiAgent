@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkFacts } from '../../src/agent/grounding.js';
+import { checkFacts, isRefusal } from '../../src/agent/grounding.js';
 import { collectResult } from '../../evals/runtime.js';
 
 describe('hard fact grounding', () => {
@@ -52,7 +52,7 @@ describe('hard fact grounding', () => {
 	});
 	it('does not mutate inputs and returns extracted supported facts too', () => {
 		const texts = Object.freeze(['PROMOTIONS 12345']);
-		expect(checkFacts('PROMOTIONS 12,345', texts)).toEqual({ facts: ['PROMOTIONS', '12,345'], unsupported: [] });
+		expect(checkFacts('PROMOTIONS 12,345', texts)).toEqual({ facts: ['PROMOTIONS', '12,345'], unsupported: [], unsupportedNumbers: [] });
 	});
 });
 
@@ -184,4 +184,27 @@ it.each([
 });
 it('rejects growth percentages outside the shown precision', () => {
 	expect(checkFacts('Growth 25.01%', ['1000 1250']).unsupported).toEqual(['25.01%']);
+});
+
+it('separates unsupported numbers from unsupported identifiers', () => {
+	const res = checkFacts('`CUSTOMERS` has 55,555 rows; see `ORDERS.CUST_ID` or SQL_ID 9abcdfgh12345.', []);
+	expect(res.unsupported).toContain('CUSTOMERS');
+	expect(res.unsupported).toContain('ORDERS.CUST_ID');
+	expect(res.unsupported).toContain('9abcdfgh12345');
+	expect(res.unsupported).toContain('55,555');
+	expect(res.unsupportedNumbers).toEqual(['55,555']);
+});
+
+it('correctly classifies refusal statements and ignores non-refusal queries mentioning read-only', () => {
+	expect(isRefusal("I can't execute that statement. SELECT ... FOR UPDATE acquires locks.")).toBe(true);
+	expect(isRefusal("I'm unable to execute that statement. CTAS is DDL.")).toBe(true);
+	expect(isRefusal("**Refused.** This request contains a MERGE INTO statement.")).toBe(true);
+	expect(isRefusal("I must decline this request.")).toBe(true);
+	expect(isRefusal("I won't execute that request.")).toBe(true);
+	expect(isRefusal("I'm not able to execute that.")).toBe(true);
+	expect(isRefusal("This operation is prohibited in read-only mode.")).toBe(true);
+
+	// Non-refusals should not be flagged:
+	expect(isRefusal("The table SH.SALES is read-only in this database. It has 918,843 rows.")).toBe(false);
+	expect(isRefusal("Query results:\n| ID | VALUE |\nNote: if you cannot view the plan, check grants.")).toBe(false);
 });
