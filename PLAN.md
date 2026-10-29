@@ -522,7 +522,7 @@ fake-agent tests (Playwright 1.64.1, Chromium) plus the opt-in live test, which
 passed once against d1. The tests found and fixed one real bug: the target
 picker overflowed at phone width (`select { min-width: 0; max-width: 100%; }`).
 
-## Phase 2 (draft 2026-10-29; awaiting approval)
+## Phase 2 (approved 2026-10-29)
 
 Theme: **trustworthy answers and DBA reports, without making every session more
 expensive.** Phase 1 left three lessons:
