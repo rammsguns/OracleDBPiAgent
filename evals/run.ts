@@ -1,21 +1,27 @@
+import { acquireEndpointLock } from './endpoint-lock.js';
+import type { EvalEndpoint } from '../src/config/eval.js';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { groundTruth, targets } from './ground-truth.js';
-import { requireStrata, runtime, type CachedAskResult, type ToolDetail, type RequestUsage } from './runtime.js';
+import { requireEvalStrata, runtime, type CachedAskResult, type ToolDetail, type RequestUsage } from './runtime.js';
 import { score } from './scoring.js';
 import type { EvalCase } from './types.js';
 
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export interface RunOptions { suite: string; split?: 'dev' | 'holdout' | 'regression'; repeat: number; ids: string[] }
+export interface RunOptions { endpoint?: EvalEndpoint; suite: string; split?: 'dev' | 'holdout' | 'regression'; repeat: number; ids: string[] }
 export function parseArgs(args: string[]): RunOptions {
 	const options: RunOptions = { suite: 'evals/cases', repeat: 1, ids: [] };
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!;
-		if (['--suite', '--split', '--repeat'].includes(arg)) {
+		if (['--suite', '--split', '--repeat', '--endpoint'].includes(arg)) {
 			const value = args[++i];
 			if (!value || value.startsWith('--')) throw new Error(`Missing value for ${arg}`);
+			if (arg === '--endpoint') {
+				if (value !== 'primary' && value !== 'secondary') throw new Error('Endpoint must be primary or secondary');
+				options.endpoint = value;
+			}
 			if (arg === '--suite') options.suite = value;
 			if (arg === '--split') {
 				if (value !== 'dev' && value !== 'holdout' && value !== 'regression') throw new Error('Split must be dev, holdout or regression');
@@ -69,60 +75,67 @@ export function toolErrorsMarkdown(summary: ReturnType<typeof summarizeToolError
 	return '\n## Tool errors\n\n' + summary.totalErrors + '/' + summary.totalCalls + ' calls returned errors.\n\n| Tool | Error code / text | Count |\n|---|---|---|\n'
 		+ Object.entries(summary.byTool).flatMap(([tool, counts]) => Object.entries(counts.byCode).map(([code, count]) => `| ${escape(tool)} | ${escape(code)} | ${count} |`)).join('\n') + '\n';
 }
-export async function runEvals(options: RunOptions, dependencies = { requireStrata, runtime, targets, groundTruth, score }) {
-	const runStart = performance.now();
-	const cases: EvalCase[] = [];
-	for (const file of (await readdir(options.suite)).filter(file => file.endsWith('.json')).sort()) {
-		cases.push(...JSON.parse(await readFile(`${options.suite}/${file}`, 'utf8')));
-	}
-	const selected = cases.filter(test => (!options.split || test.split === options.split) && (!options.ids.length || options.ids.includes(test.id)));
-	if (!selected.length) throw new Error('No eval cases selected');
-	if (new Set(selected.map(test => test.id)).size !== selected.length) throw new Error('Duplicate eval case id');
-	await dependencies.requireStrata();
-	const configured = await dependencies.targets();
-	const app = await dependencies.runtime();
-	const records: EvalRecord[] = [];
+export async function runEvals(options: RunOptions, dependencies = { requireStrata: requireEvalStrata, runtime, targets, groundTruth, score }) {
+	const endpoint = options.endpoint ?? 'primary';
+	const release = acquireEndpointLock(endpoint);
 	try {
-		for (let iteration = 1; iteration <= options.repeat; iteration++) for (const test of selected) {
-			const start = performance.now();
-			try {
-				const target = configured.find(target => target.name === test.target);
-				if (!target) throw new Error(`Unconfigured target ${test.target}`);
-				const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : [];
-				// Await each complete ask before starting another: Strata has one request slot.
-				const result = await app.ask(test.turns ?? test.question, test.target, test.limits);
-				const truthAfter = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
-				const scored = dependencies.score(test, result, truth, truthAfter);
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
-			} catch {
-				// Driver/provider errors can contain connection details; never persist raw errors.
-				records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
-			}
-			const record = records.at(-1)!;
-			console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
+		return await runLocked();
+	} finally { release(); }
+	async function runLocked() {
+		const runStart = performance.now();
+		const cases: EvalCase[] = [];
+		for (const file of (await readdir(options.suite)).filter(file => file.endsWith('.json')).sort()) {
+			cases.push(...JSON.parse(await readFile(`${options.suite}/${file}`, 'utf8')));
 		}
-	} finally { await app.sessions.closeAll(); }
-	const passed = records.filter(record => record.pass).length;
-	const rate = records.length ? passed / records.length : 0;
-	const refusalsPass = records.filter(record => record.refusal).every(record => record.pass);
-	const perCase = selected.map(test => ({ id: test.id, passes: records.filter(record => record.id === test.id && record.pass).length }));
-	const stamp = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomUUID();
-	const resultsFile = `evals/results/${stamp}.json`;
-	// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
-	const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
-	const toolErrors = summarizeToolErrors(records);
-	const requestUsage = summarizeRequestUsage(records);
-	const report = { ...options, groundingCorrections: records.reduce((n, r) => n + (r.groundingCorrections ?? 0), 0), toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
-	await mkdir('evals/results', { recursive: true });
-	await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
-	const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
-	const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
-	await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors) + requestUsageMarkdown(requestUsage));
-	console.log(`Request usage: ${JSON.stringify(requestUsage)}`);
-	console.log(passCounts);
-	console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);
-	console.log(`Tool errors: ${toolErrors.totalErrors}/${toolErrors.totalCalls} calls; ${JSON.stringify(toolErrors.byCode)}`);
-	return report;
+		const selected = cases.filter(test => (!options.split || test.split === options.split) && (!options.ids.length || options.ids.includes(test.id)));
+		if (!selected.length) throw new Error('No eval cases selected');
+		if (new Set(selected.map(test => test.id)).size !== selected.length) throw new Error('Duplicate eval case id');
+		const health = await dependencies.requireStrata(endpoint);
+		const configured = await dependencies.targets();
+		const app = await dependencies.runtime(endpoint);
+		const records: EvalRecord[] = [];
+		try {
+			for (let iteration = 1; iteration <= options.repeat; iteration++) for (const test of selected) {
+				const start = performance.now();
+				try {
+					const target = configured.find(target => target.name === test.target);
+					if (!target) throw new Error(`Unconfigured target ${test.target}`);
+					const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : [];
+					// Await each complete ask before starting another: Strata has one request slot.
+					const result = await app.ask(test.turns ?? test.question, test.target, test.limits);
+					const truthAfter = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
+					const scored = dependencies.score(test, result, truth, truthAfter);
+					records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
+				} catch {
+					// Driver/provider errors can contain connection details; never persist raw errors.
+					records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
+				}
+				const record = records.at(-1)!;
+				console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
+			}
+		} finally { await app.sessions.closeAll(); }
+		const passed = records.filter(record => record.pass).length;
+		const rate = records.length ? passed / records.length : 0;
+		const refusalsPass = records.filter(record => record.refusal).every(record => record.pass);
+		const perCase = selected.map(test => ({ id: test.id, passes: records.filter(record => record.id === test.id && record.pass).length }));
+		const stamp = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomUUID();
+		const resultsFile = `evals/results/${stamp}.json`;
+		// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
+		const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
+		const toolErrors = summarizeToolErrors(records);
+		const requestUsage = summarizeRequestUsage(records);
+		const report = { ...options, endpoint, health, groundingCorrections: records.reduce((n, r) => n + (r.groundingCorrections ?? 0), 0), toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+		await mkdir('evals/results', { recursive: true });
+		await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
+		const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
+		const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
+		await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors) + requestUsageMarkdown(requestUsage));
+		console.log(`Request usage: ${JSON.stringify(requestUsage)}`);
+		console.log(passCounts);
+		console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);
+		console.log(`Tool errors: ${toolErrors.totalErrors}/${toolErrors.totalCalls} calls; ${JSON.stringify(toolErrors.byCode)}`);
+		return report;
+	}
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
 	const result = await runEvals(parseArgs(process.argv.slice(2)));

@@ -1,3 +1,6 @@
+import { loadConfig } from '../src/config/index.js';
+import { evalLlmConfig, type EvalEndpoint } from '../src/config/eval.js';
+import { evalHealth, createEvalStrataProvider } from '../src/llm/eval.js';
 import { pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { appendFile, mkdir } from 'node:fs/promises';
@@ -76,12 +79,14 @@ export async function productModule(path: string): Promise<any> {
 		throw error;
 	}
 }
-export async function runtime() {
+export async function runtime(endpoint: EvalEndpoint = "primary") {
 	const configModule = await productModule('src/config/index.ts');
 	const oracleModule = await productModule('src/oracle/index.ts');
 	const toolsModule = await productModule('src/tools/index.ts');
 	const agentModule = await productModule('src/agent/index.ts');
-	const config: AppConfig = await configModule.loadConfig(process.env);
+	const primary: AppConfig = await configModule.loadConfig(process.env);
+	const config: AppConfig = { ...primary, llm: evalLlmConfig(primary.llm, endpoint) };
+	const wiring = endpoint === 'secondary' ? await createEvalStrataProvider(config.llm) : undefined;
 	const sessions: SessionProvider = await oracleModule.createSessionProvider(config);
 	const audit: AuditSink = { record: async event => {
 		await mkdir(dirname(config.auditFile), { recursive: true });
@@ -101,7 +106,7 @@ export async function runtime() {
 		}, runId: crypto.randomUUID(), pinnedTarget: target };
 		const tools = toolsModule.createDbTools(ctx);
 		// Local adapter: coordinator must confirm the WP-A factory/context contract.
-		const agent = await agentModule.createOracleAgent({ ...ctx, tools });
+		const agent = await agentModule.createOracleAgent({ ...ctx, tools }, wiring);
 		try {
 			await promptTurns(agent, question);
 			return { ...collectResult(agent.state.messages, events), unverified: agent.unverified ?? [] };
@@ -154,4 +159,11 @@ export function collectResult(messages: any[], events: string[] = []): CachedAsk
 
 export function caseLimits(defaults: Limits, overrides: Partial<Limits> = {}): Limits {
 	return { ...defaults, ...overrides };
+}
+
+export async function requireEvalStrata(endpoint: EvalEndpoint = 'primary') {
+	const primary = loadConfig().llm;
+	const selected = evalLlmConfig(primary, endpoint);
+	const primaryHealth = await evalHealth(primary);
+	return endpoint === 'primary' ? primaryHealth : await evalHealth(selected);
 }
