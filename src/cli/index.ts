@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import { readFileSync, realpathSync } from "node:fs";
+import { join } from "node:path";
+import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
+import { loadEnvironment, initializeHome } from "../config/environment.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
@@ -65,7 +69,10 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 	return ok;
 }
 export async function main(argv = process.argv, dependencies: DoctorDependencies = {}) {
-	const program = new Command().name("piagent").description("Read-only Oracle 19c assistant using local Strata");
+	loadEnvironment();
+	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
+	const program = new Command().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
+	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
 	program.command("web").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
 		const port = Number(options.port);
 		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid port");
@@ -78,10 +85,10 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		if (options.diffOnly && options.summarize) throw new Error("--diff-only cannot summarize");
 		const config = loadConfig();
 		const { generateReport, renderMarkdown } = await import("../report/index.js");
-		const { loadLatestReport, saveReport, validateReportTarget, DEFAULT_REPORT_DIRECTORY } = await import("../report/history.js");
+		const { loadLatestReport, saveReport, validateReportTarget } = await import("../report/history.js");
 		const { diff, renderDiffMarkdown } = await import("../report/diff.js");
 		const compare = options.diff || options.diffOnly;
-		const out = options.out ?? (compare ? DEFAULT_REPORT_DIRECTORY : undefined);
+		const out = options.out ?? (compare ? reportDirectory() : undefined);
 		validateReportTarget(options.target, config.targets);
 		const previous = compare ? await loadLatestReport(out!, options.target, config.targets) : null;
 		const sessions = await createSessions(config);
@@ -89,7 +96,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, sections: options.sections?.split(",").map(s => s.trim()) });
 			const markdown = renderMarkdown(report);
 			const changes = compare ? diff(previous, report) : undefined;
-			if (out) await saveReport(out, report, config.targets);
+			if (out) await saveReport(out, report, config.targets, options.out === undefined);
 			if (options.diffOnly) {
 				console.log(options.json ? JSON.stringify({ diff: changes }) : renderDiffMarkdown(changes!));
 				process.exitCode = changes!.changes.length ? 3 : 0;
@@ -149,4 +156,4 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("chat").option("--target <target>").action(options => run(undefined, options));
 	await program.parseAsync(argv);
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch(() => { console.error("piagent failed; check local configuration and service availability"); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(() => { console.error("piagent failed; check local configuration and service availability"); process.exitCode = 1; });

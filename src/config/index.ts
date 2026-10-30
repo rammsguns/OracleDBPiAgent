@@ -1,3 +1,5 @@
+import { agentHome, PACKAGE_ROOT } from "./paths.js";
+import { join } from "node:path";
 import { loadTunables, type TunableAppConfig } from "./tunables.js";
 import { APPROVED_TARGETS } from "./approvedTargets.js";
 import { readFileSync } from "node:fs";
@@ -22,7 +24,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): TunableAppConf
 	const baseUrl = get("LLM_BASE_URL", "http://127.0.0.1:8080/v1");
 	const llmUrl = assertLoopbackUrl(baseUrl);
 	if (llmUrl.port !== "8080" || llmUrl.pathname.replace(/\/$/, "") !== "/v1") throw new Error("Only Strata on port 8080 at /v1 is supported");
-	const raw = JSON.parse(readFileSync(path(get("TARGETS_FILE", "config/targets.json")), "utf8"));
+	const raw = JSON.parse(readFileSync(path(get("TARGETS_FILE", join(PACKAGE_ROOT, "config/targets.json"))), "utf8"));
 	if (raw.version !== 1 || !Array.isArray(raw.targets) || raw.targets.length !== 2) throw new Error("Expected the two approved 19c targets");
 	const seen = new Set<string>();
 	for (const t of raw.targets) {
@@ -43,6 +45,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): TunableAppConf
 		llm: { ...loadTunables(env), baseUrl, model: get("LLM_MODEL", "qwen3.8-flash-next-iq3_s"), apiKeyFile: path(get("LLM_API_KEY_FILE", "~/llm-rig/strata/.config/strata/api-key")), contextWindow, maxOutputTokens, thinking, requestTimeoutSeconds: num("LLM_REQUEST_TIMEOUT_SECONDS", 600) },
 		targets, defaultTarget, secretDir: path(get("SECRET_DIR", "/home/kiwi/OracleDBHarness/databases/secrets")),
 		limits: { maxRows: num("MAX_ROWS", 200), statementTimeoutSeconds: num("STATEMENT_TIMEOUT_SECONDS", 30), maxToolResultBytes: num("MAX_TOOL_RESULT_BYTES", 16384), maxToolCalls: num("MAX_TOOL_CALLS", 20), maxWallSeconds: num("MAX_WALL_SECONDS", 300) },
-		auditFile: path(get("AUDIT_FILE", "var/audit.jsonl")),
+		auditFile: path(get("AUDIT_FILE", join(agentHome(env), "audit.jsonl"))),
 	};
 }

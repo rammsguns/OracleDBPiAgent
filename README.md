@@ -13,6 +13,25 @@ local Strata LLM at `http://127.0.0.1:8080/v1`.
 
 See [PLAN.md](PLAN.md) for scope and [AGENTS.md](AGENTS.md) for contributor rules.
 
+## Install
+
+With Node 24 and npm, install from a clone:
+
+```bash
+git clone https://github.com/rammsguns/OracleDBPiAgent.git
+cd OracleDBPiAgent
+npm ci
+npm install -g .
+piagent --version
+piagent init
+```
+
+Edit the placeholder credential-file
+paths in `~/.piagent/.env`, then run `piagent targets` from any directory.
+The CLI loads that private file automatically; existing environment variables
+win. Set `PIAGENT_HOME` or `PIAGENT_ENV_FILE` to select another location.
+See [install details](docs/install.md) for permissions, defaults and overrides.
+
 ## Quick start
 
 Use Node 24 and npm. Have the two approved Oracle 19c targets in
