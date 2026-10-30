@@ -15,15 +15,18 @@ See [PLAN.md](PLAN.md) for scope and [AGENTS.md](AGENTS.md) for contributor rule
 
 ## Install
 
-With Node 24 and npm:
+With Node 24 and npm, install from a clone:
 
 ```bash
-npm install -g github:rammsguns/OracleDBPiAgent
+git clone https://github.com/rammsguns/OracleDBPiAgent.git
+cd OracleDBPiAgent
+npm ci
+npm install -g .
 piagent --version
 piagent init
 ```
 
-Or run `npm install -g .` from a clone. Edit the placeholder credential-file
+Edit the placeholder credential-file
 paths in `~/.piagent/.env`, then run `piagent targets` from any directory.
 The CLI loads that private file automatically; existing environment variables
 win. Set `PIAGENT_HOME` or `PIAGENT_ENV_FILE` to select another location.

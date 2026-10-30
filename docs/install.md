@@ -1,15 +1,31 @@
 # Install the CLI
 
-Use Node 24 and npm. Install directly from GitHub (no npm publication):
+Use Node 24 and npm. Install from a clone:
 
 ```bash
-npm install -g github:rammsguns/OracleDBPiAgent
+git clone https://github.com/rammsguns/OracleDBPiAgent.git
+cd OracleDBPiAgent
+npm ci
+npm install -g .
 piagent --version
 piagent init
 ```
 
-Or install from a clone with `npm install -g .`. The prepare script compiles the
-CLI and web assets. Run `piagent` from any directory after installation.
+Or install a packed tarball from the prepared clone:
+
+```bash
+npm pack
+npm install -g ./oracledb-pi-agent-1.0.0.tgz
+```
+
+The prepare script compiles the CLI and web assets. Run `piagent` from any
+directory after installation. Keep the clone directory when installing it
+because npm links global directory installs to their source.
+
+Direct global GitHub/git-source installs currently fail: npm runs git preparation
+without locally available devDependencies under `-g`, so `tsc` is missing. This
+was reproduced with npm 9.2.0 and npm 11 using a local git source. Use the verified
+clone or packed-tarball paths above; direct git installation is not supported yet.
 
 `piagent init` creates `~/.piagent` with mode 0700 and `.env` with mode 0600.
 It copies the bundled template with placeholder paths and never overwrites an
