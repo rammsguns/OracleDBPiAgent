@@ -1135,6 +1135,56 @@ run the command anywhere). Today `piagent` only works from a clone:
 ### Not in phase 9
 Publishing to npm, installer scripts piped from curl, and Windows support.
 
+## Phase 10: second Strata for evals (approved 2026-10-30)
+
+The owner has a second Strata on the LAN running the same model
+(`qwen3.8-flash-next-iq3_s`) with a 32k context and a k8v4 KV cache. The local
+server has 131k and q8_0/q8_0. It can make gates faster and give more runs per
+side, as WP-6A showed is needed for ±3% token precision. AGENTS.md rule 2 now
+has an eval-only exception for it, reached through an SSH tunnel at
+`127.0.0.1:18080`.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-10A Eval secondary endpoint | `wp-10a-eval-secondary` | `evals/run.ts` and eval helpers; a narrow, eval-only path in `src/llm/` and `src/config/`; tests; `docs/evals-two-servers.md` | — |
+| Coordinator | `needlefish` | same-code check across servers; the balanced gate script | WP-10A plus the owner's tunnel and key file |
+
+### WP-10A: eval secondary endpoint
+- `evals/run.ts --endpoint primary|secondary` (default `primary`, unchanged).
+  `secondary` reads:
+  - `PIAGENT_EVAL_SECONDARY_BASE_URL`, which must be exactly
+    `http://127.0.0.1:18080/v1`;
+  - `PIAGENT_EVAL_SECONDARY_API_KEY_FILE`;
+  - `PIAGENT_EVAL_SECONDARY_CONTEXT_WINDOW`, default 32768.
+- The product path stays strict: CLI, web and report still accept only
+  127.0.0.1:8080 and never read `PIAGENT_EVAL_*`. Tests prove it.
+- Before running, check the endpoint's `/health`: `loaded: true` and the same
+  model name as the primary. Stop if either fails.
+- One call at a time per endpoint, across processes: a per-endpoint lock
+  file. A second `run.ts` on the same endpoint refuses to start.
+- Results record the endpoint label and its health snapshot (no key).
+  `compare.ts` accepts mixed-endpoint files and warns if the two sides do not
+  use the endpoints equally.
+- The key is never printed or logged, and the audit log never stores it.
+- Gate: unit tests (no tunnel needed), typecheck, the Antigravity security
+  review.
+
+### Coordinator: same-code check and balanced gates
+- Owner setup: SSH key access to the LAN host, the tunnel
+  `127.0.0.1:18080 → 127.0.0.1:8080` on the LAN host, and a 0600 key file.
+- Same-code check: one hard dev ×2 run on each server, with the same code.
+  Compare pass rates and per-case tokens. Server differences are expected;
+  record their size.
+- Balanced gate: each server runs both baseline and candidate for half the
+  repeats, interleaved, so any server difference cancels.
+  - Each stream is sequential.
+  - Wall time is the main measure.
+  - Report results by server as well as pooled.
+
+### Not in phase 10
+Product use of the second server, failover, load balancing, and
+reconfiguring either server.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

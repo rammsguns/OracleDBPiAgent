@@ -14,6 +14,12 @@ Read `PLAN.md` first. It is the source of truth for scope, layout and the work p
    Do not add or register any cloud LLM provider, SDK or API key. Do not restart,
    unload or reconfigure Strata. If `/health` shows it unloaded, stop and report
    back. Send LLM calls one at a time, never in parallel.
+   **Eval-only exception (phase 10):** the eval runner, and nothing else, may also
+   use the owner's second Strata through a loopback SSH tunnel
+   (`http://127.0.0.1:18080/v1`), with its key read from the file named in
+   `PIAGENT_EVAL_SECONDARY_API_KEY_FILE`. Send at most one call at a time to each
+   server. The product (CLI, web, report) never uses it. The same no-restart and
+   no-reconfigure rules apply to it, and no other endpoint is allowed.
 3. **Secrets.** Read passwords only from `PIAGENT_SECRET_DIR`. Never copy, print, log
    or commit a password or the Strata API key. The audit log stores SQL hashes and
    short SQL text, never bind values or credentials.
