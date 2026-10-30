@@ -34,9 +34,13 @@ using DB or LLM commands. Passwords stay in `PIAGENT_SECRET_DIR`; the Strata key
 stays in its separate file. See the [quick start](../README.md#quick-start) for
 approved accounts and credential file names.
 
-Set `PIAGENT_HOME` to choose another private home. On startup the CLI loads
+Set `PIAGENT_HOME` to choose another private home. Existing homes must be real
+directories owned by the current user with no group/other permissions; they are
+never chmodded. Read-only commands such as `--version` do not create the home.
+On startup the CLI loads
 `PIAGENT_ENV_FILE`, or `$PIAGENT_HOME/.env` (default `~/.piagent/.env`). Missing
-files are allowed. Existing environment variables win, including empty values.
+default files are allowed; a missing explicit `PIAGENT_ENV_FILE` is an error.
+Existing environment variables win, including empty values.
 Env files must be private regular files: group/other permissions and symlinks
 are refused. No env values are printed. The working directory's `.env` is never
 automatically loaded.
@@ -65,5 +69,9 @@ chmod 600 .env
 # Edit local paths in .env.
 node --env-file=.env dist/cli/index.js targets
 ```
+
+Clone users can keep artifacts in `var/` by setting
+`PIAGENT_AUDIT_FILE=./var/audit.jsonl` and `PIAGENT_REPORT_DIRECTORY=./var/reports`
+in their `.env` (uncomment the report setting in the template).
 
 Explicit `--env-file` settings win over automatic private-home settings.

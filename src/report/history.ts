@@ -1,3 +1,5 @@
+import { ensureAgentHome } from "../config/environment.js";
+import { agentHome } from "../config/paths.js";
 import { chmod, lstat, mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -9,10 +11,13 @@ export function validateReportTarget(target: string, targets: Targets): void {
 	if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(target) || !targets.some(t => t.name === target)) throw new Error('Invalid or unknown report target');
 }
 const stampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/;
-async function directory(dir: string, target: string, targets: Targets, create: boolean): Promise<string> {
+async function directory(dir: string, target: string, targets: Targets, create: boolean, ensureDefaultHome = true): Promise<string> {
 	validateReportTarget(target, targets);
 	const root = resolve(dir), path = join(root, target);
-	if (create) { await mkdir(root, { recursive: true, mode: 0o700 }); }
+	if (create) {
+		if (ensureDefaultHome && process.env.PIAGENT_REPORT_DIRECTORY === undefined && root === join(agentHome(), "reports")) ensureAgentHome();
+		await mkdir(root, { recursive: true, mode: 0o700 });
+	}
 	for (const p of [root, path]) {
 		try { const stat = await lstat(p); if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('Report directory must be a real directory'); }
 		catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; if (!create) throw error; await mkdir(p, { mode: 0o700 }); }
@@ -33,8 +38,8 @@ export async function loadLatestReport(dir: string, target: string, targets: Tar
 		return report;
 	} catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
 }
-export async function saveReport(dir: string, report: DatabaseReport, targets: Targets): Promise<{ json: string; markdown: string }> {
-	const path = await directory(dir, report.target, targets, true);
+export async function saveReport(dir: string, report: DatabaseReport, targets: Targets, ensureDefaultHome = true): Promise<{ json: string; markdown: string }> {
+	const path = await directory(dir, report.target, targets, true, ensureDefaultHome);
 	if (!Number.isFinite(Date.parse(report.generatedAt))) throw new Error('Invalid report timestamp');
 	const stamp = new Date(report.generatedAt).toISOString().replace(/:/g, '-');
 	const json = join(path, `${stamp}.json`), markdown = join(path, `${stamp}.md`);

@@ -1,20 +1,34 @@
-import { constants, chmodSync, closeSync, fstatSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 import { agentHome, PACKAGE_ROOT } from "./paths.js";
 
 export function ensureAgentHome(env: NodeJS.ProcessEnv = process.env): string {
 	const home = agentHome(env);
-	mkdirSync(home, { recursive: true, mode: 0o700 });
-	chmodSync(home, 0o700);
+	try {
+		let stat;
+		try { stat = lstatSync(home); }
+		catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+			mkdirSync(home, { recursive: true, mode: 0o700 });
+			stat = lstatSync(home);
+		}
+		if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("PIAGENT_HOME must be a real directory, not a symlink");
+		if (typeof process.getuid === "function" && stat.uid !== process.getuid()) throw new Error("PIAGENT_HOME must be owned by the current user");
+		if ((stat.mode & 0o077) !== 0) throw new Error("PIAGENT_HOME must be private (mode 0700)");
+	} catch (error) {
+		if (error instanceof Error && error.message.startsWith("PIAGENT_HOME ")) throw error;
+		throw new Error("Cannot create or inspect PIAGENT_HOME private directory");
+	}
 	return home;
 }
 export function loadEnvironment(env: NodeJS.ProcessEnv = process.env): void {
+	const isExplicit = env.PIAGENT_ENV_FILE !== undefined;
 	const file = env.PIAGENT_ENV_FILE ?? join(agentHome(env), ".env");
 	let fd: number;
 	try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
 	catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+		if ((error as NodeJS.ErrnoException).code === "ENOENT" && !isExplicit) return;
 		throw new Error("Cannot open private environment file");
 	}
 	try {

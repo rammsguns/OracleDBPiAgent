@@ -2,7 +2,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
-import { loadEnvironment, ensureAgentHome, initializeHome } from "../config/environment.js";
+import { loadEnvironment, initializeHome } from "../config/environment.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
@@ -70,7 +70,6 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 }
 export async function main(argv = process.argv, dependencies: DoctorDependencies = {}) {
 	loadEnvironment();
-	ensureAgentHome();
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
 	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
@@ -97,7 +96,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, sections: options.sections?.split(",").map(s => s.trim()) });
 			const markdown = renderMarkdown(report);
 			const changes = compare ? diff(previous, report) : undefined;
-			if (out) await saveReport(out, report, config.targets);
+			if (out) await saveReport(out, report, config.targets, options.out === undefined);
 			if (options.diffOnly) {
 				console.log(options.json ? JSON.stringify({ diff: changes }) : renderDiffMarkdown(changes!));
 				process.exitCode = changes!.changes.length ? 3 : 0;

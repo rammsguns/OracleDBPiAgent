@@ -93,7 +93,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 					const summary = params.has("summarize") ? await (options.summarize ?? summarizeReport)(markdown, manager.config.llm) : undefined;
 					const unverified = summary === undefined ? [] : checkReportSummary(summary, markdown, manager.config.llm);
 					const finished = sessions; sessions = undefined; await finished.closeAll();
-					if (saving) await (options.saveReport ?? saveReport)(directory, report, manager.config.targets);
+					if (saving) await (options.saveReport ?? saveReport)(directory, report, manager.config.targets, options.reportDirectory === undefined);
 					return json(res, 200, { report, diff, ...(saving ? { savedAt: report.generatedAt } : {}), ...(summary === undefined ? {} : { summary, unverified }) });
 				} catch { throw new WebError(500, "Report failed"); }
 				finally { try { await sessions?.closeAll(); } catch { throw new WebError(500, "Report failed"); } finally { release(); } }
