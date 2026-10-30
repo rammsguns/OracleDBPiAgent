@@ -1168,6 +1168,16 @@ has an eval-only exception for it, reached through an SSH tunnel at
 - The key is never printed or logged, and the audit log never stores it.
 - Gate: unit tests (no tunnel needed), typecheck, the Antigravity security
   review.
+- **Result (2026-10-30): merged** (a2b86f4). The Antigravity security review
+  approved:
+  - product isolation;
+  - per-request URL checks for 127.0.0.1:18080 only;
+  - a 0600 key file, never logged;
+  - a cross-process lock per endpoint.
+
+  Typecheck and build pass, 626 unit tests pass, and integration has 24
+  passed and 1 skipped. The secondary server was not contacted; its live
+  check waits on the owner's tunnel.
 
 ### Coordinator: same-code check and balanced gates
 - Owner setup: SSH key access to the LAN host, the tunnel

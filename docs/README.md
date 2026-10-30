@@ -21,6 +21,7 @@ revision they checked; use the status page and current code for today's behavior
 ## Evals and optimization
 
 - [evals-two-servers.md](evals-two-servers.md) — Secondary tunnel setup and balanced eval gates.
+- [wp-10a-eval-secondary.md](wp-10a-eval-secondary.md) — WP-10A implementation and verification notes.
 - [evals-hard.md](evals-hard.md) — Hard-suite cases, splits and ground-truth checks.
 - [model-optimization.md](model-optimization.md) — Variant results, promotions and rejected token-saving experiments.
 
