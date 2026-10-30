@@ -7,7 +7,13 @@ export interface RecordRow {
 	usage: { input: number; output: number };
 	toolDetails?: { isError: boolean | null }[];
 }
-export interface Report { casesSha256?: string; records: RecordRow[] }
+export interface Report { endpoint?: "primary" | "secondary"; casesSha256?: string; records: RecordRow[] }
+export function endpointWarnings(a: Report[], b: Report[]): string[] {
+	// Count case observations, so repeats and partial suites retain their weight.
+	const count = (reports: Report[], endpoint: string) => reports.filter(r => (r.endpoint ?? 'primary') === endpoint).reduce((n, r) => n + r.records.length, 0);
+	return ['primary', 'secondary'].some(endpoint => count(a, endpoint) !== count(b, endpoint))
+		? ['Unequal endpoint use between sides: server differences may confound the comparison.'] : [];
+}
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 /** Percentile bootstrap of paired differences; fixed PRNG makes reports reproducible. */
 export function interval(xs: number[], samples = 10000): [number, number] | null {
@@ -65,7 +71,7 @@ export function compare(a: Report[], b: Report[]) {
 		}, 0)));
 	};
 	return { direction: 'B minus A; tokens = uncached input + output', pairedBlocks: aa.length,
-		warnings: [...([...aa, ...bb].some(block => [...block.values()].some(r => r.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),
+		warnings: [...endpointWarnings(a, b),...([...aa, ...bb].some(block => [...block.values()].some(r => r.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),
 			...(aa.length < 4 ? ['Fewer than four pairs: intervals are exploratory, not an acceptance gate.'] : []),
 			...([...a, ...b].some(r => !r.casesSha256) ? ['Missing case hash: manually verify identical questions and scoring.'] : [])],
 		cases, suite: { tokens: total('tokens'), passRate: total('passRate'), toolErrors: total('toolErrors') } };
@@ -126,7 +132,7 @@ export function comparePerCase(a: Report[], b: Report[], { seed = 8129, samples 
 		percentChange: pct(mean(cases.map(c => c.logRatio))), ci95: [draws[Math.floor(samples * .025)]!, draws[Math.ceil(samples * .975) - 1]!],
 		skipped, planning: { targetHalfWidthPercent: 3, runsPerSide, betweenLogVariance: between, denoisedBetweenLogVariance: trueBetween, meanWithinRelativeVariance: within,
 			reason: insufficient ? 'Within-case variance unknown with fewer than two runs on either side' : budget <= 0 ? 'No finite runs-only estimate under the de-noised between-case variance model' : 'Method-of-moments delta-method approximation; runs per arm per case' },
-		warnings: [...(insufficient ? ['Single-run cases have no estimable within-case variance; bootstrap conditions on those observations.'] : []),
+		warnings: [...endpointWarnings(a, b),...(insufficient ? ['Single-run cases have no estimable within-case variance; bootstrap conditions on those observations.'] : []),
 			...([...a, ...b].some(r => r.records.some(row => row.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),
 			...([...a, ...b].some(r => !r.casesSha256) ? ['Missing case hash: manually verify identical questions and scoring.'] : []),
 			'Case/run bootstrap assumes independent cases and independent within-case runs; shared run covariance is not preserved.'],
