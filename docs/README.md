@@ -10,6 +10,8 @@ revision they checked; use the status page and current code for today's behavior
 - [README.md](README.md) — This documentation index.
 
 - [install.md](install.md) — Global CLI installation and private configuration.
+- [wp-9a-global-install.md](wp-9a-global-install.md) — WP-9A install verification notes.
+- [wp-9a-security-fixes.md](wp-9a-security-fixes.md) — WP-9A security review fixes.
 
 ## Development
 

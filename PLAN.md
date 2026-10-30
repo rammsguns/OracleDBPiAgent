@@ -1111,6 +1111,27 @@ run the command anywhere). Today `piagent` only works from a clone:
   defaults; typecheck, unit and integration tests; the Antigravity security
   review; CI green.
 
+- **Result (2026-10-30): merged** (6308293, f488ae7, 02864a8).
+  - Supported installs: from a clone (`npm ci`, then `npm install -g .`) and
+    from a packed tarball. A direct `npm install -g github:…` fails under
+    npm 9 and 11: npm builds git packages under `-g` without
+    devDependencies. This is documented as unsupported; the owner chose no
+    nested-install workaround.
+  - The Antigravity security review requested four fixes, all applied:
+    - an existing `PIAGENT_HOME` is never re-permissioned; a symlinked,
+      foreign-owned or non-private home is refused;
+    - an explicit `PIAGENT_ENV_FILE` that is missing is an error;
+    - the home is created only by `init` or on the first default audit or
+      report write;
+    - `PIAGENT_REPORT_DIRECTORY` is listed in `.env.example`.
+  - Gate: typecheck, build, 615 unit tests, integration 24 passed and 1
+    skipped. The coordinator's temp-prefix tarball check matched: package
+    contents are clean, `--version` creates nothing, `init` gives 0700 and
+    0600, and `targets` works from an unrelated directory.
+  - Behaviour change: with the variables unset, audit and report history now
+    default to `~/.piagent/`. Set `PIAGENT_AUDIT_FILE` and
+    `PIAGENT_REPORT_DIRECTORY` to keep using `var/` in a clone.
+
 ### Not in phase 9
 Publishing to npm, installer scripts piped from curl, and Windows support.
 
