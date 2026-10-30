@@ -1191,6 +1191,34 @@ has an eval-only exception for it, reached through an SSH tunnel at
   - Wall time is the main measure.
   - Report results by server as well as pooled.
 
+Result (2026-10-30), with both servers running at once and the same code.
+Results are archived in `eval-archive/phase10/`.
+- Primary: 56/56 passed, every refusal passed, 980 s wall time.
+- Secondary: 52/56 passed, 5,676 s wall time.
+  - Three of its failures were not model failures. The LAN host rebooted
+    partway through the run, which killed the tunnel. Those calls got
+    "connection refused", so no key went anywhere.
+  - Its one real failure was `hard-follow-plan`.
+- Speed: on the 53 records both servers completed, the secondary was 5.67×
+  slower (5,334 s against 940 s).
+- Tokens, per case: −3.4%, 95% interval [−14%, +8%]. That is consistent with
+  no difference, but the interval is wide.
+
+Decision: the balanced gate is not adopted.
+- A 50/50 split would take about 2.8× as long as running on the primary
+  alone.
+- Even an ideal split by speed (about 85/15) saves at most about 15%.
+- The secondary's different context window and KV cache add a risk of
+  server bias.
+
+The `--endpoint secondary` option stays as an opt-in tool for long side
+jobs. Gates stay on the primary. Phase 10 is closed.
+
+Port note: an OracleDBHarness uvicorn process has `--port 18080` in its
+command line but was not listening. If it ever binds that port, the tunnel
+cannot start (`ExitOnForwardFailure`). The runner's health check, which
+requires `loaded` and a matching model, would then refuse the endpoint.
+
 ### Not in phase 10
 Product use of the second server, failover, load balancing, and
 reconfiguring either server.
