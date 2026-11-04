@@ -1,6 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { stripTypeScriptTypes } from 'node:module';
-import { Type } from 'typebox';
+import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import { createDbTools } from '../../src/tools/index.js';
 import type { ToolContext } from '../../src/contracts.js';
@@ -12,12 +10,8 @@ function setup(statementTimeoutSeconds = 15) {
 	const ctx = { config: { defaultTarget: 'lab', targets: [{ name: 'lab', defaultSchema: 'HR' }], limits: { statementTimeoutSeconds, maxRows: 100, maxToolResultBytes: 16000 } }, sessions: { get: async () => ({ query, close }) }, audit: { record: async () => {} }, runId: 'fallback' } as unknown as ToolContext;
 	return { query, close, tools: createDbTools(ctx) };
 }
-it('snapshots tool definitions JSON remain byte-identical with the empty dictionary hint', () => {
-	const master = execFileSync('git', ['show', 'master:src/tools/index.ts'], { encoding: 'utf8' });
-	const block = master.slice(master.indexOf('const str ='), master.indexOf('export function createDbTools'));
-	const js = stripTypeScriptTypes(block) + "\nreturn definitions;";
-	const definitions = new Function('Type', js)(Type) as [string, string, Record<string, unknown>][];
-	const baseline = definitions.map(([name, description, properties]) => ({ name, label: name, description, parameters: Type.Object({ target: Type.Optional(Type.String()), ...properties }, { additionalProperties: false }) }));
+it('keeps tool definitions byte-identical to the committed chat fixture', () => {
+	const baseline = JSON.parse(readFileSync(new URL('./fixtures/chat-master.json', import.meta.url), 'utf8')).tools;
 	const actual = setup().tools.map(({ name, label, description, parameters }) => ({ name, label, description, parameters }));
 	expect(JSON.stringify(actual)).toBe(JSON.stringify(baseline));
 });

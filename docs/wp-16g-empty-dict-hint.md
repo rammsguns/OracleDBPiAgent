@@ -23,7 +23,9 @@ This deliberately favors missing an optional hint over guessing SQL semantics.
 Unit tests cover positive/empty probes, nonempty original results, denied and
 unexpected probe failures, timeout caps, aborts before/during probes, bounded
 identical-bind execution, protected text,
-ambiguous SQL, and byte-identical serialized tool definitions against master.
+ambiguous SQL, and byte-identical serialized tool definitions against the
+committed `tests/unit/fixtures/chat-master.json` tool snapshot. Neither dictionary
+test invokes Git or needs a branch ref; chat-triage also checks this fixture.
 The existing chat fixture is unchanged.
 
 Live verification on 2026-11-04: the hidden p1 SHOPAPP.WORKLOAD ALL_SOURCE query
@@ -41,3 +43,10 @@ Validation:
 - Integration command (serial, LLM e2e excluded):
   `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- -t '^(?!.*answers one end-to-end ask)' --no-file-parallelism --maxWorkers=1`.
   Result: 31 passed, 1 skipped (excluded LLM e2e), 10 files.
+
+CI portability follow-up: merged phase-16 master, then replaced both dictionary
+snapshot tests' Git-based baselines with the committed fixture. Typecheck and
+all 967 unit tests (64 files) pass in the worktree and all 967 unit tests pass
+in a fresh clone containing only the local `wp-16g-empty-dict-hint` branch, with
+shared installed dependencies. The temporary clone was removed afterward.
+A search of test sources found no other Git or branch dependencies.
