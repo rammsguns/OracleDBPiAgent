@@ -58,7 +58,14 @@ has no differences but is not evidence of equality.
 `generatedAt`, `complete`, `hasDrift`, and `sections`. Each section has `name`,
 `source`, `status`, `notes`, `onlyLeft`, `onlyRight`, and `different`.
 `--out` additionally writes a uniquely named JSON/Markdown pair, mode 0600,
-creating the directory with mode 0700 if necessary. It does not change an
+creating the directory with mode 0700 if necessary. Both files are staged in
+private temporary files in the destination directory (mode 0600, exclusive
+creation), then atomically renamed into place: Markdown first, JSON last as the
+commit marker. Temporary files are cleaned up in `finally`; a failed JSON
+publication also removes the uncommitted Markdown file. Readers should select
+only exports with a final JSON file. The pair is not a single filesystem
+transaction: abrupt process termination can leave temporary files or Markdown
+without JSON, but never a partially written final file. It does not change an
 existing directory's permissions. The directory itself must not be a symlink.
 Output files contain database metadata and parameter values; choose a private
 local directory. No saved drift files are read or executed by this command.
@@ -97,3 +104,10 @@ run also passed. Schema/object comparisons were complete and stable across two
 runs; all self-comparisons had empty difference groups. The live CLI parameter
 check exited 1 for the missing grant. CLI schema:HR with JSON and a temporary
 output directory exited 3 with a complete result and two saved files.
+
+Review fixes (2026-11-04): atomic export tests verify private staging, publication
+order, and cleanup after a partial JSON write or either rename failing.
+Typecheck passed; unit tests finished with 672 passed and the two expected
+`wp-i-optimizer.test.ts` failures (`Eval endpoint primary is already locked`
+while the owner's eval was running). No LLM or integration tests were run for
+these filesystem-only changes.
