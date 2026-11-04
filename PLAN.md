@@ -1223,6 +1223,69 @@ requires `loaded` and a matching model, would then refuse the endpoint.
 Product use of the second server, failover, load balancing, and
 reconfiguring either server.
 
+## Phase 11: harder evals, then quality fixes (approved 2026-11-03)
+
+The owner asked for an agent quality pass. The data says the suite is
+saturated: phase 8 holdout ×3 passed 36/36, and phase 10 hard dev ×2 passed
+56/56 on the primary. The only recent real failure was `hard-follow-plan`
+(1 in 4, on the secondary). run_query errors are 6 to 7 per run. About half
+are expected ORA-00942s in grant cases. The rest are ORA-00904s from guessed
+column names (`T.CAL_YEAR`, `v$sql_plan.PLAN_ID`), recovered on the next call.
+With a 100% pass rate the suite cannot show whether a change helps, so the
+owner chose to make it harder first. Quality fixes come after, driven by real
+failures.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-11A Challenge cases | `wp-11a-challenge-evals` | new `evals/cases-hard/phase11-*.json`; `evals/types.ts` (split value only); `evals/run.ts` (split option only); `evals/validate-hard.ts`; `evals/scoring.ts` (only new, opt-in check kinds); their tests; `docs/evals-hard.md` | — |
+| WP-11B Quality fixes | decided after the 11A baseline | decided after the 11A baseline | WP-11A baseline |
+
+### WP-11A: challenge cases
+- Add a new split, `challenge`, with about 12 cases. Gates keep their current
+  splits; `challenge` is reported separately and does not change dev,
+  holdout or regression.
+- Target difficulty: the current agent should pass roughly 40 to 80% of the
+  challenge runs. Every case must be answerable from views that its target can
+  read, with read-only ground truth checked by `validate-hard.ts`.
+- Categories, 2 to 3 cases each:
+  - **Multi-step diagnosis:** the answer needs 3 or more dependent lookups,
+    each built on the last (for example: top SQL by a measure, then its plan,
+    then the indexes or columns that the plan touches).
+  - **Column traps:** natural wording that differs from the real column or
+    view name (calendar year, plan line, full SQL text), so a guess fails and
+    the agent must look up the structure.
+  - **False premises:** the question assumes an object, value or state that
+    is not true; the answer must correct the premise and invent nothing.
+  - **Ambiguity:** the same name exists in more than one schema, or the
+    question can be read two ways. The answer must name the readings or state
+    which one it used, checked by required facts for each reading.
+  - **Multi-turn dependency:** a later turn refers to a value found in an
+    earlier turn ("that table", "the second one").
+  - **Wide exact answers:** `allCells` over 8 or more rows, where one wrong
+    or missing row fails.
+- Same rules as phases 5 and 8: questions do not name tools or give away the
+  answer; ground truth is plain SELECT; `forbiddenClaims` skip negations; no
+  near-copies of existing cases.
+- Cases are written blind (no agent or LLM runs). Scorer changes are allowed
+  only as new, opt-in check kinds with unit tests. Existing case behaviour
+  must not change, which tests prove.
+- Coordinator baseline on main: challenge ×3. Triage every failure into
+  agent error or scorer/case bug. Only scorer and case bugs are fixed. A case
+  is never loosened to make the agent pass. A case that fails 3 of 3 stays if
+  the Antigravity review confirms it is unambiguous and answerable; a case
+  that passes 3 of 3 stays, but is flagged.
+- Gate: validation, typecheck and unit tests pass; the Antigravity review of
+  ground truth, ambiguity, answer leaks and independence; baseline results
+  recorded with the failure triage.
+
+### WP-11B: quality fixes
+Scoped from the 11A failure triage, then approved by the owner. It uses the
+usual gate (hard dev 4×4, holdout ×3, regression ×1, MVP) plus challenge ×4
+on each side.
+
+### Not in phase 11
+New tools, cloud LLMs, LLM-judged scoring, and changes to existing cases.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
