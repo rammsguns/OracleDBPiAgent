@@ -1908,6 +1908,56 @@ definitions stay byte-identical. Gate: as WP-16E, against master with WP-16E.
   default chat is unchanged.
 - Antigravity review per WP.
 
+### Phase 16 results (2026-11-04): complete, not yet pushed
+All WPs are merged on local master with Antigravity review APPROVE:
+
+| WP | Merges |
+|---|---|
+| 16A | d592d86 |
+| 16B | b8867fd, follow-up 2e0404f |
+| 16C | 8ad658e, follow-ups 11a6dd5 and 4ec5f84 |
+| 16D | 98efdc1 and 744c23c |
+| 16E | 5c99a4d |
+| 16F | 33732fc |
+| 16G | 387f796 |
+
+- Eval gates (alternating A/B, primary Strata, current scorer):
+
+  | Gate | PL/SQL challenge | `history-arguments` | Hard dev tokens | Holdout | Regression | MVP |
+  |---|---|---|---|---|---|---|
+  | gate-16e, master → +16E | 17/40 → 32/40 | — | −7.2k/run (CI −10.6k..−3.5k); two B misses are the trailing-zero artifact | flat | 21/21 | 39/39 |
+  | gate-16g, master(+16E/C) → +16G | 30/40 → 34/40 | 0/4 → 3/4 | flat | 33 → 34/36 | 21/21 | 39/39 |
+
+  - gate-16g tool errors: B's extras are ordinary model SQL mistakes.
+  - gate-16g IX boundary case: still refuses correctly.
+- Default chat: system prompt and tool definitions are byte-identical (the
+  chat-master snapshot test). gate-16g's A side, which includes 16C, matches
+  gate-16e's B side on dev, regression and MVP.
+- Coordinator live smokes, with screenshots checked:
+  - `plsql doc` on WORKLOAD;
+  - triage on NIGHTLY_PURGE_JOB, giving the cutoff race at lines 26/27, SYS_C007669 and a single-cutoff fix;
+  - triage on K7Q_FAILJOB with the default window, giving historical ORA-20001 runs and the dropped job;
+  - `triage --summarize`, with no unverified numbers;
+  - CLI chat `/triage`;
+  - the web PL/SQL graph and Triage panel.
+
+  These smokes found two UX gaps, both fixed and reviewed: triage found nothing
+  for a failure older than the window, and the graph had overlapping edge labels
+  and a cramped layout.
+- Tests on master:
+
+  | Suite | Result |
+  |---|---|
+  | typecheck | clean |
+  | unit | 967 passed |
+  | integration, incl. LLM e2e | 35 passed |
+  | browser | 27 passed |
+
+- Open items:
+  - security-trigger answers that only defend the error code after pushback (real misses);
+  - name recognition for job names without a _JOB suffix in triage;
+  - two Low review notes on WP-16G hint coverage (comma joins).
+
 ### Not in phase 16
 - Compiling, debugging with DBMS_DEBUG, setting breakpoints, or running any
   PL/SQL.
