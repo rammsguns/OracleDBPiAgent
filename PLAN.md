@@ -1794,6 +1794,7 @@ tables, so logs come from Oracle sources plus per-target configured log tables.
 | WP-16B Issue triage | `wp-16b-triage` | `src/triage/` (new), the `triage` command, tests, `docs/triage.md` | WP-16A |
 | WP-16C Web and chat | `wp-16c-plsql-web` | `src/web/` (PL/SQL tab, triage panel, SVG graph), chat `/triage` in `src/cli/` and web chat, browser tests, `docs/web-ui.md` | WP-16B |
 | WP-16D PL/SQL evals | `wp-16d-plsql-evals` | `evals/cases-hard/phase16-*.json` (challenge split), `docs/evals-hard.md` | — |
+| WP-16E Tool dictionary fallback | `wp-16e-tool-fallback` | `src/tools/index.ts` (fallback only, no schema/description change), tests | WP-16D baseline |
 
 ### WP-16A: PL/SQL docs and diagrams
 - `src/plsql/dictionary.ts`: a typed read layer over objects, procedures,
@@ -1861,6 +1862,17 @@ which line raises, what a d1 trigger does, and what an argument list is. Use
 `rowCells` where it fits. Validate ground truth read-only, and test scorers with
 correct and wrong answers in several layouts. The baseline is measured on
 current master; no product change is made in this WP.
+
+### WP-16E: dictionary fallback in chat tools
+The WP-16D baseline (current master, primary Strata, ×3) showed the cause of
+most failures. `get_source`, `list_objects` and `describe_object` read only `ALL_`
+views. Those hide PL/SQL the session does not own or execute (WORKLOAD and the HR
+triggers), so the model loops through `list_objects` calls. Fix: inside the
+existing tools, fall back to the matching `DBA_` view when the `ALL_` query
+returns no rows and the `DBA_` view is readable. Report which view answered.
+Tool names, schemas and descriptions stay unchanged, so there is no token cost.
+Gate: phase-16 cases ×4 alternating, plus the usual hard dev 4×4, holdout ×3,
+regression and MVP.
 
 ### Gate
 - The usual tests (unit, integration, browser).
