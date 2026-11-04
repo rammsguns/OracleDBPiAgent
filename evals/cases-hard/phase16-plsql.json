@@ -1,0 +1,197 @@
+[
+	{
+		"id": "hard-p16-entry-points",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, list the public subprograms of SHOPAPP.WORKLOAD and distinguish them from the package itself.",
+		"groundTruth": {
+			"sql": "SELECT procedure_name FROM dba_procedures WHERE owner='SHOPAPP' AND object_name='WORKLOAD' AND procedure_name IS NOT NULL ORDER BY procedure_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-writes",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, map every SHOPAPP.WORKLOAD subprogram to each table it writes and the kind of write. Include multiple operations on the same table; distinguish reads from writes.",
+		"groundTruth": {
+			"sql": "SELECT (SELECT UPPER(REGEXP_SUBSTR(p.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) FROM dba_source p WHERE p.owner=s.owner AND p.name=s.name AND p.type=s.type AND p.line=(SELECT MAX(h.line) FROM dba_source h WHERE h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line<s.line AND REGEXP_LIKE(h.text,'PROCEDURE +','i'))) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'(INSERT INTO|UPDATE|DELETE FROM) +([a-z_]+)',1,1,'i',2)) AS table_name,UPPER(REGEXP_SUBSTR(s.text,'INSERT|UPDATE|DELETE',1,1,'i')) AS operation FROM dba_source s WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND REGEXP_LIKE(s.text,'^ *(INSERT INTO|UPDATE|DELETE FROM) ','i') ORDER BY s.line",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-purge-behavior",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, explain what SHOPAPP.WORKLOAD.NIGHTLY_PURGE deletes, in what order, how it selects old data, and where it commits. Does its selection depend on order status?",
+		"groundTruth": {
+			"sql": "SELECT line,UPPER(REGEXP_SUBSTR(text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source WHERE owner='SHOPAPP' AND name='WORKLOAD' AND type='PACKAGE BODY' AND REGEXP_LIKE(text,'^ *DELETE FROM','i') ORDER BY line",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(7|seven).{0,30}day",
+				"order_lines.{0,100}(before|then|first|orders)|first.{0,100}order_lines",
+				"commit",
+				"(not|no|without|regardless).{0,60}status|status.{0,60}(not|no|irrelevant)",
+				"ordered_at"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-scheduler-map",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, map the SHOPAPP scheduler jobs that invoke WORKLOAD to their entry points. Also state whether the order-placement job supplies an argument and its value.",
+		"groundTruth": {
+			"sql": "SELECT job_name,UPPER(REGEXP_SUBSTR(job_action,'workload[.]([a-z_]+)',1,1,'i',1)) AS entry_point FROM dba_scheduler_jobs WHERE owner='SHOPAPP' AND LOWER(job_action) LIKE '%workload.%' ORDER BY job_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"\\b25\\b"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-purge-constraint",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, investigate the recorded NIGHTLY_PURGE_JOB referential-integrity failure. Identify the error, constraint, child table and column, parent table and column, and delete rule; explain why deleting the parent can be blocked.",
+		"groundTruth": {
+			"sql": "SELECT c.constraint_name,c.table_name AS child_table,cc.column_name AS child_column,p.table_name AS parent_table,pc.column_name AS parent_column,c.delete_rule FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"ORA-02292",
+				"(child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-purge-line",
+		"target": "p1-19c-prod",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On p1, trace the most recent recorded NIGHTLY_PURGE_JOB failure back to the package body: give the package line, enclosing subprogram, and failing operation and table. Distinguish the package frame from the outer block frame.",
+		"groundTruth": {
+			"sql": "SELECT s.line,UPPER(REGEXP_SUBSTR(h.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'DELETE',1,1,'i')) AS operation,UPPER(REGEXP_SUBSTR(s.text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source s JOIN dba_source h ON h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line=(SELECT MAX(x.line) FROM dba_source x WHERE x.owner=s.owner AND x.name=s.name AND x.type=s.type AND x.line<s.line AND REGEXP_LIKE(x.text,'PROCEDURE +','i')) WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND s.line=(SELECT TO_NUMBER(REGEXP_SUBSTR(additional_info,'WORKLOAD\", line ([0-9]+)',1,1,NULL,1)) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-history-trigger",
+		"target": "d1-19c-lab",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On d1, explain HR.UPDATE_JOB_HISTORY: when and at what granularity it fires, which procedure it calls, and whether the recorded employee/job/department values are old or new. Identify the destination table.",
+		"groundTruth": {
+			"sql": "SELECT trigger_type,triggering_event,table_name FROM dba_triggers WHERE owner='HR' AND trigger_name='UPDATE_JOB_HISTORY'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"ADD_JOB_HISTORY",
+				"JOB_HISTORY",
+				"(old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
+				"JOB_ID",
+				"DEPARTMENT_ID"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-security-trigger",
+		"target": "d1-19c-lab",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On d1, explain HR.SECURE_EMPLOYEES: its timing, events and granularity, the routine it calls, and the time/day restriction and application error implemented by that routine. Describe the code without executing it.",
+		"groundTruth": {
+			"sql": "SELECT trigger_type,triggering_event,table_name FROM dba_triggers WHERE owner='HR' AND trigger_name='SECURE_EMPLOYEES'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"SECURE_DML",
+				"08:00",
+				"18:00",
+				"(SAT|Saturday).{0,40}(SUN|Sunday)",
+				"20205"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-history-arguments",
+		"target": "d1-19c-lab",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On d1, list every argument of HR.ADD_JOB_HISTORY in declaration order, with name, position, mode and resolved datatype. Are any arguments defaulted?",
+		"groundTruth": {
+			"sql": "SELECT argument_name,position,in_out,data_type,defaulted FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p16-failed-lab-job",
+		"target": "d1-19c-lab",
+		"category": "plsql-insight",
+		"split": "challenge",
+		"question": "On d1, what does the most recent recorded failed run of K7Q_OWNER.K7Q_FAILJOB report? Give the scheduler status, Oracle error code, application message and source line. Base your diagnosis on recorded evidence and distinguish an application-raised error from a foreign-key error.",
+		"groundTruth": {
+			"sql": "SELECT status,'ORA-'||LPAD(TO_CHAR(error#),5,'0') AS error_code,REGEXP_SUBSTR(additional_info,'ORA-20001: ([^'||CHR(10)||']+)',1,1,NULL,1) AS message,TO_NUMBER(REGEXP_SUBSTR(additional_info,'at line ([0-9]+)',1,1,NULL,1)) AS source_line FROM dba_scheduler_job_run_details WHERE owner='K7Q_OWNER' AND job_name='K7Q_FAILJOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"application.{0,40}(rais|error)|RAISE_APPLICATION_ERROR"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]
