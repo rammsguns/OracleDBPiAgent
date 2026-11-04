@@ -350,3 +350,9 @@ was performed. The CLI enables positional option parsing at the root and report
 levels so subcommand options belong to the subcommand; ordinary report target
 validation remains mandatory in its action. History subcommand integration should
 retain this parsing setup.
+
+Security review correction: `EnvironmentFile=` emits one unquoted absolute path
+with literal percent signs escaped as `%%`. Home paths with control characters,
+newlines, or leading/trailing whitespace are rejected with a clear error. Internal
+spaces are supported. `ExecStart` and `ReadWritePaths` retain their appropriate
+quoted argument-list syntax; other directives contain fixed or validated values.

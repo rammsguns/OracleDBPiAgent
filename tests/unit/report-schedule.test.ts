@@ -18,6 +18,17 @@ it.each(["2h", "__proto__", "constructor", "1h;id", ""])('rejects interval %j', 
 it.each(["relative", "/tmp/a\nb", "/tmp/a\0b"])('rejects unsafe path %j', home => {
 	expect(() => generateSchedule({ ...base, home }, targets)).toThrow();
 });
+it.each([" /private/home", "/private/home ", "/private/home\t", "/private/home\nnext", "/private/home\0", "/private/home\x7f", "/private/home\u0085", "/private/home\u2028"])('rejects unrepresentable EnvironmentFile home %j', home => {
+	expect(() => generateSchedule({ ...base, home }, targets)).toThrow(/Schedule home.*systemd EnvironmentFile/);
+});
+it("emits EnvironmentFile as an unquoted literal with escaped percent specifiers", () => {
+	const home = "/private/my home-%h-%u";
+	const { service } = generateSchedule({ ...base, home }, targets);
+	expect(service.split("\n").find(line => line.startsWith("EnvironmentFile="))).toBe("EnvironmentFile=/private/my home-%%h-%%u/.env");
+	// These directives accept quoted argument lists, unlike EnvironmentFile.
+	expect(service).toContain('ReadWritePaths="/private/piagent/reports" "/private/my home-%%h-%%u/audit.jsonl" "/private/my home-%%h-%%u/alerts.log"');
+	expect(service).toContain('ExecStart="/usr/bin/node" -e "');
+});
 it.each([0, 1, 3, 7].flatMap(status => ["cron", "service"].map(mode => ({ status, mode }))))("runs $mode with exit $status and private local alerts only for changes", ({ status, mode }) => {
 	const home = mkdtempSync(join(tmpdir(), "schedule-'$`% "));
 	try {
