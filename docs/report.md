@@ -353,3 +353,112 @@ for their valid sections. No history files or retention settings are changed.
   count deduplication, backup age, corrupt/oversize/symlink/nonregular files,
   retention and last-N boundaries, terminal controls and CLI isolation from DB/LLM.
 - No contract or dependency changes. Web files were untouched.
+
+## Schedule helper (WP-12B)
+
+```sh
+piagent report schedule --target d1-19c-lab --every 1h
+piagent report schedule --target p1-19c-prod --every 15m --out /private/reports
+```
+
+This prints one-time setup commands, a labelled service, timer, and alternative
+crontab line. It creates
+nothing, invokes no systemctl command, and makes no database or LLM calls.
+Supported intervals are exactly `15m`, `1h`, `6h`, and `1d`. Timers use local
+wall-clock calendar boundaries and catch up once after downtime (`Persistent`).
+Use either cron or the timer, with one writer per output directory. Cron has no
+catch-up behavior. Copy each labelled unit block into its own file; the entire
+combined output is not a unit file. There is no `--install` option.
+
+The generated command captures `process.execPath` at generation time and the
+installed `dist/cli/index.js`; build a source checkout before using its output.
+Check the printed Node path: on this host `~/.local/bin/node` resolves into a
+Playwright driver installation. Regenerate after a Node upgrade or any executable
+or CLI path change. No inline JavaScript is embedded in the output.
+
+The single command is `<node> <cli> report schedule run --target <t>`, with
+`--home` and `--out` arguments pinning the selected directories. The TypeScript
+runner invokes the existing `report --target ... --out ... --diff-only` command
+with a minimal environment and translates its exit status into local alerting.
+For a manual run, `piagent report schedule run --target d1-19c-lab` uses the current
+PIAGENT_HOME and its `reports` subdirectory; explicit absolute `--home` and `--out`
+paths override these defaults.
+The output directory defaults to `PIAGENT_REPORT_DIRECTORY`, otherwise
+`<PIAGENT_HOME>/reports`; `--out` is resolved to an absolute path.
+
+The run command skips ambient environment-file loading; scheduled reports read
+only `<PIAGENT_HOME>/.env`, regardless of an ambient
+`PIAGENT_ENV_FILE`. Initialize that private configuration first and put the
+`PIAGENT_SECRET_DIR` path there. Secrets remain in their existing files, never
+inline in units. The child receives a minimal environment and pins its audit
+file to `<PIAGENT_HOME>/audit.jsonl` so the sandbox's write allowance stays exact.
+Other report settings are read by the existing CLI environment parser.
+
+Initialize the private home configuration first. Before enabling the timer, run
+the printed `# one-time setup (run once before enabling the timer)` section in
+your normal shell, outside the service sandbox. It contains safely quoted
+`mkdir -p -m 700 -- <reports>` and, for each audit/alert file,
+`touch -- <file> && chmod 600 -- <file>`. These commands preserve existing file
+contents; they never truncate an audit log. `mkdir -p` leaves existing directory
+permissions unchanged, so ensure an existing report directory is already private.
+Inspect paths first: they must be owned by you and must not be symlinks.
+
+`report schedule run` checks the report directory and both log files before
+starting any report process: all three must exist, be writable and have the
+expected directory/regular-file type, with no symlinks. On failure it exits 1
+and prints one message identifying the path and its exact setup command. Correct
+unsafe paths before running setup; run setup outside the sandbox, then retry.
+The same preflight applies to cron and manual schedule runs.
+
+`ReadWritePaths` entries have the systemd `-` prefix: missing paths are
+ignored instead of causing a `226/NAMESPACE` setup failure. This does not make
+their read-only parent writable. Provision these specific paths before scheduling
+so the sandbox can write reports, audit events and alerts; a missing writable
+path can still cause the report or alert operation to fail. This preserves the
+narrow write allowance rather than making the configuration directory writable.
+Keep these directories and files owned by the scheduling user and
+free of symlinks. The service uses
+`UMask=0077`, `NoNewPrivileges`, `ProtectSystem=strict`, and `PrivateTmp`.
+`ReadWritePaths` permits only the report directory, audit file, and local alert
+file. The alert file is a necessary additional write allowance for notification.
+It does not grant write access to the whole home. Other filesystem access remains
+read-only; the existing Oracle networking still works.
+
+A report exit status of 3 appends an ISO timestamp and target to `<PIAGENT_HOME>/alerts.log`, enforcing
+mode 0600 and refusing a symlink, then succeeds. Exit 0 creates no notification;
+other failures remain failures. Report output goes to the journal or cron stdout.
+No notify-send, mail, network notification, or automatic log rotation is added.
+The log contains no report contents or credentials. Protect and rotate it locally
+as needed. Arbitrary environment files are configuration, not shell scripts.
+
+Golden fixtures cover all four intervals. Local fake-process tests cover quoted
+paths, cron percent escaping, status handling, private alerts and symlink refusal.
+The coordinator must perform `systemd-analyze --user verify` under a temporary
+HOME and arrange the Antigravity security review; this work package never installs
+units or uses the real user's systemd session.
+
+WP-12B validation: `npm run typecheck` passed; `npm test` passed (37 files,
+658 tests). With `PIAGENT_SECRET_DIR` set to the approved secret directory,
+`npm run test:integration -- -t '^(?!.*answers one end-to-end)'` passed
+(7 files, 24 passed, 1 LLM test excluded). No browser code changed.
+No live scheduler installation, systemctl command, agent run, eval, or LLM call
+was performed. The CLI enables positional option parsing at the root and report
+levels so subcommand options belong to the subcommand; ordinary report target
+validation remains mandatory in its action. History subcommand integration should
+retain this parsing setup.
+
+Security review correction: `EnvironmentFile=` emits one unquoted absolute path
+with literal percent signs escaped as `%%`. Home paths with control characters,
+newlines, or leading/trailing whitespace are rejected with a clear error. Internal
+spaces are supported. `ExecStart` and `ReadWritePaths` retain their appropriate
+quoted argument-list syntax; other directives contain fixed or validated values.
+
+Coordinator quality revision validation: `npm run typecheck` passed. `npm test`
+reported 666 passed and the two expected optimizer failures (`Eval endpoint primary
+is already locked`); all 38 schedule tests passed. Tests use fake report processes
+and decoded generated arguments, with no live report or systemd execution.
+
+Setup/preflight revision validation: `npm run typecheck` passed; `npm test`
+passed all 681 tests in 37 files, including all 51 schedule tests. Setup tests
+run only in temporary directories and prove existing log contents are preserved.
+No systemd command or live report was run.
