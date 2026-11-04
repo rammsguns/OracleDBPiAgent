@@ -8,7 +8,7 @@ export function parseTriageCommand(question: string): string | undefined {
 	return issue;
 }
 export function groundedTriageQuestion(result: TriageResult): string {
-	// Keep the complete ranked leads, but bound bulky evidence per check.
+	// Prioritize ranked leads and bound bulky evidence per check.
 	const evidence = result.issues.map(i => ({ issue: i.issue.text.slice(0, 1000), codes: i.codes, hypotheses: i.hypotheses, limitations: i.limitations, suggestions: i.suggestions,
 		excerpts: i.excerpts.slice(0, 4).map(e => ({ object: e.object, line: e.line, subprogram: e.subprogram, statement: e.statement, status: e.status, truncated: e.truncated })),
 		checks: i.checks.map(c => ({ label: c.label, status: c.status, view: c.view, columns: c.columns, rows: c.rows.slice(0, 5), truncated: c.truncated || c.rows.length > 5 })) }));

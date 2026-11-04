@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { prepareChatQuestion } from './chatTriage.js';
+import { parseTriageCommand, prepareChatQuestion } from './chatTriage.js';
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
@@ -168,7 +168,17 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			const ask = async (q: string) => {
 				toolCalls = [];
 				const offset = agent.state.messages.length;
-				await agent.prompt(question === undefined ? await prepareChatQuestion(ctx, q) : q);
+				let prepared = q;
+				if (question === undefined) {
+					let issue: string | undefined;
+					try { issue = parseTriageCommand(q); }
+					catch (error) { console.error((error as Error).message); return; }
+					if (issue !== undefined) {
+						try { prepared = await prepareChatQuestion(ctx, q); }
+						catch { console.error('Triage failed; check local database availability'); return; }
+					}
+				}
+				await agent.prompt(prepared);
 				if (agent.state.errorMessage) throw new Error("Local model request failed");
 				const replies = agent.state.messages.slice(offset).filter(m => m.role === "assistant");
 				const last = replies.at(-1);

@@ -1,3 +1,4 @@
+import { parseTriageCommand } from '../cli/chatTriage.js';
 import { listPlsql, documentPlsql } from '../plsql/index.js';
 import { identifier, objectName } from '../plsql/dictionary.js';
 import { triage, sinceHours, renderTriageMarkdown } from '../triage/index.js';
@@ -199,6 +200,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 			if (match[2] === "ask" && req.method === "POST") {
 				const data = await body(req);
 				if (typeof data.question !== "string" || !data.question.trim() || data.question.length > 32_000) throw new WebError(400, "Invalid question");
+				try { parseTriageCommand(data.question); } catch (error) { throw new WebError(400, (error as Error).message); }
 				const entry = manager.get(id);
 				const release = acquireLlm();
 				entry.active = true;
