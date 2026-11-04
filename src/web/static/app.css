@@ -38,3 +38,9 @@ td:nth-child(2) { max-width: 24rem; }
 #report-panel label { display: inline-block; }
 .unverified { border-left: 3px solid #a55c00; padding-left: .6rem; color: #754000; overflow-wrap: anywhere; }
 [role="tablist"] { flex-wrap: wrap; }
+
+#drift-panel { overflow-wrap: anywhere; }
+#drift-panel input { font: inherit; max-width: 100%; box-sizing: border-box; }
+#drift-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#drift-panel details { margin: .6rem 0; }
+#drift-panel summary { cursor: pointer; }
