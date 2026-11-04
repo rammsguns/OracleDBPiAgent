@@ -44,3 +44,34 @@ for (const target of targets) it(`dictionary permissions and hidden source throu
 		expect(listed.details.rows.some((row: unknown[]) => row[1] === params.name)).toBe(true);
 	} finally { await provider.closeAll(); }
 }, 60000);
+
+it('hints at DBA_ARGUMENTS for hidden HR.ADD_JOB_HISTORY on p1 without returning its rows', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const provider = createSessionProvider(config);
+	try {
+		try {
+			const session = await provider.get('p1-19c-prod');
+			const fixture = await session.query("SELECT argument_name FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'", {}, { maxRows: 1 });
+			await session.close();
+			if (!fixture.rows.length) { context.skip('p1 fixture missing: DBA_ARGUMENTS has no HR.ADD_JOB_HISTORY rows'); return; }
+		}
+		catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Oracle listener unavailable'); return; } throw error; }
+		const tool = createDbTools({ config, sessions: provider, audit: { record: async () => {} }, runId: 'empty-dictionary-live' }).find(t => t.name === 'run_query')!;
+		const result = await tool.execute('arguments', { target: 'p1-19c-prod', sql: "SELECT argument_name FROM all_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'" });
+		expect(result.details.rows).toEqual([]);
+		expect(result.content[0]).toMatchObject({ text: expect.stringContaining('Re-run with DBA_ARGUMENTS.') });
+	} finally { await provider.closeAll(); }
+}, 60000);
+
+it('hints at DBA_SOURCE for hidden SHOPAPP.WORKLOAD on p1', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const provider = createSessionProvider(config);
+	try {
+		try { const session = await provider.get('p1-19c-prod'); await session.close(); }
+		catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Oracle listener unavailable'); return; } throw error; }
+		const tool = createDbTools({ config, sessions: provider, audit: { record: async () => {} }, runId: 'empty-source-live' }).find(t => t.name === 'run_query')!;
+		const result = await tool.execute('source', { target: 'p1-19c-prod', sql: "SELECT line FROM all_source WHERE owner='SHOPAPP' AND name='WORKLOAD'" });
+		expect(result.details.rows).toEqual([]);
+		expect(result.content[0]).toMatchObject({ text: expect.stringContaining('Re-run with DBA_SOURCE.') });
+	} finally { await provider.closeAll(); }
+}, 60000);

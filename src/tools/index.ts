@@ -130,6 +130,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							} else throw error;
 							result = await session.query(sql, binds, { maxRows });
 						}
+						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = await emptyDictionaryHint(session, sql, binds);
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
 							sql = "SELECT child_number, id, parent_id, operation, options, object_owner, object_name, cardinality, bytes, cost, access_predicates, filter_predicates FROM v$sql_plan WHERE sql_id=:sql_id ORDER BY child_number,id";
@@ -254,7 +255,7 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 		details.hasMore = details.startLine - 1 + details.rows.length < details.totalLines;
 		details.nextStartLine = details.hasMore ? details.startLine + details.rows.length : null;
 	};
-	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.view ? [details.view] : []), ...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
+	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.view ? [details.view] : []), ...(details.sourceNote && !details.sourceNote.startsWith("Note:") ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : []), ...(details.sourceNote?.startsWith("Note:") ? [details.sourceNote] : [])].join("\n") : JSON.stringify(details);
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
 		if (details.rows?.length) { details.rows.pop(); details.truncated = true; updateSourcePage();
@@ -408,5 +409,46 @@ async function dictionaryFallback(session: OracleSession, sql: string, binds: Re
 	} catch (error) {
 		if (!/\bORA-(00942|01031)\b/.test(String(error))) throw error;
 		return { ...primary, view };
+	}
+}
+
+// A deliberately small set of 19c dictionary families with DBA counterparts.
+const emptyHintViews = new Set(`OBJECTS ARGUMENTS SOURCE ERRORS DEPENDENCIES PROCEDURES
+TABLES TAB_COLUMNS CONSTRAINTS CONS_COLUMNS INDEXES IND_COLUMNS VIEWS TRIGGERS
+SCHEDULER_JOBS SCHEDULER_JOB_RUN_DETAILS SCHEDULER_JOB_LOG SCHEDULER_PROGRAMS
+SCHEDULER_PROGRAM_ARGS SCHEDULER_SCHEDULES`.split(/\s+/).map(name => `ALL_${name}`));
+
+async function emptyDictionaryHint(session: OracleSession, sql: string, binds: Record<string, unknown>): Promise<string | undefined> {
+	// WITH may shadow dictionary names. Quoted identifiers and Oracle alternative
+	// quoting need a richer parser; decline the optional hint for those statements.
+	if (!/^\s*SELECT\b/i.test(sql)) return;
+	const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}\p{M}_$#]*|[^\s]/gu)];
+	const code = tokens.filter(t => !t[0].startsWith("--") && !t[0].startsWith("/*") && !t[0].startsWith("'"));
+	if (code.some(t => t[0].startsWith('"') || /^(WITH|Q|NQ)$/i.test(t[0]))) return;
+	const views = new Set<string>();
+	const replacements: typeof tokens = [];
+	for (let i = 0; i < code.length; i++) {
+		const token = code[i]!;
+		const name = token[0].toUpperCase();
+		if (!name.startsWith("ALL_")) continue;
+		if (!emptyHintViews.has(name)) return;
+		const previous = code[i - 1]?.[0].toUpperCase();
+		const sys = previous === "." && code[i - 2]?.[0].toUpperCase() === "SYS";
+		const before = sys ? code[i - 3]?.[0].toUpperCase() : previous;
+		if (before === "FROM" || before === "JOIN") views.add(name);
+		else if (code[i + 1]?.[0] !== ".") return;
+		replacements.push(token);
+	}
+	if (!views.size || replacements.some(t => !views.has(t[0].toUpperCase()))) return;
+	let probe = sql;
+	for (const token of replacements.reverse()) probe = probe.slice(0, token.index) + token[0].replace(/^all_/i, "DBA_") + probe.slice(token.index + token[0].length);
+	try {
+		const result = await session.query(classifySql(probe), binds, { maxRows: 1 });
+		if (!result.rows.length) return;
+		const all = [...views].join(", ");
+		const dba = [...views].map(view => view.replace(/^ALL_/, "DBA_")).join(", ");
+		return `Note: 0 rows from ${all} (limited to objects this account can access); the same query on ${dba} returns rows. Re-run with ${dba}.`;
+	} catch (error) {
+		if (!/\bORA-(00942|01031)\b/.test(String(error))) throw error;
 	}
 }
