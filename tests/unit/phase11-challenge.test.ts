@@ -19,12 +19,12 @@ it('adds a separately selectable split while preserving every prior case', async
 
 it('requires two factual cases per challenge category and real follow-up turns', async () => {
 	const cases = await loadHardCases();
-	const challenge = cases.filter(test => test.split === 'challenge');
+	const challenge = cases.filter(test => test.id.startsWith('hard-p11-'));
 	expect(challenge).toHaveLength(12);
 	expect(new Set(challenge.map(test => test.category)).size).toBe(6);
 	const missing = structuredClone(cases);
 	delete missing.find(test => test.split === 'challenge')!.groundTruth;
-	expect(() => checkHardCases(missing)).toThrow('allCells');
+	expect(() => checkHardCases(missing)).toThrow('rowCells');
 	expect(() => checkHardCases(cases.filter(test => test.id !== challenge[0]!.id))).toThrow('two cases');
 });
 
@@ -32,16 +32,16 @@ it('wide exact records fail for every omitted or misassociated row without chang
 	const wide = (await loadHardCases()).filter(test => test.category === 'wide-exact');
 	for (const test of wide) {
 		// Synthetic cells test scoring mechanics only, not Oracle sample-data values.
-		const rows = Array.from({ length: 12 }, (_, i) => [`NAME=Record ${i} / COUNT=${100 + i}`]);
-		const response = { answer: rows.flat().join('\n'), toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
+		const rows = Array.from({ length: 12 }, (_, i) => [`Record ${i}`,100 + i]);
+		const response = { answer: rows.map(row => row.join(' | ')).join('\n'), toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
 		expect(score(test, response, rows).pass).toBe(true);
 		for (let i = 0; i < rows.length; i++) {
-			expect(score(test, { ...response, answer: rows.filter((_, n) => n !== i).flat().join('\n') }, rows).pass).toBe(false);
+			expect(score(test, { ...response, answer: rows.filter((_, n) => n !== i).map(row => row.join(' | ')).join('\n') }, rows).pass).toBe(false);
 		}
 		const swapped = structuredClone(rows);
-		swapped[0] = ['NAME=Record 0 / COUNT=101'];
-		swapped[1] = ['NAME=Record 1 / COUNT=100'];
-		expect(score(test, { ...response, answer: swapped.flat().join('\n') }, rows).pass).toBe(false);
+		swapped[0] = ['Record 0',101];
+		swapped[1] = ['Record 1',100];
+		expect(score(test, { ...response, answer: swapped.map(row => row.join(' | ')).join('\n') }, rows).pass).toBe(false);
 		expect(() => checkChallengeRows(test, rows)).not.toThrow();
 		expect(() => checkChallengeRows(test, rows.slice(0, 7))).toThrow('eight');
 		expect(() => checkChallengeRows(test, Array(8).fill(rows[0]))).toThrow('distinct');
@@ -52,8 +52,8 @@ it('fails validation when a false-premise prerequisite changes', async () => {
 	const cases = await loadHardCases();
 	const pk = cases.find(test => test.id === 'hard-p11-sales-primary-key')!;
 	const commission = cases.find(test => test.id === 'hard-p11-commission-zero')!;
-	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS=0 / FK_CONSTRAINTS=5']])).not.toThrow();
-	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS=1 / FK_CONSTRAINTS=5']])).toThrow('premise');
-	expect(() => checkChallengeRows(commission, [['NULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35']])).not.toThrow();
-	expect(() => checkChallengeRows(commission, [['NULL_COMMISSION=0 / ZERO_COMMISSION=72 / POSITIVE_COMMISSION=35']])).toThrow('premise');
+	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS',0],['FK_CONSTRAINTS',5]])).not.toThrow();
+	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS',1],['FK_CONSTRAINTS',5]])).toThrow('premise');
+	expect(() => checkChallengeRows(commission, [[72,0,35]])).not.toThrow();
+	expect(() => checkChallengeRows(commission, [[0,72,35]])).toThrow('premise');
 });

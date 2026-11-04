@@ -794,3 +794,29 @@ were performed during authoring or this validation follow-up. No shared contract
 scorer changes or new dependencies are needed. Antigravity review, the coordinator's
 challenge ×3 baseline, failure triage and confirmation of the intended 40–80%
 difficulty remain pending. Do not loosen cases based on agent answers.
+
+### Phase 11C: row scoring
+
+`rowCells` is opt-in. Truth SELECTs return separate columns; all values from a
+truth row must occur in one answer record. Markdown rows, transposed attribute
+or field tables, list items, KEY=VALUE records and single-line prose are accepted.
+Repeated values require separate occurrences. Thousands separators and numeric
+trailing zeros do not change a value. Qualified dictionary names and annotated
+cells (including VARCHAR2 lengths) are accepted. Structured cells are compared
+as complete values: `INDEX UNIQUE SCAN` cannot stand in for separate `INDEX` and
+`UNIQUE SCAN` cells. Separate records on one physical line cannot lend each
+other values. This is deterministic value checking, not semantic grading of
+arbitrary prose or a check that the explanation justifies every value.
+
+All twelve phase11 cases now use rowCells. The primary-key case returns two
+labeled rows (PK_CONSTRAINTS and FK_CONSTRAINTS), because those are independent
+facts that the real baseline answers reported on separate lines. No truth value
+was removed. The two metadata cases no longer require run_query. The other 61
+hard cases, MVP cases, scalar mode and allCells mode are unchanged.
+
+Offline fixtures come from the owner's archived baseline
+`phase11/2026-11-04T04-50-17-266Z-8a276781-5b12-474f-b98a-bed27b6d3c06.json`.
+Only IDs, iteration numbers, answers and tool names were extracted with jq.
+All 35 correct answers pass; plan-line-tree iteration 2 fails because it merges
+OP and OPTIONS. Truth snapshots under tests/fixtures are offline test data;
+actual evals always read fresh truth. No agent or LLM was run during this work.

@@ -14,7 +14,7 @@
 		},
 		"groundTruth": {
 			"sql": "SELECT cc.column_name,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='SHOPAPP' AND c.table_name='ORDERS' AND c.constraint_type='R' AND p.table_name='CUSTOMERS' ORDER BY cc.position,ic.column_position",
-			"mode": "allCells"
+			"mode": "rowCells"
 		},
 		"question": "On p1, trace the declared foreign key from SHOPAPP.ORDERS to its customer parent, then the referenced constraint to its backing index, then inspect the indexed parent columns and their types. Report child column, parent table, referenced constraint, backing index, index uniqueness, indexed position, parent column and data type. Use dictionary evidence rather than assuming matching names."
 	},
@@ -33,7 +33,7 @@
 		},
 		"groundTruth": {
 			"sql": "SELECT cc.column_name,p.owner,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='OE' AND c.table_name='WAREHOUSES' AND c.constraint_type='R' ORDER BY cc.position,ic.column_position",
-			"mode": "allCells"
+			"mode": "rowCells"
 		},
 		"question": "On d1, follow the declared foreign key from OE.WAREHOUSES to its location parent. Resolve the referenced constraint to its backing index and inspect the indexed parent columns. Give child column, parent owner/table, referenced constraint, backing index, uniqueness, indexed position, column and type /  do not assume that the parent is in OE."
 	}
