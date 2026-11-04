@@ -1413,6 +1413,9 @@ by hand: order-customer-key answers were correct (scorer artifact, WP-11E);
 two partial-memory answers said "major = 19" (artifact), two gave only the full
 version (an answer-format miss A also made once).
 
+WP-11E merged after review: the offline rescore of 694 archived records flips
+exactly those 4 records to pass, so the 11B challenge result is 82/88 → 84/88.
+
 ### Not in phase 11
 New tools, cloud LLMs, LLM-judged scoring, and changes to existing cases.
 
