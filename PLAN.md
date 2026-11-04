@@ -1426,6 +1426,140 @@ gates are not disturbed.
 Installing timers automatically, a daemon in this repo, email, Slack or other
 network notifications, LLM summaries of trends, and new database queries.
 
+## Phase 13: cross-target drift check (proposed 2026-11-03, awaiting owner approval)
+
+DBAs often need to know how two databases differ: a lab against prod, or
+before and after a change window. The report compares one target with its
+own past. This phase compares the two approved targets with each other.
+It stays read-only and uses no LLM. It uses only dictionary views both targets
+can already read.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-13A Drift engine and CLI | `wp-13a-drift` | `src/drift/` (new), the `drift` command in `src/cli/index.ts`, tests, `docs/drift.md` | — |
+| WP-13B Web drift tab | `wp-13b-web-drift` | `src/web/` (route and tab), browser tests, `docs/web-ui.md` | WP-13A |
+
+### WP-13A: drift engine and CLI
+- Command: `piagent drift --left d1-19c-lab --right p1-19c-prod --scope
+  <parameters|schema:OWNER|objects:OWNER> [--json] [--out <dir>]`.
+- Compares:
+  - non-default initialization parameters, only where both targets can read
+    them; otherwise the section says "unavailable" with the missing grant;
+  - for a schema, its tables, columns (type, length, nullability),
+    constraints, indexes (columns, uniqueness, status) and object counts by
+    type;
+  - invalid objects on each side.
+- Output groups results into only-left, only-right and different. Values are
+  normalized first: system-generated names (`SYS_C…`), storage clauses and
+  whitespace are ignored, so the result is not just noise.
+- Every query goes through the existing read-only policy and audit log, with
+  the existing row caps. Drift is a CLI command, not an agent tool, so it adds
+  no tokens to agent sessions. Phase 2 measured about 300 tokens per tool
+  schema.
+- Exit code 0 means no drift and 3 means drift, which matches
+  `report --diff-only`.
+- Gate:
+  - Unit tests: normalization, fixtures for each category, caps,
+    unavailable sections.
+  - Integration on both targets: self-compare is empty, and d1 against p1
+    gives a stable result across two runs.
+  - The Antigravity review.
+
+### WP-13B: web drift tab
+- A Drift tab with left and right target pickers and a scope picker. It shows
+  only-left, only-right and different in collapsible groups.
+- It uses the same token and Host/Origin checks, `textContent` rendering
+  only, and works at phone width.
+- Gate: route unit tests, browser tests (including an XSS payload in an
+  object name), the Antigravity security review and a live smoke test.
+
+### Not in phase 13
+Generating DDL to fix drift, any target outside the approved two, data
+comparison (row contents), and an agent tool for drift.
+
+## Phase 14: dependency refresh (proposed 2026-11-03, awaiting owner approval)
+
+On 2026-11-03, `npm outdated` shows:
+- `@earendil-works/pi-agent-core` and `pi-ai` 1.4.0 → 1.5.0;
+- `vitest` 5.0.5 → 5.1.0;
+- `@types/node` 26.6.5 → 26.6.6.
+
+The PI SDK drives every agent turn. Its upgrade is treated as a model-path
+change and gated on evals, not just tests. Each upgrade needs owner approval
+under AGENTS.md rule 4, and this phase is that approval.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-14A Dev-tool bumps | `wp-14a-devdeps` | `package.json`/`package-lock.json` (devDependencies only, coordinator-approved), test config | — |
+| WP-14B PI SDK 1.5.0 | `wp-14b-pi-sdk-15` | `package.json`/`package-lock.json` (the two PI packages), `src/llm/`, `src/agent/` adapters if the API changed, tests, `docs/pi-sdk-1.5.md` | WP-14A |
+
+### WP-14A: dev-tool bumps
+- Bump vitest and @types/node inside their current majors.
+- Gate: typecheck, unit, integration and browser tests, CI green, and
+  `npm audit` reports no new advisories.
+
+### WP-14B: PI SDK 1.5.0
+- Read the 1.5.0 changelog first. Record:
+  - every API change;
+  - any change to the request shape sent to Strata (headers, `reasoning`,
+    tool schema encoding, usage fields);
+  - any new default that could reach a non-loopback endpoint.
+
+  Stop and report if 1.5.0 adds a provider or telemetry that cannot be
+  turned off.
+- The loopback guards and the eval-only secondary isolation must still hold.
+  The existing tests prove it, and they are rerun unchanged.
+- Gate:
+  - The usual model-path gate: hard dev 4×4 alternating, holdout ×3,
+    regression ×1, MVP and challenge ×4 each side, comparing 1.4.0 with 1.5.0
+    on the same day.
+  - Token change within the noise band, or explained.
+  - No drop in pass rate.
+  - All refusals pass.
+  - The Antigravity security review of the diff and the SDK's network
+    surface.
+
+### Not in phase 14
+Major version upgrades (TypeScript, oracledb, Node), new dependencies, and
+replacing the PI SDK.
+
+## Phase 15: release 1.1.0 (proposed 2026-11-03, awaiting owner approval)
+
+v1.0.0 was tagged on 2026-10-29. Since then the project has gained phases
+8–14: a fresh holdout, the global CLI install, the eval-only second Strata,
+challenge evals, report history and scheduling, drift and the dependency
+refresh. This phase cuts 1.1.0 for whatever of these has merged. It adds no
+new features.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-15A Release notes and docs | `wp-15a-release-110` | `CHANGELOG.md`, `README.md`, `docs/README.md`, `docs/install.md`, quick-start sections | phases 11–14 closed or explicitly deferred |
+| Coordinator | `needlefish` | version bump, tag, push | WP-15A |
+
+### WP-15A: release notes and docs
+- Add a `[1.1.0]` CHANGELOG entry grouped as Added, Changed and Fixed. Each
+  item links to its doc. It must include the behaviour changes users will
+  notice: since phase 9, audit and report history default to `~/.piagent/`,
+  and there are the new `report history`, `report schedule` and `drift`
+  commands.
+- Refresh the README quick start and the command list. Every documented
+  command is run once, read-only, against the live targets, and its output
+  checked against the docs.
+
+### Coordinator release steps
+1. Confirm the release scope with the owner: the phases included, and any
+   deferred.
+2. Gate on the final release commit:
+   - typecheck, build, unit, integration and browser tests;
+   - CI green;
+   - one full gate (hard dev ×2, holdout ×3, regression ×1, MVP, challenge ×2);
+   - a temp-prefix tarball install check, as in phase 9.
+3. Bump `version` to 1.1.0, tag `v1.1.0`, and push `master` and the tag to
+   origin, only after the owner confirms (the repo is public).
+
+### Not in phase 15
+Publishing to npm, GitHub release binaries, and Windows support.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
