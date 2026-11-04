@@ -297,7 +297,8 @@ piagent report schedule --target d1-19c-lab --every 1h
 piagent report schedule --target p1-19c-prod --every 15m --out /private/reports
 ```
 
-This prints a labelled service, timer, and alternative crontab line. It creates
+This prints one-time setup commands, a labelled service, timer, and alternative
+crontab line. It creates
 nothing, invokes no systemctl command, and makes no database or LLM calls.
 Supported intervals are exactly `15m`, `1h`, `6h`, and `1d`. Timers use local
 wall-clock calendar boundaries and catch up once after downtime (`Persistent`).
@@ -329,16 +330,29 @@ inline in units. The child receives a minimal environment and pins its audit
 file to `<PIAGENT_HOME>/audit.jsonl` so the sandbox's write allowance stays exact.
 Other report settings are read by the existing CLI environment parser.
 
-Before using a service, prepare the private home and output directories (0700),
-and create private regular `audit.jsonl` and `alerts.log` files (0600) under that
-home. `ReadWritePaths` entries have the systemd `-` prefix: missing paths are
+Initialize the private home configuration first. Before enabling the timer, run
+the printed `# one-time setup (run once before enabling the timer)` section in
+your normal shell, outside the service sandbox. It contains safely quoted
+`mkdir -p -m 700 -- <reports>` and, for each audit/alert file,
+`touch -- <file> && chmod 600 -- <file>`. These commands preserve existing file
+contents; they never truncate an audit log. `mkdir -p` leaves existing directory
+permissions unchanged, so ensure an existing report directory is already private.
+Inspect paths first: they must be owned by you and must not be symlinks.
+
+`report schedule run` checks the report directory and both log files before
+starting any report process: all three must exist, be writable and have the
+expected directory/regular-file type, with no symlinks. On failure it exits 1
+and prints one message identifying the path and its exact setup command. Correct
+unsafe paths before running setup; run setup outside the sandbox, then retry.
+The same preflight applies to cron and manual schedule runs.
+
+`ReadWritePaths` entries have the systemd `-` prefix: missing paths are
 ignored instead of causing a `226/NAMESPACE` setup failure. This does not make
 their read-only parent writable. Provision these specific paths before scheduling
 so the sandbox can write reports, audit events and alerts; a missing writable
 path can still cause the report or alert operation to fail. This preserves the
 narrow write allowance rather than making the configuration directory writable.
-Outside the systemd sandbox (for example cron), normal report/alert creation
-rules apply. Keep these directories and files owned by the scheduling user and
+Keep these directories and files owned by the scheduling user and
 free of symlinks. The service uses
 `UMask=0077`, `NoNewPrivileges`, `ProtectSystem=strict`, and `PrivateTmp`.
 `ReadWritePaths` permits only the report directory, audit file, and local alert
@@ -379,3 +393,8 @@ Coordinator quality revision validation: `npm run typecheck` passed. `npm test`
 reported 666 passed and the two expected optimizer failures (`Eval endpoint primary
 is already locked`); all 38 schedule tests passed. Tests use fake report processes
 and decoded generated arguments, with no live report or systemd execution.
+
+Setup/preflight revision validation: `npm run typecheck` passed; `npm test`
+passed all 681 tests in 37 files, including all 51 schedule tests. Setup tests
+run only in temporary directories and prove existing log contents are preserved.
+No systemd command or live report was run.
