@@ -16,7 +16,7 @@ revision they checked; use the status page and current code for today's behavior
 ## Development
 
 - [ci.md](ci.md) — Node 24 CI, clean-clone checks and local verification.
-- PI SDK 1.5.0: TODO — add `pi-sdk-1.5.md` after WP-14B closes; upgrade still gated.
+- [pi-sdk-1.5.md](pi-sdk-1.5.md) — PI SDK 1.5.0 upgrade: API changes, wire behavior and safety review.
 - [Changelog](../CHANGELOG.md) — Release history.
 
 ## Evals and optimization

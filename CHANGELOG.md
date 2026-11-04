@@ -32,9 +32,10 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   See [installation and migration](docs/install.md).
 - Dev tools updated: Vitest 5.1.0 and Node types 26.6.6.
   See [dependency refresh](PLAN.md#phase-14-dependency-refresh-approved-2026-11-03).
-- **TODO — WP-14B is still gated:** fill in the PI SDK 1.5.0 decision, compatibility
-  notes and gate results; add `docs/pi-sdk-1.5.md` when available.
-  See [SDK upgrade scope](PLAN.md#wp-14b-pi-sdk-150).
+- PI SDK 1.4.0 → 1.5.0 (pinned). Requests to Strata are unchanged; tool
+  arguments are now validated by pi-schema with scalar coercion, and read-only
+  enforcement is unaffected. No new telemetry or network calls. The eval gate showed
+  no pass-rate or token change beyond noise. See [PI SDK 1.5](docs/pi-sdk-1.5.md).
 
 ### Fixed
 
@@ -46,8 +47,13 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   See [schedule helper](docs/report.md#schedule-helper-wp-12b).
 - Report history accepts its own target option after schedule subcommand parsing
   was introduced. See [phase 12 results](PLAN.md#phase-12-results-2026-11-04-complete).
-- **TODO — WP-11B is still gated:** record the quality-fix decision and final gate
-  results without claiming a promotion yet. See [quality-fix scope](PLAN.md#wp-11b-quality-fixes).
+- Answers list every requested row instead of merging rows into ranges or
+  "N more", and follow the requested output format. Hard dev went from 107/112 to
+  112/112 and MVP from 37/39 to 39/39, with no token cost.
+  See [phase 11 results](PLAN.md#phase-11-results-2026-11-04-complete).
+- `rowCells` also accepts complete records in wider vertical tables, owner-qualified
+  names and explicitly labelled single values, while wrong answers still fail.
+  See [scoring](docs/evals-hard.md).
 
 ## [1.0.0] - 2026-10-29
 

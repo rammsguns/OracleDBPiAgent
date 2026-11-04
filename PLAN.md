@@ -1667,6 +1667,27 @@ under AGENTS.md rule 4, and this phase is that approval.
   - The Antigravity security review of the diff and the SDK's network
     surface.
 
+### Phase 14 results (2026-11-04): complete
+WP-14A merged (fa14d70). WP-14B merged (5863c0b) after the security review
+(APPROVE) and a gate (A=ad36a19, B=+14B, alternating, primary Strata; archive
+`eval-archive/phase14/gate-14b/` and `gate-14b-ch2/`). The first challenge ×4
+showed 84 vs 80, so four more rounds per side were run; everything below is
+rescored with the WP-11F scorer:
+
+| Split | A | B |
+|---|---|---|
+| hard dev 4× | 112/112 | 111/112 |
+| challenge 8× | 170/176 | 169/176 |
+| holdout 3× | 35/36 | 34/36 |
+| regression | 21/21 | 21/21 |
+| MVP | 39/39 | 39/39 |
+
+All refusals pass. Tokens B/A (per-case geometric mean, 95% CI): dev −0.5%
+[−7.1, +6.4], challenge +2.9% [−1.2, +7.2], holdout −1.8% [−8.6, +5.5], MVP
+−0.4% [−1.8, +0.8]. Request payloads are unchanged, and no schema/validation tool
+errors appeared on either side. The single dev and holdout misses are on cases A
+also missed in the 11B gate.
+
 ### Not in phase 14
 Major version upgrades (TypeScript, oracledb, Node), new dependencies, and
 replacing the PI SDK.
