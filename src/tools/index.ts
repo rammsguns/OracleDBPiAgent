@@ -33,6 +33,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 			let sql: string | undefined;
 			let sourceNote: string | undefined;
 			let viewFound = false;
+			let dictionaryView: string | undefined;
 			try {
 				if (signal?.aborted) throw new Error("Tool aborted");
 				if (!ctx.config.targets.some(t => t.name === target)) throw new Error(`Unknown target: ${target}`);
@@ -94,12 +95,22 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							binds.sql_id = cached.rows[0]![0];
 						}
 						if (name === "get_source" && p.type?.toUpperCase() === "VIEW") {
-							const size = await session.query("SELECT text_length FROM all_views WHERE owner=:owner AND view_name=:name", { owner: binds.owner, name: binds.name }, { maxRows: 1 });
+							const probe = "SELECT text_length FROM all_views WHERE owner=:owner AND view_name=:name";
+							const size = await dictionaryFallback(session, probe, { owner: binds.owner, name: binds.name }, 1);
+							dictionaryView = size.view;
+							if (size.view === "DBA_VIEWS") sql = sql.replace(/\ball_views\b/g, "dba_views");
 							if (Number(size.rows[0]?.[0] ?? 0) > MAX_VIEW_SOURCE_BYTES) throw new Error("View source exceeds the 1 MiB limit; source was not fetched");
 							viewFound = size.rows.length > 0;
 						}
 						const maxRows = Math.min(name === "get_source" ? (p.lines ?? 200) : (p.maxRows ?? ctx.config.limits.maxRows), ctx.config.limits.maxRows);
-						try { result = await session.query(sql, binds, { maxRows }); }
+						try {
+							if (["list_objects", "describe_object", "get_source"].includes(name) && !(name === "get_source" && p.type?.toUpperCase() === "VIEW")) {
+								const answer = await dictionaryFallback(session, sql, binds, maxRows);
+								dictionaryView = answer.view;
+								if (answer.view.startsWith("DBA_")) sql = sql.replace(/\ball_([a-z_]+)\b/gi, "dba_$1");
+								result = answer;
+							} else result = await session.query(sql, binds, { maxRows });
+						}
 						catch (error) {
 							if (name === "run_query") throw await queryErrorHint(error, sql, session, ctx);
 							if (!/ORA-00942/.test(String(error))) throw error;
@@ -148,6 +159,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					const hasMore = start - 1 + rows.length < lines.length;
 					result = { ...source, columns: ["LINE", "TEXT"], rows, startLine: start, totalLines: lines.length, hasMore, nextStartLine: hasMore ? start + rows.length : null, truncated: hasMore };
 				}
+				if (dictionaryView) result = { ...(result as QueryResult), view: dictionaryView };
 				if (sourceNote) result = { ...(result as QueryResult), sourceNote };
 				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes, name === "describe_object" ? renderDescribe : undefined);
 				const q = output.details as QueryResult;
@@ -210,10 +222,10 @@ export function renderDescribe(result: QueryResult): string {
 
 // Render from complete entities before enforcing bytes. Raw details lose the same
 // whole entities, so neither representation can imply a shortened composite key.
-function boundedDescribe(result: QueryResult, cap: number) {
+function boundedDescribe(result: QueryResult & { view?: string }, cap: number) {
 	const details = structuredClone(result);
 	const sections = describeSections(details);
-	const output = () => ({ content: [{ type: "text" as const, text: renderDescribeSections(sections, details.truncated) }], details });
+	const output = () => ({ content: [{ type: "text" as const, text: [details.view, renderDescribeSections(sections, details.truncated)].filter(Boolean).join("\n") }], details });
 	// A database row cap may have cut a child list: do not claim it is complete.
 	if (result.truncated) {
 		for (const section of sections.filter(section => /^(Constraints|Indexes):/.test(section.header))) {
@@ -242,7 +254,7 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 		details.hasMore = details.startLine - 1 + details.rows.length < details.totalLines;
 		details.nextStartLine = details.hasMore ? details.startLine + details.rows.length : null;
 	};
-	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
+	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.view ? [details.view] : []), ...(details.sourceNote ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : [])].join("\n") : JSON.stringify(details);
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
 		if (details.rows?.length) { details.rows.pop(); details.truncated = true; updateSourcePage();
@@ -383,4 +395,18 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 	} catch { return error; }
 	if (hint && hint.length <= 1200) error.message += "\n" + hint;
 	return error;
+}
+
+// Only fixed tool SQL reaches this helper; preserve every predicate, bind and cap.
+async function dictionaryFallback(session: OracleSession, sql: string, binds: Record<string, unknown>, maxRows: number): Promise<QueryResult & { view: string }> {
+	const view = sql.match(/\bFROM (all_[a-z_]+)/i)![1]!.toUpperCase();
+	const primary = await session.query(sql, binds, { maxRows });
+	if (primary.rows.length) return { ...primary, view };
+	try {
+		const fallback = await session.query(sql.replace(/\ball_([a-z_]+)\b/gi, "dba_$1"), binds, { maxRows });
+		return { ...fallback, view: view.replace(/^ALL_/, "DBA_") };
+	} catch (error) {
+		if (!/\bORA-(00942|01031)\b/.test(String(error))) throw error;
+		return { ...primary, view };
+	}
 }
