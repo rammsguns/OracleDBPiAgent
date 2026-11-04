@@ -21,6 +21,18 @@ export interface TargetConfig {
 	/** Schema set with ALTER SESSION SET CURRENT_SCHEMA after connect. */
 	defaultSchema: string;
 	environment: TargetEnvironment;
+	/** Application log tables that `triage` may read (phase 16). Optional; validated by loadConfig. */
+	logTables?: LogTableConfig[];
+}
+
+/** One application log table for issue triage: read-only, newest rows first, row-capped. */
+export interface LogTableConfig {
+	/** OWNER.TABLE, simple uppercase identifiers only. */
+	table: string;
+	/** DATE or TIMESTAMP column used for the time window and ordering. */
+	timestampColumn: string;
+	/** Columns shown in the evidence (message, level, module...). At most 8. */
+	columns: string[];
 }
 
 export interface LlmConfig {
