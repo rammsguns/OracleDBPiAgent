@@ -1067,3 +1067,219 @@ Validation used a temporary local `node_modules` symlink to needlefish's already
 installed dependencies, removed after checks; no manifest or lockfile changed.
 A separate strict TypeScript check of the new test and its imported eval modules
 also passed (the product tsconfig covers only `src/`).
+
+### WP-16D baseline triage and offline correction
+
+Follow-up starts at master `d592d86` after `git merge master` (fast-forward;
+no rebase). Baseline archive:
+`phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json`
+under `/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive/`.
+All 30 answers and their stored checks were read. The original score was 7/30.
+The corrected offline score is **13/30 (43.3%)**: seven original failures become
+passes, sixteen original failures remain failures, and one original pass is
+rejected for a previously unscored substantive error. This is a rescore of the
+same answers, not a new agent run or a measurement of changed product behavior.
+
+Every originally failing record is listed below. **A** means real agent error
+or omission; **B** means a case/scorer artifact with the requested answer
+present. For mixed records, substantive errors take precedence over incidental
+format artifacts. Case names omit `hard-p16-`.
+
+| Case | Iteration | Class | Evidence and corrected result |
+|---|---:|:---:|---|
+| entry-points | 1 | A | Reports no visible WORKLOAD and lists none of its three public routines. FAIL. |
+| writes | 1 | A | Says WORKLOAD does not exist; supplies no subprogram/write map. FAIL. |
+| purge-behavior | 1 | A | Cannot find the code; omits age predicate, deletion order and commit behavior. FAIL. |
+| scheduler-map | 1 | B | All three mappings and inline argument 25 are correct. `SHOPAPP.WORKLOAD.PLACE_ORDERS(25)` failed whole-value identifier comparison. Scorer fix; PASS. |
+| history-trigger | 1 | A | Timing, table, called procedure and old values are present, but the JOB_ID/DEPARTMENT_ID update-column restriction is omitted. The old combined truth row also had a presentation artifact. Corrected case keeps FAIL for the omission. |
+| security-trigger | 1 | A | Gives metadata but explicitly cannot identify SECURE_DML, its hours/day rule or error number. Readable DBA_SOURCE was not used. FAIL. |
+| history-arguments | 1 | A | Does not enumerate the arguments after empty ALL_ARGUMENTS/ALL_OBJECTS results. FAIL. |
+| failed-lab-job | 1 | B | Field/Value table has FAILED, ORA-20001 (ERROR# = 20001), destination unavailable and ORA-06512 at line 1. Explicit stack text was rejected as the numeric line. Scorer fix; PASS. |
+| entry-points | 2 | A | Declares the package absent and lists no subprograms. FAIL. |
+| writes | 2 | A | Calls the request a false premise and provides no write map. FAIL. |
+| purge-behavior | 2 | A | Declares the routine absent; does not answer its behavior. FAIL. |
+| purge-line | 2 | A | Correct frame/operation/table are inferred, but explicitly claims the package body “no longer exists” and cannot retrieve the statement. The body is readable in DBA_SOURCE. Independent-fact shape is fixed, but a negation-aware absence-claim check keeps FAIL. |
+| history-trigger | 2 | A | Explicitly claims no column filter and that even salary/phone-only updates fire it. Source has UPDATE OF job_id, department_id. Shape artifact is fixed; wrong scope remains FAIL. |
+| security-trigger | 2 | B | Correct timing, statement granularity, events, base table, source routine and rules. Descriptive metadata cells and separate explanation sections were rejected by the packed row. Case separates independent facts; PASS. |
+| history-arguments | 2 | A | No arguments provided; mistakes ALL_* visibility for absence. FAIL. |
+| failed-lab-job | 2 | B | Same correct status/error/message/line in a Field/Value table; numeric line was rejected. Scorer fix; PASS. |
+| entry-points | 3 | A | Concludes there are no packages and lists no public routines. FAIL. |
+| writes | 3 | A | No subprogram/write records after catalog-visibility failure. FAIL. |
+| purge-behavior | 3 | A | Declares the routine absent; none of the requested behavior is recovered. FAIL. |
+| purge-line | 3 | B | Correct package frame 27, NIGHTLY_PURGE, DELETE and ORDERS, with the literal source statement and a distinct outer frame 1. These facts are in separate bullets/table rows; the summary operation cell says DELETE FROM orders rather than bare DELETE. Case separates independent facts; PASS. |
+| security-trigger | 3 | B | Correct routine, hours/days/error and before-statement behavior; enumerates INSERT, UPDATE, DELETE in prose. Case no longer demands the literal compound event cell “INSERT OR UPDATE OR DELETE” alongside timing/table in one record; PASS. |
+| history-arguments | 3 | A | Declares ADD_JOB_HISTORY absent and supplies no argument list. FAIL. |
+| failed-lab-job | 3 | B | Correct Field/Value table, rejected only because the line is explicit stack text. Scorer fix; PASS. |
+
+This accounts for all **23 failures: 16 A, 7 B**. Seven original passes were
+also checked. `history-trigger` iteration 3 was a false positive: it explicitly
+says there is no OF column list and “any UPDATE” fires. The corrected source-scope
+requirement rejects it. The other six original passes remain passes. This
+scorer does not certify every incidental claim in a narrative: for example,
+`purge-constraint` iteration 1 additionally alleges that the code never deletes
+children first, and `purge-line` iteration 1 calls the package “spec-less.”
+Those assertions conflict with source, but the requested constraint tuple and
+line trace are present; they are recorded here for agent-quality follow-up,
+not used to invent additional rubric requirements for unrelated cases.
+
+Case corrections touch only `phase16-plsql.json`; questions are unchanged:
+
+- The purge-line trace returns independent line/subprogram/operation/table
+  facts from the same source-and-history join, using SELECT/UNPIVOT. A correct
+  answer may explain each fact on its own line. An explicit false WORKLOAD
+  absence claim is rejected, while tested negations remain allowed.
+- Trigger metadata returns timing, granularity, table and individual events as
+  independent facts. BEFORE + STATEMENT preserves the old BEFORE STATEMENT
+  requirement; INSERT + UPDATE + DELETE preserves all three events without
+  demanding a literal English “OR” phrase. No requested fact is dropped.
+- The history trigger must explain the source's update-column scope; merely
+  mentioning JOB_ID/DEPARTMENT_ID as arguments is insufficient. This closes an
+  omission in the original case rather than relaxing it to match answers.
+
+General `rowCells` fixes in `evals/scoring.ts`:
+
+- Numeric truth columns named LINE/SOURCE_LINE accept the complete explicit
+  forms `line N`, `at line N` and `ORA-06512: at line N`. Arbitrary numbers,
+  error codes, descriptions, sources and numbering cannot supply a line value.
+- Routine-identity columns (entry point, subprogram, procedure/function/routine
+  names) accept an identifier displayed as an invocation with literal arguments.
+  Wrong routine names, malformed suffixes and arbitrary expressions still fail.
+  Operation and datatype fields retain whole-value matching.
+- Plain prose accepts qualified identifiers with the same bounded terminal
+  name, as structured cells already do. EMPLOYEES_ARCHIVE cannot satisfy
+  EMPLOYEES. Values still consume distinct occurrences on the same record;
+  unrelated tables are never pooled to build a multi-cell row.
+
+Archive comparison used the pre-change scorer from `d592d86` and identical
+archived answers, tool calls, checks and truth on each side. It recursively read
+**all 264 JSON files / 6,576 records** under `eval-archive/`, not just phase 16.
+For 6,567 scored records it reconstructs expected regexes/tool requirements from
+stored checks, rowCells rows from their JSON check text, scalar bounds from
+scalar checks, and scalar/allCells values from their stored checks. Existing
+truth SQL supplies label binding. The 17 retired case IDs occur only in older
+scalar/allCells records; those modes do not use SQL labels. Nine execution-error
+records have neither answers nor checks and remain recorded failures; they
+cannot be rescored. No fresh truth or case edits influence the scorer-only
+comparison. Counts below are both implementations replayed now, not historical
+pass flags from earlier scorer versions.
+
+The reusable local script is `/tmp/wp16-rescore.mts`, old scorer is
+`/tmp/wp16-old-scoring.mts`, and output is `/tmp/wp16-rescore.txt`.
+The committed [comparison report](phase16-rescore.json) lists every scorer check
+flip, record flip, final case-adjusted record flip and unscorable execution error.
+The script separately applies current phase16 cases to the same archived answers
+using the revalidated truth snapshots; no older case is changed.
+
+| Archive group | Scored records | Old scorer passes | New scorer passes |
+|---|---:|---:|---:|
+| baseline-dba | 238 | 236 | 236 |
+| phase10 | 109 | 108 | 108 |
+| phase11 | 102 | 79 | 79 |
+| phase11/gate-11b | 592 | 571 | 571 |
+| phase14/gate-14b-ch2 | 176 | 171 | 171 |
+| phase14/gate-14b | 592 | 580 | 580 |
+| phase15/gate-release | 196 | 189 | 189 |
+| phase16 | 30 | 7 | 11 |
+| phase16/gate-16e | 20 | 2 | 6 |
+| phase2 | 2767 | 2738 | 2738 |
+| phase5 | 163 | 157 | 157 |
+| phase6 | 428 | 421 | 421 |
+| phase8 | 36 | 36 | 36 |
+| review-wp-q | 198 | 198 | 198 |
+| review-wp-s | 166 | 165 | 165 |
+| review-wp-t | 160 | 160 | 160 |
+| wp-l-compact-describe | 118 | 118 | 118 |
+| wp-m-multi-describe | 40 | 40 | 40 |
+| wp-o-reasoning-budget | 198 | 198 | 198 |
+| wp-w-schema-health | 5 | 5 | 5 |
+| wp-x-instance-ops | 5 | 5 | 5 |
+| wp-y-dba-check | 228 | 217 | 217 |
+| Total | 6567 | 6401 | 6409 |
+
+Every scorer flip is FAIL → PASS. In the named phase16 baseline archive:
+
+| Case | Iteration | Changed check and justification |
+|---|---:|---|
+| scheduler-map | 1 | PLACE_ORDERS_JOB / PLACE_ORDERS row: displayed qualified invocation `(25)` has the correct routine identity. |
+| failed-lab-job | 1 | FAILED / ORA-20001 / destination unavailable / 1 row: Field/Value table explicitly labels stack line 1; trailing ERROR# annotation does not change the code. |
+| failed-lab-job | 2 | Same row and same explicit stack-line representation. |
+| failed-lab-job | 3 | Same row and same explicit stack-line representation. |
+
+The coordinator added two `phase16/gate-16e/` archives while this follow-up was
+running. The final snapshot includes both, through the comparison ending at
+**2026-11-04 19:24:42 UTC** (264 files). Later concurrent arrivals are outside
+this snapshot. No LLM calls were made by this worker. These additional scorer
+flips are also all FAIL → PASS, iteration 1:
+
+| Gate archive filename | Case | Justification |
+|---|---|---|
+| 2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json | scheduler-map | Correct qualified PLACE_ORDERS(25) invocation in the entry-point table. |
+| 2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json | failed-lab-job | Correct Field/Value table with explicit ORA-06512 line 1. |
+| 2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json | scheduler-map | Correct qualified PLACE_ORDERS(25) invocation in the entry-point table. |
+| 2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json | failed-lab-job | Correct status/code/message/line in Field/Value table; ERROR# annotation is incidental. |
+
+These are the only **eight scorer check flips and eight scorer record flips**
+across the final archive snapshot; no pre-phase16 archive changes. Applying the
+corrected phase16 cases adds these further record transitions in the original
+baseline file:
+
+| Case | Iteration | Transition | Justification |
+|---|---:|---|---|
+| security-trigger | 2 | FAIL → PASS | All independent metadata and source facts are correct; no literal packed-row layout is required. |
+| security-trigger | 3 | FAIL → PASS | All timing/granularity/table/events and source facts are present in prose. |
+| purge-line | 3 | FAIL → PASS | Correct independently explained frame, routine, operation and table. |
+| history-trigger | 3 | PASS → FAIL | Explicitly wrong any-column UPDATE scope; missed by the original case. |
+
+Final phase16 per-case counts: entry-points 0/3, writes 0/3, purge-behavior 0/3,
+scheduler-map 3/3, purge-constraint 3/3, purge-line 2/3, history-trigger 0/3,
+security-trigger 2/3, history-arguments 0/3, failed-lab-job 3/3: **13/30**.
+
+Applying the corrected cases to the two concurrently added gate archives also
+changes these four additional records (all FAIL → PASS, iteration 1), beyond
+the four gate scorer flips listed above:
+
+| Gate archive filename | Case | Justification |
+|---|---|---|
+| 2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json | purge-line | Source excerpt and separate frame/operation/table explanations give all four independent facts. |
+| 2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json | purge-line | Literal line-27 DELETE, NIGHTLY_PURGE, ORDERS and distinct outer frame are present in separate sections. |
+| 2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json | history-trigger | Correct AFTER UPDATE OF JOB_ID/DEPARTMENT_ID and FOR EACH ROW explanation, plus old values and destination. The original combined timing string was absent. |
+| 2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json | security-trigger | Separate timing, granularity, event and source explanations contain every requested fact. |
+
+This lists every record transition in the final report: eight from scorer
+normalization and eight more from case corrections (seven FAIL → PASS, one
+PASS → FAIL). The two gate archives mechanically rescore from 1/10 each to
+4/10 and 6/10 respectively with current cases; this does not change the requested
+original baseline's 13/30 result.
+
+Follow-up verification:
+
+```text
+Live read-only session.query validation: all 10 phase16 truth SELECTs passed;
+no empty/null/truncated truth. HR.UPDATE_JOB_HISTORY source re-read confirms
+AFTER UPDATE OF job_id, department_id ON employees / FOR EACH ROW.
+npm run typecheck
+PASSED (exit 0)
+npm test
+Test Files 53 passed (53)
+Tests 856 passed (856)
+Separate strict TypeScript check of owned tests/imported eval modules: PASSED.
+git diff --check: PASSED.
+```
+
+`tests/unit/phase16-baseline.json` retains all 30 real baseline answers, checks
+and offline truth only. Its new replay tests assert the complete corrected pass
+matrix, including every preserved substantive failure and the former false
+positive. Negative mutations cover wrong codes/lines/messages/statuses/routines,
+missing trigger facts, malformed invocation expressions, operation/type merging,
+wrong explicit owners, source/number-column borrowing, cross-table pooling and
+negated versus affirmative package-absence claims. The original case-writing
+tests still exercise three layouts and two wrong answers per case with updated
+snapshots. The pre-phase16 case SHA test still passes; no older case changed.
+
+No shared contract or dependency changes are needed. No DB/LLM product code
+changed, so integration tests were not required. No agent/LLM or eval-runner
+execution occurred. Read-only truth revalidation used only the two approved
+accounts via the existing session layer. The local dependency symlink was
+removed after checks. External review and any fresh baseline remain coordinator
+work; the archive rescore is fully offline and cannot establish how a changed
+agent will behave.

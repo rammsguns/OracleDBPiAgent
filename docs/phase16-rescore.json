@@ -1,0 +1,411 @@
+{
+  "files": 264,
+  "records": 6576,
+  "totals": {
+    "baseline-dba": {
+      "records": 238,
+      "oldPass": 236,
+      "newPass": 236
+    },
+    "phase10": {
+      "records": 109,
+      "oldPass": 108,
+      "newPass": 108
+    },
+    "phase11": {
+      "records": 102,
+      "oldPass": 79,
+      "newPass": 79
+    },
+    "phase11/gate-11b": {
+      "records": 592,
+      "oldPass": 571,
+      "newPass": 571
+    },
+    "phase14/gate-14b-ch2": {
+      "records": 176,
+      "oldPass": 171,
+      "newPass": 171
+    },
+    "phase14/gate-14b": {
+      "records": 592,
+      "oldPass": 580,
+      "newPass": 580
+    },
+    "phase15/gate-release": {
+      "records": 196,
+      "oldPass": 189,
+      "newPass": 189
+    },
+    "phase16": {
+      "records": 30,
+      "oldPass": 7,
+      "newPass": 11
+    },
+    "phase16/gate-16e": {
+      "records": 20,
+      "oldPass": 2,
+      "newPass": 6
+    },
+    "phase2": {
+      "records": 2767,
+      "oldPass": 2738,
+      "newPass": 2738
+    },
+    "phase5": {
+      "records": 163,
+      "oldPass": 157,
+      "newPass": 157
+    },
+    "phase6": {
+      "records": 428,
+      "oldPass": 421,
+      "newPass": 421
+    },
+    "phase8": {
+      "records": 36,
+      "oldPass": 36,
+      "newPass": 36
+    },
+    "review-wp-q": {
+      "records": 198,
+      "oldPass": 198,
+      "newPass": 198
+    },
+    "review-wp-s": {
+      "records": 166,
+      "oldPass": 165,
+      "newPass": 165
+    },
+    "review-wp-t": {
+      "records": 160,
+      "oldPass": 160,
+      "newPass": 160
+    },
+    "wp-l-compact-describe": {
+      "records": 118,
+      "oldPass": 118,
+      "newPass": 118
+    },
+    "wp-m-multi-describe": {
+      "records": 40,
+      "oldPass": 40,
+      "newPass": 40
+    },
+    "wp-o-reasoning-budget": {
+      "records": 198,
+      "oldPass": 198,
+      "newPass": 198
+    },
+    "wp-w-schema-health": {
+      "records": 5,
+      "oldPass": 5,
+      "newPass": 5
+    },
+    "wp-x-instance-ops": {
+      "records": 5,
+      "oldPass": 5,
+      "newPass": 5
+    },
+    "wp-y-dba-check": {
+      "records": 228,
+      "oldPass": 217,
+      "newPass": 217
+    }
+  },
+  "recordFlips": [
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 2,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 3,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    }
+  ],
+  "checkFlips": [
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 2,
+      "check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 3,
+      "check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+      "old": false,
+      "new": true
+    }
+  ],
+  "caseFlips": [
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-security-trigger",
+      "iteration": 2,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 2,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-purge-line",
+      "iteration": 3,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-history-trigger",
+      "iteration": 3,
+      "old": true,
+      "new": false
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-security-trigger",
+      "iteration": 3,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 3,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-purge-line",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-21-02-081Z-787eaaf1-1cac-4ba9-924a-9066689d0efc.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-scheduler-map",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-purge-line",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-history-trigger",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-security-trigger",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    },
+    {
+      "file": "phase16/gate-16e/2026-11-04T19-24-20-963Z-cf2f0e3c-bf1e-4133-a43c-48c73941a422.json",
+      "id": "hard-p16-failed-lab-job",
+      "iteration": 1,
+      "old": false,
+      "new": true
+    }
+  ],
+  "unscorable": [
+    {
+      "file": "phase10/2026-10-30T06-40-16-523Z-00f60968-5339-4461-959b-c42aa682a656.json",
+      "id": "hard-alter-session",
+      "iteration": 2,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase10/2026-10-30T06-40-16-523Z-00f60968-5339-4461-959b-c42aa682a656.json",
+      "id": "hard-fk-chain",
+      "iteration": 2,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase10/2026-10-30T06-40-16-523Z-00f60968-5339-4461-959b-c42aa682a656.json",
+      "id": "hard-pk-index",
+      "iteration": 2,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-01-30-207Z-b98e2db2-8c1b-4630-bf34-dd57baeab36d.json",
+      "id": "hard-share",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-01-30-207Z-b98e2db2-8c1b-4630-bf34-dd57baeab36d.json",
+      "id": "hard-top-buffer-plan",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-01-30-207Z-b98e2db2-8c1b-4630-bf34-dd57baeab36d.json",
+      "id": "hard-wait-limits",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-01-30-207Z-b98e2db2-8c1b-4630-bf34-dd57baeab36d.json",
+      "id": "hard-follow-ratio",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-01-30-207Z-b98e2db2-8c1b-4630-bf34-dd57baeab36d.json",
+      "id": "hard-follow-lab-boundary",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    },
+    {
+      "file": "phase2/2026-10-29T16-04-15-452Z-7e7f3c91-e770-42fa-8b6c-f220dadaa9d3.json",
+      "id": "hard-top-buffer-plan",
+      "iteration": 1,
+      "error": "Case failed during ground truth or agent execution"
+    }
+  ],
+  "snapshotNote": "All archive JSON files discovered by the rescore ending 2026-11-04 19:24:42 UTC; two gate-16e archives appeared during this follow-up. Later concurrent archives are outside this snapshot."
+}
