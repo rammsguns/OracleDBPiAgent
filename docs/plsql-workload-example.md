@@ -92,34 +92,31 @@ flowchart LR
   n0["SHOPAPP.NIGHTLY_PURGE_JOB"]
   n1["SHOPAPP.PLACE_ORDERS_JOB"]
   n2["SHOPAPP.SHIP_ORDERS_JOB"]
-  n3["PUBLIC.DBMS_RANDOM"]
-  n4["SHOPAPP.WORKLOAD"]
-  n5["SYS.DBMS_RANDOM"]
-  n6["SYS.STANDARD"]
-  n7["PLACE_ORDERS"]
-  n8["SHIP_ORDERS"]
-  n9["NIGHTLY_PURGE"]
-  n10["SHOPAPP.ORDER_LINES"]
-  n11["SHOPAPP.ORDERS"]
-  n12["SHOPAPP.PRODUCTS"]
-  n0 -.->|references| n9
-  n1 -.->|references| n7
-  n2 -.->|references| n8
-  n4 -->|depends-on| n3
-  n4 -->|depends-on| n5
-  n4 -->|depends-on| n6
-  n4 -->|contains| n7
-  n4 -->|contains| n8
-  n4 -->|contains| n9
-  n7 -.->|INSERT| n10
-  n7 -.->|INSERT| n11
-  n7 -.->|UPDATE| n11
-  n7 -.->|SELECT| n12
-  n7 -.->|UPDATE| n12
-  n8 -.->|UPDATE| n11
-  n9 -.->|DELETE| n10
-  n9 -.->|DELETE| n11
-  n9 -.->|SELECT| n11
+  n3["SHOPAPP.WORKLOAD"]
+  n4["PLACE_ORDERS"]
+  n5["SHIP_ORDERS"]
+  n6["NIGHTLY_PURGE"]
+  n7["SHOPAPP.ORDER_LINES"]
+  n8["SHOPAPP.ORDERS"]
+  n9["SHOPAPP.PRODUCTS"]
+  n10["Oracle-supplied (3)"]
+  n0 -.->|references| n6
+  n1 -.->|references| n4
+  n2 -.->|references| n5
+  n3 -->|depends-on| n10
+  n3 -->|contains| n4
+  n3 -->|contains| n5
+  n3 -->|contains| n6
+  n4 -.->|INSERT| n7
+  n4 -.->|INSERT| n8
+  n4 -.->|UPDATE| n8
+  n4 -.->|SELECT| n9
+  n4 -.->|UPDATE| n9
+  n5 -.->|UPDATE| n8
+  n6 -.->|DELETE| n7
+  n6 -.->|DELETE| n8
+  n6 -.->|SELECT| n8
+  click n10 href "#" "PUBLIC.DBMS_RANDOM, SYS.DBMS_RANDOM, SYS.STANDARD"
 ```
 
 ## Source appendix (redacted; maximum 2,000 lines across spec and body)
