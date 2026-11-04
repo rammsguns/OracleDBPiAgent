@@ -809,7 +809,7 @@ other values. This is deterministic value checking, not semantic grading of
 arbitrary prose or a check that the explanation justifies every value.
 
 All twelve phase11 cases now use rowCells. The primary-key case returns two
-labeled rows (PK_CONSTRAINTS and FK_CONSTRAINTS), because those are independent
+count rows (primary keys and foreign keys), because those are independent
 facts that the real baseline answers reported on separate lines. No truth value
 was removed. The two metadata cases no longer require run_query. The other 61
 hard cases, MVP cases, scalar mode and allCells mode are unchanged.
@@ -820,3 +820,58 @@ Only IDs, iteration numbers, answers and tool names were extracted with jq.
 All 35 correct answers pass; plan-line-tree iteration 2 fails because it merges
 OP and OPTIONS. Truth snapshots under tests/fixtures are offline test data;
 actual evals always read fresh truth. No agent or LLM was run during this work.
+
+### Phase 11C blind harder round
+
+Ten new `phase11b-*.json` challenge cases were written without agent/LLM runs.
+The gate splits remain 28 dev, 12 holdout and 21 regression; challenge is now 22.
+Plain SELECT validation on both configured targets checked 62 truth queries for
+83 cases. The two partial-grant cases also execute read-only access probes and
+require ORA-00942 or ORA-01031, rather than treating any query failure as proof
+of missing access. Validation fails if ties, NULL denominators, empty departments,
+date-boundary differences or the history row/person distinction disappear.
+
+Observed truth below is a snapshot, not pinned eval answers. Complete snapshots
+(including every wide row) are in `tests/fixtures/phase11-truth.json` and
+`tests/fixtures/phase11b-truth.json`. Unit tests score each blind case in table,
+record and prose layouts and reject changed/missing rows. The coordinator still
+needs to arrange Antigravity review and the challenge ×3 baseline; difficulty
+has not been measured.
+
+| New case (`hard-p11b-` prefix) | Substance and observed ground truth |
+|---|---|
+| header-fanout | OE header totals aggregated once before item quantities: direct = 73 orders, 1,903,629.20 total, 15,647 units; online = 32, 1,764,425.50, 14,440. Joining raw items would multiply header totals. |
+| nullable-manager | 21 HR departments at location 1700. Populated IDs: 10 → (1 employee, 1 manager value, 101.00 average); 30 → (6,6,111.67); 90 → (3,2,100.00); 100 → (6,6,106.83); 110 → (2,2,153.00). IDs 120–270 by tens are empty → (0,0,NONE). Outer join COUNT(*) would invent employees. |
+| commission-denominators | Manager 100 → (14 employees, 5 known commissions, .3000 known average, .1071 zero-filled average); 145 → (6,6,.2250,.2250). NULL handling changes the first denominator. |
+| salary-ties | Three highest distinct salary levels produce four employees: 100 King 24000 rank 1; 101 Kochhar and 102 De Haan 17000 rank 2; 145 Russell 14000 rank 3. ROW_NUMBER or an ordinary three-row limit loses a tie. |
+| timestamp-boundary | OE whole days Nov 18–19 2007 contain 4 orders; inclusive midnight Nov 18 through midnight Nov 19 contains 1. The end-day boundary loses 3 orders. |
+| history-chain | Rank history counts → employee 101 → earliest history 1997-09-21 → historical department 110 → manager Shelley Higgins → Accounting Manager → Seattle → United States of America → Americas. Uses historical rather than current department. |
+| salesperson-chain | Rank OE salesperson revenue → 161 / 661734.50 → HR department Sales → department manager John Russell → Sales Manager → location country United Kingdom. Department manager is a distinct lookup from employee manager. |
+| stats-grain | HR.JOB_HISTORY dictionary NUM_ROWS=10, live rows=10, distinct employees=7. The conflicting interpretation is rows versus people; statistics are not assumed stale. Live DISTINCT answers the person-count question. |
+| partial-memory | PRODCDB instance, major version 19 are readable; V$PARAMETER is inaccessible. SGA_TARGET remains unavailable, even with memory allocation evidence. |
+| partial-backup | PRODCDB / READ WRITE is readable; V$RMAN_BACKUP_JOB_DETAILS is inaccessible. An open database does not establish the latest completed backup's status. |
+
+| Converted case (`hard-p11-` prefix) | Observed ground truth / scoring note |
+|---|---|
+| customers-scope | CO CUSTOMERS 392; OE 319; SH 55500. Record strings and ordinary tables both pass. |
+| orders-status-scope | CO ORDER_STATUS VARCHAR2 N; OE ORDER_STATUS NUMBER Y. Transposed table and type-length annotations pass. No run_query requirement. |
+| fiscal-calendar | Quarter labels 2000-01 through 2000-04; min/max fiscal year both 2000; distinct dates 91,91,92,92. |
+| plan-line-tree | (0,ROOT,0,SELECT STATEMENT,NONE); (1,0,1,INDEX,UNIQUE SCAN). The merged operation answer fails. |
+| commission-zero | NULL=72; zero=0; positive=35. Premise correction still required. |
+| sales-primary-key | Primary-key count 0 and foreign-key count 5, as independent truth rows. Premise correction still required; no run_query requirement. |
+| order-customer-key | CUSTOMER_ID → CUSTOMERS / SYS_C007649 → same backing index / UNIQUE / position 1 / CUSTOMER_ID / NUMBER. |
+| warehouse-location-key | LOCATION_ID → HR.LOCATIONS / LOC_ID_PK → same backing index / UNIQUE / position 1 / LOCATION_ID / NUMBER. |
+| second-department | 80 / Sales / 34 employees / 304500 salary total / John Russell. |
+| second-warehouse | 6 / Sydney / Sydney / Australia / Asia. |
+| job-salary-bands | All 19 HR job definitions; exact minimum/maximum pairs preserved in the fixture. |
+| subcategory-counts | All 21 subcategories; exact counts preserved in the fixture (Accessories=10, Y Box Games=8, including all intermediate rows). |
+
+WP-11C verification: `npm run typecheck` passed; `npm test` passed 648 tests
+in 38 files. With PIAGENT_SECRET_DIR set to the owner's secret directory,
+`npx tsx evals/validate-hard.ts` passed (62 truth queries / 83 cases), and
+`npm run test:integration -- --testNamePattern='^(?!.*end-to-end ask)'`
+passed 24 tests with 1 skipped. The excluded test is the end-to-end LLM ask,
+consistent with the instruction not to run an agent or any LLM. No shared
+contracts or dependencies need changing. The generated validation report was
+used to capture the owned test fixtures; the existing shared report is left
+for the coordinator to refresh after merging.

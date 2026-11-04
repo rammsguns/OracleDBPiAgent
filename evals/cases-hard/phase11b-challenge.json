@@ -1,0 +1,191 @@
+[
+	{
+		"id": "hard-p11b-header-fanout",
+		"target": "d1-19c-lab",
+		"category": "sql-semantics",
+		"split": "challenge",
+		"question": "On d1 in OE, for each ORDER_MODE report the number of orders having at least one ORDER_ITEMS row, the sum of their header ORDER_TOTAL exactly once per order, and their total item quantity. Round monetary totals to two decimals. Explain the aggregation grain that keeps header totals correct.",
+		"groundTruth": {
+			"sql": "SELECT o.order_mode,COUNT(*),ROUND(SUM(o.order_total),2),SUM(i.qty) FROM oe.orders o JOIN (SELECT order_id,SUM(quantity) qty FROM oe.order_items GROUP BY order_id) i ON i.order_id=o.order_id GROUP BY o.order_mode ORDER BY o.order_mode",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(per.order|once|fan.?out|duplicat|grain)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-nullable-manager",
+		"target": "d1-19c-lab",
+		"category": "sql-semantics",
+		"split": "challenge",
+		"question": "On d1, for every HR department whose LOCATION_ID is 1700, show department ID, number of employees including zero for empty departments, number with a non-null manager, and average manager ID rounded to two decimals or the word NONE when undefined. Explain which rows enter each aggregate.",
+		"groundTruth": {
+			"sql": "SELECT d.department_id,COUNT(e.employee_id),COUNT(e.manager_id),NVL(TO_CHAR(ROUND(AVG(e.manager_id),2),'FM9999990.00'),'NONE') FROM hr.departments d LEFT JOIN hr.employees e ON e.department_id=d.department_id WHERE d.location_id=1700 GROUP BY d.department_id ORDER BY d.department_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(NULL|empty|non.null)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-commission-denominators",
+		"target": "d1-19c-lab",
+		"category": "sql-semantics",
+		"split": "challenge",
+		"question": "On d1 for HR employees reporting directly to manager IDs 100 and 145, report each manager ID, total employee count, count with a commission, average commission among known values, and average when missing commissions are treated as zero. Round both averages to four decimals. Explain the denominators.",
+		"groundTruth": {
+			"sql": "SELECT manager_id,COUNT(*),COUNT(commission_pct),ROUND(AVG(commission_pct),4),ROUND(AVG(NVL(commission_pct,0)),4) FROM hr.employees WHERE manager_id IN (100,145) GROUP BY manager_id ORDER BY manager_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(denominator|NULL|count)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-salary-ties",
+		"target": "d1-19c-lab",
+		"category": "sql-semantics",
+		"split": "challenge",
+		"question": "On d1, list every HR employee in the three highest distinct salary levels across all departments, including all ties. Give employee ID, last name, salary and salary-level rank, sorted by salary descending then employee ID. Three employees alone may not describe three salary levels.",
+		"groundTruth": {
+			"sql": "SELECT employee_id,last_name,salary,rnk FROM (SELECT employee_id,last_name,salary,DENSE_RANK() OVER(ORDER BY salary DESC) rnk FROM hr.employees) WHERE rnk<=3 ORDER BY salary DESC,employee_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-timestamp-boundary",
+		"target": "d1-19c-lab",
+		"category": "sql-semantics",
+		"split": "challenge",
+		"question": "On d1 in OE, count orders during the two whole calendar days 2007-11-18 and 2007-11-19. Compare this with an inclusive range from midnight 2007-11-18 through midnight 2007-11-19. Report WHOLE_DAYS and INCLUSIVE_MIDNIGHT counts together and explain whether that inclusive upper bound includes all of the second day.",
+		"groundTruth": {
+			"sql": "SELECT COUNT(CASE WHEN order_date>=TIMESTAMP '2007-11-18 00:00:00' AND order_date<TIMESTAMP '2007-11-20 00:00:00' THEN 1 END),COUNT(CASE WHEN order_date BETWEEN TIMESTAMP '2007-11-18 00:00:00' AND TIMESTAMP '2007-11-19 00:00:00' THEN 1 END) FROM oe.orders",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(exclusive|half.open|next.*midnight|includes.*midnight|upper bound)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-history-chain",
+		"target": "d1-19c-lab",
+		"category": "long-diagnosis",
+		"split": "challenge",
+		"question": "On d1, start with the HR employee having the greatest number of JOB_HISTORY records, ties by lowest employee ID. Find that employee's earliest history row, ties by END_DATE then JOB_ID. Follow that historical department to its current manager, that manager's current job, and that department's location, country and region. Report employee ID, history start date as YYYY-MM-DD, historical department ID, manager full name, manager job title, city, country and region. Do not substitute the employee's current department.",
+		"groundTruth": {
+			"sql": "SELECT e.employee_id,TO_CHAR(h.start_date,'YYYY-MM-DD'),d.department_id,m.first_name||' '||m.last_name,j.job_title,l.city,c.country_name,r.region_name FROM (SELECT employee_id FROM hr.job_history GROUP BY employee_id ORDER BY COUNT(*) DESC,employee_id FETCH FIRST 1 ROW ONLY) e JOIN hr.job_history h ON h.employee_id=e.employee_id JOIN hr.departments d ON d.department_id=h.department_id JOIN hr.employees m ON m.employee_id=d.manager_id JOIN hr.jobs j ON j.job_id=m.job_id JOIN hr.locations l ON l.location_id=d.location_id JOIN hr.countries c ON c.country_id=l.country_id JOIN hr.regions r ON r.region_id=c.region_id ORDER BY h.start_date,h.end_date,h.job_id FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-salesperson-chain",
+		"target": "d1-19c-lab",
+		"category": "long-diagnosis",
+		"split": "challenge",
+		"question": "On d1 in OE, choose the salesperson with the largest total ORDER_TOTAL, excluding orders with no salesperson and breaking ties by salesperson ID. Follow that person into HR to their current department, its manager, the manager's job and the department location's country. Report salesperson ID, total order value rounded to two decimals, department name, department manager full name, manager job title and country name. Use the department manager, who need not be the salesperson's own manager.",
+		"groundTruth": {
+			"sql": "SELECT s.sales_rep_id,ROUND(s.total,2),d.department_name,m.first_name||' '||m.last_name,j.job_title,c.country_name FROM (SELECT sales_rep_id,SUM(order_total) total FROM oe.orders WHERE sales_rep_id IS NOT NULL GROUP BY sales_rep_id ORDER BY total DESC,sales_rep_id FETCH FIRST 1 ROW ONLY) s JOIN hr.employees e ON e.employee_id=s.sales_rep_id JOIN hr.departments d ON d.department_id=e.department_id JOIN hr.employees m ON m.employee_id=d.manager_id JOIN hr.jobs j ON j.job_id=m.job_id JOIN hr.locations l ON l.location_id=d.location_id JOIN hr.countries c ON c.country_id=l.country_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-stats-grain",
+		"target": "d1-19c-lab",
+		"category": "conflicting-evidence",
+		"split": "challenge",
+		"question": "On d1, reconcile HR.JOB_HISTORY dictionary NUM_ROWS with its live row count and the number of distinct employees represented. Report all three values in that order in one record. Explain whether a statistics row count can answer how many different employees have history, and which source you used for that question.",
+		"groundTruth": {
+			"sql": "SELECT t.num_rows,(SELECT COUNT(*) FROM hr.job_history),(SELECT COUNT(DISTINCT employee_id) FROM hr.job_history) FROM all_tables t WHERE owner='HR' AND table_name='JOB_HISTORY'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(distinct|different employees)",
+				"(statistic|NUM_ROWS)",
+				"(live|COUNT)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-partial-memory",
+		"target": "p1-19c-prod",
+		"category": "partial-grants",
+		"split": "challenge",
+		"question": "On p1, report instance name and major database version, then the configured SGA_TARGET value in bytes. Give every part the account can verify and explicitly identify any unavailable source and value; do not infer configured targets from currently allocated memory.",
+		"groundTruth": {
+			"sql": "SELECT instance_name,REGEXP_SUBSTR(version,'^[0-9]+'),'V$PARAMETER','unavailable' FROM v$instance",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"SGA_TARGET",
+				"(unavailable|inaccessible|cannot|denied|lack|missing)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p11b-partial-backup",
+		"target": "p1-19c-prod",
+		"category": "partial-grants",
+		"split": "challenge",
+		"question": "On p1, report database name and open mode, then the latest completed RMAN backup end time and status. Give the accessible part even if backup history cannot be read, and name that access gap. Explain why an open database does not establish backup health.",
+		"groundTruth": {
+			"sql": "SELECT name,open_mode,'V$RMAN_BACKUP_JOB_DETAILS','unavailable' FROM v$database",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(backup|RMAN)",
+				"(unavailable|inaccessible|cannot|denied|lack|missing)",
+				"(does not|doesn.t|cannot|not.*(?:prove|establish|guarantee))"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]

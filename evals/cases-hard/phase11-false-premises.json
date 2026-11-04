@@ -34,7 +34,7 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'PK_CONSTRAINTS',COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='P' UNION ALL SELECT 'FK_CONSTRAINTS',COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='R'",
+			"sql": "SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='P' UNION ALL SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='R'",
 			"mode": "rowCells"
 		},
 		"question": "On d1, which columns make up the declared primary key of SH.SALES? I assume there is one because it is a fact table. Verify the premise from constraints, explicitly say if no primary key is declared, and separately count declared foreign-key constraints. Return PK_CONSTRAINTS=<count> / FK_CONSTRAINTS=<count>. Do not infer a primary key from an index or a plausible business key."

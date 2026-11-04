@@ -52,8 +52,8 @@ it('fails validation when a false-premise prerequisite changes', async () => {
 	const cases = await loadHardCases();
 	const pk = cases.find(test => test.id === 'hard-p11-sales-primary-key')!;
 	const commission = cases.find(test => test.id === 'hard-p11-commission-zero')!;
-	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS',0],['FK_CONSTRAINTS',5]])).not.toThrow();
-	expect(() => checkChallengeRows(pk, [['PK_CONSTRAINTS',1],['FK_CONSTRAINTS',5]])).toThrow('premise');
+	expect(() => checkChallengeRows(pk, [[0],[5]])).not.toThrow();
+	expect(() => checkChallengeRows(pk, [[1],[5]])).toThrow('premise');
 	expect(() => checkChallengeRows(commission, [[72,0,35]])).not.toThrow();
 	expect(() => checkChallengeRows(commission, [[0,72,35]])).toThrow('premise');
 });

@@ -50,16 +50,23 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 function rowMatches(answer: string, row: unknown[]): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
+	const decimal = (text: string) => {
+		const negative = text.startsWith('-');
+		const [integer = '', fraction = ''] = text.replace(/^[-+]/, '').split('.');
+		const magnitude = integer.replace(/^0+(?=\d)/, '') + (fraction.replace(/0+$/, '') ? '.' + fraction.replace(/0+$/, '') : '');
+		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
+	};
 	const same = (actual: string, expected: unknown) => {
 		const text = clean(actual).replace(/\s+\([^)]*\)\s*$/, ''), value = String(expected);
-		if (/^-?\d+(?:\.\d+)?$/.test(value)) return /^[-+]?\d+(?:\.\d+)?$/.test(text) && Number(text) === Number(value);
+		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
 	const lines = answer.split(/\r?\n/).map(clean).flatMap(line => {
 		// Repeated record keys and adjacent markdown rows delimit separate records,
 		// even when a response puts them on one physical line.
-		const firstKey = /(?:^|[|;])\s*([A-Za-z_]+)\s*=/.exec(line)?.[1];
-		const records = firstKey ? line.split(new RegExp(`;\\s*(?=${firstKey}\\s*=)`, 'i')) : [line];
+		const firstKey = /(?:^[-•]?\s*|[|;])\s*([A-Za-z_]+)\s*=/.exec(line)?.[1];
+		const records = firstKey ? line.split(new RegExp(`(?:[;,]\\s*|\\s+/\\s+|\\s*\\|\\s*)(?=${firstKey}\\s*=)`, 'i')) : [line];
 		return records.flatMap(record => record.split(/(?<=\S)\s*\|\s*\|\s*(?=\S)/));
 	});
 	// Column-oriented markdown tables are also records: transpose each contiguous table.
@@ -88,8 +95,10 @@ function rowMatches(answer: string, row: unknown[]): boolean {
 		let remaining = line;
 		return row.every(value => {
 			const escaped = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			const pattern = new RegExp(`(?<![\\w.])${escaped}${typeof value === 'number' ? '(?:\\.0+)?' : ''}(?!\\w|\\.\\d)`, 'i');
-			const match = pattern.exec(remaining);
+			const pattern = new RegExp(`(?<![\\w.])${escaped}(?!\\w|\\.\\d)`, 'i');
+			const match = numeric(String(value))
+				? [...remaining.matchAll(/(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)].find(candidate => same(candidate[0], value))
+				: pattern.exec(remaining);
 			if (!match) return false;
 			remaining = remaining.slice(0, match.index) + ' '.repeat(match[0].length) + remaining.slice(match.index + match[0].length);
 			return true;

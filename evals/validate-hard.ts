@@ -80,7 +80,7 @@ export function checkChallengeRows(test: EvalCase, rows: unknown[][]): void {
 	if (test.id === 'hard-p11b-commission-denominators' && !rows.some(row => Number(row[1]) > Number(row[2]) && Number(row[3]) !== Number(row[4]))) throw new Error('NULL denominator prerequisite changed');
 	if (test.id === 'hard-p11b-nullable-manager' && !rows.some(row => row[1] === 0 && row[3] === 'NONE')) throw new Error('Empty department prerequisite changed');
 	if (test.id === 'hard-p11b-stats-grain' && !(Number(rows[0]?.[1]) > Number(rows[0]?.[2]))) throw new Error('History grain prerequisite changed');
-	if (test.id === 'hard-p11-sales-primary-key' && (rows[0]?.[0] !== 'PK_CONSTRAINTS' || Number(rows[0]?.[1]) !== 0)) throw new Error('SALES primary-key premise changed');
+	if (test.id === 'hard-p11-sales-primary-key' && Number(rows[0]?.[0]) !== 0) throw new Error('SALES primary-key premise changed');
 	if (test.id === 'hard-p11-commission-zero' && !(Number(rows[0]?.[0]) > 0 && Number(rows[0]?.[1]) === 0 && Number(rows[0]?.[2]) > 0)) throw new Error('Commission premise changed');
 }
 

@@ -98,11 +98,9 @@
 		"id": "hard-p11-sales-primary-key",
 		"rows": [
 			[
-				"PK_CONSTRAINTS",
 				0
 			],
 			[
-				"FK_CONSTRAINTS",
 				5
 			]
 		]

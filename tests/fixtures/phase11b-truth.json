@@ -1,0 +1,267 @@
+[
+	{
+		"id": "hard-p11b-header-fanout",
+		"rows": [
+			[
+				"direct",
+				73,
+				1903629.2,
+				15647
+			],
+			[
+				"online",
+				32,
+				1764425.5,
+				14440
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-nullable-manager",
+		"rows": [
+			[
+				10,
+				1,
+				1,
+				"101.00"
+			],
+			[
+				30,
+				6,
+				6,
+				"111.67"
+			],
+			[
+				90,
+				3,
+				2,
+				"100.00"
+			],
+			[
+				100,
+				6,
+				6,
+				"106.83"
+			],
+			[
+				110,
+				2,
+				2,
+				"153.00"
+			],
+			[
+				120,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				130,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				140,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				150,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				160,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				170,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				180,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				190,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				200,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				210,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				220,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				230,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				240,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				250,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				260,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				270,
+				0,
+				0,
+				"NONE"
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-commission-denominators",
+		"rows": [
+			[
+				100,
+				14,
+				5,
+				0.3,
+				0.1071
+			],
+			[
+				145,
+				6,
+				6,
+				0.225,
+				0.225
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-salary-ties",
+		"rows": [
+			[
+				100,
+				"King",
+				24000,
+				1
+			],
+			[
+				101,
+				"Kochhar",
+				17000,
+				2
+			],
+			[
+				102,
+				"De Haan",
+				17000,
+				2
+			],
+			[
+				145,
+				"Russell",
+				14000,
+				3
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-timestamp-boundary",
+		"rows": [
+			[
+				4,
+				1
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-history-chain",
+		"rows": [
+			[
+				101,
+				"1997-09-21",
+				110,
+				"Shelley Higgins",
+				"Accounting Manager",
+				"Seattle",
+				"United States of America",
+				"Americas"
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-salesperson-chain",
+		"rows": [
+			[
+				161,
+				661734.5,
+				"Sales",
+				"John Russell",
+				"Sales Manager",
+				"United Kingdom"
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-stats-grain",
+		"rows": [
+			[
+				10,
+				10,
+				7
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-partial-memory",
+		"rows": [
+			[
+				"PRODCDB",
+				"19",
+				"V$PARAMETER",
+				"unavailable"
+			]
+		]
+	},
+	{
+		"id": "hard-p11b-partial-backup",
+		"rows": [
+			[
+				"PRODCDB",
+				"READ WRITE",
+				"V$RMAN_BACKUP_JOB_DETAILS",
+				"unavailable"
+			]
+		]
+	}
+]

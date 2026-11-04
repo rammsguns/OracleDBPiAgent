@@ -44,11 +44,15 @@ it('scores the actual baseline answers: correct answers pass, merged plan operat
 });
 it('keeps different records on one physical line separate', () => {
 	const rows = [['Alpha', 100], ['Beta', 200]];
-	for (const answer of ['NAME=Alpha / N=200; NAME=Beta / N=100', '| Alpha | 200 | | Beta | 100 |']) {
+	for (const answer of ['NAME=Alpha / N=200; NAME=Beta / N=100', '| Alpha | 200 | | Beta | 100 |', 'NAME=Alpha / N=200 / NAME=Beta / N=100']) {
 		expect(score(test, result(answer), rows).pass).toBe(false);
 	}
 });
 it('handles negative numbers and numeric text without accepting a longer value', () => {
 	expect(score(test, result('| A | −1,234.500 |'), [['A', '-1234.5']]).pass).toBe(true);
 	expect(score(test, result('| A | -1234.5001 |'), [['A', '-1234.5']]).pass).toBe(false);
+});
+it('normalizes numeric text in prose without losing precision', () => {
+	expect(score(test, result('Alpha has 1.2000 and −55,500.00.'), [['Alpha', '1.2', -55500]]).pass).toBe(true);
+	expect(score(test, result('| A | 9007199254740993 |'), [['A', '9007199254740992']]).pass).toBe(false);
 });
