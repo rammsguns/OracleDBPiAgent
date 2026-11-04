@@ -95,7 +95,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	// Column-oriented markdown tables are also records: transpose each contiguous table.
 	const inlineRecord = /\(([^()]*[A-Za-z_][\w$]*\s*=[^()]*)\)/g;
 	const candidates = lines.map(line => singleRow ? line.replace(inlineRecord, '') : line);
-	if (singleRow) {
+	if (singleRow || row.length === 1) {
 		for (const line of lines) {
 			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!);
 		}
@@ -110,6 +110,18 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		}
 		if (block[0]?.some(cell => labels.some(label => label && label.toLowerCase() === cell.toLowerCase()))) {
 			for (let i = 1; i < block.length; i++) candidates[indices[i]!] = block[i]!.map((value, col) => `${block[0]![col]}=${value}`).join(' / ');
+			continue;
+		}
+		// Presentation columns (#, sources) are not evidence values. A vertical
+		// record can use Detail and Value together, but only inside this table
+		// and only for a single truth record; never pool unrelated tables.
+		const header = block[0] ?? [];
+		const keyColumn = header.findIndex(cell => /^(?:item|step|attribute|field|property)$/i.test(cell));
+		const valueColumns = header.flatMap((cell, index) => /^(?:value|detail)$/i.test(cell) ? [index] : []);
+		if (singleRow && keyColumn >= 0 && valueColumns.length) {
+			for (const index of indices) candidates[index] = '';
+			candidates.push(block.slice(1).flatMap(cells => valueColumns.map(col =>
+				`${cells[keyColumn]}=${(cells[col] ?? '').replace(/\s+\([^)]*\)\s*$/, '')}`)).join(' / '));
 			continue;
 		}
 		if (!singleRow && !/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
