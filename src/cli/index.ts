@@ -117,6 +117,10 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const result = buildReportTrends(await loadReportHistory(reportDirectory(), options.target, loadConfig().targets, /^\d+$/.test(options.last) ? Number(options.last) : NaN));
 		console.log(options.json ? JSON.stringify(result) : renderTrends(result));
 	});
+	program.command("drift").description("Compare two approved targets (parameters, schema or objects); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+		const { runDrift } = await import("../drift/cli.js");
+		await runDrift(options);
+	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
