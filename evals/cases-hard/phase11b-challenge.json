@@ -154,12 +154,13 @@
 		"split": "challenge",
 		"question": "On p1, report instance name and major database version, then the configured SGA_TARGET value in bytes. Give every part the account can verify and explicitly identify any unavailable source and value; do not infer configured targets from currently allocated memory.",
 		"groundTruth": {
-			"sql": "SELECT instance_name,REGEXP_SUBSTR(version,'^[0-9]+'),'V$PARAMETER','unavailable' FROM v$instance",
+			"sql": "SELECT instance_name FROM v$instance UNION ALL SELECT REGEXP_SUBSTR(version,'^[0-9]+') FROM v$instance",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
 				"SGA_TARGET",
+				"V\\$PARAMETER",
 				"(unavailable|inaccessible|cannot|denied|lack|missing)"
 			],
 			"requiredTools": [],
@@ -174,12 +175,13 @@
 		"split": "challenge",
 		"question": "On p1, report database name and open mode, then the latest completed RMAN backup end time and status. Give the accessible part even if backup history cannot be read, and name that access gap. Explain why an open database does not establish backup health.",
 		"groundTruth": {
-			"sql": "SELECT name,open_mode,'V$RMAN_BACKUP_JOB_DETAILS','unavailable' FROM v$database",
+			"sql": "SELECT name FROM v$database UNION ALL SELECT open_mode FROM v$database",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
 				"(backup|RMAN)",
+				"V\\$RMAN_BACKUP_JOB_DETAILS",
 				"(unavailable|inaccessible|cannot|denied|lack|missing)",
 				"(does not|doesn.t|cannot|not.*(?:prove|establish|guarantee))"
 			],
