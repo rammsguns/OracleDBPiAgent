@@ -447,15 +447,30 @@ async function emptyDictionaryHint(session: OracleSession, sql: string, binds: R
 	if (code.some(t => t[0].startsWith('"') || /^(WITH|Q|NQ)$/i.test(t[0]))) return;
 	const views = new Set<string>();
 	const replacements: typeof tokens = [];
+	const fromDepths = new Set<number>();
+	const fromCommas = new Set<number>();
+	let depth = 0;
 	for (let i = 0; i < code.length; i++) {
 		const token = code[i]!;
 		const name = token[0].toUpperCase();
+		if (name === "(") depth++;
+		else if (name === ")") {
+			fromDepths.delete(depth);
+			depth--;
+		} else if (name === "FROM") fromDepths.add(depth);
+		else if (/^(WHERE|GROUP|ORDER|CONNECT|START|HAVING|UNION|MINUS|INTERSECT|FETCH)$/.test(name)) {
+			fromDepths.delete(depth);
+		} else if (name === "," && fromDepths.has(depth)) {
+			// Nested function arguments and select lists have their own depth;
+			// only commas in an active FROM list introduce another view.
+			fromCommas.add(i);
+		}
 		if (!name.startsWith("ALL_")) continue;
 		if (!emptyHintViews.has(name)) return;
 		const previous = code[i - 1]?.[0].toUpperCase();
 		const sys = previous === "." && code[i - 2]?.[0].toUpperCase() === "SYS";
 		const before = sys ? code[i - 3]?.[0].toUpperCase() : previous;
-		if (before === "FROM" || before === "JOIN") views.add(name);
+		if (before === "FROM" || before === "JOIN" || fromCommas.has(sys ? i - 3 : i - 1)) views.add(name);
 		else if (code[i + 1]?.[0] !== ".") return;
 		replacements.push(token);
 	}
