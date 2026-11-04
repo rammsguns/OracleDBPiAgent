@@ -82,8 +82,19 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	};
 	// Dictionary constraint types may be explained after an identifier.
 	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+—\s+type\s+[PRUCV]$/i, '$1');
-	const same = (actual: string, expected: unknown) => {
-		const text = evidence(actual), value = String(expected);
+	const same = (actual: string, expected: unknown, label = '') => {
+		let text = evidence(actual);
+		const value = String(expected);
+		// A line-labelled numeric fact may be written as an explicit Oracle stack
+		// frame. Do not borrow error numbers or numbers in arbitrary descriptions.
+		if (/^(?:source_)?line$/i.test(label)) {
+			text = /^(?:ORA-06512:\s*at\s+|at\s+)?line\s+(\d+)$/i.exec(text)?.[1] ?? text;
+		}
+		// Routine identity survives a displayed invocation with literal arguments.
+		// Operation/type columns still require whole values (INDEX != INDEX(1)).
+		if (/^(?:entry_point|subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label)) {
+			text = /^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\(\s*(?:(?:[-+]?\d+(?:\.\d+)?|NULL|'(?:[^']|'')*')\s*(?:,\s*(?:[-+]?\d+(?:\.\d+)?|NULL|'(?:[^']|'')*')\s*)*)?\)$/i.exec(text)?.[1] ?? text;
+		}
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
@@ -134,7 +145,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// Named values must agree with their own truth column, even when the
 		// unordered multiset of values would otherwise match a swapped record.
 		const bindings = [...line.matchAll(/(?:^|[|;,/(]\s*)([A-Za-z_][\w$]*)\s*=\s*([^|;,/)]*)/g)];
-		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index])))) return false;
+		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index], label)))) return false;
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
 		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
 		if (structured) {
@@ -154,17 +165,25 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 				const value = evidence(field);
 				return /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(value) ? value.split('.') : [value];
 			});
-			return row.every(value => { const index = available.findIndex(field => same(field, value)); if (index < 0) return false; available.splice(index, 1); return true; });
+			return row.every((value, column) => { const index = available.findIndex(field => same(field, value, labels[column])); if (index < 0) return false; available.splice(index, 1); return true; });
 		}
 		// Plain prose/list rows: consume distinct bounded occurrences on this line.
 		let remaining = line;
-		return row.every(value => {
+		return row.every((value, column) => {
 			const escaped = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			const pattern = new RegExp(`(?<![\\w.])${escaped}(?!\\w|\\.\\d)`, 'i');
+			const qualifier = /^[A-Za-z_][\w$]*$/.test(String(value)) ? '(?:[A-Za-z_][\\w$]*\\.)*' : '';
+			const pattern = new RegExp(`(?<![\\w.])${qualifier}${escaped}(?!\\w|\\.\\d)`, 'i');
 			const match = numeric(String(value))
 				? [...remaining.matchAll(/(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)].find(candidate => same(candidate[0], value))
 				: pattern.exec(remaining);
 			if (!match) return false;
+			// Preserve the structured-cell owner check for newly accepted prose
+			// qualifiers as well: an explicit wrong owner is not equivalent.
+			if (qualifier && match[0].includes('.') && /(?:table|table_name|index|index_name|constraint|constraint_name)$/i.test(labels[column] ?? '')) {
+				const ownerLabel = labels[column]?.replace(/(?:table|table_name|index|index_name|constraint|constraint_name)$/i, 'owner');
+				const ownerIndex = labels.findIndex(label => /owner$/i.test(label) && (label === ownerLabel || label === 'owner'));
+				if (ownerIndex >= 0 && !same(match[0].split('.')[0]!, row[ownerIndex])) return false;
+			}
 			remaining = remaining.slice(0, match.index) + ' '.repeat(match[0].length) + remaining.slice(match.index + match[0].length);
 			return true;
 		});

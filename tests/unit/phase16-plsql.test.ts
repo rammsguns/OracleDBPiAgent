@@ -333,37 +333,55 @@ const fixtures = [
 	{
 		"id": "hard-p16-purge-line",
 		"columns": [
-			"LINE",
-			"SUBPROGRAM",
-			"OPERATION",
-			"TABLE_NAME"
+			"FACT"
 		],
 		"rows": [
 			[
-				27,
-				"NIGHTLY_PURGE",
-				"DELETE",
+				"27"
+			],
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"DELETE"
+			],
+			[
 				"ORDERS"
 			]
 		],
 		"note": "The outer block is line 1; the package frame identifies the failing parent delete.",
 		"prose": [
-			"Line 27 in NIGHTLY_PURGE performs DELETE on ORDERS."
+			"The observed fact is 27.",
+			"The observed fact is NIGHTLY_PURGE.",
+			"The observed fact is DELETE.",
+			"The observed fact is ORDERS."
 		],
 		"wrong": [
 			[
 				[
-					26,
-					"NIGHTLY_PURGE",
-					"DELETE",
+					"26"
+				],
+				[
+					"NIGHTLY_PURGE"
+				],
+				[
+					"DELETE"
+				],
+				[
 					"ORDERS"
 				]
 			],
 			[
 				[
-					1,
-					"NIGHTLY_PURGE",
-					"DELETE",
+					"1"
+				],
+				[
+					"NIGHTLY_PURGE"
+				],
+				[
+					"DELETE"
+				],
+				[
 					"ORDERS"
 				]
 			]
@@ -372,34 +390,56 @@ const fixtures = [
 	{
 		"id": "hard-p16-history-trigger",
 		"columns": [
-			"TRIGGER_TYPE",
-			"TRIGGERING_EVENT",
-			"TABLE_NAME"
+			"FACT"
 		],
 		"rows": [
 			[
-				"AFTER EACH ROW",
-				"UPDATE",
+				"AFTER"
+			],
+			[
+				"ROW"
+			],
+			[
 				"EMPLOYEES"
+			],
+			[
+				"UPDATE"
 			]
 		],
 		"note": "On UPDATE OF JOB_ID or DEPARTMENT_ID it calls ADD_JOB_HISTORY to insert JOB_HISTORY using the old employee ID, hire date, job and department, with SYSDATE as end date.",
 		"prose": [
-			"The trigger runs AFTER EACH ROW for UPDATE on EMPLOYEES."
+			"The observed fact is AFTER.",
+			"The observed fact is ROW.",
+			"The observed fact is EMPLOYEES.",
+			"The observed fact is UPDATE."
 		],
 		"wrong": [
 			[
 				[
-					"BEFORE EACH ROW",
-					"UPDATE",
+					"BEFORE"
+				],
+				[
+					"ROW"
+				],
+				[
 					"EMPLOYEES"
+				],
+				[
+					"UPDATE"
 				]
 			],
 			[
 				[
-					"AFTER EACH ROW",
-					"UPDATE",
+					"AFTER"
+				],
+				[
+					"ROW"
+				],
+				[
 					"JOB_HISTORY"
+				],
+				[
+					"UPDATE"
 				]
 			]
 		]
@@ -407,34 +447,76 @@ const fixtures = [
 	{
 		"id": "hard-p16-security-trigger",
 		"columns": [
-			"TRIGGER_TYPE",
-			"TRIGGERING_EVENT",
-			"TABLE_NAME"
+			"FACT"
 		],
 		"rows": [
 			[
-				"BEFORE STATEMENT",
-				"INSERT OR UPDATE OR DELETE",
+				"BEFORE"
+			],
+			[
+				"STATEMENT"
+			],
+			[
 				"EMPLOYEES"
+			],
+			[
+				"INSERT"
+			],
+			[
+				"UPDATE"
+			],
+			[
+				"DELETE"
 			]
 		],
 		"note": "It calls SECURE_DML, which raises application error -20205 outside 08:00 through 18:00 or on SAT and SUN. This describes the code; day names depend on session language.",
 		"prose": [
-			"The trigger runs BEFORE STATEMENT for INSERT OR UPDATE OR DELETE on EMPLOYEES."
+			"The observed fact is BEFORE.",
+			"The observed fact is STATEMENT.",
+			"The observed fact is EMPLOYEES.",
+			"The observed fact is INSERT.",
+			"The observed fact is UPDATE.",
+			"The observed fact is DELETE."
 		],
 		"wrong": [
 			[
 				[
-					"BEFORE EACH ROW",
-					"INSERT OR UPDATE OR DELETE",
+					"AFTER"
+				],
+				[
+					"STATEMENT"
+				],
+				[
 					"EMPLOYEES"
+				],
+				[
+					"INSERT"
+				],
+				[
+					"UPDATE"
+				],
+				[
+					"DELETE"
 				]
 			],
 			[
 				[
-					"BEFORE STATEMENT",
-					"UPDATE",
+					"BEFORE"
+				],
+				[
+					"ROW"
+				],
+				[
 					"EMPLOYEES"
+				],
+				[
+					"INSERT"
+				],
+				[
+					"UPDATE"
+				],
+				[
+					"DELETE"
 				]
 			]
 		]

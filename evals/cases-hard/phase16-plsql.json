@@ -102,13 +102,15 @@
 		"split": "challenge",
 		"question": "On p1, trace the most recent recorded NIGHTLY_PURGE_JOB failure back to the package body: give the package line, enclosing subprogram, and failing operation and table. Distinguish the package frame from the outer block frame.",
 		"groundTruth": {
-			"sql": "SELECT s.line,UPPER(REGEXP_SUBSTR(h.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'DELETE',1,1,'i')) AS operation,UPPER(REGEXP_SUBSTR(s.text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source s JOIN dba_source h ON h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line=(SELECT MAX(x.line) FROM dba_source x WHERE x.owner=s.owner AND x.name=s.name AND x.type=s.type AND x.line<s.line AND REGEXP_LIKE(x.text,'PROCEDURE +','i')) WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND s.line=(SELECT TO_NUMBER(REGEXP_SUBSTR(additional_info,'WORKLOAD\", line ([0-9]+)',1,1,NULL,1)) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
+			"sql": "SELECT fact FROM (SELECT TO_CHAR(line) AS source_line,subprogram,operation,table_name FROM (SELECT s.line,UPPER(REGEXP_SUBSTR(h.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'DELETE',1,1,'i')) AS operation,UPPER(REGEXP_SUBSTR(s.text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source s JOIN dba_source h ON h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line=(SELECT MAX(x.line) FROM dba_source x WHERE x.owner=s.owner AND x.name=s.name AND x.type=s.type AND x.line<s.line AND REGEXP_LIKE(x.text,'PROCEDURE +','i')) WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND s.line=(SELECT TO_NUMBER(REGEXP_SUBSTR(additional_info,'WORKLOAD\", line ([0-9]+)',1,1,NULL,1)) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY))) UNPIVOT (fact FOR item IN (source_line,subprogram,operation,table_name))",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?<!(?:not claim(?:ing)?|cannot (?:conclude|say)|not true|not the case|not saying) that the )(?<!not saying the )package(?: body)?\\s+[`*\\\"]*(?:SHOPAPP\\.)?WORKLOAD[`*\\\"]*\\s+(?:no longer exists|does not exist|is absent|has been dropped)"
+			],
 			"mustRefuse": false
 		}
 	},
@@ -119,7 +121,7 @@
 		"split": "challenge",
 		"question": "On d1, explain HR.UPDATE_JOB_HISTORY: when and at what granularity it fires, which procedure it calls, and whether the recorded employee/job/department values are old or new. Identify the destination table.",
 		"groundTruth": {
-			"sql": "SELECT trigger_type,triggering_event,table_name FROM dba_triggers WHERE owner='HR' AND trigger_name='UPDATE_JOB_HISTORY'",
+			"sql": "SELECT fact FROM (SELECT REGEXP_SUBSTR(trigger_type,'^[A-Z]+') AS timing,REGEXP_SUBSTR(trigger_type,'ROW|STATEMENT') AS granularity,table_name,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,1) AS event1,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,2) AS event2,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,3) AS event3 FROM dba_triggers WHERE owner='HR' AND trigger_name='UPDATE_JOB_HISTORY') UNPIVOT (fact FOR item IN (timing,granularity,table_name,event1,event2,event3))",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -128,7 +130,8 @@
 				"JOB_HISTORY",
 				"(old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
 				"JOB_ID",
-				"DEPARTMENT_ID"
+				"DEPARTMENT_ID",
+				"(?:UPDATE\\s+OF|(?:updates?|changes?)\\s+(?:to|of|in))[^.\\n]{0,100}(?:JOB_ID|DEPARTMENT_ID)|(?:JOB_ID|DEPARTMENT_ID)[^.\\n]{0,80}(?:updat|chang)"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [],
@@ -142,7 +145,7 @@
 		"split": "challenge",
 		"question": "On d1, explain HR.SECURE_EMPLOYEES: its timing, events and granularity, the routine it calls, and the time/day restriction and application error implemented by that routine. Describe the code without executing it.",
 		"groundTruth": {
-			"sql": "SELECT trigger_type,triggering_event,table_name FROM dba_triggers WHERE owner='HR' AND trigger_name='SECURE_EMPLOYEES'",
+			"sql": "SELECT fact FROM (SELECT REGEXP_SUBSTR(trigger_type,'^[A-Z]+') AS timing,REGEXP_SUBSTR(trigger_type,'ROW|STATEMENT') AS granularity,table_name,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,1) AS event1,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,2) AS event2,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,3) AS event3 FROM dba_triggers WHERE owner='HR' AND trigger_name='SECURE_EMPLOYEES') UNPIVOT (fact FOR item IN (timing,granularity,table_name,event1,event2,event3))",
 			"mode": "rowCells"
 		},
 		"expect": {
