@@ -1,16 +1,19 @@
 import type { ToolContext } from '../contracts.js';
 import { Dictionary, objectName, identifier, redact, type SourceRow, type DependencyRow } from './dictionary.js';
-import { routines, matchRoutine } from './analysis.js';
+import { routines, matchRoutine, mask } from './analysis.js';
 import { buildGraph, renderMermaid } from './diagram.js';
 export interface TableUse { owner: string; name: string; operations: string[]; heuristic: true }
 /** Strip comments and literals before scanning; dynamic SQL is deliberately not inferred. */
-export function staticText(text: string): string { return text.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'/g, match => match.replace(/[^\n]/g, ' ')); }
+export const staticText = mask;
 export function tableUses(source: SourceRow[], dependencies: DependencyRow[]): TableUse[] {
 	const text = staticText(source.filter(s => /BODY|PROCEDURE|FUNCTION|TRIGGER/.test(s.type)).map(s => s.text).join('\n')).toUpperCase();
+	// DELETE's target FROM is a write clause. Preserve FROM/JOIN in its
+	// subqueries (including reads of the same target table).
+	const reads = text.replace(/\bDELETE\s+FROM\b/g, clause => ' '.repeat(clause.length));
 	return dependencies.filter(d => d.referencedType === 'TABLE').filter((d, i, all) => all.findIndex(x => x.referencedOwner === d.referencedOwner && x.referencedName === d.referencedName) === i).map(d => {
 		const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 		const table = `(?:${escape(d.referencedOwner)}\\s*\\.\\s*)?${escape(d.referencedName)}(?![A-Z0-9_$#])`;
-		const operations = Object.entries({ SELECT: `(?:FROM|JOIN)\\s+${table}`, INSERT: `INSERT\\s+INTO\\s+${table}`, UPDATE: `UPDATE\\s+${table}`, DELETE: `DELETE\\s+(?:FROM\\s+)?${table}`, MERGE: `MERGE\\s+INTO\\s+${table}` }).filter(([, pattern]) => new RegExp(`\\b${pattern}`, 'i').test(text)).map(([op]) => op);
+		const operations = Object.entries({ SELECT: `(?:FROM|JOIN|USING)\\s+${table}`, INSERT: `INSERT\\s+INTO\\s+${table}`, UPDATE: `UPDATE\\s+${table}`, DELETE: `DELETE\\s+(?:FROM\\s+)?${table}`, MERGE: `MERGE\\s+INTO\\s+${table}` }).filter(([op, pattern]) => new RegExp(`\\b${pattern}`, 'i').test(op === 'SELECT' ? reads : text)).map(([op]) => op);
 		return { owner: d.referencedOwner, name: d.referencedName, operations, heuristic: true };
 	});
 }

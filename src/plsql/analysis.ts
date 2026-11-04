@@ -3,7 +3,7 @@ export interface BodyRange { type: string; startLine: number; endLine: number; h
 interface Token { value: string; start: number; end: number }
 export interface Routine { type: string; name: string; declaration: string; comments: string; parameters: { name: string; type: string; default: string | null }[]; range: BodyRange | null; rows: SourceRow[] }
 /** Offset-preserving lexer: comments/literals cannot introduce declarations or ENDs. */
-export function mask(text: string): string { return text.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'/g, s => s.replace(/[^\n]/g, ' ')); }
+export function mask(text: string): string { return text.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|q'\[[\s\S]*?\]'|q'\{[\s\S]*?\}'|q'\([\s\S]*?\)'|q'<[\s\S]*?>'|q'([^\w\s])[\s\S]*?\1'|'(?:''|[^'])*'/gi, s => s.replace(/[^\n]/g, ' ')); }
 function parameters(header: string): Routine['parameters'] {
 	const text = mask(header), start = text.indexOf('('); if (start < 0) return [];
 	let depth = 1, from = start + 1;
@@ -14,10 +14,11 @@ function parameters(header: string): Routine['parameters'] {
 		if (depth === 0 || (depth === 1 && text[i] === ',')) { parts.push(header.slice(from, i)); from = i + 1; if (!depth) break; }
 	}
 	return parts.map(part => {
-		const m = /^\s*([\w$#]+)\s+(?:(?:IN\s+OUT|IN|OUT)\s+)?(?:NOCOPY\s+)?([\s\S]*)$/i.exec(part);
+		const m = /^\s*([\w$#]+)\s+(?:(?:IN\s+OUT|IN|OUT)\s+)?(?:NOCOPY\s+)?([\s\S]*)$/i.exec(mask(part));
 		if (!m) return { name: '', type: '', default: null };
-		const d = /\bDEFAULT\b|:=/i.exec(mask(m[2]!));
-		return { name: m[1]!.toUpperCase(), type: (d ? m[2]!.slice(0, d.index) : m[2]!).trim().toUpperCase(), default: d ? m[2]!.slice(d.index + d[0].length).trim() : null };
+		const rawTypeAndDefault = part.slice(part.length - m[2]!.length);
+		const d = /\bDEFAULT\b|:=/i.exec(m[2]!);
+		return { name: m[1]!.toUpperCase(), type: (d ? m[2]!.slice(0, d.index) : m[2]!).trim().toUpperCase(), default: d ? rawTypeAndDefault.slice(d.index + d[0].length).trim() : null };
 	});
 }
 function commentsBefore(text: string): string {
@@ -49,9 +50,9 @@ export function routines(source: SourceRow[]): Routine[] {
 				if (v === '(') depth++; if (v === ')') depth--;
 			}
 			if (headerEnd === tokens.length) return null;
-			const header = text.slice(tokens[start]!.start, tokens[headerEnd]!.start).trim();
+			const header = text.slice(tokens[start]!.start, tokens[headerEnd]!.start).trimStart();
 			const comments = commentsBefore(text.slice(0, tokens[start]!.start));
-			const routine: Routine = { type, name: name.value, declaration: header + ';', comments, parameters: parameters(header), range: null, rows: [] };
+			const routine: Routine = { type, name: name.value, declaration: (header + ';').trim(), comments, parameters: parameters(header), range: null, rows: [] };
 			if (tokens[headerEnd]!.value === ';') return { next: headerEnd + 1, routine };
 			const blocks: string[] = [], nested: [number, number][] = [];
 			let began = false;

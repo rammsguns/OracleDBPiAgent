@@ -16,7 +16,9 @@ it('documents WORKLOAD and an HR procedure using read-only dictionary evidence',
 		expect(workload.signatures.map(s => s.name)).toContain('NIGHTLY_PURGE');
 		const purge = workload.signatures.find(s => s.name === 'NIGHTLY_PURGE')!;
 		expect(purge.bodyRange).toMatchObject({ startLine: 24, endLine: 29 });
-		expect(purge.tables.find(t => t.name === 'ORDERS')?.operations).toContain('DELETE');
+		expect(purge.tables.find(t => t.name === 'ORDERS')?.operations).toEqual(['SELECT', 'DELETE']);
+		expect(purge.tables.find(t => t.name === 'ORDER_LINES')?.operations).toEqual(['DELETE']);
+		expect(workload.tables.find(t => t.name === 'ORDER_LINES')?.operations).not.toContain('SELECT');
 		const ship = workload.signatures.find(s => s.name === 'SHIP_ORDERS')!;
 		expect(ship.tables.map(t => [t.name, t.operations])).toEqual([['ORDERS', ['UPDATE']]]);
 		expect(workload.signatures.find(s => s.name === 'PLACE_ORDERS')?.signature).toContain('DEFAULT 25');
