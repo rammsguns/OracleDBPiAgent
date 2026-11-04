@@ -682,15 +682,17 @@ queries and the one cursor prerequisite are plain SELECTs. No scorer change,
 contract change or dependency addition is needed. The only type change is the
 local split union. No product code changed.
 
-**Validation is blocked, and these cases are not ready for the coordinator's
-baseline.** Both configured listeners refused connections during authoring:
-`127.0.0.1:1522` and `127.0.0.1:1523`, each with NJS-503 / ECONNREFUSED.
-The containers were not changed. Consequently no new Oracle result values,
-view visibility, cross-schema constraint visibility or cache prerequisites have
-been verified. The expected outputs below are definitions from the independent
-truth SQL, not observed results. The numeric values must be recorded after the
-owner restores the approved targets; no seed-data guesses are presented as truth.
-The historical generated validation JSON was left unchanged.
+**Read-only validation passed on both approved 19c targets** at
+`2026-11-04T04:31:51.193Z` after the coordinator restored the listeners.
+The validator checked 52 truth queries for all 73 cases, including every one of
+the 12 challenge queries. All returned nonempty, non-null, untruncated results;
+the two wide answers contain 19 and 21 distinct records. Cross-schema key/index
+metadata and the tagged cached-plan prerequisite are readable on their targets.
+No case or truth SQL correction was needed, and no case was loosened.
+The normal CLI flow regenerated `evals/hard-ground-truth-validation.json`,
+which is committed with this verification. The values below are observed SQL
+results, not agent answers. They remain fresh-read expectations during evals,
+not hard-coded scoring values.
 
 Every ID below has prefix `hard-p11-`. Each case has `allCells` truth. Labels
 inside one cell bind metrics to their dimension so that values from different
@@ -699,20 +701,70 @@ format; synthetic tests prove a missing row or swapped counts fail. This uses
 the existing scorer rather than introducing new checks. Such tests establish
 scoring mechanics, not Oracle result values or model solvability.
 
-| ID suffix / category | What makes it hard; independence from prior cases | Expected ground-truth output (values awaiting DB validation) |
+| ID suffix / category | What makes it hard; independence from prior cases | Observed ground-truth output |
 |---|---|---|
-| order-customer-key / multi-step-diagnosis | Resolve an ORDERS foreign key, its referenced parent constraint and index, then the indexed parent column type. Prior SHOPAPP FK cases stop at relationships; the PK-index case inspects ORDER_LINES itself. | Child column, parent table, referenced constraint, backing index, uniqueness, indexed position, parent column and type, from joined dictionary rows on p1. No index/constraint names are guessed. |
-| warehouse-location-key / multi-step-diagnosis | Follow OE.WAREHOUSES across schema ownership to the referenced constraint, backing index and typed columns. Earlier warehouse valuation does not inspect its parent key/index. | Child column, parent owner/table, referenced constraint, backing index, uniqueness, indexed position, parent column and type on d1. Cross-schema metadata visibility remains a prerequisite to verify. |
-| fiscal-calendar / column-traps | Distinguish calendar filtering from fiscal-year extrema and discover the real column names. Earlier SH analytics use revenue/calendar joins rather than fiscal boundary facts. | One row per calendar quarter in 2000: quarter label, minimum fiscal year, maximum fiscal year, distinct date count, in quarter order. Exact quarter boundaries and counts remain unverified. |
-| plan-line-tree / column-traps | Discover the right cursor/child and actual tree columns instead of guessing PLAN_ID. Earlier cached-plan cases score access paths, not line/parent/depth records. | Every `LINE=<id> / PARENT=<id or ROOT> / DEPTH=<depth> / OP=<operation> / OPTIONS=<options or NONE>` record for the selected p1 cursor, ordered by line ID. These values are plan-dependent and deliberately unpinned. |
-| commission-zero / false-premises | Distinguish NULL from zero; an equality-only count can confirm the wrong premise. Earlier HR cases do not test commission storage semantics. | `NULL_COMMISSION=<count> / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=<count>`. The validator requires both other counts to be positive. Exact counts remain unverified. The answer must address the premise. |
-| sales-primary-key / false-premises | Distinguish a declared primary key from plausible dimensional uniqueness or an index. Earlier SH relationship cases inspect SALES foreign-key endpoints rather than the absence of a primary key. | `PK_CONSTRAINTS=0 / FK_CONSTRAINTS=<count>`. The validator fails if the presumed absence of a primary key changes. The foreign-key count remains unverified; an explicit no-primary-key explanation is required. |
-| customers-scope / ambiguity | Reconcile three independently qualified tables rather than silently choosing CURRENT_SCHEMA; counts stay attached to owners. Earlier customer cases calculate metrics in one schema. | Three records `OWNER=CO|OE|SH / TABLE=CUSTOMERS / ROWS=<live count>` (one owner per record), ordered by owner. All three counts remain unverified. |
-| orders-status-scope / ambiguity | The same table name has differently named and represented status columns. Earlier CO order grouping never compares its representation to OE. | `OWNER=<owner> / COLUMN=<actual status column> / TYPE=<type> / NULLABLE=<Y or N>` for every status-named column in CO.ORDERS and OE.ORDERS. Names/types/nullability remain unverified. |
-| second-department / multi-turn-dependency | Preserve the second item of a count-based ranking, then resolve its manager and salaries; reranking by salary changes the referent. Earlier HR questions do not retain a ranked department into a manager lookup. | ID, name, employee count, salary total and manager full name for the second department by employee count descending, ties by ID. All values remain unverified. |
-| second-warehouse / multi-turn-dependency | Retain the second warehouse by quantity, then follow location/country/region rather than reuse a value ranking. Earlier warehouse valuation uses price-weighted totals and does not ask for the retained warehouse's geography. | ID, name, city, country and region of the second warehouse by total quantity descending, ties by ID. All values remain unverified. |
-| job-salary-bands / wide-exact | Return every job definition, including unfilled jobs, with two correctly associated salary boundaries. Earlier JOBS questions inspect a cached plan or segment allocation. | Every `JOB=<id> / MIN=<salary> / MAX=<salary>` record from HR.JOBS, ordered by ID. At least eight distinct records required; the full set and bounds remain unverified. |
-| subcategory-counts / wide-exact | Preserve every product subcategory and its count, including products without sales; a sales join drops definitions. Earlier product analytics aggregate revenue by category. | Every `SUBCATEGORY=<name> / PRODUCTS=<count>` record from SH.PRODUCTS, ordered by subcategory. At least eight distinct records required; the full set/counts remain unverified. |
+| order-customer-key / multi-step-diagnosis | Resolve an ORDERS foreign key, its referenced parent constraint and index, then the indexed parent column type. Prior SHOPAPP FK cases stop at relationships; the PK-index case inspects ORDER_LINES itself. | `CUSTOMER_ID / CUSTOMERS / SYS_C007649 / SYS_C007649 / UNIQUE / 1 / CUSTOMER_ID / NUMBER` (child column, parent table, constraint, index, uniqueness, position, parent column, type). |
+| warehouse-location-key / multi-step-diagnosis | Follow OE.WAREHOUSES across schema ownership to the referenced constraint, backing index and typed columns. Earlier warehouse valuation does not inspect its parent key/index. | `LOCATION_ID / HR / LOCATIONS / LOC_ID_PK / LOC_ID_PK / UNIQUE / 1 / LOCATION_ID / NUMBER` (child column, parent owner/table, constraint, index, uniqueness, position, parent column, type). |
+| fiscal-calendar / column-traps | Distinguish calendar filtering from fiscal-year extrema and discover the real column names. Earlier SH analytics use revenue/calendar joins rather than fiscal boundary facts. | Quarter label / minimum fiscal year / maximum fiscal year / distinct dates: `2000-01 / 2000 / 2000 / 91`; `2000-02 / 2000 / 2000 / 91`; `2000-03 / 2000 / 2000 / 92`; `2000-04 / 2000 / 2000 / 92`. Fiscal-year extrema happen to equal the calendar year in this dataset; quarter labels use numeric suffixes, not Q1–Q4. |
+| plan-line-tree / column-traps | Discover the right cursor/child and actual tree columns instead of guessing PLAN_ID. Earlier cached-plan cases score access paths, not line/parent/depth records. | `LINE=0 / PARENT=ROOT / DEPTH=0 / OP=SELECT STATEMENT / OPTIONS=NONE`; `LINE=1 / PARENT=0 / DEPTH=1 / OP=INDEX / OPTIONS=UNIQUE SCAN`. These plan-dependent values are deliberately unpinned; estimates do not establish measured runtime. |
+| commission-zero / false-premises | Distinguish NULL from zero; an equality-only count can confirm the wrong premise. Earlier HR cases do not test commission storage semantics. | `NULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35`. The validator requires zero zero-commission rows and positive null/positive counts. The premise must be corrected. |
+| sales-primary-key / false-premises | Distinguish a declared primary key from plausible dimensional uniqueness or an index. Earlier SH relationship cases inspect SALES foreign-key endpoints rather than the absence of a primary key. | `PK_CONSTRAINTS=0 / FK_CONSTRAINTS=5`. No primary key is declared. The validator fails if a primary key appears. |
+| customers-scope / ambiguity | Reconcile three independently qualified tables rather than silently choosing CURRENT_SCHEMA; counts stay attached to owners. Earlier customer cases calculate metrics in one schema. | `OWNER=CO / TABLE=CUSTOMERS / ROWS=392`; `OWNER=OE / TABLE=CUSTOMERS / ROWS=319`; `OWNER=SH / TABLE=CUSTOMERS / ROWS=55500`. |
+| orders-status-scope / ambiguity | The same table name has status columns with different representations and nullability. Earlier CO order grouping never compares its representation to OE. | `OWNER=CO / COLUMN=ORDER_STATUS / TYPE=VARCHAR2 / NULLABLE=N`; `OWNER=OE / COLUMN=ORDER_STATUS / TYPE=NUMBER / NULLABLE=Y`. The spelling is the same; representation and nullability differ. |
+| second-department / multi-turn-dependency | Preserve the second item of a count-based ranking, then resolve its manager and salaries; reranking by salary changes the referent. Earlier HR questions do not retain a ranked department into a manager lookup. | `80 / Sales / 34 / 304500 / John Russell` (ID, name, employee count, salary total, manager). |
+| second-warehouse / multi-turn-dependency | Retain the second warehouse by quantity, then follow location/country/region rather than reuse a value ranking. Earlier warehouse valuation uses price-weighted totals and does not ask for the retained warehouse's geography. | `6 / Sydney / Sydney / Australia / Asia` (ID, warehouse name, city, country, region). `Asia` is the stored HR region name for Australia; no geographical relabeling is applied. |
+| job-salary-bands / wide-exact | Return every job definition, including unfilled jobs, with two correctly associated salary boundaries. Earlier JOBS questions inspect a cached plan or segment allocation. | 19 distinct job records, including unfilled definitions. Full observed records below; every row is required. |
+| subcategory-counts / wide-exact | Preserve every product subcategory and its count, including products without sales; a sales join drops definitions. Earlier product analytics aggregate revenue by category. | 21 distinct subcategory records. Full observed records below; every row is required. |
+
+Observed `job-salary-bands` records, in truth-query order:
+
+```text
+JOB=AC_ACCOUNT / MIN=4200 / MAX=9000
+JOB=AC_MGR / MIN=8200 / MAX=16000
+JOB=AD_ASST / MIN=3000 / MAX=6000
+JOB=AD_PRES / MIN=20080 / MAX=40000
+JOB=AD_VP / MIN=15000 / MAX=30000
+JOB=FI_ACCOUNT / MIN=4200 / MAX=9000
+JOB=FI_MGR / MIN=8200 / MAX=16000
+JOB=HR_REP / MIN=4000 / MAX=9000
+JOB=IT_PROG / MIN=4000 / MAX=10000
+JOB=MK_MAN / MIN=9000 / MAX=15000
+JOB=MK_REP / MIN=4000 / MAX=9000
+JOB=PR_REP / MIN=4500 / MAX=10500
+JOB=PU_CLERK / MIN=2500 / MAX=5500
+JOB=PU_MAN / MIN=8000 / MAX=15000
+JOB=SA_MAN / MIN=10000 / MAX=20080
+JOB=SA_REP / MIN=6000 / MAX=12008
+JOB=SH_CLERK / MIN=2500 / MAX=5500
+JOB=ST_CLERK / MIN=2008 / MAX=5000
+JOB=ST_MAN / MIN=5500 / MAX=8500
+```
+
+Observed `subcategory-counts` records, in truth-query order:
+
+```text
+SUBCATEGORY=Accessories / PRODUCTS=10
+SUBCATEGORY=Bulk Pack Diskettes / PRODUCTS=2
+SUBCATEGORY=CD-ROM / PRODUCTS=6
+SUBCATEGORY=Camcorders / PRODUCTS=1
+SUBCATEGORY=Camera Batteries / PRODUCTS=5
+SUBCATEGORY=Camera Media / PRODUCTS=3
+SUBCATEGORY=Cameras / PRODUCTS=1
+SUBCATEGORY=Desktop PCs / PRODUCTS=1
+SUBCATEGORY=Documentation / PRODUCTS=6
+SUBCATEGORY=Game Consoles / PRODUCTS=1
+SUBCATEGORY=Home Audio / PRODUCTS=2
+SUBCATEGORY=Memory / PRODUCTS=2
+SUBCATEGORY=Modems/Fax / PRODUCTS=2
+SUBCATEGORY=Monitors / PRODUCTS=2
+SUBCATEGORY=Operating Systems / PRODUCTS=1
+SUBCATEGORY=Portable PCs / PRODUCTS=1
+SUBCATEGORY=Printer Supplies / PRODUCTS=4
+SUBCATEGORY=Recordable CDs / PRODUCTS=7
+SUBCATEGORY=Recordable DVD Discs / PRODUCTS=5
+SUBCATEGORY=Y Box Accessories / PRODUCTS=2
+SUBCATEGORY=Y Box Games / PRODUCTS=8
+```
 
 The plan case's validator setup populates only its own tagged SELECT cursor,
 using a negative order ID and no application write. The question supplies the
@@ -721,13 +773,11 @@ text. Truth picks the lowest SQL_ID and child, joins the exact pair and reads
 all plan lines. Revalidate immediately before baseline because cursor aging and
 plan differences can change this prerequisite. Estimates are not measurements.
 
-Verification during authoring:
+Verification after the coordinator restored the approved listeners:
 
 ```text
 PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-hard.ts
-FAILED: NJS-503 / ECONNREFUSED 127.0.0.1:1522
-validateHardCases with the same suite ordered to visit p1 first
-FAILED: NJS-503 / ECONNREFUSED 127.0.0.1:1523
+Validated 52 ground-truth queries for 73 hard cases; row counts recorded.
 npm run typecheck
 PASSED (exit 0)
 npm test
@@ -735,10 +785,12 @@ Test Files 36 passed (36)
 Tests 630 passed (630)
 ```
 
-A separate strict TypeScript check of the changed eval modules and the new test
-also passed (including `src/oracle/driver.d.ts`; the product tsconfig excludes
-evals). Unit tests include all prior scorer tests. No DB or LLM product code was
-changed, so integration tests were not required. The requested live validation,
-expected numeric result transcription, Antigravity review, challenge ×3 baseline,
-failure triage and confirmation of the intended 40–80% difficulty remain pending.
-Do not loosen cases based on agent answers.
+The earlier listener-refusal blocker is resolved. A separate strict TypeScript
+check of the changed eval modules and the new test also passed during authoring
+(including `src/oracle/driver.d.ts`; the product tsconfig excludes evals).
+Unit tests include all prior scorer tests. No DB or LLM product code was changed,
+so integration tests were not required. No agent or LLM runs or database writes
+were performed during authoring or this validation follow-up. No shared contracts,
+scorer changes or new dependencies are needed. Antigravity review, the coordinator's
+challenge ×3 baseline, failure triage and confirmation of the intended 40–80%
+difficulty remain pending. Do not loosen cases based on agent answers.

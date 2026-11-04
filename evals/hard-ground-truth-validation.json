@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-10-29T23:52:13.150Z",
-	"caseCount": 61,
+	"validatedAt": "2026-11-04T04:31:51.193Z",
+	"caseCount": 73,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -325,6 +325,320 @@
 			"rows": [
 				[
 					"System I/O"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-customers-scope",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'OWNER=CO / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM co.customers UNION ALL SELECT 'OWNER=OE / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM oe.customers UNION ALL SELECT 'OWNER=SH / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM sh.customers",
+			"mode": "allCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"OWNER=CO / TABLE=CUSTOMERS / ROWS=392"
+				],
+				[
+					"OWNER=OE / TABLE=CUSTOMERS / ROWS=319"
+				],
+				[
+					"OWNER=SH / TABLE=CUSTOMERS / ROWS=55500"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-orders-status-scope",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'OWNER='||owner||' / COLUMN='||column_name||' / TYPE='||data_type||' / NULLABLE='||nullable FROM all_tab_columns WHERE owner IN ('CO','OE') AND table_name='ORDERS' AND column_name LIKE '%STATUS%' ORDER BY owner,column_id",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"OWNER=CO / COLUMN=ORDER_STATUS / TYPE=VARCHAR2 / NULLABLE=N"
+				],
+				[
+					"OWNER=OE / COLUMN=ORDER_STATUS / TYPE=NUMBER / NULLABLE=Y"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-fiscal-calendar",
+			"target": "d1-19c-lab",
+			"sql": "SELECT calendar_quarter_desc,MIN(fiscal_year),MAX(fiscal_year),COUNT(DISTINCT time_id) FROM sh.times WHERE calendar_year=2000 GROUP BY calendar_quarter_desc ORDER BY calendar_quarter_desc",
+			"mode": "allCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					"2000-01",
+					2000,
+					2000,
+					91
+				],
+				[
+					"2000-02",
+					2000,
+					2000,
+					91
+				],
+				[
+					"2000-03",
+					2000,
+					2000,
+					92
+				],
+				[
+					"2000-04",
+					2000,
+					2000,
+					92
+				]
+			]
+		},
+		{
+			"id": "hard-p11-plan-line-tree",
+			"target": "p1-19c-prod",
+			"sql": "SELECT 'LINE='||p.id||' / PARENT='||NVL(TO_CHAR(p.parent_id),'ROOT')||' / DEPTH='||p.depth||' / OP='||p.operation||' / OPTIONS='||NVL(p.options,'NONE') FROM v$sql_plan p WHERE (p.sql_id,p.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE UPPER(sql_text) LIKE 'SELECT /* P11_ORDER_PROBE */ ORDER_ID FROM SHOPAPP.ORDERS WHERE ORDER_ID = -110011%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) ORDER BY p.id",
+			"mode": "allCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"LINE=0 / PARENT=ROOT / DEPTH=0 / OP=SELECT STATEMENT / OPTIONS=NONE"
+				],
+				[
+					"LINE=1 / PARENT=0 / DEPTH=1 / OP=INDEX / OPTIONS=UNIQUE SCAN"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-commission-zero",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'NULL_COMMISSION='||COUNT(CASE WHEN commission_pct IS NULL THEN 1 END)||' / ZERO_COMMISSION='||COUNT(CASE WHEN commission_pct=0 THEN 1 END)||' / POSITIVE_COMMISSION='||COUNT(CASE WHEN commission_pct>0 THEN 1 END) FROM hr.employees",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"NULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-sales-primary-key",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'PK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='P' THEN 1 END)||' / FK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='R' THEN 1 END) FROM all_constraints WHERE owner='SH' AND table_name='SALES'",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"PK_CONSTRAINTS=0 / FK_CONSTRAINTS=5"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-order-customer-key",
+			"target": "p1-19c-prod",
+			"sql": "SELECT cc.column_name,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='SHOPAPP' AND c.table_name='ORDERS' AND c.constraint_type='R' AND p.table_name='CUSTOMERS' ORDER BY cc.position,ic.column_position",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"CUSTOMER_ID",
+					"CUSTOMERS",
+					"SYS_C007649",
+					"SYS_C007649",
+					"UNIQUE",
+					1,
+					"CUSTOMER_ID",
+					"NUMBER"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-warehouse-location-key",
+			"target": "d1-19c-lab",
+			"sql": "SELECT cc.column_name,p.owner,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='OE' AND c.table_name='WAREHOUSES' AND c.constraint_type='R' ORDER BY cc.position,ic.column_position",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"LOCATION_ID",
+					"HR",
+					"LOCATIONS",
+					"LOC_ID_PK",
+					"LOC_ID_PK",
+					"UNIQUE",
+					1,
+					"LOCATION_ID",
+					"NUMBER"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-second-department",
+			"target": "d1-19c-lab",
+			"sql": "SELECT d.department_id,d.department_name,r.n,r.salary_total,m.first_name||' '||m.last_name FROM (SELECT department_id,COUNT(*) n,SUM(salary) salary_total,ROW_NUMBER() OVER(ORDER BY COUNT(*) DESC,department_id) rn FROM hr.employees WHERE department_id IS NOT NULL GROUP BY department_id) r JOIN hr.departments d ON d.department_id=r.department_id JOIN hr.employees m ON m.employee_id=d.manager_id WHERE r.rn=2",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					80,
+					"Sales",
+					34,
+					304500,
+					"John Russell"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-second-warehouse",
+			"target": "d1-19c-lab",
+			"sql": "SELECT w.warehouse_id,w.warehouse_name,l.city,c.country_name,r.region_name FROM (SELECT warehouse_id,ROW_NUMBER() OVER(ORDER BY SUM(quantity_on_hand) DESC,warehouse_id) rn FROM oe.inventories GROUP BY warehouse_id) q JOIN oe.warehouses w ON w.warehouse_id=q.warehouse_id JOIN hr.locations l ON l.location_id=w.location_id JOIN hr.countries c ON c.country_id=l.country_id JOIN hr.regions r ON r.region_id=c.region_id WHERE q.rn=2",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					6,
+					"Sydney",
+					"Sydney",
+					"Australia",
+					"Asia"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-job-salary-bands",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'JOB='||job_id||' / MIN='||min_salary||' / MAX='||max_salary FROM hr.jobs ORDER BY job_id",
+			"mode": "allCells",
+			"rowCount": 19,
+			"rows": [
+				[
+					"JOB=AC_ACCOUNT / MIN=4200 / MAX=9000"
+				],
+				[
+					"JOB=AC_MGR / MIN=8200 / MAX=16000"
+				],
+				[
+					"JOB=AD_ASST / MIN=3000 / MAX=6000"
+				],
+				[
+					"JOB=AD_PRES / MIN=20080 / MAX=40000"
+				],
+				[
+					"JOB=AD_VP / MIN=15000 / MAX=30000"
+				],
+				[
+					"JOB=FI_ACCOUNT / MIN=4200 / MAX=9000"
+				],
+				[
+					"JOB=FI_MGR / MIN=8200 / MAX=16000"
+				],
+				[
+					"JOB=HR_REP / MIN=4000 / MAX=9000"
+				],
+				[
+					"JOB=IT_PROG / MIN=4000 / MAX=10000"
+				],
+				[
+					"JOB=MK_MAN / MIN=9000 / MAX=15000"
+				],
+				[
+					"JOB=MK_REP / MIN=4000 / MAX=9000"
+				],
+				[
+					"JOB=PR_REP / MIN=4500 / MAX=10500"
+				],
+				[
+					"JOB=PU_CLERK / MIN=2500 / MAX=5500"
+				],
+				[
+					"JOB=PU_MAN / MIN=8000 / MAX=15000"
+				],
+				[
+					"JOB=SA_MAN / MIN=10000 / MAX=20080"
+				],
+				[
+					"JOB=SA_REP / MIN=6000 / MAX=12008"
+				],
+				[
+					"JOB=SH_CLERK / MIN=2500 / MAX=5500"
+				],
+				[
+					"JOB=ST_CLERK / MIN=2008 / MAX=5000"
+				],
+				[
+					"JOB=ST_MAN / MIN=5500 / MAX=8500"
+				]
+			]
+		},
+		{
+			"id": "hard-p11-subcategory-counts",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'SUBCATEGORY='||prod_subcategory||' / PRODUCTS='||COUNT(*) FROM sh.products GROUP BY prod_subcategory ORDER BY prod_subcategory",
+			"mode": "allCells",
+			"rowCount": 21,
+			"rows": [
+				[
+					"SUBCATEGORY=Accessories / PRODUCTS=10"
+				],
+				[
+					"SUBCATEGORY=Bulk Pack Diskettes / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=CD-ROM / PRODUCTS=6"
+				],
+				[
+					"SUBCATEGORY=Camcorders / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Camera Batteries / PRODUCTS=5"
+				],
+				[
+					"SUBCATEGORY=Camera Media / PRODUCTS=3"
+				],
+				[
+					"SUBCATEGORY=Cameras / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Desktop PCs / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Documentation / PRODUCTS=6"
+				],
+				[
+					"SUBCATEGORY=Game Consoles / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Home Audio / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=Memory / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=Modems/Fax / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=Monitors / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=Operating Systems / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Portable PCs / PRODUCTS=1"
+				],
+				[
+					"SUBCATEGORY=Printer Supplies / PRODUCTS=4"
+				],
+				[
+					"SUBCATEGORY=Recordable CDs / PRODUCTS=7"
+				],
+				[
+					"SUBCATEGORY=Recordable DVD Discs / PRODUCTS=5"
+				],
+				[
+					"SUBCATEGORY=Y Box Accessories / PRODUCTS=2"
+				],
+				[
+					"SUBCATEGORY=Y Box Games / PRODUCTS=8"
 				]
 			]
 		},
