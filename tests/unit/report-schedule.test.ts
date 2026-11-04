@@ -3,7 +3,7 @@ import { readFileSync, mkdtempSync, writeFileSync, statSync, rmSync, symlinkSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { generateSchedule, renderSchedule } from "../../src/report/schedule.js";
+import { generateSchedule, renderSchedule, runSchedule } from "../../src/report/schedule.js";
 const targets = [{ name: "d1-19c-lab" }];
 const base = { target: targets[0]!.name, every: "1h", home: "/private/piagent", out: "/private/piagent/reports", node: "/usr/bin/node", cli: "/opt/piagent/dist/cli/index.js" };
 it.each(["15m", "1h", "6h", "1d"])("matches golden output for %s", every => {
@@ -26,41 +26,74 @@ it("emits EnvironmentFile as an unquoted literal with escaped percent specifiers
 	const { service } = generateSchedule({ ...base, home }, targets);
 	expect(service.split("\n").find(line => line.startsWith("EnvironmentFile="))).toBe("EnvironmentFile=/private/my home-%%h-%%u/.env");
 	// These directives accept quoted argument lists, unlike EnvironmentFile.
-	expect(service).toContain('ReadWritePaths="/private/piagent/reports" "/private/my home-%%h-%%u/audit.jsonl" "/private/my home-%%h-%%u/alerts.log"');
-	expect(service).toContain('ExecStart="/usr/bin/node" -e "');
+	expect(service).toContain('ReadWritePaths="-/private/piagent/reports" "-/private/my home-%%h-%%u/audit.jsonl" "-/private/my home-%%h-%%u/alerts.log"');
+	expect(service).toContain('ExecStart="/usr/bin/node" "/opt/piagent/dist/cli/index.js" "report" "schedule" "run"');
 });
-it.each([0, 1, 3, 7].flatMap(status => ["cron", "service"].map(mode => ({ status, mode }))))("runs $mode with exit $status and private local alerts only for changes", ({ status, mode }) => {
+it.each([0, 1, 3, 7])("run handles fake report exit %s", status => {
 	const home = mkdtempSync(join(tmpdir(), "schedule-'$`% "));
 	try {
 		const cli = join(home, "fake cli.cjs"), out = join(home, "reports ' $(touch INJECTED) %");
 		writeFileSync(cli, `require('node:fs').writeFileSync(${JSON.stringify(join(home, "args.json"))},JSON.stringify({args:process.argv.slice(2),env:process.env}));process.exit(${status});`);
-		const s = generateSchedule({ ...base, home, out, node: process.execPath, cli }, targets);
-		const command = s.cron.slice("0 * * * * ".length).replaceAll("\\%", "%");
-		const env = { HOME: home, PIAGENT_ENV_FILE: "/bad", PIAGENT_SECRET_DIR: "/ambient" };
-		// Decode the generated systemd argument grammar without invoking systemd.
-		const encoded = s.service.split(" -e ")[1]!.split("\n")[0]!;
-		const script = JSON.parse(encoded.replaceAll("%%", "%").replaceAll("$$", "$"));
-		const r = mode === "cron" ? spawnSync("/bin/sh", ["-c", command], { env }) : spawnSync(process.execPath, ["-e", script], { env });
-		expect(r.status, r.stderr.toString()).toBe(status === 3 ? 0 : status);
+		const result = runSchedule({ target: base.target, home, out, node: process.execPath, cli });
+		expect(result).toBe(status === 3 ? 0 : status);
 		const recorded = JSON.parse(readFileSync(join(home, "args.json"), "utf8"));
 		expect(recorded.args).toEqual(["report", "--target", base.target, "--out", out, "--diff-only"]);
 		expect(recorded.env.PIAGENT_ENV_FILE).toBe(join(home, ".env"));
-		expect(recorded.env.PIAGENT_SECRET_DIR).toBeUndefined();
+		expect(recorded.env.PIAGENT_AUDIT_FILE).toBe(join(home, "audit.jsonl"));
+		expect(Object.keys(recorded.env).sort()).toEqual(["HOME", "PATH", "PIAGENT_AUDIT_FILE", "PIAGENT_ENV_FILE", "PIAGENT_HOME"]);
 		if (status === 3) {
 			expect(statSync(join(home, "alerts.log")).mode & 0o777).toBe(0o600);
 			expect(readFileSync(join(home, "alerts.log"), "utf8")).toMatch(/ report changes: d1-19c-lab\n$/);
 		} else expect(() => statSync(join(home, "alerts.log"))).toThrow();
 	} finally { rmSync(home, { recursive: true, force: true }); }
 });
-it("refuses alert symlinks", () => {
+it("generated cron is a short quoted invocation of schedule run", () => {
+	const home = mkdtempSync(join(tmpdir(), "schedule-'$`% "));
+	try {
+		const cli = join(home, "fake.cjs"), out = join(home, "report '%h");
+		writeFileSync(cli, `console.log(JSON.stringify(process.argv.slice(2)))`);
+		const schedule = generateSchedule({ ...base, home, out, cli, node: process.execPath }, targets);
+		const command = schedule.cron.slice("0 * * * * ".length).replaceAll("\\%", "%");
+		const result = spawnSync("/bin/sh", ["-c", command]);
+		expect(result.status).toBe(0);
+		expect(JSON.parse(result.stdout.toString())).toEqual(["report", "schedule", "run", "--target", base.target, "--home", home, "--out", out]);
+		const execStart = schedule.service.split("\n").find(line => line.startsWith("ExecStart="))!.slice("ExecStart=".length);
+		const argv = execStart.match(/"(?:\\.|[^"\\])*"/g)!.map(argument => JSON.parse(argument.replaceAll("%%", "%").replaceAll("$$", "$")) as string);
+		const serviceResult = spawnSync(argv[0]!, argv.slice(1));
+		expect(serviceResult.status).toBe(0);
+		expect(JSON.parse(serviceResult.stdout.toString())).toEqual(JSON.parse(result.stdout.toString()));
+		expect(schedule.service).not.toContain(" -e ");
+		expect(schedule.cron).not.toContain(" -e ");
+	} finally { rmSync(home, { recursive: true, force: true }); }
+});
+it("appends alerts privately and refuses symlinks", () => {
 	const home = mkdtempSync(join(tmpdir(), "schedule-"));
 	try {
-		const cli = join(home, "fake.cjs"), victim = join(home, "victim");
-		writeFileSync(cli, "process.exit(3)"); writeFileSync(victim, "unchanged"); symlinkSync(victim, join(home, "alerts.log"));
-		const command = generateSchedule({ ...base, home, cli, node: process.execPath }, targets).cron.slice("0 * * * * ".length);
-		expect(spawnSync("/bin/sh", ["-c", command]).status).toBe(1);
+		const alerts = join(home, "alerts.log"), victim = join(home, "victim");
+		writeFileSync(alerts, "previous\n", { mode: 0o644 });
+		const options = { target: base.target, home, cli: base.cli };
+		const dependencies = { execute: () => 3, now: () => new Date("2026-11-04T00:00:00Z") };
+		expect(runSchedule(options, dependencies)).toBe(0);
+		expect(readFileSync(alerts, "utf8")).toBe("previous\n2026-11-04T00:00:00.000Z report changes: d1-19c-lab\n");
+		expect(statSync(alerts).mode & 0o777).toBe(0o600);
+		rmSync(alerts); writeFileSync(victim, "unchanged"); symlinkSync(victim, alerts);
+		expect(() => runSchedule(options, dependencies)).toThrow();
 		expect(readFileSync(victim, "utf8")).toBe("unchanged");
 	} finally { rmSync(home, { recursive: true, force: true }); }
+});
+it("run returns failure for missing executables and signal termination", () => {
+	const home = mkdtempSync(join(tmpdir(), "schedule-"));
+	try {
+		expect(runSchedule({ target: base.target, home, cli: base.cli, node: join(home, "missing") })).toBe(1);
+		const cli = join(home, "signal.cjs"); writeFileSync(cli, "process.kill(process.pid, 'SIGTERM')");
+		expect(runSchedule({ target: base.target, home, cli })).toBe(1);
+		expect(() => statSync(join(home, "alerts.log"))).toThrow();
+	} finally { rmSync(home, { recursive: true, force: true }); }
+});
+it("run rejects invalid targets before invoking the report", () => {
+	const execute = vi.fn();
+	expect(() => runSchedule({ target: "../bad", cli: base.cli }, { execute })).toThrow();
+	expect(execute).not.toHaveBeenCalled();
 });
 it("registers the schedule subcommand without executing a report", async () => {
 	const log = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -69,4 +102,22 @@ it("registers the schedule subcommand without executing a report", async () => {
 		await main(["node", "piagent", "report", "schedule", "--target", base.target, "--every", "1h"]);
 		expect(log).toHaveBeenCalledWith(expect.stringContaining("# piagent-report-d1-19c-lab.service"));
 	} finally { log.mockRestore(); }
+});
+
+it.each([0, 7])("registers schedule run and propagates fake report result %s", async status => {
+	const runner = await import("../../src/report/schedule.js");
+	const fake = vi.spyOn(runner, "runSchedule").mockReturnValue(status);
+	const previous = process.exitCode;
+	const previousEnvFile = process.env.PIAGENT_ENV_FILE;
+	process.env.PIAGENT_ENV_FILE = "/missing-ambient-env-file-must-not-be-read";
+	try {
+		const { main } = await import("../../src/cli/index.js");
+		await main(["node", "piagent", "report", "schedule", "run", "--target", base.target, "--home", base.home, "--out", base.out]);
+		expect(fake).toHaveBeenCalledWith(expect.objectContaining({ target: base.target, home: base.home, out: base.out }));
+		expect(process.exitCode).toBe(status);
+	} finally {
+		fake.mockRestore(); process.exitCode = previous;
+		if (previousEnvFile === undefined) delete process.env.PIAGENT_ENV_FILE;
+		else process.env.PIAGENT_ENV_FILE = previousEnvFile;
+	}
 });

@@ -69,7 +69,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 	return ok;
 }
 export async function main(argv = process.argv, dependencies: DoctorDependencies = {}) {
-	loadEnvironment();
+	if (argv.slice(2, 5).join(" ") !== "report schedule run") loadEnvironment();
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
 	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
@@ -111,10 +111,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			}
 		} finally { await sessions.closeAll(); }
 	});
-	program.commands.find(command => command.name() === "report")!.command("schedule").requiredOption("--target <target>").requiredOption("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
+	const schedule = program.commands.find(command => command.name() === "report")!.command("schedule").enablePositionalOptions().option("--target <target>").option("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
+		if (!options.target || !options.every) throw new Error("Schedule requires --target and --every");
 		const { generateSchedule, renderSchedule } = await import("../report/schedule.js");
 		const { agentHome } = await import("../config/paths.js");
 		console.log(renderSchedule(generateSchedule({ target: options.target, every: options.every, home: agentHome(), out: options.out ? (await import("node:path")).resolve(options.out) : reportDirectory(), node: process.execPath, cli: join(PACKAGE_ROOT, "dist/cli/index.js") }, loadConfig().targets)));
+	});
+	schedule.command("run").requiredOption("--target <target>").option("--home <dir>").option("--out <dir>").action(async (options: { target: string; home?: string; out?: string }) => {
+		const { runSchedule } = await import("../report/schedule.js");
+		process.exitCode = runSchedule({ ...options, cli: join(PACKAGE_ROOT, "dist/cli/index.js") });
 	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();

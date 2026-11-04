@@ -305,13 +305,24 @@ Use either cron or the timer, with one writer per output directory. Cron has no
 catch-up behavior. Copy each labelled unit block into its own file; the entire
 combined output is not a unit file. There is no `--install` option.
 
-The generated command uses the current absolute Node executable and the installed
-`dist/cli/index.js`; build a source checkout before using its output. Regenerate
-if either path changes. It runs `report --target ... --out ... --diff-only`.
+The generated command captures `process.execPath` at generation time and the
+installed `dist/cli/index.js`; build a source checkout before using its output.
+Check the printed Node path: on this host `~/.local/bin/node` resolves into a
+Playwright driver installation. Regenerate after a Node upgrade or any executable
+or CLI path change. No inline JavaScript is embedded in the output.
+
+The single command is `<node> <cli> report schedule run --target <t>`, with
+`--home` and `--out` arguments pinning the selected directories. The TypeScript
+runner invokes the existing `report --target ... --out ... --diff-only` command
+with a minimal environment and translates its exit status into local alerting.
+For a manual run, `piagent report schedule run --target d1-19c-lab` uses the current
+PIAGENT_HOME and its `reports` subdirectory; explicit absolute `--home` and `--out`
+paths override these defaults.
 The output directory defaults to `PIAGENT_REPORT_DIRECTORY`, otherwise
 `<PIAGENT_HOME>/reports`; `--out` is resolved to an absolute path.
 
-Scheduled reports read only `<PIAGENT_HOME>/.env`, regardless of an ambient
+The run command skips ambient environment-file loading; scheduled reports read
+only `<PIAGENT_HOME>/.env`, regardless of an ambient
 `PIAGENT_ENV_FILE`. Initialize that private configuration first and put the
 `PIAGENT_SECRET_DIR` path there. Secrets remain in their existing files, never
 inline in units. The child receives a minimal environment and pins its audit
@@ -320,15 +331,22 @@ Other report settings are read by the existing CLI environment parser.
 
 Before using a service, prepare the private home and output directories (0700),
 and create private regular `audit.jsonl` and `alerts.log` files (0600) under that
-home. Systemd requires the listed writable paths to exist. Keep these directories
-and files owned by the scheduling user and free of symlinks. The service uses
+home. `ReadWritePaths` entries have the systemd `-` prefix: missing paths are
+ignored instead of causing a `226/NAMESPACE` setup failure. This does not make
+their read-only parent writable. Provision these specific paths before scheduling
+so the sandbox can write reports, audit events and alerts; a missing writable
+path can still cause the report or alert operation to fail. This preserves the
+narrow write allowance rather than making the configuration directory writable.
+Outside the systemd sandbox (for example cron), normal report/alert creation
+rules apply. Keep these directories and files owned by the scheduling user and
+free of symlinks. The service uses
 `UMask=0077`, `NoNewPrivileges`, `ProtectSystem=strict`, and `PrivateTmp`.
 `ReadWritePaths` permits only the report directory, audit file, and local alert
 file. The alert file is a necessary additional write allowance for notification.
 It does not grant write access to the whole home. Other filesystem access remains
 read-only; the existing Oracle networking still works.
 
-Exit 3 appends an ISO timestamp and target to `<PIAGENT_HOME>/alerts.log`, enforcing
+A report exit status of 3 appends an ISO timestamp and target to `<PIAGENT_HOME>/alerts.log`, enforcing
 mode 0600 and refusing a symlink, then succeeds. Exit 0 creates no notification;
 other failures remain failures. Report output goes to the journal or cron stdout.
 No notify-send, mail, network notification, or automatic log rotation is added.
@@ -356,3 +374,8 @@ with literal percent signs escaped as `%%`. Home paths with control characters,
 newlines, or leading/trailing whitespace are rejected with a clear error. Internal
 spaces are supported. `ExecStart` and `ReadWritePaths` retain their appropriate
 quoted argument-list syntax; other directives contain fixed or validated values.
+
+Coordinator quality revision validation: `npm run typecheck` passed. `npm test`
+reported 666 passed and the two expected optimizer failures (`Eval endpoint primary
+is already locked`); all 38 schedule tests passed. Tests use fake report processes
+and decoded generated arguments, with no live report or systemd execution.
