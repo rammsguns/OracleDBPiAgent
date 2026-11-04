@@ -255,7 +255,26 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 		details.hasMore = details.startLine - 1 + details.rows.length < details.totalLines;
 		details.nextStartLine = details.hasMore ? details.startLine + details.rows.length : null;
 	};
-	const render = () => renderTable && details.columns ? renderTable(details) : Array.isArray(details) ? JSON.stringify(details) : details.columns ? [...(details.view ? [details.view] : []), ...(details.sourceNote && !details.sourceNote.startsWith("Note:") ? [details.sourceNote] : []), ...(typeof details.totalLines === "number" ? [`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`] : []), details.columns.join(" | "), ...details.rows.map((r: unknown[]) => r.map(v => v == null ? "NULL" : String(v).replace(/\s+/g, " ")).join(" | ")), ...(details.truncated ? ["[truncated]"] : []), ...(details.sourceNote?.startsWith("Note:") ? [details.sourceNote] : [])].join("\n") : JSON.stringify(details);
+	const render = () => {
+		if (renderTable && details.columns) return renderTable(details);
+		if (Array.isArray(details) || !details.columns) return JSON.stringify(details);
+		const headerLines = [
+			...(details.view ? [details.view] : []),
+			...(details.sourceNote && !details.sourceNote.startsWith("Note:") ? [details.sourceNote] : []),
+			...(typeof details.totalLines === "number" ? [
+				`Total lines: ${details.totalLines}; more: ${details.hasMore}; next startLine: ${details.nextStartLine ?? "none"}`,
+			] : []),
+			details.columns.join(" | "),
+		];
+		const rowLines = details.rows.map((row: unknown[]) => row.map(value =>
+			value == null ? "NULL" : String(value).replace(/\s+/g, " ")
+		).join(" | "));
+		const footerLines = [
+			...(details.truncated ? ["[truncated]"] : []),
+			...(details.sourceNote?.startsWith("Note:") ? [details.sourceNote] : []),
+		];
+		return [...headerLines, ...rowLines, ...footerLines].join("\n");
+	};
 	let output = { content: [{ type: "text" as const, text: render() }], details };
 	while (Buffer.byteLength(JSON.stringify(output)) > cap) {
 		if (details.rows?.length) { details.rows.pop(); details.truncated = true; updateSourcePage();

@@ -21,10 +21,12 @@ ambiguous SQL, and byte-identical serialized tool definitions against master.
 The existing chat fixture is unchanged.
 
 Live verification on 2026-11-04: the hidden p1 SHOPAPP.WORKLOAD ALL_SOURCE query
-produces the DBA_SOURCE hint, retaining zero rows. The requested p1
-HR.ADD_JOB_HISTORY fixture is absent: both DBA_ARGUMENTS and DBA_OBJECTS return
-zero rows. Its integration test explicitly skips with that reason until the
-fixture exists; the equivalent positive case is covered by the fake session.
+produces the DBA_SOURCE hint, retaining zero rows. The HR.ADD_JOB_HISTORY eval
+case belongs to d1-19c-lab: its integration test asserts five DBA_ARGUMENTS rows,
+then verifies the empty ALL_ARGUMENTS query produces the hint without returning
+DBA rows. The earlier p1 fixture skip has been removed.
+The result renderer uses named header, row and footer arrays with unchanged
+ordering and formatting.
 No database changes, LLM calls or evals were made.
 
 Validation:
@@ -32,7 +34,4 @@ Validation:
 - `npm test`: 848 passed, 50 files.
 - Integration command (serial, LLM e2e excluded):
   `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- -t '^(?!.*answers one end-to-end ask)' --no-file-parallelism --maxWorkers=1`.
-  Result: 30 passed, 2 skipped, 10 files. Skips: excluded LLM e2e and missing
-  p1 HR.ADD_JOB_HISTORY fixture. The initial integration run exposed this absent
-  fixture (29 passed, 1 failed, 1 skipped); read-only DBA checks confirmed it,
-  and the final run passed with the explicit fixture skip and live source case.
+  Result: 31 passed, 1 skipped (excluded LLM e2e), 10 files.

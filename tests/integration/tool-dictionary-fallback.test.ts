@@ -45,19 +45,19 @@ for (const target of targets) it(`dictionary permissions and hidden source throu
 	} finally { await provider.closeAll(); }
 }, 60000);
 
-it('hints at DBA_ARGUMENTS for hidden HR.ADD_JOB_HISTORY on p1 without returning its rows', async context => {
+it('hints at DBA_ARGUMENTS for hidden HR.ADD_JOB_HISTORY on d1 without returning its rows', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
 	const provider = createSessionProvider(config);
 	try {
 		try {
-			const session = await provider.get('p1-19c-prod');
-			const fixture = await session.query("SELECT argument_name FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'", {}, { maxRows: 1 });
+			const session = await provider.get('d1-19c-lab');
+			const fixture = await session.query("SELECT argument_name FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'", {}, { maxRows: 10 });
 			await session.close();
-			if (!fixture.rows.length) { context.skip('p1 fixture missing: DBA_ARGUMENTS has no HR.ADD_JOB_HISTORY rows'); return; }
+			expect(fixture.rows).toHaveLength(5);
 		}
 		catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Oracle listener unavailable'); return; } throw error; }
 		const tool = createDbTools({ config, sessions: provider, audit: { record: async () => {} }, runId: 'empty-dictionary-live' }).find(t => t.name === 'run_query')!;
-		const result = await tool.execute('arguments', { target: 'p1-19c-prod', sql: "SELECT argument_name FROM all_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'" });
+		const result = await tool.execute('arguments', { target: 'd1-19c-lab', sql: "SELECT argument_name FROM all_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'" });
 		expect(result.details.rows).toEqual([]);
 		expect(result.content[0]).toMatchObject({ text: expect.stringContaining('Re-run with DBA_ARGUMENTS.') });
 	} finally { await provider.closeAll(); }
