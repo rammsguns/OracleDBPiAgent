@@ -117,6 +117,13 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const result = buildReportTrends(await loadReportHistory(reportDirectory(), options.target, loadConfig().targets, /^\d+$/.test(options.last) ? Number(options.last) : NaN));
 		console.log(options.json ? JSON.stringify(result) : renderTrends(result));
 	});
+	const plsql = program.command("plsql").description("Read-only PL/SQL documentation and dependency diagrams; no LLM");
+	plsql.command("list").requiredOption("--target <target>").option("--owner <owner>").option("--json").action(async options => {
+		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("list", options);
+	});
+	plsql.command("doc").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
+		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
+	});
 	program.command("drift").description("Compare two approved targets (parameters, schema or objects); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
