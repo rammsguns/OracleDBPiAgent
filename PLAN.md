@@ -1726,7 +1726,7 @@ new features.
 3. Bump `version` to 1.1.0, tag `v1.1.0`, and push `master` and the tag to
    origin, only after the owner confirms (the repo is public).
 
-### Phase 15 results (2026-11-04): ready to push
+### Phase 15 results (2026-11-04): released
 WP-15A merged (8ab6cae, review APPROVE); changelog placeholders filled (f0c9fc8);
 version 1.1.0 committed (cc214c3). Checks on cc214c3:
 
@@ -1748,7 +1748,8 @@ Notes: after `init`, `ask` fails with a generic message until the placeholder
 follow-up. `report schedule` pins `process.execPath`, which on this machine
 resolves to a Playwright-bundled Node via `~/.local/bin/node`.
 
-Remaining: the owner confirms, then push `master` and `v1.1.0` and check CI.
+Pushed after the owner confirmed: origin/main 848670c and tag `v1.1.0`. CI run
+41864215262 succeeded; it waited about 14 minutes in GitHub's runner queue first.
 
 ### Not in phase 15
 Publishing to npm, GitHub release binaries, and Windows support.
