@@ -16,7 +16,7 @@ Or install a packed tarball from the prepared clone:
 ```bash
 npm pack
 # Replace the filename below with the one printed by npm pack.
-npm install -g ./oracledb-pi-agent-1.0.0.tgz
+npm install -g ./oracledb-pi-agent-1.1.0.tgz
 ```
 
 The prepare script compiles the CLI and web assets. Run `piagent` from any
