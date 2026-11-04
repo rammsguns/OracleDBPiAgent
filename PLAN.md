@@ -1795,6 +1795,8 @@ tables, so logs come from Oracle sources plus per-target configured log tables.
 | WP-16C Web and chat | `wp-16c-plsql-web` | `src/web/` (PL/SQL tab, triage panel, SVG graph), chat `/triage` in `src/cli/` and web chat, browser tests, `docs/web-ui.md` | WP-16B |
 | WP-16D PL/SQL evals | `wp-16d-plsql-evals` | `evals/cases-hard/phase16-*.json` (challenge split), `docs/evals-hard.md` | — |
 | WP-16E Tool dictionary fallback | `wp-16e-tool-fallback` | `src/tools/index.ts` (fallback only, no schema/description change), tests | WP-16D baseline |
+| WP-16F Case/scorer corrections | `wp-16d-plsql-evals` | `evals/scoring.ts` (rowCells, dash normalization), `evals/cases-hard/phase16-plsql.json`, tests, `docs/evals-hard.md` | WP-16E gate archive |
+| WP-16G Empty dictionary hint | `wp-16g-empty-dict-hint` | `run_query` in `src/tools/index.ts` (result note only, no schema/description change), tests, `docs/wp-16g-empty-dict-hint.md` | WP-16E |
 
 ### WP-16A: PL/SQL docs and diagrams
 - `src/plsql/dictionary.ts`: a typed read layer over objects, procedures,
@@ -1873,6 +1875,30 @@ returns no rows and the `DBA_` view is readable. Report which view answered.
 Tool names, schemas and descriptions stay unchanged, so there is no token cost.
 Gate: phase-16 cases ×4 alternating, plus the usual hard dev 4×4, holdout ×3,
 regression and MVP.
+
+### WP-16F: case and scorer corrections (merged 2026-11-04)
+The gate-16e PL/SQL rounds were scored with the original cases. Triage of all 40
+failing answers found 31 real misses and 9 artifacts:
+- child and parent on separate rows of a role table;
+- U+2011 and other Unicode dashes in ORA codes;
+- per-procedure section tables;
+- semicolons inside schedule metadata;
+- "no defaults" stated once rather than per row;
+- an unasked line-number requirement.
+
+The fix normalizes U+2010–U+2015 and U+2212 to `-`, and splits constraint truth
+into child and parent records. Wrong layouts (swapped roles, CASCADE, wrong
+routine association, parent-first purge) still fail. Rescored, gate-16e p16 is
+A 17/40 and B 32/40, and every pre-phase16 record is unchanged. Review APPROVE.
+
+### WP-16G: empty dictionary hint in run_query
+With WP-16E, the model still writes its own `run_query` against `ALL_ARGUMENTS`
+or `ALL_OBJECTS`, gets 0 rows, and says HR.ADD_JOB_HISTORY does not exist (3/4
+gate-16e runs). Fix: when a `run_query` SELECT on `ALL_` dictionary views returns
+0 rows, run the same SQL once on the `DBA_` views (maxRows 1; privilege errors
+ignored). If that finds rows, append one note telling the model to re-run on
+`DBA_`. No rows are returned, the user SQL is never silently rewritten, and tool
+definitions stay byte-identical. Gate: as WP-16E, against master with WP-16E.
 
 ### Gate
 - The usual tests (unit, integration, browser).
