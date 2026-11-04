@@ -71,7 +71,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 export async function main(argv = process.argv, dependencies: DoctorDependencies = {}) {
 	loadEnvironment();
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
-	const program = new Command().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
+	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
 	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
 	program.command("web").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
 		const port = Number(options.port);
@@ -80,7 +80,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
 	});
-	program.command("report").requiredOption("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
+	program.command("report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
+		if (!options.target) throw new Error("Report requires --target");
 		if (options.json && options.md) throw new Error("Choose --json or --md");
 		if (options.diffOnly && options.summarize) throw new Error("--diff-only cannot summarize");
 		const config = loadConfig();
@@ -109,6 +110,11 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				if (unverified.length) console.log(`Unverified: ${unverified.join(", ")}`);
 			}
 		} finally { await sessions.closeAll(); }
+	});
+	program.commands.find(command => command.name() === "report")!.command("schedule").requiredOption("--target <target>").requiredOption("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
+		const { generateSchedule, renderSchedule } = await import("../report/schedule.js");
+		const { agentHome } = await import("../config/paths.js");
+		console.log(renderSchedule(generateSchedule({ target: options.target, every: options.every, home: agentHome(), out: options.out ? (await import("node:path")).resolve(options.out) : reportDirectory(), node: process.execPath, cli: join(PACKAGE_ROOT, "dist/cli/index.js") }, loadConfig().targets)));
 	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();

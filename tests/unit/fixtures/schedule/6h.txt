@@ -1,0 +1,28 @@
+# piagent-report-d1-19c-lab.service
+[Unit]
+Description=Read-only Oracle report for d1-19c-lab
+
+[Service]
+Type=oneshot
+UMask=0077
+EnvironmentFile="/private/piagent/.env"
+ExecStart="/usr/bin/node" -e "const {spawnSync}=require('node:child_process');const fs=require('node:fs');const env={PATH:'/usr/bin:/bin',HOME:process.env.HOME,PIAGENT_HOME:\"/private/piagent\",PIAGENT_ENV_FILE:\"/private/piagent/.env\",PIAGENT_AUDIT_FILE:\"/private/piagent/audit.jsonl\"};const r=spawnSync(\"/usr/bin/node\",[\"/opt/piagent/dist/cli/index.js\",\"report\",\"--target\",\"d1-19c-lab\",\"--out\",\"/private/piagent/reports\",\"--diff-only\"],{env,stdio:'inherit'});if(r.error||r.signal)process.exit(1);if(r.status===3){const fd=fs.openSync(\"/private/piagent/alerts.log\",fs.constants.O_WRONLY|fs.constants.O_APPEND|fs.constants.O_CREAT|fs.constants.O_NOFOLLOW,0o600);try{fs.fchmodSync(fd,0o600);fs.writeSync(fd,new Date().toISOString()+\" report changes: d1-19c-lab\\n\");}finally{fs.closeSync(fd);}process.exit(0);}process.exit(r.status??1);"
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths="/private/piagent/reports" "/private/piagent/audit.jsonl" "/private/piagent/alerts.log"
+PrivateTmp=true
+
+# piagent-report-d1-19c-lab.timer
+[Unit]
+Description=Schedule Oracle report for d1-19c-lab
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00
+Persistent=true
+Unit=piagent-report-d1-19c-lab.service
+
+[Install]
+WantedBy=timers.target
+
+# crontab (use instead of the timer)
+0 */6 * * * '/usr/bin/node' -e 'const {spawnSync}=require('\''node:child_process'\'');const fs=require('\''node:fs'\'');const env={PATH:'\''/usr/bin:/bin'\'',HOME:process.env.HOME,PIAGENT_HOME:"/private/piagent",PIAGENT_ENV_FILE:"/private/piagent/.env",PIAGENT_AUDIT_FILE:"/private/piagent/audit.jsonl"};const r=spawnSync("/usr/bin/node",["/opt/piagent/dist/cli/index.js","report","--target","d1-19c-lab","--out","/private/piagent/reports","--diff-only"],{env,stdio:'\''inherit'\''});if(r.error||r.signal)process.exit(1);if(r.status===3){const fd=fs.openSync("/private/piagent/alerts.log",fs.constants.O_WRONLY|fs.constants.O_APPEND|fs.constants.O_CREAT|fs.constants.O_NOFOLLOW,0o600);try{fs.fchmodSync(fd,0o600);fs.writeSync(fd,new Date().toISOString()+" report changes: d1-19c-lab\n");}finally{fs.closeSync(fd);}process.exit(0);}process.exit(r.status??1);'
