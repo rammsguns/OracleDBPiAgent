@@ -72,7 +72,7 @@ function truthLabels(sql: string): string[] {
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
 function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[]): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
-	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
 	const decimal = (text: string) => {
 		const negative = text.startsWith('-');
@@ -80,10 +80,12 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		const magnitude = integer.replace(/^0+(?=\d)/, '') + (fraction.replace(/0+$/, '') ? '.' + fraction.replace(/0+$/, '') : '');
 		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
 	};
+	// Dictionary constraint types may be explained after an identifier.
+	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+—\s+type\s+[PRUCV]$/i, '$1');
 	const same = (actual: string, expected: unknown) => {
-		const text = clean(actual).replace(/\s+\([^)]*\)\s*$/, ''), value = String(expected);
+		const text = evidence(actual), value = String(expected);
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
-		return text.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
+		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
 	const lines = answer.split(/\r?\n/).map(clean).flatMap(line => {
 		// Repeated record keys and adjacent markdown rows delimit separate records,
@@ -93,11 +95,11 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		return records.flatMap(record => record.split(/(?<=\S)\s*\|\s*\|\s*(?=\S)/));
 	});
 	// Column-oriented markdown tables are also records: transpose each contiguous table.
-	const inlineRecord = /\(([^()]*[A-Za-z_][\w$]*\s*=[^()]*)\)/g;
+	const inlineRecord = /\(([^()]*[A-Za-z_][\w$]*(?:\s+[A-Za-z_][\w$]*)*\s*[=:][^()]*)\)/g;
 	const candidates = lines.map(line => singleRow ? line.replace(inlineRecord, '') : line);
 	if (singleRow || row.length === 1) {
 		for (const line of lines) {
-			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!);
+			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!.replace(/^([^=:]+):\s*/, '$1='));
 		}
 	}
 	for (let start = 0; start < lines.length; start++) {
@@ -116,7 +118,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// record can use Detail and Value together, but only inside this table
 		// and only for a single truth record; never pool unrelated tables.
 		const header = block[0] ?? [];
-		const keyColumn = header.findIndex(cell => /^(?:item|step|attribute|field|property)$/i.test(cell));
+		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property)$/i.test(cell));
 		const valueColumns = header.flatMap((cell, index) => /^(?:value|detail)$/i.test(cell) ? [index] : []);
 		if (singleRow && keyColumn >= 0 && valueColumns.length) {
 			for (const index of indices) candidates[index] = '';
@@ -136,8 +138,20 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
 		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
 		if (structured) {
+			// An explicitly qualified object cannot borrow a different owner from
+			// another field. Only owner columns constrain qualifiers; unrelated
+			// child and parent objects may legitimately use different schemas.
+			for (const field of fields) {
+				const parts = evidence(field).split('.');
+				if (parts.length < 2 || !parts.every(part => /^[A-Za-z_][\w$]*$/.test(part))) continue;
+				const objectIndex = row.findIndex(value => String(value).toLowerCase() === parts.at(-1)!.toLowerCase());
+				if (objectIndex < 0 || !/(?:table|table_name|index|index_name|constraint|constraint_name)$/i.test(labels[objectIndex] ?? '')) continue;
+				const ownerLabel = labels[objectIndex]?.replace(/(?:table|table_name|index|index_name|constraint|constraint_name)$/i, 'owner');
+				const ownerIndex = labels.findIndex(label => /owner$/i.test(label) && (label === ownerLabel || label === 'owner'));
+				if (ownerIndex >= 0 && !same(parts[0]!, row[ownerIndex])) return false;
+			}
 			const available = fields.flatMap(field => {
-				const value = field.replace(/\s+\([^)]*\)\s*$/, '');
+				const value = evidence(field);
 				return /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(value) ? value.split('.') : [value];
 			});
 			return row.every(value => { const index = available.findIndex(field => same(field, value)); if (index < 0) return false; available.splice(index, 1); return true; });
