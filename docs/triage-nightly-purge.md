@@ -1,6 +1,6 @@
 # Issue triage: p1-19c-prod
 
-Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Source and job literals are redacted; graph call associations and statement ranges are heuristic.
+Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Credential-looking literals are redacted; ordinary business literals are preserved; graph call associations and statement ranges are heuristic.
 
 ## Issue 1
 
@@ -10,34 +10,56 @@ Window: 24h. Codes: ORA-02292, ORA-06512. Reported times: none.
 
 ### Ranked hypotheses
 
-1. A child foreign key still references the parent rows being deleted.
+1. Cutoff evaluated twice / predicate mismatch: rows crossing the boundary between statements keep child rows.
+
+- SHOPAPP.WORKLOAD.NIGHTLY_PURGE, line 26: `DELETE FROM order_lines WHERE order_id IN (SELECT order_id FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY);`
+- SHOPAPP.WORKLOAD.NIGHTLY_PURGE, line 27: `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
+- Both statements evaluate a time-relative cutoff separately; the later statement can include parents that crossed the boundary.
+- This is a source-based hypothesis; current aggregates cannot reconstruct the failing transaction.
+- Current matching child row count: 772720 (a new read-only snapshot, not proof of the historical cause).
+
+2. A child foreign key still references the parent rows being deleted.
 
 - SHOPAPP.SYS_C007669: table SHOPAPP.ORDER_LINES, type R.
-- SHOPAPP.WORKLOAD line 27 inside NIGHTLY_PURGE: DELETE FROM orders WHERE ordered_at &lt; SYSTIMESTAMP - INTERVAL '[REDACTED]' DAY;
-- SHOPAPP.NIGHTLY_PURGE_JOB line 1 inside anonymous block (job_action): BEGIN shopapp.workload.nightly_purge; END;
+- SHOPAPP.WORKLOAD line 27 inside NIGHTLY_PURGE: `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
+- SHOPAPP.NIGHTLY_PURGE_JOB line 1 inside anonymous block (job_action): `BEGIN shopapp.workload.nightly_purge; END;`
 
-2. A child table other than ORDER_LINES may still reference old ORDERS rows (unconfirmed).
+### Limitations
 
-- Line 26 already deletes from ORDER_LINES before the ORDERS delete at line 27.
-- The recorded constraint currently resolves to SHOPAPP.ORDER_LINES; this does not prove another child table.
-- Review all visible child foreign keys. ALL_ fallback can hide other owners; request DBA visibility if needed. Concurrent child inserts or differences between the two DELETE predicates also require investigation.
+No additional limitations identified; view failures and caps are reported below.
+
+### Concurrency review
+
+SHOPAPP.PLACE_ORDERS_JOB calls SHOPAPP.WORKLOAD.PLACE_ORDERS: line 6 inserts a new parent and RETURNING order_id INTO v_order; line 12 inserts child rows using that new key. This shown path cannot explain child rows for old parents selected by the purge; it does not support that concurrency explanation.
+
+### Suggested fixes (not executed)
+
+Suggestions for a developer; no changes were run.
+
+- For SHOPAPP.WORKLOAD.NIGHTLY_PURGE lines 26 and 27, capture the cutoff once in a variable and use it in both statements; make the predicates identical.
+
+- For SHOPAPP.ORDER_LINES → SHOPAPP.ORDERS, collect the intended parent key set first and delete children using that same key set before deleting parents.
+
+- Consider ON DELETE CASCADE only as a schema design choice after reviewing ownership, retention rules and all dependent tables.
+
+- Add exception logging that records the error stack, backtrace, captured cutoff and operation context without credentials.
 
 ### Frame excerpts
 
 SHOPAPP.WORKLOAD line 27 inside NIGHTLY_PURGE; ok; DBA_SOURCE.
 
-Statement (heuristic): DELETE FROM orders WHERE ordered_at &lt; SYSTIMESTAMP - INTERVAL '[REDACTED]' DAY;
+Statement (heuristic): `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
 
 ```plsql
 19:   PROCEDURE ship_orders IS
 20:   BEGIN
-21:     UPDATE orders SET status = '[REDACTED]' WHERE status = '[REDACTED]' AND ordered_at < SYSTIMESTAMP - INTERVAL '[REDACTED]' MINUTE;
+21:     UPDATE orders SET status = 'SHIPPED' WHERE status = 'NEW' AND ordered_at < SYSTIMESTAMP - INTERVAL '2' MINUTE;
 22:     COMMIT;
 23:   END;
 24:   PROCEDURE nightly_purge IS
 25:   BEGIN
-26:     DELETE FROM order_lines WHERE order_id IN (SELECT order_id FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '[REDACTED]' DAY);
-27:     DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '[REDACTED]' DAY;
+26:     DELETE FROM order_lines WHERE order_id IN (SELECT order_id FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY);
+27:     DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;
 28:     COMMIT;
 29:   END;
 30: END workload;
@@ -45,7 +67,7 @@ Statement (heuristic): DELETE FROM orders WHERE ordered_at &lt; SYSTIMESTAMP - I
 
 SHOPAPP.NIGHTLY_PURGE_JOB line 1 inside anonymous block (job_action); ok; DBA_SCHEDULER_JOBS.
 
-Statement (heuristic): BEGIN shopapp.workload.nightly_purge; END;
+Statement (heuristic): `BEGIN shopapp.workload.nightly_purge; END;`
 
 ```plsql
 1: BEGIN shopapp.workload.nightly_purge; END;
@@ -111,76 +133,102 @@ All visible child foreign keys referencing SHOPAPP.SYS_C007661: ok; ALL_CONSTRAI
 | --- | --- | --- | --- | --- | --- | --- |
 | SHOPAPP | SYS_C007669 | ORDER_LINES | SHOPAPP | SYS_C007661 | NO ACTION | ENABLED |
 
+Current child references matching parent predicate (SHOPAPP.ORDER_LINES → SHOPAPP.ORDERS): ok; SHOPAPP.ORDER_LINES, SHOPAPP.ORDERS
+
+| CHILD_ROWS |
+| --- |
+| 772720 |
+
+Other jobs referencing SHOPAPP.WORKLOAD (concurrency review): ok; DBA_SCHEDULER_JOBS
+
+| OWNER | JOB_NAME | JOB_ACTION |
+| --- | --- | --- |
+| SHOPAPP | NIGHTLY_PURGE_JOB | BEGIN shopapp.workload.nightly_purge; END; |
+| SHOPAPP | PLACE_ORDERS_JOB | BEGIN shopapp.workload.place_orders(25); END; |
+| SHOPAPP | SHIP_ORDERS_JOB | BEGIN shopapp.workload.ship_orders; END; |
+
 ### Local error guide
 
 ORA-02292: Integrity constraint violated: child record found. Typical causes: Parent DELETE/UPDATE still has referencing child rows. Read-only checks: Resolve all child foreign keys, including tables not cleared by the preceding code.
 
 ### Numbered debug checklist
 
-1. Named scheduler job actions. Review the rows above and correlate keys and timestamps.
+1. Named scheduler job actions. Look for the job type and entry point; an empty current dictionary result with retained history can mean a dropped or auto-dropped job.
 
 ```sql
 SELECT OWNER, JOB_NAME, JOB_TYPE, JOB_ACTION FROM DBA_SCHEDULER_JOBS WHERE (JOB_NAME = 'NIGHTLY_PURGE_JOB') ORDER BY OWNER, JOB_NAME
 ```
 
-2. Scheduler run history in window. Review the rows above and correlate keys and timestamps.
+2. Scheduler run history in window. Look for FAILED runs, their exact error stack and start time; compare repeated failures with the reported incident window.
 
 ```sql
-SELECT OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO FROM DBA_SCHEDULER_JOB_RUN_DETAILS WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(24, 'HOUR') AND ((OWNER = 'SHOPAPP' AND JOB_NAME = 'NIGHTLY_PURGE_JOB') OR JOB_NAME = 'NIGHTLY_PURGE_JOB') ORDER BY ACTUAL_START_DATE DESC
+SELECT OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO FROM DBA_SCHEDULER_JOB_RUN_DETAILS WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(24, 'HOUR') AND ((OWNER = 'SHOPAPP' AND JOB_NAME = 'NIGHTLY_PURGE_JOB')) ORDER BY ACTUAL_START_DATE DESC
 ```
 
-3. Source around SHOPAPP.WORKLOAD line 27 (from bounded dictionary source). Review the rows above and correlate keys and timestamps.
+3. Source around SHOPAPP.WORKLOAD line 27 (from bounded dictionary source). Look for the raising statement and the enclosing subprogram; compare the child and parent selection predicates and their evaluation times.
 
 ```sql
 SELECT TYPE, LINE, TEXT FROM DBA_SOURCE WHERE OWNER = 'SHOPAPP' AND NAME = 'WORKLOAD' AND LINE BETWEEN 19 AND 35 ORDER BY TYPE, LINE
 ```
 
-4. Compile errors in SHOPAPP. Review the rows above and correlate keys and timestamps.
+4. Compile errors in SHOPAPP. Look for compiler line/position and messages naming the failing object or its dependencies.
 
 ```sql
 SELECT OWNER, NAME, TYPE, LINE, POSITION, TEXT FROM DBA_ERRORS WHERE OWNER = 'SHOPAPP' ORDER BY NAME, TYPE, SEQUENCE
 ```
 
-5. Invalid objects in SHOPAPP. Review the rows above and correlate keys and timestamps.
+5. Invalid objects in SHOPAPP. Look for INVALID status on the failing unit or a dependency and compare LAST_DDL_TIME with the incident.
 
 ```sql
 SELECT OWNER, OBJECT_NAME, OBJECT_TYPE, STATUS, LAST_DDL_TIME FROM DBA_OBJECTS WHERE OWNER = 'SHOPAPP' AND STATUS = 'INVALID' ORDER BY OBJECT_NAME, OBJECT_TYPE
 ```
 
-6. Candidate log tables in SHOPAPP (listed only). Review the rows above and correlate keys and timestamps.
+6. Candidate log tables in SHOPAPP (listed only). Look for plausible application log names; only explicitly configured log tables may be read.
 
 ```sql
 SELECT OWNER, TABLE_NAME FROM ALL_TABLES WHERE OWNER = 'SHOPAPP' AND (TABLE_NAME LIKE '%LOG%' OR TABLE_NAME LIKE '%ERROR%') ORDER BY TABLE_NAME
 ```
 
-7. Constraint SHOPAPP.SYS_C007669. Review the rows above and correlate keys and timestamps.
+7. Constraint SHOPAPP.SYS_C007669. Look for constraint type, owning child table, referenced parent key, delete rule and enabled status.
 
 ```sql
 SELECT OWNER, CONSTRAINT_NAME, CONSTRAINT_TYPE, TABLE_NAME, R_OWNER, R_CONSTRAINT_NAME, DELETE_RULE, STATUS FROM ALL_CONSTRAINTS WHERE OWNER = 'SHOPAPP' AND CONSTRAINT_NAME = 'SYS_C007669'
 ```
 
-8. Columns for SHOPAPP.SYS_C007669. Review the rows above and correlate keys and timestamps.
+8. Columns for SHOPAPP.SYS_C007669. Look for columns ordered by POSITION; pair child and parent key columns at the same position.
 
 ```sql
 SELECT OWNER, CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, POSITION FROM ALL_CONS_COLUMNS WHERE OWNER = 'SHOPAPP' AND CONSTRAINT_NAME = 'SYS_C007669' ORDER BY POSITION
 ```
 
-9. Parent/key table for SHOPAPP.SYS_C007669. Review the rows above and correlate keys and timestamps.
+9. Parent/key table for SHOPAPP.SYS_C007669. Look for the parent table and primary/unique key referenced by the failing foreign key.
 
 ```sql
 SELECT OWNER, CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE FROM ALL_CONSTRAINTS WHERE OWNER = 'SHOPAPP' AND CONSTRAINT_NAME = 'SYS_C007661'
 ```
 
-10. Columns for SHOPAPP.SYS_C007661. Review the rows above and correlate keys and timestamps.
+10. Columns for SHOPAPP.SYS_C007661. Look for columns ordered by POSITION; pair child and parent key columns at the same position.
 
 ```sql
 SELECT OWNER, CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, POSITION FROM ALL_CONS_COLUMNS WHERE OWNER = 'SHOPAPP' AND CONSTRAINT_NAME = 'SYS_C007661' ORDER BY POSITION
 ```
 
-11. All visible child foreign keys referencing SHOPAPP.SYS_C007661. Review the rows above and correlate keys and timestamps.
+11. All visible child foreign keys referencing SHOPAPP.SYS_C007661. Look for every child foreign key to this parent key, including other owners; ALL visibility can hide additional children.
 
 ```sql
 SELECT OWNER, CONSTRAINT_NAME, TABLE_NAME, R_OWNER, R_CONSTRAINT_NAME, DELETE_RULE, STATUS FROM ALL_CONSTRAINTS WHERE CONSTRAINT_TYPE = 'R' AND R_OWNER = 'SHOPAPP' AND R_CONSTRAINT_NAME = 'SYS_C007661' ORDER BY OWNER, CONSTRAINT_NAME
+```
+
+12. Current child references matching parent predicate (SHOPAPP.ORDER_LINES → SHOPAPP.ORDERS). Look for a nonzero CHILD_ROWS count: children currently reference parents eligible for the parent operation; zero does not disprove a past boundary race.
+
+```sql
+SELECT COUNT(*) AS CHILD_ROWS FROM SHOPAPP.ORDER_LINES c WHERE EXISTS (SELECT 1 FROM SHOPAPP.ORDERS p WHERE c.ORDER_ID = p.ORDER_ID AND p.ORDERED_AT < SYSTIMESTAMP - INTERVAL '7' DAY)
+```
+
+13. Other jobs referencing SHOPAPP.WORKLOAD (concurrency review). Look for job entry points that insert child rows, then verify whether their keys can refer to the same eligible parents.
+
+```sql
+SELECT OWNER, JOB_NAME, JOB_ACTION FROM DBA_SCHEDULER_JOBS WHERE INSTR(UPPER(JOB_ACTION), 'WORKLOAD') > 0 ORDER BY OWNER, JOB_NAME
 ```
 
 ### Trace diagram
@@ -188,7 +236,7 @@ SELECT OWNER, CONSTRAINT_NAME, TABLE_NAME, R_OWNER, R_CONSTRAINT_NAME, DELETE_RU
 ```mermaid
 flowchart LR
   n0["SHOPAPP.WORKLOAD.NIGHTLY_PURGE line 27"]
-  n1["DELETE FROM orders WHERE ordered_at _ SYSTIMESTAMP - INTERVAL __REDACTED__ DAY_"]
+  n1["DELETE FROM orders WHERE ordered_at _ SYSTIMESTAMP - INTERVAL _7_ DAY_"]
   n2["SHOPAPP.NIGHTLY_PURGE_JOB"]
   n3["SHOPAPP.ORDER_LINES"]
   n4["SHOPAPP.SYS_C007669"]
