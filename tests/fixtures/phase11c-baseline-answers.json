@@ -1,0 +1,2941 @@
+[
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 1,
+    "answer": "Here are the live `CUSTOMERS` row counts across all three accessible application schemas on **d1-19c-lab**:\n\n| # | Record |\n|---|--------|\n| 1 | OWNER=CO / TABLE=CUSTOMERS / ROWS=392 |\n| 2 | OWNER=OE / TABLE=CUSTOMERS / ROWS=319 |\n| 3 | OWNER=SH / TABLE=CUSTOMERS / ROWS=55500 |\n\nAll three schemas contain a `CUSTOMERS` table with distinct row counts, confirming the ambiguity is real. The SH sample schema's `CUSTOMERS` (55,500 rows) is by far the largest; CO and OE hold much smaller reference sets.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1933,
+      "input": 1788,
+      "output": 367
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "CUSTOMERS",
+        392
+      ],
+      [
+        "OE",
+        "CUSTOMERS",
+        319
+      ],
+      [
+        "SH",
+        "CUSTOMERS",
+        55500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 1,
+    "answer": "Here are the results from `describe_object` on **d1-19c-lab**:\n\n---\n\n**CO schema:**\n\n| Field | Value |\n|-------|-------|\n| OWNER | CO |\n| COLUMN | ORDER_STATUS |\n| TYPE | VARCHAR2(40) |\n| NULLABLE | N |\n\n*(NOT NULL enforced by system constraint `SYS_C007905`; additionally a check constraint `ORDERS_STATUS_C` limits allowed values.)*\n\n---\n\n**OE schema:**\n\n| Field | Value |\n|-------|-------|\n| OWNER | OE |\n| COLUMN | ORDER_STATUS |\n| TYPE | NUMBER |\n| NULLABLE | Y |\n\n*(No NOT NULL or CHECK constraint exists on this column in OE.)*\n\n---\n\n### Key difference\n\nDespite sharing the same column name (`ORDER_STATUS`), the two schemas represent order status fundamentally differently:\n\n- **CO** uses a **VARCHAR2(40)** textual code (e.g., `'Shipped'`, `'Received'`) and mandates it is populated.\n- **OE** uses a **NUMBER** (integer code) and permits NULLs.\n\nAny cross-schema logic must account for this type and nullability mismatch.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "usage": {
+      "cached": 1942,
+      "input": 2470,
+      "output": 778
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "ORDER_STATUS",
+        "VARCHAR2",
+        "N"
+      ],
+      [
+        "OE",
+        "ORDER_STATUS",
+        "NUMBER",
+        "Y"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 1,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Key observations:**\n\n- **Calendar-year filter used:** `CALENDAR_YEAR = 2000` (not fiscal year).\n- **Quarter label column:** `CALENDAR_QUARTER_DESC` (format `YYYY-QQ`).\n- **Fiscal year columns:** `FISCAL_YEAR` for MIN/MAX aggregation.\n- All four calendar quarters in 2000 fall entirely within fiscal year 2000 (min = max = 2000), meaning the SH sample's fiscal calendar aligns with the calendar year for this period.\n- The distinct-date counts (91 + 91 + 92 + 92 = **366**) confirm 2000 is a leap year.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5559,
+      "input": 3331,
+      "output": 874
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "2000-01",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-02",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-03",
+        2000,
+        2000,
+        92
+      ],
+      [
+        "2000-04",
+        2000,
+        2000,
+        92
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 1,
+    "answer": "## Result\n\n**Target:** p1-19c-prod  \n**SQL_ID:** `6scf5afs3262d`, **CHILD_NUMBER:** 0  \n**SQL text (not executed):** `SELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011`\n\nThe other cached cursors containing the string `p11_order_probe` are dictionary queries against `v$sql` that merely search for that text; they were excluded.\n\n## Cached Plan Tree (from `v$sql_plan`)\n\nThis is the **optimizer-generated plan structure** (static plan tree), not measured runtime statistics (which would come from `v$sql_plan_statistics`).\n\n| LINE | PARENT | DEPTH | OP | OPTIONS |\n|------|--------|-------|----|---------|\n| 0 | ROOT | 0 | SELECT STATEMENT | NONE |\n| 1 | 0 | 1 | INDEX | UNIQUE SCAN |\n\n**Column mapping to `v$sql_plan`:**\n\n| Requested label | Actual column name |\n|---|---|\n| LINE | `ID` |\n| PARENT | `PARENT_ID` (NULL → ROOT) |\n| DEPTH | `DEPTH` |\n| OP | `OPERATION` |\n| OPTIONS | `OPTIONS` (NULL → NONE) |\n\nThe plan is a two-step tree: the root `SELECT STATEMENT` node with a single child performing an **INDEX UNIQUE SCAN** (consistent with the equality predicate on what is evidently the primary key of `shopapp.orders`).",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7081,
+      "input": 2223,
+      "output": 1298
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0,
+        "ROOT",
+        0,
+        "SELECT STATEMENT",
+        "NONE"
+      ],
+      [
+        1,
+        "0",
+        1,
+        "INDEX",
+        "UNIQUE SCAN"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 1,
+    "answer": "Your premise is **incorrect**. On `d1-19c-lab`, employees without commission are stored with `COMMISSION_PCT` as **NULL**, not zero — there are exactly **zero** rows where `COMMISSION_PCT = 0`.\n\nOne record (from `hr.employees`, single conditional-aggregation query):\n\n```\nNULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35\n```\n\nCorrection: the \"no commission\" population is represented by NULLs (72 rows), not zeros (0 rows). The 35 positive values are the actual commissioned sales staff. These sum to 107, matching the total row count of `hr.employees`, so there are no negative or other unexpected values.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1934,
+      "input": 1779,
+      "output": 420
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        72,
+        0,
+        35
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 1,
+    "answer": "Verified against `ALL_CONSTRAINTS` / `ALL_CONS_COLUMNS` on **d1-19c-lab**.\n\n**Premise is false — SH.SALES has NO declared primary key.** The only constraint types present are:\n- `C` (check/NOT NULL) on the 7 columns, and\n- `R` (referential / foreign-key) constraints.\n\nThere is no row with `CONSTRAINT_TYPE = 'P'`, so I will not list PK columns (and per your instruction I am not inferring one from an index or a plausible business key such as PROD_ID+CUST_ID+TIME_ID+CHANNEL_ID+PROMO_ID).\n\n**Declared foreign-key constraints (5):**\n| Constraint | Column |\n|---|---|\n| SALES_CHANNEL_FK | CHANNEL_ID |\n| SALES_CUSTOMER_FK | CUST_ID |\n| SALES_PRODUCT_FK | PROD_ID |\n| SALES_PROMO_FK | PROMO_ID |\n| SALES_TIME_FK | TIME_ID |\n\n**Result:**\n\n```\nPK_CONSTRAINTS=0 / FK_CONSTRAINTS=5\n```\n\nNote: the absence of a PK is expected for the SH sample fact table — it is loaded via bulk operations and relies on the NOT NULL (`C`) constraints plus the five FKs, not a declared primary key.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1988,
+      "input": 1969,
+      "output": 623
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0
+      ],
+      [
+        5
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 1,
+    "answer": "Here is the complete foreign-key trace on **p1-19c-prod**, built entirely from dictionary joins (`ALL_CONSTRAINTS` → `ALL_CONS_COLUMNS` → `ALL_INDEXES` → `ALL_IND_COLUMNS` → `ALL_TAB_COLUMNS`):\n\n| Attribute | Value |\n|-----------|-------|\n| **Child table** | SHOPAPP.ORDERS |\n| **FK constraint name** | SYS_C007662 |\n| **Child column** | CUSTOMER_ID |\n| **Parent table** | SHOPAPP.CUSTOMERS |\n| **Referenced constraint** | SYS_C007649 (type = **P**, i.e. PRIMARY KEY) |\n| **Backing index name** | SYS_C007649 |\n| **Index uniqueness** | UNIQUE |\n| **Indexed column position** | 1 |\n| **Parent (indexed) column** | CUSTOMER_ID |\n| **Data type** | NUMBER (precision NULL, scale NULL → unconstrained NUMBER; storage length 22) |\n\n### How the chain was resolved\n\n1. **FK → parent constraint:** `ALL_CONSTRAINTS` row for `SHOPAPP.ORDERS` with `CONSTRAINT_TYPE='R'` gave `R_OWNER=SHOPAPP`, `R_CONSTRAINT_NAME=SYS_C007649`. The child column (`CUSTOMER_ID`) came from `ALL_CONS_COLUMNS` on the FK itself.\n\n2. **Parent constraint → parent table:** Looking up `SYS_C007649` in `ALL_CONSTRAINTS` returned `TABLE_NAME=CUSTOMERS`, `CONSTRAINT_TYPE='P'`.\n\n3. **Constraint → backing index:** `ALL_CONSTRAINTS.INDEX_OWNER / INDEX_NAME` for `SYS_C007649` pointed to index `SHOPAPP.SYS_C007649`. (The name coincidence is because Oracle auto-created a system-named unique index to enforce the PK; it was confirmed via the dictionary columns, not by name-matching.)\n\n4. **Index → indexed columns & types:** `ALL_IND_COLUMNS` gave position 1 = `CUSTOMER_ID`; joining to `ALL_TAB_COLUMNS` on the parent table yielded the type `NUMBER` with no declared precision/scale.",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 8150,
+      "input": 2201,
+      "output": 1908
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CUSTOMER_ID",
+        "CUSTOMERS",
+        "SYS_C007649",
+        "SYS_C007649",
+        "UNIQUE",
+        1,
+        "CUSTOMER_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 1,
+    "answer": "Here is the full resolution chain from **OE.WAREHOUSES** to its parent, confirmed on **d1-19c-lab**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `OE.WAREHOUSES.LOCATION_ID` (position 1 in FK) |\n| **FK constraint** | `OE.WAREHOUSES_LOCATION_FK` (ENABLED) |\n| **Parent owner / table** | **HR**.LOCATIONS |\n| **Referenced constraint** | `HR.LOC_ID_PK` (type **P** = Primary Key, ENABLED) |\n| **Backing index** | `HR.LOC_ID_PK` |\n| **Uniqueness** | **UNIQUE** |\n| **Index status** | VALID |\n| **Indexed position** | 1 |\n| **Indexed column** | `LOCATION_ID` |\n| **Column type** | NUMBER |\n\nKey observation: the parent is **not** in OE — it lives in the **HR** schema (`HR.LOCATIONS`), which is the canonical cross-schema FK pattern in the sample schemas. The backing index name matches the constraint name (`LOC_ID_PK`), confirming Oracle auto-created it to enforce the primary key.",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7007,
+      "input": 2090,
+      "output": 1100
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "LOCATION_ID",
+        "HR",
+        "LOCATIONS",
+        "LOC_ID_PK",
+        "LOC_ID_PK",
+        "UNIQUE",
+        1,
+        "LOCATION_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 1,
+    "answer": "Here are the details for the second-ranked department (ranked by employee count) on **d1-19c-lab**:\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Department Name | Sales |\n| Employee Count | 34 |\n| Exact Salary Total | 304,500 |\n| Manager Full Name | John Russell |",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6418,
+      "input": 1864,
+      "output": 724
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        80,
+        "Sales",
+        34,
+        304500,
+        "John Russell"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 1,
+    "answer": "The second-ranked warehouse (by total quantity on hand = 20457) is:\n\n| Field | Value |\n|-------|-------|\n| Warehouse ID | 6 |\n| Warehouse Name | Sydney |\n| City | Sydney |\n| Country Name | Australia |\n| Region Name | Asia |\n\nRelationship chain followed (d1-19c-lab): `OE.WAREHOUSES.LOCATION_ID` → `HR.LOCATIONS` (city, country_id) → `HR.COUNTRIES` (country_name, region_id) → `HR.REGIONS` (region_name). Note that in this sample schema Australia is mapped to the \"Asia\" region.",
+    "toolCalls": [
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 13248,
+      "input": 2664,
+      "output": 1293
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        6,
+        "Sydney",
+        "Sydney",
+        "Australia",
+        "Asia"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 1,
+    "answer": "All 19 job definitions from `HR.JOBS` (target **d1-19c-lab**), ordered by `JOB_ID`:\n\n```\nJOB=AC_ACCOUNT / MIN=4200 / MAX=9000\nJOB=AC_MGR / MIN=8200 / MAX=16000\nJOB=AD_ASST / MIN=3000 / MAX=6000\nJOB=AD_PRES / MIN=20080 / MAX=40000\nJOB=AD_VP / MIN=15000 / MAX=30000\nJOB=FI_ACCOUNT / MIN=4200 / MAX=9000\nJOB=FI_MGR / MIN=8200 / MAX=16000\nJOB=HR_REP / MIN=4000 / MAX=9000\nJOB=IT_PROG / MIN=4000 / MAX=10000\nJOB=MK_MAN / MIN=9000 / MAX=15000\nJOB=MK_REP / MIN=4000 / MAX=9000\nJOB=PR_REP / MIN=4500 / MAX=10500\nJOB=PU_CLERK / MIN=2500 / MAX=5500\nJOB=PU_MAN / MIN=8000 / MAX=15000\nJOB=SA_MAN / MIN=10000 / MAX=20080\nJOB=SA_REP / MIN=6000 / MAX=12008\nJOB=SH_CLERK / MIN=2500 / MAX=5500\nJOB=ST_CLERK / MIN=2008 / MAX=5000\nJOB=ST_MAN / MIN=5500 / MAX=8500\n```\n\nThis reads the full `HR.JOBS` definition table (not the employee-joined view), so every job is included regardless of whether any employee currently holds it.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2165,
+      "input": 2144,
+      "output": 908
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "AC_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "AC_MGR",
+        8200,
+        16000
+      ],
+      [
+        "AD_ASST",
+        3000,
+        6000
+      ],
+      [
+        "AD_PRES",
+        20080,
+        40000
+      ],
+      [
+        "AD_VP",
+        15000,
+        30000
+      ],
+      [
+        "FI_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "FI_MGR",
+        8200,
+        16000
+      ],
+      [
+        "HR_REP",
+        4000,
+        9000
+      ],
+      [
+        "IT_PROG",
+        4000,
+        10000
+      ],
+      [
+        "MK_MAN",
+        9000,
+        15000
+      ],
+      [
+        "MK_REP",
+        4000,
+        9000
+      ],
+      [
+        "PR_REP",
+        4500,
+        10500
+      ],
+      [
+        "PU_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "PU_MAN",
+        8000,
+        15000
+      ],
+      [
+        "SA_MAN",
+        10000,
+        20080
+      ],
+      [
+        "SA_REP",
+        6000,
+        12008
+      ],
+      [
+        "SH_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "ST_CLERK",
+        2008,
+        5000
+      ],
+      [
+        "ST_MAN",
+        5500,
+        8500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 1,
+    "answer": "Counted product rows from `SH.PRODUCTS` grouped by `PROD_SUBCATEGORY` (no join to SALES, so products with no sales are included). Source: `run_query` on **d1-19c-lab**. Total = 72 product definitions, matching the PRODUCTS table row count.\n\nNote: `SH.PRODUCT_SUBCATEGORIES` is not accessible to HARNESS_LAB (describe returned no metadata; the join query raised ORA-00942), so I grouped directly on `PRODUCTS.PROD_SUBCATEGORY`, which carries the subcategory name on each product row. This yields every subcategory that has product definitions, one record each, in name order:\n\n```\nSUBCATEGORY=Accessories / PRODUCTS=10\nSUBCATEGORY=Bulk Pack Diskettes / PRODUCTS=2\nSUBCATEGORY=CD-ROM / PRODUCTS=6\nSUBCATEGORY=Camcorders / PRODUCTS=1\nSUBCATEGORY=Camera Batteries / PRODUCTS=5\nSUBCATEGORY=Camera Media / PRODUCTS=3\nSUBCATEGORY=Cameras / PRODUCTS=1\nSUBCATEGORY=Desktop PCs / PRODUCTS=1\nSUBCATEGORY=Documentation / PRODUCTS=6\nSUBCATEGORY=Game Consoles / PRODUCTS=1\nSUBCATEGORY=Home Audio / PRODUCTS=2\nSUBCATEGORY=Memory / PRODUCTS=2\nSUBCATEGORY=Modems/Fax / PRODUCTS=2\nSUBCATEGORY=Monitors / PRODUCTS=2\nSUBCATEGORY=Operating Systems / PRODUCTS=1\nSUBCATEGORY=Portable PCs / PRODUCTS=1\nSUBCATEGORY=Printer Supplies / PRODUCTS=4\nSUBCATEGORY=Recordable CDs / PRODUCTS=7\nSUBCATEGORY=Recordable DVD Discs / PRODUCTS=5\nSUBCATEGORY=Y Box Accessories / PRODUCTS=2\nSUBCATEGORY=Y Box Games / PRODUCTS=8\n```\n\n21 subcategories returned. (If you specifically need subcategories that exist in the dimension table but have zero products, that would require access to `PRODUCT_SUBCATEGORIES`, which is currently not granted.)",
+    "toolCalls": [
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 8150,
+      "input": 2717,
+      "output": 1459
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "Accessories",
+        10
+      ],
+      [
+        "Bulk Pack Diskettes",
+        2
+      ],
+      [
+        "CD-ROM",
+        6
+      ],
+      [
+        "Camcorders",
+        1
+      ],
+      [
+        "Camera Batteries",
+        5
+      ],
+      [
+        "Camera Media",
+        3
+      ],
+      [
+        "Cameras",
+        1
+      ],
+      [
+        "Desktop PCs",
+        1
+      ],
+      [
+        "Documentation",
+        6
+      ],
+      [
+        "Game Consoles",
+        1
+      ],
+      [
+        "Home Audio",
+        2
+      ],
+      [
+        "Memory",
+        2
+      ],
+      [
+        "Modems/Fax",
+        2
+      ],
+      [
+        "Monitors",
+        2
+      ],
+      [
+        "Operating Systems",
+        1
+      ],
+      [
+        "Portable PCs",
+        1
+      ],
+      [
+        "Printer Supplies",
+        4
+      ],
+      [
+        "Recordable CDs",
+        7
+      ],
+      [
+        "Recordable DVD Discs",
+        5
+      ],
+      [
+        "Y Box Accessories",
+        2
+      ],
+      [
+        "Y Box Games",
+        8
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-header-fanout",
+    "iteration": 1,
+    "answer": "## Result (target: d1-19c-lab, schema OE)\n\n| ORDER_MODE | Orders with ≥1 item | Sum of ORDER_TOTAL | Total item quantity |\n|---|---:|---:|---:|\n| direct | 73 | 1,903,629.20 | 15,647 |\n| online | 32 | 1,764,425.50 | 14,440 |\n\n(Only modes that actually have orders with items appear; the inner join enforces \"at least one ORDER_ITEMS row\".)\n\n## The aggregation grain that keeps header totals correct\n\nThe trap is a **fan-out**. `ORDERS`→`ORDER_ITEMS` is one-to-many (one order, many line items). If you joined them flat and then grouped by `ORDER_MODE`, each order's header `ORDER_TOTAL` would be repeated once per line item, so `SUM(o.order_total)` would be inflated by the item count of every order — a classic double-counting bug.\n\nThe fix is to **collapse the child to the parent's grain before joining**:\n\n1. The inline view `SELECT order_id, SUM(quantity) ... GROUP BY order_id` aggregates at **one row per order** (grain = ORDER_ID). This is where item-level detail (`QUANTITY`) is correctly summed — that's its natural grain.\n2. Joining that result back to `ORDERS` on `ORDER_ID` is now **one-to-one**, because the inline view has exactly one row per order and `ORDER_ID` is the `ORDERS` primary key (`ORDER_PK`). No header row can be duplicated.\n3. The outer `GROUP BY ORDER_MODE` therefore sees each order exactly once, so:\n   - `COUNT(*)` = number of orders (not items),\n   - `SUM(o.order_total)` counts each header total **exactly once**,\n   - `SUM(i.item_qty)` sums the already-per-order item quantities.\n\nIn short: aggregate the many-side to the one-side's grain first, then group by the reporting dimension (`ORDER_MODE`). That guarantees header measures like `ORDER_TOTAL` are neither multiplied nor lost. Monetary values are rounded to two decimals as requested.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5468,
+      "input": 2475,
+      "output": 1404
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "direct",
+        73,
+        1903629.2,
+        15647
+      ],
+      [
+        "online",
+        32,
+        1764425.5,
+        14440
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-nullable-manager",
+    "iteration": 1,
+    "answer": "## Result (target `d1-19c-lab`, HR schema)\n\n| DEPARTMENT_ID | EMP_COUNT | WITH_MANAGER | AVG_MANAGER_ID |\n|---|---|---|---|\n| 10 | 1 | 1 | 101.00 |\n| 30 | 6 | 6 | 111.67 |\n| 90 | 3 | 2 | 100.00 |\n| 100 | 6 | 6 | 106.83 |\n| 110 | 2 | 2 | 153.00 |\n| 120–270 (16 depts) | 0 | 0 | NONE |\n\n21 departments have `LOCATION_ID = 1700`.\n\n## The query used\n\n```sql\nSELECT d.department_id,\n       COUNT(e.employee_id)                              AS emp_count,\n       COUNT(e.manager_id)                               AS with_manager,\n       NVL(TO_CHAR(ROUND(AVG(e.manager_id), 2),\n                   'FM9999999990.00'), 'NONE')           AS avg_manager_id\nFROM   hr.departments d\nLEFT   JOIN hr.employees e ON e.department_id = d.department_id\nWHERE  d.location_id = 1700\nGROUP  BY d.department_id\nORDER  BY d.department_id\n```\n\n## Which rows enter each aggregate\n\nThe `GROUP BY` partitions by department, so all three aggregates are computed **per department** over the rows produced by the `FROM`/`LEFT JOIN` for that group. The driving set is departments filtered to `location_id = 1700`; the `LEFT JOIN` attaches matching employees, and where a department has none it contributes exactly **one row with all `e.*` columns NULL** (this is what makes empty departments appear instead of vanishing).\n\n- **`COUNT(e.employee_id)` — number of employees.** Counts non-NULL `employee_id` values. For staffed departments every joined employee row has a non-NULL PK, so it equals the headcount. For an empty department the single LEFT-JOIN filler row has `employee_id = NULL`, which `COUNT(column)` ignores → **0**. (This is why I used `COUNT(e.employee_id)` rather than `COUNT(*)`, which would wrongly report 1 for empty departments.)\n\n- **`COUNT(e.manager_id)` — number with a non-null manager.** Same joined rows, but counts only those where `manager_id` is not NULL. Empty departments → 0. Department 90 shows the distinction clearly: 3 employees enter, but one (the President, whose `manager_id` is NULL) is excluded, giving **2**.\n\n- **`AVG(e.manager_id)` — average manager ID.** The average is taken over only the non-NULL `manager_id` values in the group (NULLs are ignored by `AVG`, both the LEFT-JOIN fillers and genuinely manager-less employees like the President). So for dept 90 it averages the 2 non-null managers, not 3. If a group has **no** non-null manager values — empty departments, or hypothetically a department where every employee's `manager_id` is NULL — `AVG` returns NULL; `ROUND(NULL,2)` stays NULL and `NVL(...,'NONE')` turns it into the word **NONE**.\n\nThe `TO_CHAR(..., 'FM9999999990.00')` mask forces exactly two decimals with trailing zeros (e.g. `101.00`, `153.00`), satisfying the \"two decimals\" requirement; `ROUND(...,2)` supplies the rounding itself (e.g. dept 30 → 111.67, dept 100 → 106.83).\n\nNote: `DEPARTMENTS.MANAGER_ID` also exists but is a different column (the department's assigned manager); the aggregates above intentionally use `EMPLOYEES.MANAGER_ID` per the request (\"employees ... with a non-null manager\", \"average manager ID\" of those employees).",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6021,
+      "input": 2735,
+      "output": 2002
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        10,
+        1,
+        1,
+        "101.00"
+      ],
+      [
+        30,
+        6,
+        6,
+        "111.67"
+      ],
+      [
+        90,
+        3,
+        2,
+        "100.00"
+      ],
+      [
+        100,
+        6,
+        6,
+        "106.83"
+      ],
+      [
+        110,
+        2,
+        2,
+        "153.00"
+      ],
+      [
+        120,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        130,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        140,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        150,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        160,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        170,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        180,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        190,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        200,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        210,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        220,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        230,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        240,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        250,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        260,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        270,
+        0,
+        0,
+        "NONE"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-commission-denominators",
+    "iteration": 1,
+    "answer": "Results from `hr.employees` on **d1-19c-lab** (single grouped query):\n\n| manager_id | total_emp | with_commission | avg_known | avg_zero_filled |\n|---|---|---|---|---|\n| 100 | 14 | 5 | 0.3000 | 0.1071 |\n| 145 | 6 | 6 | 0.2250 | 0.2250 |\n\n(Values shown to exactly four decimals; the tool returned `0.3` and `0.225`, which are the same numbers with trailing zeros omitted.)\n\n**Denominator explanation:**\n\n- **total_emp** = `COUNT(*)` — every employee row for that manager, regardless of commission.\n- **with_commission** = `COUNT(commission_pct)` — counts only non‑NULL commission values (COUNT on an expression skips NULLs).\n- **avg_known** = `AVG(commission_pct)` — standard aggregate; it sums the non‑NULL commissions and divides by the count of *non‑NULL* values. So for manager 100 the denominator is **5**, not 14.\n- **avg_zero_filled** = `AVG(NVL(commission_pct,0))` — missing commissions are replaced with 0 before averaging, so every employee counts; the denominator is the full headcount (**14** for manager 100).\n\nWhy the two averages differ:\n- Manager 100 has 9 employees with NULL commission. Treating those as zeros drags the average down from 0.3000 to 0.1071 (roughly 0.3 × 5/14).\n- Manager 145 has no NULL commissions (all 6 have one), so both denominators are 6 and the two averages are identical at 0.2250.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2066,
+      "input": 1818,
+      "output": 867
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        14,
+        5,
+        0.3,
+        0.1071
+      ],
+      [
+        145,
+        6,
+        6,
+        0.225,
+        0.225
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salary-ties",
+    "iteration": 1,
+    "answer": "Here are all HR employees in the three highest distinct salary levels (using `DENSE_RANK` to include ties):\n\n| EMPLOYEE_ID | LAST_NAME | SALARY | SALARY_LEVEL_RANK |\n|---|---|---|---|\n| 100 | King | 24000 | 1 |\n| 101 | Kochhar | 17000 | 2 |\n| 102 | De Haan | 17000 | 2 |\n| 145 | Russell | 14000 | 3 |\n\n**Result:** 4 employees across 3 distinct salary levels (24,000 → 17,000 → 14,000). The `DENSE_RANK` approach correctly captures the tie at level 2 (Kochhar and De Haan both earn 17,000) rather than stopping after three rows.\n\n*Source: `hr.employees` on d1-19c-lab.*",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1961,
+      "input": 1822,
+      "output": 1313
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        "King",
+        24000,
+        1
+      ],
+      [
+        101,
+        "Kochhar",
+        17000,
+        2
+      ],
+      [
+        102,
+        "De Haan",
+        17000,
+        2
+      ],
+      [
+        145,
+        "Russell",
+        14000,
+        3
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-timestamp-boundary",
+    "iteration": 1,
+    "answer": "On **d1-19c-lab**, schema **OE**, table `ORDERS` (column `ORDER_DATE`), one query returned:\n\n| WHOLE_DAYS | INCLUSIVE_MIDNIGHT |\n|---|---|\n| **4** | **1** |\n\n**Definitions used**\n- WHOLE_DAYS = both full calendar days: `order_date >= 2007-11-18 00:00:00 AND order_date < 2007-11-20 00:00:00` (half-open, so all of Nov 18 *and* all of Nov 19).\n- INCLUSIVE_MIDNIGHT = `order_date >= 2007-11-18 00:00:00 AND order_date <= 2007-11-19 00:00:00` (inclusive upper bound at midnight).\n\n**Does the inclusive upper bound include all of the second day? No.**\n\n`DATE '2007-11-19'` is the instant **midnight at the very start** of Nov 19, not the end of it. So `<= 2007-11-19 00:00:00` captures all of Nov 18 plus only that single midnight instant — it excludes every order placed *during* Nov 19 (from 00:00:01 onward). That's why the count drops from 4 to 1: the 3 orders that fall within Nov 19 are missed.\n\nTo reliably cover both whole days, use a **half-open** range with an exclusive upper bound at the start of the day *after* the last one (`< DATE '2007-11-20'`), rather than an inclusive `<=` on the second day's midnight.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2496,
+      "input": 1800,
+      "output": 1325
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        4,
+        1
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-history-chain",
+    "iteration": 1,
+    "answer": "Here are the results from **d1-19c-lab** (HR schema):\n\n| Field | Value |\n|-------|-------|\n| **Employee ID** | 101 |\n| **History Start Date** | 1997-09-21 |\n| **Historical Department ID** | 110 |\n| **Manager Full Name** | Shelley Higgins |\n| **Manager Job Title** | Accounting Manager |\n| **City** | Seattle |\n| **Country** | United States of America |\n| **Region** | Americas |\n\n**Reasoning chain:**\n1. Employee 101 has the most `JOB_HISTORY` rows (2 records); ties broken by lowest employee_id.\n2. Their earliest history row started **1997-09-21** in department **110** (Accounting).\n3. Department 110's current manager is **Shelley Higgins**, whose job title is **Accounting Manager**.\n4. Department 110 is located in **Seattle**, **United States of America**, region **Americas**.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 3040,
+      "input": 1852,
+      "output": 1644
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        101,
+        "1997-09-21",
+        110,
+        "Shelley Higgins",
+        "Accounting Manager",
+        "Seattle",
+        "United States of America",
+        "Americas"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salesperson-chain",
+    "iteration": 1,
+    "answer": "Here are the results from **d1-19c-lab**:\n\n| Field | Value |\n|-------|-------|\n| **Salesperson ID** | 161 |\n| **Total Order Value** | 661734.50 |\n| **Department Name** | Sales |\n| **Department Manager Full Name** | John Russell |\n| **Manager Job Title** | Sales Manager |\n| **Country Name** | United Kingdom |\n\n**Path traced:** OE.ORDERS (`SALES_REP_ID` 161, highest SUM of `ORDER_TOTAL`) → HR.EMPLOYEES (employee 161 belongs to department \"Sales\") → HR.DEPARTMENTS (department manager = John Russell) → HR.JOBS (his job title = Sales Manager) → HR.LOCATIONS → HR.COUNTRIES (the Sales department's location is in the United Kingdom).",
+    "toolCalls": [
+      "run_query",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 9603,
+      "input": 2254,
+      "output": 1726
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        161,
+        661734.5,
+        "Sales",
+        "John Russell",
+        "Sales Manager",
+        "United Kingdom"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-stats-grain",
+    "iteration": 1,
+    "answer": "**Result (one record, target d1-19c-lab):**\n\n| dictionary NUM_ROWS | live row count | distinct employees |\n|---|---|---|\n| 10 | 10 | 7 |\n\n- **Dictionary NUM_ROWS = 10** — from the `describe_object` Stats block for HR.JOB_HISTORY (LAST_ANALYZED 2026-09-11 18:11:43).\n- **Live row count = 10** and **distinct employees = 7** — from a single `run_query`: `COUNT(*)` and `COUNT(DISTINCT EMPLOYEE_ID)` over HR.JOB_HISTORY.\n\n**Reconciliation:** The optimizer's NUM_ROWS (10) matches the live COUNT(*) (10), so table statistics are current for the row count. However, they do **not** match the distinct-employee figure (7), because 10 history rows belong to only 7 different employees — some employees have multiple job-history entries (consistent with the primary key JHIST_EMP_ID_ST_DATE_PK on EMPLOYEE_ID + START_DATE).\n\n**Can a statistics row count answer \"how many different employees have history\"?** No. NUM_ROWS is a *table-level* count of rows (an optimizer estimate gathered at analyze time); it says nothing about how many unique values appear in a given column, and it can also be stale/approximate. It answers \"how many history records,\" not \"how many distinct employees.\"\n\n**Source used for the distinct-employee question:** the **live query** — `COUNT(DISTINCT EMPLOYEE_ID)` executed against HR.JOB_HISTORY via `run_query` on d1-19c-lab. (A column-level `NUM_DISTINCT` in ALL_TAB_COL_STATISTICS could give an approximate figure, but the authoritative value here comes from the live count.)",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4749,
+      "input": 2152,
+      "output": 1067
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        10,
+        10,
+        7
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-memory",
+    "iteration": 1,
+    "answer": "## Results — target `p1-19c-prod`\n\n**Verified (from `db_overview`):**\n- **Instance name:** `PRODCDB`\n- **Full version:** `19.9.1.0.0` → **major database version: 19** (Oracle Database 19c)\n\n**Configured `SGA_TARGET`: NOT AVAILABLE — cannot be verified by this account.**\n- `v$parameter` → **ORA-00942** (table/view does not exist / not granted to this account)\n- `v$spparameter` → **ORA-00942** (same)\n\nBoth authoritative sources for the *configured* parameter value are inaccessible, so I cannot report a configured `SGA_TARGET` in bytes.\n\n**Explicit note on what must NOT be used as the answer:** `db_overview` reports `SGA_BYTES = 3,221,222,464`, but that is **currently allocated SGA memory**, not the configured target. Per your instruction, I am not inferring `SGA_TARGET` from it, and it should not be treated as the configured value.\n\n**Summary of availability:**\n| Item | Value | Source | Status |\n|---|---|---|---|\n| Instance name | PRODCDB | db_overview | ✅ verified |\n| Major version | 19 (full: 19.9.1.0.0) | db_overview | ✅ verified |\n| Configured SGA_TARGET (bytes) | — | v$parameter / v$spparameter | ❌ unavailable (ORA-00942, no grant) |\n\nTo obtain the configured value, the account would need `SELECT` on `V$PARAMETER` (or `V$SYSTEM_PARAMETER`/`V$SPPARAMETER`), or access to the spfile/pfile.",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4487,
+      "input": 1954,
+      "output": 1083
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "19",
+        "V$PARAMETER",
+        "unavailable"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-backup",
+    "iteration": 1,
+    "answer": "## Results for `p1-19c-prod`\n\n| Item | Value | Source |\n|------|-------|--------|\n| Database name | **PRODCDB** | `v$database` |\n| Open mode | **READ WRITE** | `v$database` |\n| Latest completed RMAN backup | **Not retrievable** | see gap below |\n\n### Access Gap\n\nQuerying `V$RMAN_BACKUP_JOB_DETAILS` returned **ORA-00942: table or view does not exist**. This dynamic performance view (and its siblings like `V$RMAN_BACKUP_SUBSET`, `RC_BACKUP_SET_DETAILS` in the recovery-catalog schema) is not granted to the monitoring account used here. The gap is a **privilege/grant issue on RMAN-related V$/RC$ views**—the data exists in the control file or recovery catalog but the session lacks `SELECT` on those objects.\n\n### Why \"Open\" ≠ \"Backup-Healthy\"\n\nAn open (READ WRITE) database only proves:\n\n1. **Instance availability right now** — SGA allocated, background processes running, files accessible.\n2. **No current mount/open failure** — the control file and online datafiles passed their open-time checks.\n\nIt says nothing about:\n\n- **Recovery-point objective (RPO):** If the last backup was 30 days ago, you can lose up to 30 days of committed transactions on media failure—yet the database is perfectly \"open\" today.\n- **Backup validity:** A backup may have completed with warnings, been taken against a corrupt block, or been written to a storage tier that has since failed silently.\n- **Archivelog continuity:** If archiving stalled or logs were deleted before being backed up, the incremental chain is broken; the database still opens fine until you actually need to recover.\n- **Restore testability:** A backup that was never *restored and validated* (e.g., `RESTORE VALIDATE`, `CROSSCHECK`, or a refresh test) may be unusable despite showing COMPLETED in RMAN's own metadata.\n\nIn short, open mode is a **liveness signal**, not a **recoverability guarantee**. Backup health requires inspecting the backup history, validating media, and periodically testing restores—none of which are implied by `OPEN_MODE = READ WRITE`.",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4392,
+      "input": 1935,
+      "output": 1041
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "READ WRITE",
+        "V$RMAN_BACKUP_JOB_DETAILS",
+        "unavailable"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 2,
+    "answer": "Here are the three accessible `CUSTOMERS` readings on **d1-19c-lab**:\n\n| # | Record |\n|---|--------|\n| 1 | OWNER=CO / TABLE=CUSTOMERS / ROWS=392 |\n| 2 | OWNER=OE / TABLE=CUSTOMERS / ROWS=319 |\n| 3 | OWNER=SH / TABLE=CUSTOMERS / ROWS=55500 |\n\nOrdered by owner. All counts are live (`COUNT(*)`) from the respective schemas—no default schema was assumed.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1903,
+      "input": 1786,
+      "output": 292
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "CUSTOMERS",
+        392
+      ],
+      [
+        "OE",
+        "CUSTOMERS",
+        319
+      ],
+      [
+        "SH",
+        "CUSTOMERS",
+        55500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 2,
+    "answer": "Here are the results from `describe_object` on **d1-19c-lab**:\n\n---\n\n### CO schema\n\n| Field | Value |\n|-------|-------|\n| OWNER | CO |\n| COLUMN | ORDER_STATUS |\n| TYPE | VARCHAR2(40) |\n| NULLABLE | N |\n\n**Evidence:** The constraint `SYS_C007905` (type C, system-generated name) on `ORDER_STATUS` is a NOT NULL constraint. Additionally, a check constraint `ORDERS_STATUS_C` further restricts the allowed values.\n\n---\n\n### OE schema\n\n| Field | Value |\n|-------|-------|\n| OWNER | OE |\n| COLUMN | ORDER_STATUS |\n| TYPE | NUMBER |\n| NULLABLE | Y |\n\n**Evidence:** No NOT NULL constraint (no `SYS_C…` entry) exists on `ORDER_STATUS`, and no check constraint references it. The column is nullable.\n\n---\n\n### Key differences\n\n| Aspect | CO | OE |\n|--------|----|----|\n| Representation | **VARCHAR2(40)** — text status values | **NUMBER** — numeric code |\n| Nullability | NOT NULL | Nullable |\n| Check constraint | `ORDERS_STATUS_C` (restricts values) | None on this column |\n\nThe two schemas use the same column name (`ORDER_STATUS`) but with fundamentally different data types and nullability rules.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "usage": {
+      "cached": 1941,
+      "input": 2470,
+      "output": 796
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "ORDER_STATUS",
+        "VARCHAR2",
+        "N"
+      ],
+      [
+        "OE",
+        "ORDER_STATUS",
+        "NUMBER",
+        "Y"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 2,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Key observations:**\n\n- **Calendar quarter label** = `CALENDAR_QUARTER_DESC` (format `YYYY-QQ`).\n- **Fiscal year** = `FISCAL_YEAR`; for every date in calendar year 2000 the fiscal year is also 2000, so min = max = 2000 across all four quarters.\n- **Distinct dates** = `COUNT(DISTINCT TIME_ID)`; the total is 366 (91 + 91 + 92 + 92), confirming 2000 is a leap year.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5567,
+      "input": 3331,
+      "output": 836
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "2000-01",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-02",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-03",
+        2000,
+        2000,
+        92
+      ],
+      [
+        "2000-04",
+        2000,
+        2000,
+        92
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 2,
+    "answer": "**Target:** `p1-19c-prod`  \n**SQL_ID:** `6scf5afs3262d`, **CHILD_NUMBER:** 0  \n**SQL text (not executed):** `SELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011`\n\nThe plan was retrieved from **`v$sql_plan`** using its actual column names: `ID`, `PARENT_ID`, `DEPTH`, `OPERATION`, `OPTIONS`. These are all **plan-structure** columns (optimizer-derived tree shape); no runtime statistics columns (`LAST_OUTPUT_ROWS`, `ESTIMATED_EXECUTIONS`, etc.) are included.\n\n---\n\n| LINE | PARENT | DEPTH | OP | OPTIONS |\n|------|--------|-------|----|---------|\n| 0 | ROOT | 0 | SELECT STATEMENT | NONE |\n| 1 | 0 | 1 | INDEX | UNIQUE SCAN |\n\n**Interpretation:** The optimizer chose a single access path—an index unique scan (line 1) feeding the root SELECT STATEMENT (line 0). This is consistent with an equality predicate on a column backed by a unique index (`ORDER_ID` primary key). No child cursors beyond child 0 exist for this SQL_ID.",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7730,
+      "input": 2609,
+      "output": 1217
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0,
+        "ROOT",
+        0,
+        "SELECT STATEMENT",
+        "NONE"
+      ],
+      [
+        1,
+        "0",
+        1,
+        "INDEX",
+        "UNIQUE SCAN"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 2,
+    "answer": "Your premise is **incorrect**. On `d1-19c-lab`, HR employees without commission store `COMMISSION_PCT` as **NULL**, not zero — there are no rows with a zero value at all.\n\n**Result (single record, from `run_query` on `hr.employees`):**\n\n```\nNULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35\n```\n\nCorrection: the \"no commission\" group is represented by **NULL** (72 rows), while `ZERO_COMMISSION` is 0. So the assumption that zero denotes \"no commission\" does not hold in this schema.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1915,
+      "input": 1779,
+      "output": 341
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        72,
+        0,
+        35
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 2,
+    "answer": "**Premise check: FALSE — SH.SALES has no declared primary key.**\n\nFrom `describe_object` on **SH.SALES** (target `d1-19c-lab`), the constraint list contains only referential (`R`) and check (`C`) constraints. There is **no constraint of type `P`**, so no primary key is declared. The five dimensional columns (`PROD_ID`, `CUST_ID`, `TIME_ID`, `CHANNEL_ID`, `PROMO_ID`) carry `NOT NULL` check constraints (`SYS_C007748`–`SYS_C007752`), but a NOT NULL is not a primary key, and I am not inferring a PK from those or from the (all NONUNIQUE) bitmapped indexes.\n\n- **Foreign-key constraints (type `R`, all ENABLED):** 5\n  - `SALES_CHANNEL_FK` → CHANNEL_ID\n  - `SALES_CUSTOMER_FK` → CUST_ID\n  - `SALES_PRODUCT_FK` → PROD_ID\n  - `SALES_PROMO_FK` → PROMO_ID\n  - `SALES_TIME_FK` → TIME_ID\n\n**PK_CONSTRAINTS=0 / FK_CONSTRAINTS=5**",
+    "toolCalls": [
+      "describe_object"
+    ],
+    "executedToolCalls": [
+      "describe_object"
+    ],
+    "usage": {
+      "cached": 1887,
+      "input": 2233,
+      "output": 644
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0
+      ],
+      [
+        5
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 2,
+    "answer": "## FK Trace: SHOPAPP.ORDERS → CUSTOMERS\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `CUSTOMER_ID` |\n| **FK constraint** | `SYS_C007662` (system-generated) |\n| **Parent table** | `SHOPAPP.CUSTOMERS` |\n| **Referenced constraint** | `SYS_C007649` (system-generated PK/UK) |\n| **Backing index** | `SYS_C007649` |\n| **Index uniqueness** | `UNIQUE` |\n| **Indexed position** | 1 |\n| **Indexed column** | `CUSTOMER_ID` |\n| **Data type** | `NUMBER` |\n\n### How it was traced (dictionary path)\n\n1. **ALL_CONS_COLUMNS + ALL_CONSTRAINTS** (`constraint_type = 'R'`) on `SHOPAPP.ORDERS` → identified FK `SYS_C007662` with `R_OWNER/R_CONSTRAINT_NAME` pointing to parent constraint `SYS_C007649`.\n2. **ALL_CONSTRAINTS** for `SYS_C007649` → confirmed parent table is `CUSTOMERS`.\n3. **ALL_INDEXES + ALL_IND_COLUMNS** matched to the parent constraint's column set (bidirectional NOT EXISTS ensures the index covers exactly the constraint columns and nothing more) → backing index is `SYS_C007649`, a **UNIQUE** index on position 1 of `CUSTOMER_ID`.\n4. **ALL_TAB_COLUMNS** → data type `NUMBER`.\n\nThe index name coincidentally matches the constraint name (Oracle's default for PK/UK), but this was confirmed by joining on column-set equality rather than assuming name equivalence.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 3576,
+      "input": 1839,
+      "output": 2420
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CUSTOMER_ID",
+        "CUSTOMERS",
+        "SYS_C007649",
+        "SYS_C007649",
+        "UNIQUE",
+        1,
+        "CUSTOMER_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 2,
+    "answer": "Here is the full resolution chain for the FK on **OE.WAREHOUSES**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `LOCATION_ID` (position 1 in FK) |\n| **Parent owner / table** | **HR**.LOCATIONS |\n| **Referenced constraint** | `LOC_ID_PK` (PRIMARY KEY, ENABLED) |\n| **Backing index** | `LOC_ID_PK` (owner HR) |\n| **Uniqueness** | UNIQUE |\n| **Indexed position** | 1 |\n| **Column** | `LOCATION_ID` |\n| **Data type** | NUMBER |\n\n**Resolution path (from tool results on d1-19c-lab):**\n\n1. `describe_object OE.WAREHOUSES` → FK `WAREHOUSES_LOCATION_FK` on child column `LOCATION_ID`.\n2. `ALL_CONSTRAINTS` → `R_OWNER = HR`, `R_CONSTRAINT_NAME = LOC_ID_PK` (parent is **not** in OE).\n3. `ALL_INDEXES` + `ALL_IND_COLUMNS` + `ALL_TAB_COLUMNS` → backing index `HR.LOC_ID_PK`, UNIQUE, single column `LOCATION_ID NUMBER` at position 1.",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6815,
+      "input": 2048,
+      "output": 1225
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "LOCATION_ID",
+        "HR",
+        "LOCATIONS",
+        "LOC_ID_PK",
+        "LOC_ID_PK",
+        "UNIQUE",
+        1,
+        "LOCATION_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 2,
+    "answer": "For department **80 – Sales** (2nd in the employee-count ranking, target: **d1-19c-lab**):\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Department Name | Sales |\n| Employee Count | 34 |\n| Exact Salary Total | 304,500 |\n| Manager Full Name | John Russell |",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6268,
+      "input": 1861,
+      "output": 636
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        80,
+        "Sales",
+        34,
+        304500,
+        "John Russell"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 2,
+    "answer": "The second-ranked warehouse (rank #2 by quantity on hand, total 28613... no — 20457) is:\n\n| Field | Value |\n|-------|-------|\n| WAREHOUSE_ID | 6 |\n| WAREHOUSE_NAME | Sydney |\n| CITY | Sydney |\n| COUNTRY_NAME | Australia |\n| REGION_NAME | Asia |\n\nNotes:\n- Stock ranking carried over from the previous turn: warehouse 6 (Sydney) was rank #2 with total quantity on hand **20457**.\n- The location relationship crosses schemas: `OE.WAREHOUSES.LOCATION_ID` → `HR.LOCATIONS` → (`COUNTRY_ID`) `HR.COUNTRIES` → (`REGION_ID`) `HR.REGIONS`. OE has no LOCATIONS/COUNTRIES/REGIONS tables of its own; the FK resolves into HR.\n- Interestingly, Australia maps to the **Asia** region in the sample data's `HR.REGIONS` mapping.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "list_objects",
+      "list_objects",
+      "list_objects",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "list_objects",
+      "list_objects",
+      "list_objects",
+      "describe_object",
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 23711,
+      "input": 3194,
+      "output": 2181
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        6,
+        "Sydney",
+        "Sydney",
+        "Australia",
+        "Asia"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 2,
+    "answer": "Here are all 19 job definitions from `HR.JOBS` on **d1-19c-lab**, ordered by `JOB_ID`:\n\n```\nJOB=AC_ACCOUNT / MIN=4200 / MAX=9000\nJOB=AC_MGR / MIN=8200 / MAX=16000\nJOB=AD_ASST / MIN=3000 / MAX=6000\nJOB=AD_PRES / MIN=20080 / MAX=40000\nJOB=AD_VP / MIN=15000 / MAX=30000\nJOB=FI_ACCOUNT / MIN=4200 / MAX=9000\nJOB=FI_MGR / MIN=8200 / MAX=16000\nJOB=HR_REP / MIN=4000 / MAX=9000\nJOB=IT_PROG / MIN=4000 / MAX=10000\nJOB=MK_MAN / MIN=9000 / MAX=15000\nJOB=MK_REP / MIN=4000 / MAX=9000\nJOB=PR_REP / MIN=4500 / MAX=10500\nJOB=PU_CLERK / MIN=2500 / MAX=5500\nJOB=PU_MAN / MIN=8000 / MAX=15000\nJOB=SA_MAN / MIN=10000 / MAX=20080\nJOB=SA_REP / MIN=6000 / MAX=12008\nJOB=SH_CLERK / MIN=2500 / MAX=5500\nJOB=ST_CLERK / MIN=2008 / MAX=5000\nJOB=ST_MAN / MIN=5500 / MAX=8500\n```\n\nAll 19 rows from `HR.JOBS` are included (the full job catalogue, not just jobs currently assigned to employees).",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1903,
+      "input": 2143,
+      "output": 657
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "AC_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "AC_MGR",
+        8200,
+        16000
+      ],
+      [
+        "AD_ASST",
+        3000,
+        6000
+      ],
+      [
+        "AD_PRES",
+        20080,
+        40000
+      ],
+      [
+        "AD_VP",
+        15000,
+        30000
+      ],
+      [
+        "FI_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "FI_MGR",
+        8200,
+        16000
+      ],
+      [
+        "HR_REP",
+        4000,
+        9000
+      ],
+      [
+        "IT_PROG",
+        4000,
+        10000
+      ],
+      [
+        "MK_MAN",
+        9000,
+        15000
+      ],
+      [
+        "MK_REP",
+        4000,
+        9000
+      ],
+      [
+        "PR_REP",
+        4500,
+        10500
+      ],
+      [
+        "PU_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "PU_MAN",
+        8000,
+        15000
+      ],
+      [
+        "SA_MAN",
+        10000,
+        20080
+      ],
+      [
+        "SA_REP",
+        6000,
+        12008
+      ],
+      [
+        "SH_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "ST_CLERK",
+        2008,
+        5000
+      ],
+      [
+        "ST_MAN",
+        5500,
+        8500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 2,
+    "answer": "Here are all 21 product subcategories from `SH.PRODUCTS` (target **d1-19c-lab**), ordered by name:\n\n| SUBCATEGORY | PRODUCTS |\n|---|---|\n| Accessories | 10 |\n| Bulk Pack Diskettes | 2 |\n| CD-ROM | 6 |\n| Camcorders | 1 |\n| Camera Batteries | 5 |\n| Camera Media | 3 |\n| Cameras | 1 |\n| Desktop PCs | 1 |\n| Documentation | 6 |\n| Game Consoles | 1 |\n| Home Audio | 2 |\n| Memory | 2 |\n| Modems/Fax | 2 |\n| Monitors | 2 |\n| Operating Systems | 1 |\n| Portable PCs | 1 |\n| Printer Supplies | 4 |\n| Recordable CDs | 7 |\n| Recordable DVD Discs | 5 |\n| Y Box Accessories | 2 |\n| Y Box Games | 8 |\n\n**Total: 72 product definitions across 21 subcategories.** The count is from the `PRODUCTS` table directly, so products with no sales rows are included.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2029,
+      "input": 1882,
+      "output": 582
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "Accessories",
+        10
+      ],
+      [
+        "Bulk Pack Diskettes",
+        2
+      ],
+      [
+        "CD-ROM",
+        6
+      ],
+      [
+        "Camcorders",
+        1
+      ],
+      [
+        "Camera Batteries",
+        5
+      ],
+      [
+        "Camera Media",
+        3
+      ],
+      [
+        "Cameras",
+        1
+      ],
+      [
+        "Desktop PCs",
+        1
+      ],
+      [
+        "Documentation",
+        6
+      ],
+      [
+        "Game Consoles",
+        1
+      ],
+      [
+        "Home Audio",
+        2
+      ],
+      [
+        "Memory",
+        2
+      ],
+      [
+        "Modems/Fax",
+        2
+      ],
+      [
+        "Monitors",
+        2
+      ],
+      [
+        "Operating Systems",
+        1
+      ],
+      [
+        "Portable PCs",
+        1
+      ],
+      [
+        "Printer Supplies",
+        4
+      ],
+      [
+        "Recordable CDs",
+        7
+      ],
+      [
+        "Recordable DVD Discs",
+        5
+      ],
+      [
+        "Y Box Accessories",
+        2
+      ],
+      [
+        "Y Box Games",
+        8
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-header-fanout",
+    "iteration": 2,
+    "answer": "## Results (d1-19c-lab, OE schema)\n\n| ORDER_MODE | Orders with ≥1 item | SUM(ORDER_TOTAL) | Total Item Quantity |\n|---|---:|---:|---:|\n| direct | 73 | 1,903,629.20 | 15,647 |\n| online | 32 | 1,764,425.50 | 14,440 |\n\n## Aggregation Grain Explanation\n\nThe core problem is a **one-to-many fan-out**: one row in `ORDERS` can have many rows in `ORDER_ITEMS`. If you join them naively and then `GROUP BY ORDER_MODE`, each order's header value (`ORDER_TOTAL`) is repeated once per line item, inflating the sum.\n\n**The fix — collapse to order grain *before* joining:**\n\n```sql\nJOIN (SELECT order_id, SUM(quantity) AS total_qty\n      FROM oe.order_items\n      GROUP BY order_id) ia\n  ON ia.order_id = o.order_id\n```\n\nThis subquery produces **exactly one row per `order_id`** (the PK of `ORDERS`). After the join, every row in the result set still represents exactly **one order**, so:\n\n| Measure | Grain it lives at | Why it's safe here |\n|---|---|---|\n| `COUNT(*)` | order | one row = one order ✓ |\n| `SUM(o.order_total)` | order (header) | no duplication because the join is 1:1 after pre-aggregation ✓ |\n| `SUM(ia.total_qty)` | order (pre-summed detail) | already rolled up to order level ✓ |\n\nHad we instead written `FROM orders o JOIN order_items i ON …` and grouped by `ORDER_MODE`, `ORDER_TOTAL` would appear N times per order (N = number of line items), producing a wildly inflated monetary total. The pre-aggregation subquery is the standard technique for mixing header and detail measures in a single GROUP BY.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5471,
+      "input": 2473,
+      "output": 1455
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "direct",
+        73,
+        1903629.2,
+        15647
+      ],
+      [
+        "online",
+        32,
+        1764425.5,
+        14440
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-nullable-manager",
+    "iteration": 2,
+    "answer": "## Result (target `d1-19c-lab`, HR schema)\n\nDepartments at LOCATION_ID = 1700:\n\n| DEPARTMENT_ID | EMP_COUNT | WITH_MANAGER | AVG_MANAGER_ID |\n|---|---|---|---|\n| 10 | 1 | 1 | 101.00 |\n| 30 | 6 | 6 | 111.67 |\n| 90 | 3 | 2 | 100.00 |\n| 100 | 6 | 6 | 106.83 |\n| 110 | 2 | 2 | 153.00 |\n| 120–270 (16 depts) | 0 | 0 | NONE |\n\n## Which rows enter each aggregate\n\nThe `WHERE d.location_id = 1700` is applied to the **driving (left) table** before grouping, so exactly these 21 departments form the groups. The `LEFT JOIN hr.employees` then attaches matching employees; a department with no employees still survives as a single row whose `e.*` columns are all NULL.\n\n- **EMP_COUNT = `COUNT(e.employee_id)`** — counts only non‑NULL `employee_id` values. For an empty department the join yields one synthetic row but `e.employee_id` is NULL, so it contributes 0 (this is why I used `COUNT(e.employee_id)` and not `COUNT(*)`, which would have wrongly reported 1 for the empty departments).\n\n- **WITH_MANAGER = `COUNT(e.manager_id)`** — counts only employees whose own `MANAGER_ID` is non‑NULL. Here \"manager\" means each **employee's** manager, not the department's `MANAGER_ID` column. The proof is department 90: it has 3 employees but only 2 have a non‑null manager (the president has NULL manager), so EMP_COUNT=3 but WITH_MANAGER=2.\n\n- **AVG_MANAGER_ID = `AVG(e.manager_id)`** — averages over the same set of non‑NULL employee `manager_id` values; NULLs (including the all‑NULL synthetic row for empty departments) are ignored by `AVG`. When a group has no non‑NULL manager values at all, `AVG` returns NULL, and the `CASE` renders that as the word **NONE**. The numeric branch is wrapped in `TO_CHAR(...,'FM9990.00')` so the value always displays with exactly two decimals (e.g. 153.00, not 153).\n\nNote on interpretation: I read \"number with a non‑null manager\" and \"average manager ID\" as referring to each **employee's** `MANAGER_ID`. If you instead meant the department's own `MANAGER_ID` column, the per‑group counts would be based on that single value rather than on employee rows — let me know and I'll re-run it that way.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5906,
+      "input": 2734,
+      "output": 2050
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        10,
+        1,
+        1,
+        "101.00"
+      ],
+      [
+        30,
+        6,
+        6,
+        "111.67"
+      ],
+      [
+        90,
+        3,
+        2,
+        "100.00"
+      ],
+      [
+        100,
+        6,
+        6,
+        "106.83"
+      ],
+      [
+        110,
+        2,
+        2,
+        "153.00"
+      ],
+      [
+        120,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        130,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        140,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        150,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        160,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        170,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        180,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        190,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        200,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        210,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        220,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        230,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        240,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        250,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        260,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        270,
+        0,
+        0,
+        "NONE"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-commission-denominators",
+    "iteration": 2,
+    "answer": "Source: `HR.EMPLOYEES` on **d1-19c-lab** (commission column = `COMMISSION_PCT`).\n\n| MANAGER_ID | Total employees | With commission (non‑null) | Avg of known values | Avg with missing = 0 |\n|---|---|---|---|---|\n| 100 | 14 | 5 | 0.3000 | 0.1071 |\n| 145 | 6 | 6 | 0.2250 | 0.2250 |\n\n**Denominator explanation**\n\n- **Avg of known values** = `AVG(COMMISSION_PCT)`. Oracle's aggregate functions ignore NULLs, so the denominator is only the rows that actually have a commission:\n  - Manager 100 → sum ÷ **5** (the 5 with a commission), giving 0.3000.\n  - Manager 145 → sum ÷ **6**, giving 0.2250.\n\n- **Avg with missing = 0** = `AVG(NVL(COMMISSION_PCT,0))`. The NULLs are replaced by 0 before averaging, so every direct report counts in the denominator:\n  - Manager 100 → sum ÷ **14** (all 14 reports), giving 0.1071.\n  - Manager 145 → sum ÷ **6** — no NULLs here, so it equals the known‑value average (0.2250).\n\nIn short: the \"known values\" average divides by the count of non‑null commissions, while the \"missing as zero\" average divides by the total headcount, which is why 100's figure drops from 0.3000 to 0.1071 (9 of its 14 reports have no commission), whereas 145 is unchanged because all 6 of its reports carry a commission.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5106,
+      "input": 2286,
+      "output": 1190
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        14,
+        5,
+        0.3,
+        0.1071
+      ],
+      [
+        145,
+        6,
+        6,
+        0.225,
+        0.225
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salary-ties",
+    "iteration": 2,
+    "answer": "Using `DENSE_RANK() OVER (ORDER BY salary DESC)` on `HR.EMPLOYEES` (target **d1-19c-lab**) to capture the three highest *distinct* salary levels including all ties:\n\n| EMPLOYEE_ID | LAST_NAME | SALARY | SALARY_RANK |\n|---|---|---|---|\n| 100 | King | 24000 | 1 |\n| 101 | Kochhar | 17000 | 2 |\n| 102 | De Haan | 17000 | 2 |\n| 145 | Russell | 14000 | 3 |\n\n**Note:** The three highest distinct salary levels are 24000, 17000, and 14000. Because 17000 has a tie (Kochhar and De Haan), this yields **4 employees**, not 3 — which is why `DENSE_RANK` (not `ROWNUM`/`FETCH FIRST 3`) is required here. Sorted by salary descending, then employee ID as requested.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2109,
+      "input": 1821,
+      "output": 706
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        "King",
+        24000,
+        1
+      ],
+      [
+        101,
+        "Kochhar",
+        17000,
+        2
+      ],
+      [
+        102,
+        "De Haan",
+        17000,
+        2
+      ],
+      [
+        145,
+        "Russell",
+        14000,
+        3
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-timestamp-boundary",
+    "iteration": 2,
+    "answer": "## Results (target: d1-19c-lab, schema OE, table ORDERS)\n\n| Metric | Count |\n|--------|-------|\n| **WHOLE_DAYS** (Nov 18 + Nov 19 full days) | **4** |\n| **INCLUSIVE_MIDNIGHT** (≥ midnight Nov 18 ≤ midnight Nov 19) | **1** |\n\n## Explanation\n\nThe inclusive upper bound `ORDER_DATE <= TIMESTAMP '2007-11-19 00:00:00'` does **not** include all of the second day. It only captures rows whose timestamp is exactly midnight (00:00:00.000000) on Nov 19 or earlier. Any order placed at, say, 09:30 or 14:00 on Nov 19 has a timestamp **greater than** `2007-11-19 00:00:00` and is therefore excluded.\n\nThe correct half-open pattern for two whole calendar days is:\n\n```sql\nORDER_DATE >= TIMESTAMP '2007-11-18 00:00:00'\nAND ORDER_DATE <  TIMESTAMP '2007-11-20 00:00:00'   -- exclusive upper bound = start of day AFTER\n```\n\nThis guarantees every timestamp within both days is captured regardless of the time component, and it avoids the common off-by-one error that silently drops most (or all) of the final day.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5019,
+      "input": 2168,
+      "output": 1303
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        4,
+        1
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-history-chain",
+    "iteration": 2,
+    "answer": "Here are the results from **d1-19c-lab** (HR schema):\n\n| Field | Value |\n|-------|-------|\n| **Employee ID** | 101 |\n| **History Start Date** | 1997-09-21 |\n| **Historical Department ID** | 110 |\n| **Manager Full Name** | Shelley Higgins |\n| **Manager Job Title** | Accounting Manager |\n| **City** | Seattle |\n| **Country** | United States of America |\n| **Region** | Americas |\n\n**Reasoning chain:**\n1. Employee **101** has the most `JOB_HISTORY` records (ties broken by lowest ID).\n2. Their earliest history row started **1997-09-21** in department **110**.\n3. Department 110's current manager is **Shelly Higgins**, whose job title is **Accounting Manager**.\n4. Department 110 is located in **Seattle**, **United States of America**, in the **Americas** region.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 3241,
+      "input": 1862,
+      "output": 1844
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        101,
+        "1997-09-21",
+        110,
+        "Shelley Higgins",
+        "Accounting Manager",
+        "Seattle",
+        "United States of America",
+        "Americas"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salesperson-chain",
+    "iteration": 2,
+    "answer": "Here are the results from **d1-19c-lab**:\n\n| Field | Value |\n|-------|-------|\n| **Salesperson ID** | 161 |\n| **Total Order Value** | 661734.50 |\n| **Department Name** | Sales |\n| **Department Manager Full Name** | John Russell |\n| **Manager Job Title** | Sales Manager |\n| **Country Name** | United Kingdom |\n\n**How it was derived (single query across OE → HR):**\n\n1. **OE.ORDERS** – grouped by `SALES_REP_ID` (excluding NULLs), summed `ORDER_TOTAL`, ordered descending with ties broken by ascending `SALES_REP_ID`, took the top row → sales rep **161**.\n2. **HR.EMPLOYEES** – found employee 161's current `DEPARTMENT_ID` → the **Sales** department.\n3. **HR.DEPARTMENTS** – used the department's own `MANAGER_ID` (not the employee's personal manager) → **John Russell**.\n4. **HR.JOBS** – looked up John Russell's `JOB_ID` → **Sales Manager**.\n5. **HR.LOCATIONS → HR.COUNTRIES** – followed the department's `LOCATION_ID` to its country → **United Kingdom**.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5883,
+      "input": 2205,
+      "output": 1641
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        161,
+        661734.5,
+        "Sales",
+        "John Russell",
+        "Sales Manager",
+        "United Kingdom"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-stats-grain",
+    "iteration": 2,
+    "answer": "**Reconciliation — HR.JOB_HISTORY on d1-19c-lab (one record):**\n\n| dictionary NUM_ROWS | live row count | distinct employees |\n|---|---|---|\n| 10 | 10 | 7 |\n\n- **Dictionary NUM_ROWS = 10** — from `describe_object` → *Stats* (table JOB_HISTORY, LAST_ANALYZED 2026-09-11).\n- **Live row count = 10** and **distinct employees = 7** — from a single `run_query` (`COUNT(*)`, `COUNT(DISTINCT EMPLOYEE_ID)`).\n\nThe dictionary and live counts agree (10 = 10), so statistics are current for the table-level row count.\n\n**Can a statistics row count answer \"how many different employees have history\"? No.**\n`NUM_ROWS` is a single **table-level cardinality** figure — it reports how many *rows* exist, not how many unique values appear in a particular column. The \"different employees\" question is a **distinct-value (column cardinality)** question, which `NUM_ROWS` does not carry. The gap here is structural: the primary key is `(EMPLOYEE_ID, START_DATE)`, so one employee can legitimately own multiple history rows — 10 rows map to only 7 distinct employees.\n\n**Source used for the distinct-employee figure:** a **live query** — `COUNT(DISTINCT EMPLOYEE_ID)` against `HR.JOB_HISTORY` (the authoritative current data). A statistics-based alternative would be the per-column `NUM_DISTINCT` in column statistics (e.g., `ALL_TAB_COL_STATISTICS`), but that is a *column* statistic, not the table `NUM_ROWS`, and it can drift from reality between analyses — so I used the live count for the definitive answer.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4758,
+      "input": 2156,
+      "output": 1117
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        10,
+        10,
+        7
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-memory",
+    "iteration": 2,
+    "answer": "## p1-19c-prod — verifiable vs. unavailable\n\n**Verifiable (via `db_overview`, target p1-19c-prod):**\n- **Instance name:** `PRODCDB`\n- **Major database version:** 19 (full version string `19.9.1.0.0`; non-CDB, host `oracle19c-prod`)\n\n**Not available to this account:**\n- **Configured `SGA_TARGET` (bytes): UNAVAILABLE.** The sources that expose the configured parameter value are not granted to this account — every attempt returned `ORA-00942: table or view does not exist`:\n  - `V$PARAMETER` → ORA-00942\n  - `V$SYSTEM_PARAMETER` → ORA-00942\n  - `GV$PARAMETER` → ORA-00942\n\n**Explicit note on what I am *not* using:** `db_overview` reports a currently allocated **SGA_BYTES = 3,221,222,464**, but per your instruction this is live allocated memory, not the configured target, so it is **not** reported as `SGA_TARGET`. With no accessible parameter view, the configured `SGA_TARGET` value cannot be verified from this account, and I will not infer it from the allocated figure.\n\nTo obtain it, an account with dictionary access would need to read `V$PARAMETER`/`V$SYSTEM_PARAMETER` (e.g., `SELECT value FROM v$spparameter`/`v$parameter WHERE name='sga_target'`) or the server parameter file — none of which this session can reach.",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6514,
+      "input": 2002,
+      "output": 1148
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "19",
+        "V$PARAMETER",
+        "unavailable"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-backup",
+    "iteration": 2,
+    "answer": "## Results from `p1-19c-prod`\n\n### Database Identity and Open Mode\n\n| Attribute | Value |\n|-----------|-------|\n| **NAME** | PRODCDB |\n| **OPEN_MODE** | READ WRITE |\n| **DATABASE_ROLE** | PRIMARY |\n| **LOG_MODE** | NOARCHIVELOG |\n\n*(Source: `V$DATABASE`, target p1-19c-prod)*\n\n---\n\n### RMAN Backup History — Access Gap\n\nQuerying `V$RMAN_BACKUP_JOB_DETAILS` returned **ORA-00942: table or view does not exist**. The connected user lacks the necessary grants (or the public synonym is absent), so **no backup completion time or status can be reported from this session**.\n\n**Named gap:** The monitoring account does not have `SELECT` on `V_$RMAN_BACKUP_JOB_DETAILS` (or its synonym). To close it, a DBA would grant:\n\n```sql\nGRANT SELECT ON V_$RMAN_BACKUP_JOB_DETAILS TO <monitoring_user>;\n```\n\nAlternatively, `RC_BACKUP_SET_DETAILS` from a Recovery Catalog schema could be used if one is configured.\n\n---\n\n### Why an Open Database Does Not Establish Backup Health\n\n1. **Open ≠ Recoverable.** A database in `READ WRITE` mode is merely accepting connections; it says nothing about whether a consistent, restorable backup exists. The instance could have been running for weeks with zero successful backups.\n\n2. **NOARCHIVELOG compounds the risk.** This instance is in **NOARCHIVELOG** mode, meaning only cold (closed) whole-DB backups are truly consistent. An open-mode \"backup\" in NOARCHIVELOG produces an inconsistent image that cannot be recovered without a crash-consistent restore—effectively no usable backup at all.\n\n3. **Silent failures.** RMAN jobs can fail mid-stream (I/O errors, space exhaustion, channel timeouts) while the database remains open and serving traffic. Without querying backup metadata, operators have no signal that the last \"successful\" backup was actually days ago or never completed.\n\n4. **Logical corruption is invisible to open-mode checks.** Block-level corruption, lost datafiles on a mirror, or a corrupted controlfile won't prevent `OPEN_MODE = READ WRITE` from reporting normally—yet the database may be unrecoverable.\n\n**Bottom line:** Open mode confirms availability of the *instance*; backup health requires inspecting RMAN metadata (or an external backup tool's logs) to confirm a recent, complete, and verified backup set exists.",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7137,
+      "input": 2312,
+      "output": 1354
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "READ WRITE",
+        "V$RMAN_BACKUP_JOB_DETAILS",
+        "unavailable"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 3,
+    "answer": "Here are the live `CUSTOMERS` row counts across all three accessible schemas on **d1-19c-lab**:\n\n| # | Record |\n|---|--------|\n| 1 | OWNER=CO / TABLE=CUSTOMERS / ROWS=392 |\n| 2 | OWNER=OE / TABLE=CUSTOMERS / ROWS=319 |\n| 3 | OWNER=SH / TABLE=CUSTOMERS / ROWS=55500 |\n\n**Note:** SH.CUSTOMERS is a dimensional table in the Sales History sample schema (55,500 rows), while CO and OE hold smaller application-style customer tables. The schema ambiguity is now resolved—each count is tied to its explicit owner.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1940,
+      "input": 1788,
+      "output": 365
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "CUSTOMERS",
+        392
+      ],
+      [
+        "OE",
+        "CUSTOMERS",
+        319
+      ],
+      [
+        "SH",
+        "CUSTOMERS",
+        55500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 3,
+    "answer": "Here are the results from `describe_object` on **d1-19c-lab**:\n\n---\n\n**CO schema:**\n\n| Field | Value |\n|-------|-------|\n| OWNER | CO |\n| COLUMN | ORDER_STATUS |\n| TYPE | VARCHAR2(40) |\n| NULLABLE | N |\n\n*(NOT NULL enforced by system constraint `SYS_C007905`; additionally a check constraint `ORDERS_STATUS_C` restricts values.)*\n\n---\n\n**OE schema:**\n\n| Field | Value |\n|-------|-------|\n| OWNER | OE |\n| COLUMN | ORDER_STATUS |\n| TYPE | NUMBER(22) |\n| NULLABLE | Y |\n\n*(No NOT NULL constraint exists on this column in OE; it is a numeric code.)*\n\n---\n\n**Key difference:** Both schemas name the column `ORDER_STATUS`, but the representations are fundamentally different — CO stores it as a **VARCHAR2(40)** text label (e.g. `'Approved'`, `'Shipped'`), while OE stores it as a **NUMBER** code (e.g. 0–7). They are not interchangeable.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object"
+    ],
+    "usage": {
+      "cached": 1941,
+      "input": 2471,
+      "output": 631
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "CO",
+        "ORDER_STATUS",
+        "VARCHAR2",
+        "N"
+      ],
+      [
+        "OE",
+        "ORDER_STATUS",
+        "NUMBER",
+        "Y"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 3,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Key observations:**\n\n- **Columns used:** `CALENDAR_YEAR` (filter), `CALENDAR_QUARTER_DESC` (grouping label, e.g. \"2000-01\"), `FISCAL_YEAR` (min/max aggregate), `TIME_ID` (distinct date count).\n- In the SH sample data, fiscal year and calendar year coincide for 2000 — every date in calendar year 2000 also falls in fiscal year 2000.\n- The total distinct dates = 91 + 91 + 92 + 92 = **366**, confirming 2000 is a leap year.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5583,
+      "input": 3331,
+      "output": 867
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "2000-01",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-02",
+        2000,
+        2000,
+        91
+      ],
+      [
+        "2000-03",
+        2000,
+        2000,
+        92
+      ],
+      [
+        "2000-04",
+        2000,
+        2000,
+        92
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 3,
+    "answer": "Here is the cached plan tree for **SQL_ID `6scf5afs3262d`, child_number 0** on **p1-19c-prod**, using the actual `v$sql_plan` column names (`ID`, `PARENT_ID`, `DEPTH`, `OPERATION`, `OPTIONS`):\n\n```\nLINE=0 / PARENT=ROOT / DEPTH=0 / OP=SELECT STATEMENT / OPTIONS=NONE\nLINE=1 / PARENT=0 / DEPTH=1 / OP=INDEX / OPTIONS=UNIQUE SCAN\n```\n\n**Notes:**\n\n- This is the **optimizer-generated plan** (static structure from `v$sql_plan`), not measured runtime statistics. Runtime metrics (e.g., `E-Rows`, `E-Time`, `Buffers`) would require `v$sql_plan_statistics_all` or `V$SQL_PLAN_MONITOR`.\n- The plan consists of a single access path: an **INDEX UNIQUE SCAN** on the primary-key index of `SHOPAPP.ORDERS`, confirming the predicate `order_id = -110011` is served by a unique index lookup with no table access (index-only / covering scan for the projected column).",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7616,
+      "input": 2609,
+      "output": 1076
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0,
+        "ROOT",
+        0,
+        "SELECT STATEMENT",
+        "NONE"
+      ],
+      [
+        1,
+        "0",
+        1,
+        "INDEX",
+        "UNIQUE SCAN"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 3,
+    "answer": "**Your premise is incorrect.** Employees without commission in `HR.EMPLOYEES` (d1-19c-lab) store `COMMISSION_PCT` as **NULL**, not zero. There are no rows where `commission_pct = 0`.\n\n| NULL_COMMISSION | ZERO_COMMISSION | POSITIVE_COMMISSION |\n|---|---|---|\n| 72 | 0 | 35 |\n\nThe correct filter for \"no commission\" is `commission_pct IS NULL`, not `commission_pct = 0`.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1906,
+      "input": 1777,
+      "output": 363
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        72,
+        0,
+        35
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 3,
+    "answer": "Verified against the declared constraints on **d1-19c-lab** (`describe_object` for `SH.SALES`).\n\n**Premise check — no primary key is declared.** The constraint list contains only referential (`R`) and check/NOT NULL (`C`) constraints. There is **no constraint of type `P`**, so `SH.SALES` has **no declared primary key**. I am not inferring one from the bitmap-style indexes or from a plausible business key (e.g. PROD_ID+CUST_ID+TIME_ID+CHANNEL_ID+PROMO_ID); none is enforced by a PK constraint.\n\n- **PK columns:** none (no PK constraint exists).\n- **Declared foreign-key constraints (`type = R`):** 5 — `SALES_CHANNEL_FK`, `SALES_CUSTOMER_FK`, `SALES_PRODUCT_FK`, `SALES_PROMO_FK`, `SALES_TIME_FK`.\n\n```\nPK_CONSTRAINTS=0\nFK_CONSTRAINTS=5\n```\n\nNote: the five `SYS_C0077xx` entries are `C` (NOT NULL check) constraints, not keys, so they are excluded from both counts.",
+    "toolCalls": [
+      "describe_object"
+    ],
+    "executedToolCalls": [
+      "describe_object"
+    ],
+    "usage": {
+      "cached": 1862,
+      "input": 2233,
+      "output": 483
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        0
+      ],
+      [
+        5
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 3,
+    "answer": "Here is the full trace from dictionary views on **p1-19c-prod**:\n\n| Step | Detail |\n|------|--------|\n| **FK constraint (child)** | `SYS_C007662` on `SHOPAPP.ORDERS` |\n| **Child column** | `CUSTOMER_ID` |\n| **Parent table** | `SHOPAPP.CUSTOMERS` |\n| **Referenced constraint** | `SYS_C007649` (type P — primary key) |\n| **Backing index** | `SYS_C007649` |\n| **Index uniqueness** | `UNIQUE` |\n| **Indexed position** | 1 |\n| **Parent column** | `CUSTOMER_ID` |\n| **Parent data type** | `NUMBER` |\n\n### How it was resolved (dictionary path)\n\n1. **ALL_CONSTRAINTS** (`CONSTRAINT_TYPE = 'R'`, owner/table = SHOPAPP/ORDERS) → gave `R_OWNER = SHOPAPP`, `R_CONSTRAINT_NAME = SYS_C007649`.\n2. **ALL_CONSTRAINTS** joined on that parent constraint → confirmed `TABLE_NAME = CUSTOMERS`.\n3. **ALL_CONS_COLUMNS** for `SYS_C007649` → parent column is `CUSTOMER_ID` at position 1.\n4. **ALL_IND_COLUMNS / ALL_INDEXES** matched the same owner, table, column, and position → backing index is also named `SYS_C007649` (auto-created for the PK), uniqueness = `UNIQUE`.\n5. **ALL_TAB_COLUMNS** confirmed the parent column data type is `NUMBER`.\n\nNo name-matching assumptions were made; every link was resolved through the constraint metadata (`R_OWNER` / `R_CONSTRAINT_NAME`) and index-column correlation.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 5041,
+      "input": 1860,
+      "output": 1586
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "CUSTOMER_ID",
+        "CUSTOMERS",
+        "SYS_C007649",
+        "SYS_C007649",
+        "UNIQUE",
+        1,
+        "CUSTOMER_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 3,
+    "answer": "Here is the full resolution chain from `OE.WAREHOUSES` to its location parent on **d1-19c-lab**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `LOCATION_ID` (position 1 in FK) |\n| **Parent owner / table** | **HR**.LOCATIONS |\n| **Referenced constraint** | `LOC_ID_PK` (Primary Key, ENABLED) |\n| **Backing index** | `LOC_ID_PK` |\n| **Uniqueness** | UNIQUE |\n| **Indexed position** | 1 |\n| **Column** | LOCATION_ID |\n| **Type** | NUMBER |\n\nThe parent is **not** in OE — the FK `WAREHOUSES_LOCATION_FK` crosses schemas into **HR.LOCATIONS**, backed by the unique primary-key index `LOC_ID_PK` on a single `NUMBER` column.",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6804,
+      "input": 2062,
+      "output": 891
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "LOCATION_ID",
+        "HR",
+        "LOCATIONS",
+        "LOC_ID_PK",
+        "LOC_ID_PK",
+        "UNIQUE",
+        1,
+        "LOCATION_ID",
+        "NUMBER"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 3,
+    "answer": "Second department in the count-based ranking — **Sales (ID 80)** — from `d1-19c-lab`:\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Name | Sales |\n| Employee Count | 34 |\n| Exact Salary Total | 304500 |\n| Manager Full Name | John Russell |\n\nSource: `HR.DEPARTMENTS` joined to `HR.EMPLOYEES` (for the employee count and `SUM(salary)`) and to `HR.EMPLOYEES` again as the manager (via `d.manager_id`), filtered to `department_id = 80`. The salary total is summed over the same 34-employee set used for the ranking, not a separate salary-based ordering.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6481,
+      "input": 2012,
+      "output": 994
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        80,
+        "Sales",
+        34,
+        304500,
+        "John Russell"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 3,
+    "answer": "The second-ranked warehouse (by total quantity on hand) is:\n\n| Field | Value |\n|-------|-------|\n| **Warehouse ID** | 6 |\n| **Name** | Sydney |\n| **City** | Sydney |\n| **Country Name** | Australia |\n| **Region Name** | Asia |\n\nThe relationship chain followed was: `OE.WAREHOUSES` → `HR.LOCATIONS` (via `location_id`) → `HR.COUNTRIES` (via `country_id`) → `HR.REGIONS` (via `region_id`).",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6841,
+      "input": 1858,
+      "output": 859
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        6,
+        "Sydney",
+        "Sydney",
+        "Australia",
+        "Asia"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 3,
+    "answer": "Here are all 19 job definitions from **HR.JOBS** on **d1-19c-lab**, ordered by `JOB_ID`:\n\n```\nJOB=AC_ACCOUNT / MIN=4200 / MAX=9000\nJOB=AC_MGR / MIN=8200 / MAX=16000\nJOB=AD_ASST / MIN=3000 / MAX=6000\nJOB=AD_PRES / MIN=20080 / MAX=40000\nJOB=AD_VP / MIN=15000 / MAX=30000\nJOB=FI_ACCOUNT / MIN=4200 / MAX=9000\nJOB=FI_MGR / MIN=8200 / MAX=16000\nJOB=HR_REP / MIN=4000 / MAX=9000\nJOB=IT_PROG / MIN=4000 / MAX=10000\nJOB=MK_MAN / MIN=9000 / MAX=15000\nJOB=MK_REP / MIN=4000 / MAX=9000\nJOB=PR_REP / MIN=4500 / MAX=10500\nJOB=PU_CLERK / MIN=2500 / MAX=5500\nJOB=PU_MAN / MIN=8000 / MAX=15000\nJOB=SA_MAN / MIN=10000 / MAX=20080\nJOB=SA_REP / MIN=6000 / MAX=12008\nJOB=SH_CLERK / MIN=2500 / MAX=5500\nJOB=ST_CLERK / MIN=2008 / MAX=5000\nJOB=ST_MAN / MIN=5500 / MAX=8500\n```\n\nAll 19 rows returned — one per job, regardless of whether any employee currently holds that position.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1894,
+      "input": 2143,
+      "output": 630
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "AC_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "AC_MGR",
+        8200,
+        16000
+      ],
+      [
+        "AD_ASST",
+        3000,
+        6000
+      ],
+      [
+        "AD_PRES",
+        20080,
+        40000
+      ],
+      [
+        "AD_VP",
+        15000,
+        30000
+      ],
+      [
+        "FI_ACCOUNT",
+        4200,
+        9000
+      ],
+      [
+        "FI_MGR",
+        8200,
+        16000
+      ],
+      [
+        "HR_REP",
+        4000,
+        9000
+      ],
+      [
+        "IT_PROG",
+        4000,
+        10000
+      ],
+      [
+        "MK_MAN",
+        9000,
+        15000
+      ],
+      [
+        "MK_REP",
+        4000,
+        9000
+      ],
+      [
+        "PR_REP",
+        4500,
+        10500
+      ],
+      [
+        "PU_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "PU_MAN",
+        8000,
+        15000
+      ],
+      [
+        "SA_MAN",
+        10000,
+        20080
+      ],
+      [
+        "SA_REP",
+        6000,
+        12008
+      ],
+      [
+        "SH_CLERK",
+        2500,
+        5500
+      ],
+      [
+        "ST_CLERK",
+        2008,
+        5000
+      ],
+      [
+        "ST_MAN",
+        5500,
+        8500
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 3,
+    "answer": "Here are all 21 product subcategories from `SH.PRODUCTS` on **d1-19c-lab**, in name order:\n\n| SUBCATEGORY | PRODUCTS |\n|---|---|\n| Accessories | 10 |\n| Bulk Pack Diskettes | 2 |\n| CD-ROM | 6 |\n| Camcorders | 1 |\n| Camera Batteries | 5 |\n| Camera Media | 3 |\n| Cameras | 1 |\n| Desktop PCs | 1 |\n| Documentation | 6 |\n| Game Consoles | 1 |\n| Home Audio | 2 |\n| Memory | 2 |\n| Modems/Fax | 2 |\n| Monitors | 2 |\n| Operating Systems | 1 |\n| Portable PCs | 1 |\n| Printer Supplies | 4 |\n| Recordable CDs | 7 |\n| Recordable DVD Discs | 5 |\n| Y Box Accessories | 2 |\n| Y Box Games | 8 |\n\n**Total: 72 product definitions** across 21 subcategories. The count is of rows in `SH.PRODUCTS` (product definitions), independent of whether any sales exist for them.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4105,
+      "input": 1929,
+      "output": 674
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "Accessories",
+        10
+      ],
+      [
+        "Bulk Pack Diskettes",
+        2
+      ],
+      [
+        "CD-ROM",
+        6
+      ],
+      [
+        "Camcorders",
+        1
+      ],
+      [
+        "Camera Batteries",
+        5
+      ],
+      [
+        "Camera Media",
+        3
+      ],
+      [
+        "Cameras",
+        1
+      ],
+      [
+        "Desktop PCs",
+        1
+      ],
+      [
+        "Documentation",
+        6
+      ],
+      [
+        "Game Consoles",
+        1
+      ],
+      [
+        "Home Audio",
+        2
+      ],
+      [
+        "Memory",
+        2
+      ],
+      [
+        "Modems/Fax",
+        2
+      ],
+      [
+        "Monitors",
+        2
+      ],
+      [
+        "Operating Systems",
+        1
+      ],
+      [
+        "Portable PCs",
+        1
+      ],
+      [
+        "Printer Supplies",
+        4
+      ],
+      [
+        "Recordable CDs",
+        7
+      ],
+      [
+        "Recordable DVD Discs",
+        5
+      ],
+      [
+        "Y Box Accessories",
+        2
+      ],
+      [
+        "Y Box Games",
+        8
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-header-fanout",
+    "iteration": 3,
+    "answer": "## Results (target: `d1-19c-lab`, schema: OE)\n\n| ORDER_MODE | Orders with ≥1 item | Sum of ORDER_TOTAL | Total Item Quantity |\n|---|---:|---:|---:|\n| direct | 73 | 1,903,629.20 | 15,647 |\n| online | 32 | 1,764,425.50 | 14,440 |\n\n## Aggregation Grain Explanation\n\nThe critical design choice is **pre-aggregating ORDER_ITEMS to one row per order before joining back to ORDERS**:\n\n```\nORDER_ITEMS  ──GROUP BY order_id──▶  inline view (1 row per order)\n                                          │\nORDERS  ────────────── JOIN ──────────────┘   ← 1:1, no fan-out\n                                          │\n                                   GROUP BY order_mode\n```\n\n**Why this matters:**\n\n- A naive `ORDERS JOIN ORDER_ITEMS` produces a **fan-out**: an order with 5 line items appears 5 times. Summing `ORDER_TOTAL` at that grain would multiply it by the item count, inflating the monetary total.\n- By collapsing ORDER_ITEMS to one row per `order_id` first (carrying only `SUM(quantity)`), the join back to ORDERS is strictly **one-to-one**. Each order's `ORDER_TOTAL` enters the outer aggregation exactly once.\n- The inner view preserves the item-level detail we need (`total_qty` per order) while eliminating the multiplicity that would corrupt header-level sums.\n\nThis two-level pattern—**detail → pre-aggregate to header grain → join → final GROUP BY**—is the standard way to mix header and detail measures without double-counting.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2229,
+      "input": 1809,
+      "output": 979
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        "direct",
+        73,
+        1903629.2,
+        15647
+      ],
+      [
+        "online",
+        32,
+        1764425.5,
+        14440
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-nullable-manager",
+    "iteration": 3,
+    "answer": "## Result (target `d1-19c-lab`, schema HR)\n\nDepartments with `LOCATION_ID = 1700`:\n\n| DEPARTMENT_ID | EMP_COUNT | WITH_MANAGER | AVG_MANAGER_ID |\n|---|---|---|---|\n| 10 | 1 | 1 | 101.00 |\n| 30 | 6 | 6 | 111.67 |\n| 90 | 3 | 2 | 100.00 |\n| 100 | 6 | 6 | 106.83 |\n| 110 | 2 | 2 | 153.00 |\n| 120–270 (16 depts) | 0 | 0 | NONE |\n\nThe query drives from `HR.DEPARTMENTS` filtered to `LOCATION_ID = 1700`, then `LEFT JOIN HR.EMPLOYEES ON e.department_id = d.department_id`, grouped by `department_id`.\n\n## Which rows enter each aggregate\n\nThe LEFT JOIN is what makes empty departments appear: a department with no matching employees still produces exactly one joined row, but every `e.*` column in that row is NULL.\n\n- **EMP_COUNT — `COUNT(e.employee_id)`**: counts only non‑NULL `employee_id` values from the joined rows. Real employee rows contribute 1 each; the single NULL‑padded row of an empty department contributes 0 (COUNT ignores NULLs). So empty departments correctly report 0 rather than 1.\n\n- **WITH_MANAGER — `COUNT(e.manager_id)`**: counts only joined rows where the *employee's* `manager_id` is non‑NULL. Employees whose `manager_id` is NULL are excluded — this is why department 90 shows EMP_COUNT 3 but WITH_MANAGER 2 (one of its three employees, the President, has a NULL manager). The NULL‑padded row of an empty department also contributes 0.\n\n- **AVG_MANAGER_ID — `ROUND(AVG(e.manager_id),2)`**: averages over non‑NULL `manager_id` values only; NULLs (both the null‑manager employee and the empty‑department's padded row) are ignored by AVG, so they don't drag the average toward zero. When a department has no non‑NULL manager at all — either because it is empty or because its only employees have NULL managers — AVG returns NULL, and `NVL(...,'NONE')` renders the word **NONE**. The value is cast to text with format mask `FM9999999990.00` so it always shows exactly two decimals (e.g. `153.00`, not `153`).\n\nNote: this uses the *employee's* `MANAGER_ID` (from EMPLOYEES), not the department's own `MANAGER_ID` column — that matches \"number with a non‑null manager\" and \"average manager ID\" being per‑employee measures. If you instead wanted the department's assigned manager, say so and I'll rework it.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 6147,
+      "input": 2737,
+      "output": 1814
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        10,
+        1,
+        1,
+        "101.00"
+      ],
+      [
+        30,
+        6,
+        6,
+        "111.67"
+      ],
+      [
+        90,
+        3,
+        2,
+        "100.00"
+      ],
+      [
+        100,
+        6,
+        6,
+        "106.83"
+      ],
+      [
+        110,
+        2,
+        2,
+        "153.00"
+      ],
+      [
+        120,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        130,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        140,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        150,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        160,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        170,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        180,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        190,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        200,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        210,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        220,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        230,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        240,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        250,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        260,
+        0,
+        0,
+        "NONE"
+      ],
+      [
+        270,
+        0,
+        0,
+        "NONE"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-commission-denominators",
+    "iteration": 3,
+    "answer": "Source: `HR.EMPLOYEES` on **d1-19c-lab** (107 rows total). Employees reporting directly to manager IDs 100 and 145:\n\n| MANAGER_ID | Total employees | With commission (non‑null) | Avg commission (known only) | Avg commission (missing = 0) |\n|---|---|---|---|---|\n| 100 | 14 | 5 | 0.3000 | 0.1071 |\n| 145 | 6 | 6 | 0.2250 | 0.2250 |\n\n**Denominator explanation**\n\n- **Avg commission (known only)** — `AVG(COMMISSION_PCT)` ignores NULLs, so the denominator is the count of employees who actually have a commission value:\n  - Manager 100: sum of the 5 known values ÷ **5** = 0.3000.\n  - Manager 145: all 6 have commissions, so ÷ **6** = 0.2250.\n\n- **Avg commission (missing = 0)** — `AVG(NVL(COMMISSION_PCT,0))` replaces each NULL with 0, so the denominator becomes the full headcount of direct reports:\n  - Manager 100: same numerator ÷ **14** = 0.1071 (the 9 employees without a commission now contribute 0 and dilute the average).\n  - Manager 145: no missing values, so the denominator stays **6** and the result is identical (0.2250).\n\nNote that for manager 100 the two averages differ precisely because 9 of 14 direct reports have a NULL `COMMISSION_PCT`; for manager 145 there are no NULLs, so both methods coincide.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4954,
+      "input": 2286,
+      "output": 1150
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        14,
+        5,
+        0.3,
+        0.1071
+      ],
+      [
+        145,
+        6,
+        6,
+        0.225,
+        0.225
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salary-ties",
+    "iteration": 3,
+    "answer": "Using `DENSE_RANK() OVER (ORDER BY salary DESC)` on `HR.EMPLOYEES` (target **d1-19c-lab**), the three highest distinct salary levels are 24000, 17000, and 14000. All employees tied at those levels:\n\n| EMPLOYEE_ID | LAST_NAME | SALARY | SALARY_RANK |\n|---|---|---|---|\n| 100 | King | 24000 | 1 |\n| 101 | Kochhar | 17000 | 2 |\n| 102 | De Haan | 17000 | 2 |\n| 145 | Russell | 14000 | 3 |\n\n**Notes:**\n- `DENSE_RANK` (not `ROW_NUMBER`/`RANK`) is the right choice here: it assigns one rank per *distinct* salary and keeps every tie, so filtering `salary_rank <= 3` captures exactly the top three salary levels regardless of how many people share each. A plain \"top 3 rows\" approach would have missed Kochhar and De Haan (tied at level 2).\n- Sorted by salary descending, then employee_id ascending, as requested.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 1952,
+      "input": 1821,
+      "output": 690
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        100,
+        "King",
+        24000,
+        1
+      ],
+      [
+        101,
+        "Kochhar",
+        17000,
+        2
+      ],
+      [
+        102,
+        "De Haan",
+        17000,
+        2
+      ],
+      [
+        145,
+        "Russell",
+        14000,
+        3
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-timestamp-boundary",
+    "iteration": 3,
+    "answer": "## Results (target: d1-19c-lab, schema OE, table ORDERS)\n\n| Metric | Count |\n|--------|-------|\n| **WHOLE_DAYS** | **4** |\n| **INCLUSIVE_MIDNIGHT** | **1** |\n\n## Explanation\n\nThe two predicates differ in what they capture on the second day:\n\n| Approach | Predicate logic | What it covers |\n|----------|----------------|----------------|\n| **WHOLE_DAYS** | `TRUNC(order_date) IN (DATE '2007-11-18', DATE '2007-11-19')` | All of Nov 18 **and** all of Nov 19 |\n| **INCLUSIVE_MIDNIGHT** | `order_date >= '2007-11-18 00:00:00' AND order_date <= '2007-11-19 00:00:00'` | All of Nov 18, plus **only the single instant** of midnight on Nov 19 |\n\nThe inclusive upper bound (`<= midnight 2007-11-19`) does **not** include all of the second day. It includes:\n\n- Every order on Nov 18 (from the start of the day through the end of the day) ✓\n- An order at *exactly* `2007-11-19 00:00:00` (if one exists) ✓\n- Orders at any point after that midnight instant on Nov 19 ✗\n\nThe gap of **3 orders** (4 − 1) are all on Nov 19 but fall *after* the midnight instant, so they are excluded by the inclusive-midnight range.\n\n### Correct pattern for two full calendar days\n\nUse a half-open interval with the upper bound set to **one day after** the last desired day:\n\n```sql\norder_date >= TIMESTAMP '2007-11-18 00:00:00'\nAND order_date <  TIMESTAMP '2007-11-20 00:00:00'\n```\n\nThis captures every microsecond of both Nov 18 and Nov 19 without the boundary ambiguity.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7937,
+      "input": 3250,
+      "output": 2538
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        4,
+        1
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-history-chain",
+    "iteration": 3,
+    "answer": "Here are the results from **d1-19c-lab** (HR schema):\n\n| Field | Value |\n|-------|-------|\n| **Employee ID** | 101 |\n| **History Start Date** | 1997-09-21 |\n| **Historical Department ID** | 110 |\n| **Manager Full Name** | Shelley Higgins |\n| **Manager Job Title** | Accounting Manager |\n| **City** | Seattle |\n| **Country** | United States of America |\n| **Region** | Americas |\n\n**Reasoning chain:**\n1. Employee **101** has the most `JOB_HISTORY` records (tied at 2 with employee 176, but wins on lowest employee_id).\n2. Their earliest history row started **1997-09-21** in department **110**.\n3. Department 110's current manager is **Shelly Higgins**, whose job title is **Accounting Manager**.\n4. Department 110 is located in **Seattle**, **United States of America**, region **Americas**.",
+    "toolCalls": [
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2979,
+      "input": 1855,
+      "output": 1865
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        101,
+        "1997-09-21",
+        110,
+        "Shelley Higgins",
+        "Accounting Manager",
+        "Seattle",
+        "United States of America",
+        "Americas"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-salesperson-chain",
+    "iteration": 3,
+    "answer": "Here are the results from **d1-19c-lab**:\n\n| Field | Value |\n|-------|-------|\n| **Salesperson ID** | 161 |\n| **Total Order Value** | 661,734.50 |\n| **Department Name** | Sales |\n| **Department Manager Full Name** | John Russell |\n| **Manager Job Title** | Sales Manager |\n| **Country Name** | United Kingdom |\n\n**Path traced:**\n1. `OE.ORDERS` → grouped by `SALES_REP_ID`, excluding NULLs; sales rep **161** had the highest total (`ORDER_TOTAL` sum = 661,734.50).\n2. `HR.EMPLOYEES` (employee 161) → belongs to department **Sales**.\n3. `HR.DEPARTMENTS` → the Sales department's manager is **John Russell** (job: *Sales Manager*).\n4. `HR.LOCATIONS` → `HR.COUNTRIES` → the Sales department is located in the **United Kingdom**.",
+    "toolCalls": [
+      "run_query",
+      "describe_object",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "describe_object",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 9792,
+      "input": 2257,
+      "output": 1943
+    },
+    "baselinePass": true,
+    "truth": [
+      [
+        161,
+        661734.5,
+        "Sales",
+        "John Russell",
+        "Sales Manager",
+        "United Kingdom"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-stats-grain",
+    "iteration": 3,
+    "answer": "**Reconciliation — HR.JOB_HISTORY (target: d1-19c-lab)**\n\n| # | Metric | Value | Source |\n|---|--------|-------|--------|\n| 1 | Dictionary `NUM_ROWS` | **10** | `ALL_TAB_STATISTICS` (object_type=TABLE), last_analyzed 2026‑09‑11 |\n| 2 | Live row count | **10** | `COUNT(*)` |\n| 3 | Distinct employees | **7** | `COUNT(DISTINCT employee_id)` |\n\nOne record: **(NUM_ROWS=10, live_rows=10, distinct_employees=7)**\n\nThe statistics value and the live count agree (10 = 10), so the optimizer's row estimate for this table is currently accurate — no stale-stats gap here.\n\n**Can a statistics row count answer \"how many different employees have history\"? No.** `NUM_ROWS` is a *row/segment* count gathered by statistics collection; it reflects the number of rows in JOB_HISTORY, not the number of unique keys. Because an employee can appear in multiple history rows (job/department changes over time), 10 rows collapse to only 7 distinct employees — so a row count would overstate the answer by 3 and carries no notion of distinctness at all. Even if stats were stale, that error is orthogonal: it would misreport *rows*, not *distinct employees*.\n\n**Source used for the distinct-employee question:** the live query `COUNT(DISTINCT employee_id)` against the table itself (via `run_query`), not the statistics dictionary. Distinct-value cardinality of a column comes from column statistics (`ALL_TAB_COL_STATISTICS.NUM_DISTINCT`) only as an *estimate*; the authoritative count here is the direct `COUNT(DISTINCT …)`.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 2194,
+      "input": 1825,
+      "output": 947
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        10,
+        10,
+        7
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-memory",
+    "iteration": 3,
+    "answer": "## Result — target `p1-19c-prod`\n\n**Verifiable from the `db_overview` tool:**\n- **Instance name:** `PRODCDB`\n- **Database version:** major **19** (full version string `19.9.1.0.0`)\n\n**Configured `SGA_TARGET` in bytes — UNAVAILABLE.**\nI could not obtain the configured parameter value because every parameter source this account can reach is denied:\n- `v$parameter` → ORA‑00942 (table or view does not exist)\n- `v$system_parameter` → ORA‑00942\n- `v$spparameter` (spfile-derived configured value) → ORA‑00942\n\nThe account lacks SELECT on these dynamic performance / parameter views, so the configured `SGA_TARGET` cannot be verified.\n\n**Explicit note on what I did *not* use:** `db_overview` reports an allocated **`SGA_BYTES = 3,221,222,464`**, but that is *currently allocated* SGA memory, not the configured target. Per your instruction, I am not inferring the configured `SGA_TARGET` from it, and I am not reporting it as the answer.\n\n**Summary:** instance name and version are confirmed; the configured `SGA_TARGET` value in bytes is **not obtainable** with this account's privileges (all three parameter views return ORA‑00942).",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 7319,
+      "input": 2006,
+      "output": 1527
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "19",
+        "V$PARAMETER",
+        "unavailable"
+      ]
+    ]
+  },
+  {
+    "id": "hard-p11b-partial-backup",
+    "iteration": 3,
+    "answer": "## Results for p1-19c-prod\n\n### Database Identity and Open Mode\n\n| Attribute | Value |\n|-----------|-------|\n| **Database Name** | PRODCDB |\n| **Open Mode** | READ WRITE |\n| Version | 19.9.1.0.0 (non-CDB) |\n| Instance | PRODCDB on host `oracle19c-prod` |\n\n*(Source: `v$database` via `run_query`; corroborated by `db_overview`.)*\n\n### RMAN Backup History — Access Gap\n\nQuerying `V$RMAN_BACKUP_JOB_DETAILS` returned **ORA-00942: table or view does not exist**. This means the connected user lacks SELECT privilege on the dynamic performance views that expose RMAN job history. The view itself exists in 19c but is not visible to this session's privilege set.\n\n**Gap:** No backup end time or status can be reported from SQL alone with the current grants. To close it, a DBA would need to either:\n- grant `SELECT ON V_$RMAN_BACKUP_JOB_DETAILS` (or the broader `SELECT_CATALOG_ROLE`) to the monitoring user, or\n- run `RMAN> LIST BACKUP SUMMARY` from an RMAN session with appropriate privileges.\n\n### Why an Open Database Does Not Establish Backup Health\n\nAn open/read-write state tells you only that the instance is **available for connections and DML**. It says nothing about recoverability:\n\n1. **No guarantee of recent backups.** A database can be open for months with zero successful RMAN jobs; a media failure would then be unrecoverable beyond the last backup (or not at all).\n2. **Silent corruption.** Block-level corruption (e.g., lost writes, bit-rot) can exist in datafiles while the instance remains fully open; only a backup or validation pass surfaces it.\n3. **Archive-log gaps / failed jobs.** A prior backup may have completed with `COMPLETED WITH WARNINGS` or been skipped entirely due to channel errors—none of which affect open mode.\n4. **Restore-readiness is untested.** A backup that cannot be restored (missing pieces, catalog mismatch, encryption-key loss) still leaves the primary open and healthy-looking.\n\nIn short, **open mode measures availability; backup health measures recoverability**—two independent dimensions that must each be verified separately.",
+    "toolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "executedToolCalls": [
+      "db_overview",
+      "run_query",
+      "run_query"
+    ],
+    "usage": {
+      "cached": 4176,
+      "input": 1934,
+      "output": 1088
+    },
+    "baselinePass": false,
+    "truth": [
+      [
+        "PRODCDB",
+        "READ WRITE",
+        "V$RMAN_BACKUP_JOB_DETAILS",
+        "unavailable"
+      ]
+    ]
+  }
+]
