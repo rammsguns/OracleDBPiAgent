@@ -1,0 +1,40 @@
+[
+	{
+		"id": "hard-p11-customers-scope",
+		"target": "d1-19c-lab",
+		"category": "ambiguity",
+		"split": "challenge",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT 'OWNER=CO / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM co.customers UNION ALL SELECT 'OWNER=OE / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM oe.customers UNION ALL SELECT 'OWNER=SH / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM sh.customers",
+			"mode": "allCells"
+		},
+		"question": "On d1, how many rows are in CUSTOMERS? Resolve the schema ambiguity by reporting all three accessible application readings in CO, OE and SH, with exact live counts and the schema stated for each. Return one record per schema as OWNER=<owner> / TABLE=CUSTOMERS / ROWS=<count>, ordered by owner. Do not silently use the default schema."
+	},
+	{
+		"id": "hard-p11-orders-status-scope",
+		"target": "d1-19c-lab",
+		"category": "ambiguity",
+		"split": "challenge",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT 'OWNER='||owner||' / COLUMN='||column_name||' / TYPE='||data_type||' / NULLABLE='||nullable FROM all_tab_columns WHERE owner IN ('CO','OE') AND table_name='ORDERS' AND column_name LIKE '%STATUS%' ORDER BY owner,column_id",
+			"mode": "allCells"
+		},
+		"question": "On d1, what is the status column of ORDERS? Cover both CO and OE interpretations explicitly, checking the actual column names, data types and nullability. Return OWNER=<owner> / COLUMN=<column> / TYPE=<data type> / NULLABLE=<Y or N> for each, ordered by owner. A status in one schema must not be assumed to have the same representation in the other."
+	}
+]
