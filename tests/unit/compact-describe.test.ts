@@ -39,7 +39,7 @@ it('uses compact rendering only for describe and keeps binds, audit and the FK n
 	const ctx = { config: { defaultTarget: 'lab', targets: [{ name: 'lab', defaultSchema: 'SH' }], limits: { maxRows: 200, maxToolResultBytes: 16000 } }, sessions: { get: async () => ({ query, close }) }, audit: { record }, runId: 'compact' } as unknown as ToolContext;
 	const tool = createDbTools(ctx).find(tool => tool.name === 'describe_object')!;
 	const output = await tool.execute('1', { name: 'sales' });
-	expect(output.content[0]).toMatchObject({ text: renderDescribe(result) });
+	expect(output.content[0]).toMatchObject({ text: "ALL_TAB_COLUMNS\n" + renderDescribe(result) });
 	expect(query.mock.calls[0]![1]).toEqual({ owner: 'SH', name: 'SALES' });
 	expect(query.mock.calls[0]![0]).not.toMatch(/LISTAGG/i);
 	expect(record).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tool_call', rows: 11 }));
