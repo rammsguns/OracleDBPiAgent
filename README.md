@@ -97,6 +97,9 @@ private `.env`. See the [documentation index](docs/README.md).
 | `piagent report schedule --target d1-19c-lab --every 1h` | Print setup, systemd service/timer and alternative cron line; optional `--out`. No installation or DB/LLM. |
 | `piagent report schedule run --target d1-19c-lab` | Run the scheduled read-only report; optional absolute `--home` and `--out`. |
 | `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`; optional JSON and `--out`. No LLM. |
+| `piagent plsql list --target p1-19c-prod --owner SHOPAPP` | List PL/SQL objects with status, line count and last DDL time; optional `--json`. No LLM. See [PL/SQL docs](docs/plsql.md). |
+| `piagent plsql doc --target p1-19c-prod --object SHOPAPP.WORKLOAD` | Document a package, procedure or trigger: signatures, tables read and written, callers, jobs, errors, source and a Mermaid graph; `--json`, `--out`. No LLM. |
+| `piagent triage --target p1-19c-prod --issue "NIGHTLY_PURGE_JOB failed"` | Turn an issue report into read-only evidence: ranked hypotheses, debug SQL checklist, trace diagram and suggested fixes; `--issue-file`, `--since 24h`, `--json`, `--out`, optional LLM `--summarize`. With no issue, scans recent failures. See [triage](docs/triage.md). |
 
 Manual `schedule run` defaults to `<PIAGENT_HOME>/reports`; pass `--out`
 explicitly when using a separate report directory. The generated schedule pins
@@ -136,7 +139,10 @@ The page shows a target picker, streamed chat, tool-call trace, session audit an
 health checks, with a Stop button. The Report tab runs the selected target's DBA
 checks with an optional summary and includes a saved-file History panel with
 sparklines and worsening flags. The Drift tab compares parameters, schema or object
-metadata without an LLM. Chat and report summaries show Unverified notes
+metadata without an LLM. The PL/SQL tab documents an object with an SVG
+dependency graph, and the Triage panel turns a pasted issue into evidence and a
+debug checklist. In chat, `/triage [--since 7d] <issue>` runs triage, then asks the
+model one grounded question. Chat and report summaries show Unverified notes
 when facts remain unsupported. Export Markdown downloads the displayed conversation,
 grounding notes and trace; trace arguments omit SQL, binds and connection fields.
 The token stays in browser memory; reopen the original URL after reloading. The build copies the page into `dist/web/static/`.
