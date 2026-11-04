@@ -995,3 +995,75 @@ This worktree lacked dependency binaries, so validation used a local
 No dependency manifest changed. Integration/eval execution was intentionally
 excluded: no DB or LLM code changed and this package is offline-only.
 No contract changes are needed. Live behavior was not exercised.
+
+### WP-16D: blind PL/SQL chat cases (2026-11-04)
+
+`phase16-plsql.json` adds ten challenge cases for plain chat, without naming
+chat tools or depending on the new PL/SQL documentation/triage commands. No
+existing case, split, scorer or product code changes. The gate splits remain
+28 dev, 12 holdout and 21 regression; challenge grows from 22 to 32.
+
+Every truth query was executed sequentially through `src/oracle`'s
+`createSessionProvider` / `session.query`, with
+`PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets`, on the two
+configured targets as HARNESS_RO / HARNESS_LAB. All ten returned nonempty rows,
+no NULL cells and no truncation. Source, job history and argument metadata were
+also read independently to check explanation requirements. Only SELECTs were
+submitted; no application code was executed, no database writes, agent/LLM calls
+or `evals/run.ts` invocations occurred.
+
+| Case (`hard-p16-` prefix) | Observed evidence and scoring focus |
+|---|---|
+| entry-points | WORKLOAD exposes NIGHTLY_PURGE, PLACE_ORDERS and SHIP_ORDERS; the package's own dictionary row is excluded. |
+| writes | Seven source-derived operation/table records: PLACE_ORDERS inserts ORDERS and ORDER_LINES, updates PRODUCTS and ORDERS; SHIP_ORDERS updates ORDERS; NIGHTLY_PURGE deletes ORDER_LINES and ORDERS. The PRODUCTS SELECT is excluded. This is a static source scan, not a claim about runtime execution. |
+| purge-behavior | Lines 26/27 delete ORDER_LINES then ORDERS based on ORDERED_AT older than seven days; no status filter; COMMIT at 28. Child rows are selected through old parent orders. |
+| scheduler-map | NIGHTLY_PURGE_JOB → NIGHTLY_PURGE, PLACE_ORDERS_JOB → PLACE_ORDERS, SHIP_ORDERS_JOB → SHIP_ORDERS. Placement supplies 25. Entry points are extracted from current JOB_ACTION text. |
+| purge-constraint | Latest failed run names SYS_C007669: ORDER_LINES.ORDER_ID → ORDERS.ORDER_ID, NO ACTION. ORA-02292 reports remaining children. The source's child-first DELETE does not itself prove the live workload cannot leave children; the case does not demand an unproven concurrency cause. |
+| purge-line | Latest failed run's package frame resolves to WORKLOAD line 27, inside NIGHTLY_PURGE, DELETE on ORDERS. Outer block line 1 is a distinct frame. |
+| history-trigger | HR.UPDATE_JOB_HISTORY: AFTER EACH ROW / UPDATE / EMPLOYEES, limited to JOB_ID or DEPARTMENT_ID updates. Calls ADD_JOB_HISTORY with old employee/hire-date/job/department values and SYSDATE, inserting JOB_HISTORY. |
+| security-trigger | HR.SECURE_EMPLOYEES: BEFORE STATEMENT / INSERT OR UPDATE OR DELETE / EMPLOYEES. SECURE_DML raises -20205 outside 08:00–18:00 or for SAT/SUN. These are literal source conditions, dependent on session day-name language; no execution or present-time permission claim. |
+| history-arguments | ADD_JOB_HISTORY: P_EMP_ID/1/IN/NUMBER/N, P_START_DATE/2/IN/DATE/N, P_END_DATE/3/IN/DATE/N, P_JOB_ID/4/IN/VARCHAR2/N, P_DEPARTMENT_ID/5/IN/NUMBER/N. DEFAULTED=N means no default. |
+| failed-lab-job | Latest failed K7Q_OWNER.K7Q_FAILJOB run: FAILED, ORA-20001, “destination unavailable”, line 1; application-raised error. There is currently no matching DBA_SCHEDULER_JOBS row. The question deliberately asks about retained run history, not a current job action or a named stored procedure. |
+
+All cases use separate-column `rowCells`. Source semantics that are not natural
+dictionary cells use explanation regexes grounded in the independently read
+source. Related values stay together; independent public procedure names remain
+separate truth rows. p1 cannot read every DBA constraint view (initial probe
+returned ORA-00942), so the constraint trace uses readable ALL_CONSTRAINTS and
+ALL_CONS_COLUMNS instead. No new grants are required.
+
+`tests/unit/phase16-plsql.test.ts` embeds the ten observed snapshots as offline
+test data, never as eval answers. Each scorer accepts a real Markdown table,
+separate vertical Attribute/Value tables and natural prose, and rejects two
+realistic mistakes in each layout (90 scoring checks). Examples include a
+read misclassified as a write, swapped scheduler entry points, CASCADE instead
+of NO ACTION, package line 26 or outer line 1 instead of 27, statement versus
+row timing, wrong argument types/defaults and a foreign-key error substituted
+for the lab application error. Additional checks reject incorrect source
+explanations even with correct dictionary rows. Fresh eval truth is always
+queried live; mutable job history may need revalidation before baseline.
+
+No shared contract changes or dependencies are needed. No DB or LLM product
+code changed, so integration tests are not required for this WP. Antigravity
+review and the coordinator's baseline remain pending; difficulty has not been
+measured and these cases have not been tuned against agent answers.
+
+WP-16D verification:
+
+```text
+Live session.query validation: 10/10 new truth SELECTs passed on approved targets.
+npm run typecheck
+PASSED (exit 0)
+npm test
+Test Files 48 passed (48)
+Tests 812 passed (812)
+```
+
+The existing case SHA fixture passes unchanged. The pre-existing suite-size
+assertion in `tests/unit/hard-evals.test.ts` was updated from 83 to 93; the
+individual gate counts remain unchanged. The new test adds 12 test entries,
+including 90 layout/error scoring checks and six explanation-error checks.
+Validation used a temporary local `node_modules` symlink to needlefish's already
+installed dependencies, removed after checks; no manifest or lockfile changed.
+A separate strict TypeScript check of the new test and its imported eval modules
+also passed (the product tsconfig covers only `src/`).
