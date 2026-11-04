@@ -1346,14 +1346,17 @@ on each side.
 ### Not in phase 11
 New tools, cloud LLMs, LLM-judged scoring, and changes to existing cases.
 
-## Phase 12: report history and scheduling (proposed 2026-11-03, awaiting owner approval)
+## Phase 12: report history and scheduling (approved 2026-11-03)
 
 Phase 4 saves up to 30 report runs per target, but it only ever compares the
 newest two. It also leaves scheduling to the user's own cron. Phase 12 makes
 that history useful: trends across saved runs, an easy and safe way to
 schedule runs, and a local alert when something changes. It stays read-only,
-uses no LLM and costs no tokens. It starts after phase 11 closes, so eval
-gates are not disturbed.
+uses no LLM and costs no tokens. It does not touch the agent, its prompts or
+its tools, so it runs in parallel with phase 11 (owner: "continue to all
+phases, don't stop until you finish all"). Phases 12 and 13 may run in
+parallel. Phase 14B waits for phase 11 to close, because it needs clean eval
+baselines.
 
 | WP | Branch | Owns | Depends on |
 |---|---|---|---|
@@ -1426,7 +1429,7 @@ gates are not disturbed.
 Installing timers automatically, a daemon in this repo, email, Slack or other
 network notifications, LLM summaries of trends, and new database queries.
 
-## Phase 13: cross-target drift check (proposed 2026-11-03, awaiting owner approval)
+## Phase 13: cross-target drift check (approved 2026-11-03)
 
 DBAs often need to know how two databases differ: a lab against prod, or
 before and after a change window. The report compares one target with its
@@ -1477,7 +1480,7 @@ can already read.
 Generating DDL to fix drift, any target outside the approved two, data
 comparison (row contents), and an agent tool for drift.
 
-## Phase 14: dependency refresh (proposed 2026-11-03, awaiting owner approval)
+## Phase 14: dependency refresh (approved 2026-11-03)
 
 On 2026-11-03, `npm outdated` shows:
 - `@earendil-works/pi-agent-core` and `pi-ai` 1.4.0 → 1.5.0;
@@ -1523,7 +1526,7 @@ under AGENTS.md rule 4, and this phase is that approval.
 Major version upgrades (TypeScript, oracledb, Node), new dependencies, and
 replacing the PI SDK.
 
-## Phase 15: release 1.1.0 (proposed 2026-11-03, awaiting owner approval)
+## Phase 15: release 1.1.0 (approved 2026-11-03)
 
 v1.0.0 was tagged on 2026-10-29. Since then the project has gained phases
 8–14: a fresh holdout, the global CLI install, the eval-only second Strata,
