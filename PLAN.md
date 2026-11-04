@@ -1338,8 +1338,52 @@ failures.
   prose, records), as well as wrong answers. Then a coordinator baseline:
   challenge ×3 on main, with every failure triaged as before.
 
+- **Result (2026-11-04): merged** (3c9c9a1, f71f3f2; merge ef204fd). 648
+  unit tests pass, and validation checked 62 truth queries for 83 cases. The
+  Antigravity review approved: 77 of 77 correct answers in four layouts passed,
+  44 of 44 wrong answers failed, and the adversarial row mixing checks passed.
+- **Baseline (2026-11-04), challenge ×3 on ef204fd: 54/66 (81.8%)**, all
+  refusals passed, 17 tool errors in 151 calls (13 of them expected
+  ORA-00942s in the grant cases). The WP-11A cases scored 35/36, which matches
+  the earlier triage; the new round scored 19/30. **Triage: 9 of the 12
+  failures are case or scorer bugs, and 3 are agent errors.**
+  - `partial-memory` and `partial-backup` (0/3 each) are case bugs. Each
+    truth "row" glues unrelated facts together
+    (`[PRODCDB, 19, V$PARAMETER, unavailable]`), but a correct answer puts
+    them on different lines. Every answer was right and named the grant gap.
+  - `order-customer-key`, `timestamp-boundary` and `stats-grain` (one each)
+    are scorer bugs:
+    - vertical label/value tables (`Metric | Value`, `Step | Detail`) are
+      transposed only when the header is Attribute, Field or Property;
+    - a trailing parenthetical (`(NUM_ROWS=10, live_rows=10, ...)`) is
+      stripped before matching.
+  - **Agent errors:** `nullable-manager` 0/3. Asked for every department, the
+    agent collapsed 16 empty departments into `120–270 (16 depts)`. This is
+    the WP-11B target.
+
+### WP-11D: scorer and case fixes from the 11C baseline
+| Branch | Owns |
+|---|---|
+| `wp-11d-scorer-fixes` | `evals/scoring.ts` (rowCells only), `evals/cases-hard/phase11b-challenge.json` (the two partial-grant cases only), `evals/validate-hard.ts`, their tests, `tests/unit/wp-i-optimizer.test.ts`, `docs/evals-hard.md` |
+
+- `rowCells` treats a two-column label/value table, and an inline
+  `(K=V, ...)` record, as one record. It does this only when the truth has a
+  single row, so values cannot mix across rows. Where truth column names
+  appear as labels, values must bind to their labels, so swapped values
+  fail.
+- A trailing parenthetical is no longer stripped when it holds the record
+  itself.
+- The two partial-grant cases score each fact on its own: the accessible
+  values, plus a required fact naming the unavailable view. No check is
+  loosened.
+- Test isolation: the eval-runner unit tests must not take the host's real
+  endpoint lock. They failed while a real eval held it.
+- Gate: unit tests built from the real 11C baseline answers (all 9 bug cases
+  pass, the 3 `nullable-manager` answers still fail), typecheck, and the
+  Antigravity review.
+
 ### WP-11B: quality fixes
-Scoped from the 11C failure triage, then approved by the owner. It uses the
+Scoped from the 11C failure triage: the agent collapses requested rows into ranges (`nullable-manager`), and it ignored requested record formats in 13 of 36 WP-11A runs. Approved by the owner on 2026-11-03 (all phases). It uses the
 usual gate (hard dev 4×4, holdout ×3, regression ×1, MVP) plus challenge ×4
 on each side.
 
