@@ -130,7 +130,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							} else throw error;
 							result = await session.query(sql, binds, { maxRows });
 						}
-						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = await emptyDictionaryHint(session, sql, binds);
+						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
 							sql = "SELECT child_number, id, parent_id, operation, options, object_owner, object_name, cardinality, bytes, cost, access_predicates, filter_predicates FROM v$sql_plan WHERE sql_id=:sql_id ORDER BY child_number,id";
@@ -437,12 +437,13 @@ TABLES TAB_COLUMNS CONSTRAINTS CONS_COLUMNS INDEXES IND_COLUMNS VIEWS TRIGGERS
 SCHEDULER_JOBS SCHEDULER_JOB_RUN_DETAILS SCHEDULER_JOB_LOG SCHEDULER_PROGRAMS
 SCHEDULER_PROGRAM_ARGS SCHEDULER_SCHEDULES`.split(/\s+/).map(name => `ALL_${name}`));
 
-async function emptyDictionaryHint(session: OracleSession, sql: string, binds: Record<string, unknown>): Promise<string | undefined> {
+async function emptyDictionaryHint(session: OracleSession, sql: string, binds: Record<string, unknown>, timeoutSeconds: number, signal?: AbortSignal): Promise<string | undefined> {
+	if (signal?.aborted) throw new Error("Tool aborted");
 	// WITH may shadow dictionary names. Quoted identifiers and Oracle alternative
 	// quoting need a richer parser; decline the optional hint for those statements.
-	if (!/^\s*SELECT\b/i.test(sql)) return;
 	const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}\p{M}_$#]*|[^\s]/gu)];
 	const code = tokens.filter(t => !t[0].startsWith("--") && !t[0].startsWith("/*") && !t[0].startsWith("'"));
+	if (code[0]?.[0].toUpperCase() !== "SELECT") return;
 	if (code.some(t => t[0].startsWith('"') || /^(WITH|Q|NQ)$/i.test(t[0]))) return;
 	const views = new Set<string>();
 	const replacements: typeof tokens = [];
@@ -462,12 +463,14 @@ async function emptyDictionaryHint(session: OracleSession, sql: string, binds: R
 	let probe = sql;
 	for (const token of replacements.reverse()) probe = probe.slice(0, token.index) + token[0].replace(/^all_/i, "DBA_") + probe.slice(token.index + token[0].length);
 	try {
-		const result = await session.query(classifySql(probe), binds, { maxRows: 1 });
+		const result = await session.query(classifySql(probe), binds, { maxRows: 1, timeoutSeconds: Math.min(timeoutSeconds, 5) });
+		if (signal?.aborted) throw new Error("Tool aborted");
 		if (!result.rows.length) return;
 		const all = [...views].join(", ");
 		const dba = [...views].map(view => view.replace(/^ALL_/, "DBA_")).join(", ");
 		return `Note: 0 rows from ${all} (limited to objects this account can access); the same query on ${dba} returns rows. Re-run with ${dba}.`;
-	} catch (error) {
-		if (!/\bORA-(00942|01031)\b/.test(String(error))) throw error;
+	} catch {
+		// A best-effort probe must not invalidate the successful primary query.
+		if (signal?.aborted) throw new Error("Tool aborted");
 	}
 }

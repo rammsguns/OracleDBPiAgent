@@ -3,20 +3,26 @@
 After an empty successful `run_query` SELECT, a conservative lexical scan can
 probe the same SQL with allowlisted ALL_ dictionary identifiers changed to DBA_.
 The probe goes through the SQL policy and the same read-only session, binds and
-default timeout, with `maxRows: 1`. It never replaces the original result rows or
+a timeout of `min(configured statement timeout, 5 seconds)`, with `maxRows: 1`. It never replaces the original result rows or
 SQL. A positive probe appends one short visibility note directing an explicit
-DBA_ retry. Empty probes and ORA-00942/01031 produce no note; other errors throw.
+DBA_ retry. The probe is best-effort: any probe error (including conversion,
+division-by-zero, disconnect and timeout errors) produces no note and preserves
+the successful primary result. If the tool signal is aborted before or during
+the probe, the tool still throws `Tool aborted`, including after a successful
+probe.
 The existing result byte cap includes the note. No tool definition, prompt,
 contract, dependency or grant changes are needed.
 
 The scanner preserves ordinary strings, escaped quotes and comments verbatim.
-It accepts plain or SYS-qualified FROM/JOIN references and matching qualifiers.
+It accepts leading comments, plain or SYS-qualified FROM/JOIN references and
+matching qualifiers.
 It skips WITH, quoted identifiers, alternative quoting, unknown ALL_ names,
 other schemas and ambiguous uses (including comma-separated dictionary tables).
 This deliberately favors missing an optional hint over guessing SQL semantics.
 
 Unit tests cover positive/empty probes, nonempty original results, denied and
-unexpected probe failures, bounded identical-bind execution, protected text,
+unexpected probe failures, timeout caps, aborts before/during probes, bounded
+identical-bind execution, protected text,
 ambiguous SQL, and byte-identical serialized tool definitions against master.
 The existing chat fixture is unchanged.
 
@@ -31,7 +37,7 @@ No database changes, LLM calls or evals were made.
 
 Validation:
 - `npm run typecheck`: pass.
-- `npm test`: 848 passed, 50 files.
+- `npm test`: 856 passed, 50 files.
 - Integration command (serial, LLM e2e excluded):
   `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- -t '^(?!.*answers one end-to-end ask)' --no-file-parallelism --maxWorkers=1`.
   Result: 31 passed, 1 skipped (excluded LLM e2e), 10 files.

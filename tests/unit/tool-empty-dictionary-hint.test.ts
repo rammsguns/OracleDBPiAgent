@@ -6,10 +6,10 @@ import { createDbTools } from '../../src/tools/index.js';
 import type { ToolContext } from '../../src/contracts.js';
 
 const empty = { columns: ['N'], rows: [], truncated: false, elapsedMs: 1 };
-function setup() {
+function setup(statementTimeoutSeconds = 15) {
 	const query = vi.fn().mockResolvedValue(empty);
 	const close = vi.fn();
-	const ctx = { config: { defaultTarget: 'lab', targets: [{ name: 'lab', defaultSchema: 'HR' }], limits: { maxRows: 100, maxToolResultBytes: 16000 } }, sessions: { get: async () => ({ query, close }) }, audit: { record: async () => {} }, runId: 'fallback' } as unknown as ToolContext;
+	const ctx = { config: { defaultTarget: 'lab', targets: [{ name: 'lab', defaultSchema: 'HR' }], limits: { statementTimeoutSeconds, maxRows: 100, maxToolResultBytes: 16000 } }, sessions: { get: async () => ({ query, close }) }, audit: { record: async () => {} }, runId: 'fallback' } as unknown as ToolContext;
 	return { query, close, tools: createDbTools(ctx) };
 }
 it('snapshots tool definitions JSON remain byte-identical with the empty dictionary hint', () => {
@@ -30,7 +30,7 @@ it('adds one note, preserving empty rows and probing SELECT with identical binds
 	expect(result.details.rows).toEqual([]);
 	expect(JSON.stringify(result)).not.toContain('SECRET_PROBE_ROW');
 	expect(result.content[0]).toMatchObject({ text: expect.stringContaining('Re-run with DBA_ARGUMENTS.') });
-	expect(query.mock.calls[1]).toEqual([sql.replace('all_arguments', 'DBA_arguments'), query.mock.calls[0]![1], { maxRows: 1 }]);
+	expect(query.mock.calls[1]).toEqual([sql.replace('all_arguments', 'DBA_arguments'), query.mock.calls[0]![1], { maxRows: 1, timeoutSeconds: 5 }]);
 	expect(close).toHaveBeenCalledOnce();
 });
 for (const mode of ['empty', 'nonempty', '00942', '01031'] as const) it(`omits note for ${mode}`, async () => {
@@ -59,9 +59,45 @@ for (const statement of [
 	await tools.find(t => t.name === 'run_query')!.execute('1', { sql: statement });
 	expect(query).toHaveBeenCalledOnce();
 });
-it('propagates unexpected probe failures and closes the session', async () => {
+
+for (const message of ['ORA-03113: disconnected', 'ORA-01476: divisor is equal to zero', 'ORA-01722: invalid number', 'Statement timed out']) it(`preserves the primary result when the probe fails: ${message}`, async () => {
 	const { tools, query, close } = setup();
-	query.mockResolvedValueOnce(empty).mockRejectedValueOnce(new Error('ORA-03113: disconnected'));
-	await expect(tools.find(t => t.name === 'run_query')!.execute('1', { sql })).rejects.toThrow('03113');
+	query.mockResolvedValueOnce(empty).mockRejectedValueOnce(new Error(message));
+	const result = await tools.find(t => t.name === 'run_query')!.execute('1', { sql });
+	expect(result.details).toEqual(empty);
+	expect(result.content[0]).toEqual({ type: 'text', text: 'N' });
+	expect(query).toHaveBeenCalledTimes(2);
 	expect(close).toHaveBeenCalledOnce();
+});
+it('respects a configured timeout shorter than five seconds', async () => {
+	const { tools, query } = setup(2);
+	await tools.find(t => t.name === 'run_query')!.execute('1', { sql });
+	expect(query.mock.calls[1]?.[2]).toEqual({ maxRows: 1, timeoutSeconds: 2 });
+});
+for (const reject of [false, true]) it(`honors abort during the probe when rejection is ${reject}`, async () => {
+	const { tools, query, close } = setup();
+	const controller = new AbortController();
+	query.mockResolvedValueOnce(empty).mockImplementationOnce(async () => {
+		controller.abort();
+		if (reject) throw new Error('Statement timed out');
+		return { ...empty, rows: [[1]] };
+	});
+	await expect(tools.find(t => t.name === 'run_query')!.execute('1', { sql }, controller.signal)).rejects.toThrow('Tool aborted');
+	expect(close).toHaveBeenCalledOnce();
+});
+it('honors abort after the primary query without starting a probe', async () => {
+	const { tools, query, close } = setup();
+	const controller = new AbortController();
+	query.mockImplementationOnce(async () => { controller.abort(); return empty; });
+	await expect(tools.find(t => t.name === 'run_query')!.execute('1', { sql }, controller.signal)).rejects.toThrow('Tool aborted');
+	expect(query).toHaveBeenCalledOnce();
+	expect(close).toHaveBeenCalledOnce();
+});
+it('accepts leading comments without rewriting them', async () => {
+	const { tools, query } = setup();
+	const statement = '-- all_objects\n/* all_source */ ' + sql;
+	query.mockResolvedValueOnce(empty).mockResolvedValueOnce({ ...empty, rows: [[1]] });
+	const result = await tools.find(t => t.name === 'run_query')!.execute('1', { sql: statement });
+	expect(query.mock.calls[1]?.[0]).toBe(statement.replace('FROM all_arguments', 'FROM DBA_arguments'));
+	expect(result.details.sourceNote).toContain('Re-run with DBA_ARGUMENTS.');
 });
