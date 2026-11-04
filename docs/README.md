@@ -29,6 +29,8 @@ revision they checked; use the status page and current code for today's behavior
 ## Reports, grounding and web UI
 
 - [report.md](report.md) — Read-only DBA report sections, CLI options, summary grounding and live verification.
+- [triage.md](triage.md) — Issue evidence, constraint resolution, debug SQL, traces and exports.
+- [triage-nightly-purge.md](triage-nightly-purge.md) and [triage-k7q-failjob.md](triage-k7q-failjob.md) — Generated read-only triage examples.
 - [plsql.md](plsql.md) — Read-only PL/SQL signatures, source, dependencies, graphs and exports.
 - [drift.md](drift.md) — Read-only cross-target metadata comparisons, scopes, exports and incomplete results.
 - [grounding.md](grounding.md) — Evidence checks, numeric-only corrections, unverified facts and measurement results.

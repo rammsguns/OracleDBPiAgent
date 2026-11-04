@@ -27,7 +27,7 @@ export function redact(text: string): string {
 
 const str = (v: unknown) => v == null ? '' : v instanceof Date ? v.toISOString() : String(v);
 export class Dictionary {
-	constructor(private ctx: ToolContext, readonly target: string) {
+	constructor(private ctx: ToolContext, readonly target: string, private redactText: (text: string) => string = redact) {
 		if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned PL/SQL target');
 	}
 	private async read<T>(suffix: string, select: string, where: string, binds: Record<string, unknown>, map: (r: unknown[]) => T, cap = this.ctx.config.limits.maxRows): Promise<Evidence<T>> {
@@ -39,7 +39,7 @@ export class Dictionary {
 			try {
 				const result = await session.query(sql, binds, { maxRows: cap, timeoutSeconds: this.ctx.config.limits.statementTimeoutSeconds });
 				await this.ctx.audit.record({ ...base, kind: 'tool_call', rows: result.rows.length, truncated: result.truncated, elapsedMs: result.elapsedMs });
-				return { status: 'ok', view, rows: result.rows.map(r => map(r.map(v => typeof v === 'string' && suffix !== 'SOURCE' ? redact(v) : v))), truncated: result.truncated, attempts };
+				return { status: 'ok', view, rows: result.rows.map(r => map(r.map(v => typeof v === 'string' && suffix !== 'SOURCE' ? this.redactText(v) : v))), truncated: result.truncated, attempts };
 			} catch (error) {
 				if (error instanceof UnsupportedVersionError) throw error;
 				const code = /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED';
@@ -62,7 +62,7 @@ export class Dictionary {
 			const last = rows.at(-1); if (last) { afterType = last.type; afterLine = last.line; }
 		} while (result.status === 'ok' && result.truncated && result.rows.length && rows.length < 2000);
 		// Redact after assembling pages, preserving dictionary line boundaries.
-		const lines = redact(rows.map(r => r.text).join('\n')).split('\n');
+		const lines = this.redactText(rows.map(r => r.text).join('\n')).split('\n');
 		let offset = 0;
 		const safe = rows.map(r => { const count = r.text.split('\n').length; const text = lines.slice(offset, offset + count).join('\n'); offset += count; return { ...r, text }; });
 		return { ...result, rows: safe, attempts: [...new Map(attempts.map(a => [a.view + a.code, a])).values()] };
