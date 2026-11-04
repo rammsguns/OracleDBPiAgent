@@ -185,43 +185,36 @@ const fixtures = [
 	{
 		"id": "hard-p16-purge-behavior",
 		"columns": [
-			"LINE",
 			"TABLE_NAME"
 		],
 		"rows": [
 			[
-				26,
 				"ORDER_LINES"
 			],
 			[
-				27,
 				"ORDERS"
 			]
 		],
-		"note": "It deletes ORDER_LINES first, then ORDERS older than 7 days using ORDERED_AT, and commits at line 28. There is no status filter.",
+		"note": "It deletes child rows first, then parent rows older than 7 days using ORDERED_AT, and commits at line 28. There is no status filter.",
 		"prose": [
-			"Line 26 deletes from ORDER_LINES.",
-			"Line 27 deletes from ORDERS."
+			"It deletes from ORDER_LINES.",
+			"It deletes from ORDERS."
 		],
 		"wrong": [
 			[
 				[
-					27,
-					"ORDER_LINES"
+					"PRODUCTS"
 				],
 				[
-					27,
 					"ORDERS"
 				]
 			],
 			[
 				[
-					26,
 					"ORDER_LINES"
 				],
 				[
-					27,
-					"ORDER_LINES"
+					"CUSTOMERS"
 				]
 			]
 		]
@@ -286,46 +279,50 @@ const fixtures = [
 	{
 		"id": "hard-p16-purge-constraint",
 		"columns": [
-			"CONSTRAINT_NAME",
-			"CHILD_TABLE",
-			"CHILD_COLUMN",
-			"PARENT_TABLE",
-			"PARENT_COLUMN",
-			"DELETE_RULE"
+			"ROLE",
+			"TABLE_NAME",
+			"COLUMN_NAME"
 		],
 		"rows": [
 			[
-				"SYS_C007669",
+				"CHILD",
 				"ORDER_LINES",
-				"ORDER_ID",
+				"ORDER_ID"
+			],
+			[
+				"PARENT",
 				"ORDERS",
-				"ORDER_ID",
-				"NO ACTION"
+				"ORDER_ID"
 			]
 		],
-		"note": "ORA-02292 means child records remain and block parent deletion.",
+		"note": "ORA-02292 means child records remain and block parent deletion. Constraint SYS_C007669 has delete rule NO ACTION.",
 		"prose": [
-			"Constraint SYS_C007669 connects child ORDER_LINES column ORDER_ID to parent ORDERS column ORDER_ID, with delete rule NO ACTION."
+			"The CHILD table is ORDER_LINES with column ORDER_ID.",
+			"The PARENT table is ORDERS with column ORDER_ID."
 		],
 		"wrong": [
 			[
 				[
-					"SYS_C007669",
+					"CHILD",
 					"ORDERS",
-					"ORDER_ID",
-					"ORDERS",
-					"ORDER_ID",
-					"NO ACTION"
+					"ORDER_ID"
+				],
+				[
+					"PARENT",
+					"ORDER_LINES",
+					"ORDER_ID"
 				]
 			],
 			[
 				[
-					"SYS_C007669",
+					"CHILD",
 					"ORDER_LINES",
-					"ORDER_ID",
+					"PRODUCT_ID"
+				],
+				[
+					"PARENT",
 					"ORDERS",
-					"ORDER_ID",
-					"CASCADE"
+					"ORDER_ID"
 				]
 			]
 		]
@@ -527,53 +524,47 @@ const fixtures = [
 			"ARGUMENT_NAME",
 			"POSITION",
 			"IN_OUT",
-			"DATA_TYPE",
-			"DEFAULTED"
+			"DATA_TYPE"
 		],
 		"rows": [
 			[
 				"P_EMP_ID",
 				1,
 				"IN",
-				"NUMBER",
-				"N"
+				"NUMBER"
 			],
 			[
 				"P_START_DATE",
 				2,
 				"IN",
-				"DATE",
-				"N"
+				"DATE"
 			],
 			[
 				"P_END_DATE",
 				3,
 				"IN",
-				"DATE",
-				"N"
+				"DATE"
 			],
 			[
 				"P_JOB_ID",
 				4,
 				"IN",
-				"VARCHAR2",
-				"N"
+				"VARCHAR2"
 			],
 			[
 				"P_DEPARTMENT_ID",
 				5,
 				"IN",
-				"NUMBER",
-				"N"
+				"NUMBER"
 			]
 		],
 		"note": "DEFAULTED N means no argument has a default.",
 		"prose": [
-			"P_EMP_ID is argument 1, mode IN, datatype NUMBER, defaulted N.",
-			"P_START_DATE is argument 2, mode IN, datatype DATE, defaulted N.",
-			"P_END_DATE is argument 3, mode IN, datatype DATE, defaulted N.",
-			"P_JOB_ID is argument 4, mode IN, datatype VARCHAR2, defaulted N.",
-			"P_DEPARTMENT_ID is argument 5, mode IN, datatype NUMBER, defaulted N."
+			"P_EMP_ID is argument 1, mode IN, datatype NUMBER.",
+			"P_START_DATE is argument 2, mode IN, datatype DATE.",
+			"P_END_DATE is argument 3, mode IN, datatype DATE.",
+			"P_JOB_ID is argument 4, mode IN, datatype VARCHAR2.",
+			"P_DEPARTMENT_ID is argument 5, mode IN, datatype NUMBER."
 		],
 		"wrong": [
 			[
@@ -581,36 +572,31 @@ const fixtures = [
 					"P_EMP_ID",
 					1,
 					"IN",
-					"NUMBER",
-					"N"
+					"NUMBER"
 				],
 				[
 					"P_START_DATE",
 					2,
 					"IN",
-					"NUMBER",
-					"N"
+					"NUMBER"
 				],
 				[
 					"P_END_DATE",
 					3,
 					"IN",
-					"DATE",
-					"N"
+					"DATE"
 				],
 				[
 					"P_JOB_ID",
 					4,
 					"IN",
-					"VARCHAR2",
-					"N"
+					"VARCHAR2"
 				],
 				[
 					"P_DEPARTMENT_ID",
 					5,
 					"IN",
-					"NUMBER",
-					"N"
+					"NUMBER"
 				]
 			],
 			[
@@ -618,36 +604,31 @@ const fixtures = [
 					"P_EMP_ID",
 					1,
 					"IN",
-					"NUMBER",
-					"N"
+					"NUMBER"
 				],
 				[
 					"P_START_DATE",
 					2,
 					"IN",
-					"DATE",
-					"N"
+					"DATE"
 				],
 				[
 					"P_END_DATE",
 					3,
 					"IN",
-					"DATE",
-					"N"
+					"DATE"
 				],
 				[
 					"P_JOB_ID",
 					4,
 					"IN",
-					"VARCHAR2",
-					"N"
+					"VARCHAR2"
 				],
 				[
 					"P_DEPARTMENT_ID",
 					5,
-					"IN",
-					"NUMBER",
-					"Y"
+					"OUT",
+					"NUMBER"
 				]
 			]
 		]

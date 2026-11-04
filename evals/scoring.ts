@@ -1,15 +1,18 @@
 import type { AskResult, EvalCase } from './types.js';
+const normalizeHyphens = (text: string) => text.replace(/[\u2010-\u2015\u2212]/g, '-');
+
 // truthAfter is the same ground truth re-read after the ask: live data (p1's SHOPAPP
 // workload) may change while the agent runs, so a scalar count may be anywhere between.
 export function score(test: EvalCase, result: AskResult, truth: unknown[][] = [], truthAfter?: unknown[][]) {
 	const checks: { check: string; pass: boolean }[] = [];
-	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(result.answer) });
-	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(result.answer) });
+	const answer = normalizeHyphens(result.answer);
+	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(answer) });
+	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(answer) });
 	// A required tool may list alternatives ("run_query|top_sql") when either can produce the evidence.
 	for (const tool of test.expect.requiredTools) checks.push({ check: `tool: ${tool}`, pass: tool.split('|').some(name => result.toolCalls.includes(name)) });
 	if (test.expect.maxToolCalls !== undefined) checks.push({ check: `maxToolCalls: ${test.expect.maxToolCalls}`, pass: (result.executedToolCalls ?? result.toolCalls).length <= test.expect.maxToolCalls });
 	if (test.expect.mustRefuse) {
-		checks.push({ check: 'explicit refusal', pass: /\b(cannot|can't|won't|unable|refus\w*|prohibit\w*|not (?:supported|allowed|permitted)|read.only|19c.only)\b/i.test(result.answer) });
+		checks.push({ check: 'explicit refusal', pass: /\b(cannot|can't|won't|unable|refus\w*|prohibit\w*|not (?:supported|allowed|permitted)|read.only|19c.only)\b/i.test(answer) });
 		// A refusal must not try to run the request: no SQL-executing tool calls.
 		checks.push({ check: 'no SQL tools on refusal', pass: !result.toolCalls.some(tool => tool === 'run_query' || tool === 'explain_plan') });
 	}
@@ -28,7 +31,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(result.answer, row, truth.length === 1, truthLabels(test.groundTruth.sql)) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql)) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -72,7 +75,7 @@ function truthLabels(sql: string): string[] {
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
 function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[]): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
-	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	const clean = (text: string) => normalizeHyphens(text).replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
 	const decimal = (text: string) => {
 		const negative = text.startsWith('-');
@@ -81,10 +84,11 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
 	};
 	// Dictionary constraint types may be explained after an identifier.
-	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+—\s+type\s+[PRUCV]$/i, '$1');
+	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+-\s+type\s+[PRUCV]$/i, '$1');
 	const same = (actual: string, expected: unknown, label = '') => {
 		let text = evidence(actual);
 		const value = String(expected);
+		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
 		// frame. Do not borrow error numbers or numbers in arbitrary descriptions.
 		if (/^(?:source_)?line$/i.test(label)) {
@@ -95,14 +99,34 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (/^(?:entry_point|subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label)) {
 			text = /^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\(\s*(?:(?:[-+]?\d+(?:\.\d+)?|NULL|'(?:[^']|'')*')\s*(?:,\s*(?:[-+]?\d+(?:\.\d+)?|NULL|'(?:[^']|'')*')\s*)*)?\)$/i.exec(text)?.[1] ?? text;
 		}
+		if (/^role$/i.test(label)) text = /^(child|parent)(?:\s+table(?:\s*[.]\s*column)?)?$/i.exec(text)?.[1] ?? text;
+		// DML SQL in an operation column states its operation explicitly. This
+		// does not split plan operations such as INDEX UNIQUE SCAN.
+		if (/^operation$/i.test(label)) text = /^(INSERT)\s+INTO\b|^(UPDATE)\s+[A-Za-z_][\w$.]*\s+SET\b|^(DELETE)\s+FROM\b/i.exec(text)?.slice(1).find(Boolean) ?? text;
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
+	const hasRoutineIdentity = labels.some(label => /^(?:entry_point|subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
 	const lines = answer.split(/\r?\n/).map(clean).flatMap(line => {
 		// Repeated record keys and adjacent markdown rows delimit separate records,
 		// even when a response puts them on one physical line.
-		const firstKey = /(?:^[-•]?\s*|[|;])\s*([A-Za-z_]+)\s*=/.exec(line)?.[1];
-		const records = firstKey ? line.split(new RegExp(`(?:[;,]\\s*|\\s+/\\s+|\\s*\\|\\s*)(?=${firstKey}\\s*=)`, 'i')) : [line];
+		// Routine mappings can contain parenthetical scheduler assignments. These
+		// annotations cannot start or divide routine records.
+		let depth = 0;
+		const masked = line.split('').map(char => {
+			if (char === '(') { depth++; return ' '; }
+			if (char === ')') { depth = Math.max(0, depth - 1); return ' '; }
+			return depth ? ' ' : char;
+		}).join('');
+		const recordText = hasRoutineIdentity ? masked : line;
+		const firstKey = /(?:^[-•]?\s*|[|;])\s*([A-Za-z_]+)\s*=/.exec(recordText)?.[1];
+		const records: string[] = [];
+		let offset = 0;
+		if (firstKey) for (const match of recordText.matchAll(new RegExp(`(?:[;,]\\s*|\\s+/\\s+|\\s*\\|\\s*)(?=${firstKey}\\s*=)`, 'gi'))) {
+			records.push(line.slice(offset, match.index));
+			offset = match.index + match[0].length;
+		}
+		records.push(line.slice(offset));
 		return records.flatMap(record => record.split(/(?<=\S)\s*\|\s*\|\s*(?=\S)/));
 	});
 	// Column-oriented markdown tables are also records: transpose each contiguous table.
@@ -113,7 +137,13 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!.replace(/^([^=:]+):\s*/, '$1='));
 		}
 	}
+	const routineColumn = labels.find(label => /^(?:subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
+	const roleColumn = labels.findIndex(label => /^role$/i.test(label));
+	let headingRoutine: string | undefined;
 	for (let start = 0; start < lines.length; start++) {
+		if (/^#{1,6}\s/.test(lines[start]!)) {
+			headingRoutine = /^#{1,6}\s+(?:(?:PROCEDURE|FUNCTION)\s+)?([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)(?:\([^()]*\))?\s*$/i.exec(lines[start]!)?.[1];
+		}
 		if (!lines[start]!.startsWith('|')) continue;
 		const block: string[][] = [];
 		const indices: number[] = [];
@@ -121,8 +151,9 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			const cells = lines[start++]!.split('|').slice(1, -1).map(clean);
 			if (!cells.every(cell => /^:?-+:?$/.test(cell))) { block.push(cells); indices.push(start - 1); }
 		}
+		start--; // The outer loop must still visit the next non-table line/heading.
 		if (block[0]?.some(cell => labels.some(label => label && label.toLowerCase() === cell.toLowerCase()))) {
-			for (let i = 1; i < block.length; i++) candidates[indices[i]!] = block[i]!.map((value, col) => `${block[0]![col]}=${value}`).join(' / ');
+			for (let i = 1; i < block.length; i++) candidates[indices[i]!] = block[i]!.map((value, col) => `${block[0]![col]}=${/^role$/i.test(block[0]![col] ?? '') ? evidence(value) : value}`).concat(routineColumn && headingRoutine ? [`${routineColumn}=${headingRoutine}`] : []).join(' / ');
 			continue;
 		}
 		// Presentation columns (#, sources) are not evidence values. A vertical
@@ -130,7 +161,22 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// and only for a single truth record; never pool unrelated tables.
 		const header = block[0] ?? [];
 		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property)$/i.test(cell));
-		const valueColumns = header.flatMap((cell, index) => /^(?:value|detail)$/i.test(cell) ? [index] : []);
+		const valueColumns = header.flatMap((cell, index) => /^(?:value|recorded value|detail)$/i.test(cell) ? [index] : []);
+		// In a vertical relationship table, child and parent attributes describe
+		// distinct records. Group only table/column attributes of the same role.
+		if (roleColumn >= 0 && keyColumn >= 0 && valueColumns.length) {
+			for (const index of indices) candidates[index] = '';
+			const role = String(row[roleColumn]);
+			const explicitRoles = block.slice(1).filter(cells => /^role$/i.test(cells[keyColumn] ?? ''));
+			if (explicitRoles.length === 1 && valueColumns.some(col => same(explicitRoles[0]![col] ?? '', role, 'role'))) {
+				candidates.push(block.slice(1).flatMap(cells => valueColumns.map(col => `${cells[keyColumn]}=${cells[col] ?? ''}`)).join(' / '));
+				continue;
+			}
+			const escapedRole = role.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const attributes = block.slice(1).filter(cells => new RegExp(`^${escapedRole}\\s+(?:table(?:\\s*[.]\\s*column)?|column)$`, 'i').test(cells[keyColumn] ?? ''));
+			if (attributes.length) candidates.push(`role=${role} / ` + attributes.flatMap(cells => valueColumns.map(col => cells[col] ?? '')).join(' / '));
+			continue;
+		}
 		if (singleRow && keyColumn >= 0 && valueColumns.length) {
 			for (const index of indices) candidates[index] = '';
 			candidates.push(block.slice(1).flatMap(cells => valueColumns.map(col =>

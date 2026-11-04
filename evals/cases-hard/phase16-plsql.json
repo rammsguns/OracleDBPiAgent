@@ -40,13 +40,13 @@
 		"split": "challenge",
 		"question": "On p1, explain what SHOPAPP.WORKLOAD.NIGHTLY_PURGE deletes, in what order, how it selects old data, and where it commits. Does its selection depend on order status?",
 		"groundTruth": {
-			"sql": "SELECT line,UPPER(REGEXP_SUBSTR(text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source WHERE owner='SHOPAPP' AND name='WORKLOAD' AND type='PACKAGE BODY' AND REGEXP_LIKE(text,'^ *DELETE FROM','i') ORDER BY line",
+			"sql": "SELECT UPPER(REGEXP_SUBSTR(text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source WHERE owner='SHOPAPP' AND name='WORKLOAD' AND type='PACKAGE BODY' AND REGEXP_LIKE(text,'^ *DELETE FROM','i') ORDER BY line",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
 				"(7|seven).{0,30}day",
-				"order_lines.{0,100}(before|then|first|orders)|first.{0,100}order_lines",
+				"ORDER_LINES[^.\\n]{0,80}(?:first|before|then[^.\\n]{0,40}ORDERS)|first[^.\\n]{0,30}delet[^.\\n]{0,30}ORDER_LINES|child[^.\\n]{0,30}(?:rows\\s+)?first|child.before.parent",
 				"commit",
 				"(not|no|without|regardless).{0,60}status|status.{0,60}(not|no|irrelevant)",
 				"ordered_at"
@@ -82,16 +82,20 @@
 		"split": "challenge",
 		"question": "On p1, investigate the recorded NIGHTLY_PURGE_JOB referential-integrity failure. Identify the error, constraint, child table and column, parent table and column, and delete rule; explain why deleting the parent can be blocked.",
 		"groundTruth": {
-			"sql": "SELECT c.constraint_name,c.table_name AS child_table,cc.column_name AS child_column,p.table_name AS parent_table,pc.column_name AS parent_column,c.delete_rule FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
+			"sql": "SELECT 'CHILD' AS role,c.table_name AS table_name,cc.column_name AS column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY) UNION ALL SELECT 'PARENT' AS role,p.table_name AS table_name,pc.column_name AS column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
 				"ORA-02292",
-				"(child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)"
+				"(child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)",
+				"\\bSYS_C007669\\b",
+				"\\bNO\\s+ACTION\\b"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?<!not )(?<!not claim that )(?<!cannot conclude that )(?:DELETE_RULE|delete rule)[`*]*\\s*(?:=|\\||:)\\s*[`*]*(?:NULL|CASCADE)\\b"
+			],
 			"mustRefuse": false
 		}
 	},
@@ -131,7 +135,7 @@
 				"(old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
 				"JOB_ID",
 				"DEPARTMENT_ID",
-				"(?:UPDATE\\s+OF|(?:updates?|changes?)\\s+(?:to|of|in))[^.\\n]{0,100}(?:JOB_ID|DEPARTMENT_ID)|(?:JOB_ID|DEPARTMENT_ID)[^.\\n]{0,80}(?:updat|chang)"
+				"UPDATE\\s+OF\\s+[*`]*(?:JOB_ID|DEPARTMENT_ID)|(?:JOB_ID|DEPARTMENT_ID)[^.\\n]{0,60}(?:JOB_ID|DEPARTMENT_ID)[^.\\n]{0,60}(?:column[^.\\n]{0,20})?(?:is\\s+|are\\s+)?updated"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [],
@@ -168,11 +172,13 @@
 		"split": "challenge",
 		"question": "On d1, list every argument of HR.ADD_JOB_HISTORY in declaration order, with name, position, mode and resolved datatype. Are any arguments defaulted?",
 		"groundTruth": {
-			"sql": "SELECT argument_name,position,in_out,data_type,defaulted FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
+			"sql": "SELECT argument_name,position,in_out,data_type FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
 			"mode": "rowCells"
 		},
 		"expect": {
-			"requiredFacts": [],
+			"requiredFacts": [
+				"Defaults?[*`]*\\s*:\\s*[*`]*(?:No|None)\\b|\\b(?:no|none)[^.\\n]{0,60}default|\\b(?:all|every)[^.\\n]{0,60}DEFAULTED\\s*=\\s*N\\b"
+			],
 			"requiredTools": [],
 			"forbiddenClaims": [],
 			"mustRefuse": false

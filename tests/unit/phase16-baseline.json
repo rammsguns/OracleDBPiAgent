@@ -1259,11 +1259,9 @@
 		],
 		"hard-p16-purge-behavior": [
 			[
-				26,
 				"ORDER_LINES"
 			],
 			[
-				27,
 				"ORDERS"
 			]
 		],
@@ -1283,12 +1281,14 @@
 		],
 		"hard-p16-purge-constraint": [
 			[
-				"SYS_C007669",
+				"CHILD",
 				"ORDER_LINES",
-				"ORDER_ID",
+				"ORDER_ID"
+			],
+			[
+				"PARENT",
 				"ORDERS",
-				"ORDER_ID",
-				"NO ACTION"
+				"ORDER_ID"
 			]
 		],
 		"hard-p16-purge-line": [
@@ -1344,36 +1344,31 @@
 				"P_EMP_ID",
 				1,
 				"IN",
-				"NUMBER",
-				"N"
+				"NUMBER"
 			],
 			[
 				"P_START_DATE",
 				2,
 				"IN",
-				"DATE",
-				"N"
+				"DATE"
 			],
 			[
 				"P_END_DATE",
 				3,
 				"IN",
-				"DATE",
-				"N"
+				"DATE"
 			],
 			[
 				"P_JOB_ID",
 				4,
 				"IN",
-				"VARCHAR2",
-				"N"
+				"VARCHAR2"
 			],
 			[
 				"P_DEPARTMENT_ID",
 				5,
 				"IN",
-				"NUMBER",
-				"N"
+				"NUMBER"
 			]
 		],
 		"hard-p16-failed-lab-job": [

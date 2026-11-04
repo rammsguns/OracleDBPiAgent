@@ -1283,3 +1283,240 @@ accounts via the existing session layer. The local dependency symlink was
 removed after checks. External review and any fresh baseline remain coordinator
 work; the archive rescore is fully offline and cannot establish how a changed
 agent will behave.
+
+### WP-16F: gate-16e case/scorer correction and complete triage
+
+Started with `git merge master` (fast-forward to `b8867fd`; no rebase).
+The selected gate is exactly the eight `files.tsv` rows labelled `p16-1` through
+`p16-4` in `eval-archive/phase16/gate-16e/`: A = master, B = master plus WP-16E
+fallback. Those archives used the original phase16 cases. Replaying them first
+with the pre-follow-up master cases and scorer reproduces **A 16/40, B 24/40**.
+After the corrections below, the same answers score **A 17/40 (42.5%),
+B 32/40 (80%)**. All forty former passes are preserved. Nine of forty failures
+are artifacts; the other thirty-one remain failures.
+
+| Pair | A before | A corrected | B before | B corrected |
+|---|---:|---:|---:|---:|
+| p16-1 | 4/10 | 4/10 | 6/10 | 9/10 |
+| p16-2 | 3/10 | 4/10 | 5/10 | 7/10 |
+| p16-3 | 5/10 | 5/10 | 6/10 | 9/10 |
+| p16-4 | 4/10 | 4/10 | 7/10 | 7/10 |
+| Total | 16/40 | 17/40 | 24/40 | 32/40 |
+
+Every failure under the pre-follow-up master scorer/cases is triaged below.
+“Real” includes omitted requested facts and incorrect assertions, even when
+another part of the answer has a presentation artifact. “Artifact” means the
+requested facts are correct and present. Sides A/B name product variants and
+are independent of this classification. Only the stored final answer is graded:
+“my previous answer stands” cannot substitute for missing answer text.
+
+| Pair | Side | Case (without hard-p16-) | Class | Evidence / disposition |
+|---|:---:|---|---|---|
+| p16-1 | A | entry-points | Real | Declares WORKLOAD absent; supplies no public routines. |
+| p16-1 | A | writes | Real | Declares WORKLOAD absent; supplies no write map. |
+| p16-1 | A | purge-behavior | Real | Cannot find the source and supplies no deletion/age/commit behavior. |
+| p16-1 | A | purge-constraint | Real | Claims DELETE_RULE = NULL, despite a readable NO ACTION dictionary value. Correct relationship facts and an explanatory NO ACTION mention do not repair that explicit wrong value. Remains FAIL. |
+| p16-1 | A | security-trigger | Real | Gives generic HR sample code with an error_number placeholder; omits the actual 20205 error and wrongly says the routine is not retrievable. |
+| p16-1 | A | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+| p16-1 | B | writes | Artifact | All seven correct mappings appear in per-procedure tables. Procedure headings and SQL operation cells were not associated with each record. PASS. |
+| p16-1 | B | purge-behavior | Artifact | Correct child-first/parent-second deletes, seven-day ORDERED_AT predicate, commit at 28 and no status filter. Case unnecessarily demanded delete-line numbers 26/27. PASS. |
+| p16-1 | B | purge-constraint | Artifact | Correct Role/Table/Column/Constraint table gives child and parent on distinct rows; NO ACTION is separate. Packed truth row was the artifact. PASS. |
+| p16-1 | B | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+| p16-2 | B | entry-points | Real | Declares WORKLOAD absent after ALL_* queries; no public routines. |
+| p16-2 | B | purge-constraint | Artifact | Correct Role/Object/Detail table gives the child and parent qualified table.column values on separate rows, plus constraint and rule. Packed truth row was the artifact. PASS. |
+| p16-2 | B | security-trigger | Real | Stored final answer only defends 20205 and says the previous answer stands; omits the requested timing/events/rule explanation. |
+| p16-2 | B | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+| p16-2 | B | failed-lab-job | Artifact | Correct Field/Recorded value table has FAILED, ORA‑20001, quoted destination unavailable and ORA‑06512 line 1. Unicode hyphens, the value-header variant and quoted message caused a layout artifact. PASS. |
+| p16-2 | A | entry-points | Real | Declares WORKLOAD absent; no public routines. |
+| p16-2 | A | purge-behavior | Real | Declares the routine absent; no behavioral answer. |
+| p16-2 | A | scheduler-map | Artifact | All three job/entry-point pairs and 25 are correct. Semicolons inside parenthetical FREQ/INTERVAL schedule metadata split the table row before its entry point. PASS. |
+| p16-2 | A | purge-line | Real | Cannot locate the run/source and supplies none of the trace tuple; readable DBA evidence was not recovered. |
+| p16-2 | A | history-trigger | Real | Gives AFTER/row-level metadata and old values, but explicitly cannot confirm the update-column restriction. The old scope regex accidentally accepted an incidental mention; it now requires an actual scope assertion. Remains FAIL. |
+| p16-2 | A | security-trigger | Real | Stored final answer only defends 20205; no self-contained trigger explanation. |
+| p16-2 | A | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+| p16-3 | A | entry-points | Real | Declares WORKLOAD absent; no public routines. |
+| p16-3 | A | writes | Real | Declares WORKLOAD absent; no write map. |
+| p16-3 | A | purge-behavior | Real | Declares the routine absent; no behavioral answer. |
+| p16-3 | A | history-trigger | Real | Explicitly says the trigger is whole-table/not column-specific and fires for any UPDATE. Source restricts it to JOB_ID/DEPARTMENT_ID updates. |
+| p16-3 | A | history-arguments | Real | No argument list after ALL_* visibility failure. |
+| p16-3 | B | writes | Artifact | Correct per-procedure tables include all seven writes and distinguish reads. Headings/signatures and SQL operation cells were the artifact. PASS. |
+| p16-3 | B | purge-constraint | Artifact | Correct full constraint answer spells ORA‑02292 with U+2011. Unicode normalization fixes the required-fact check. PASS. |
+| p16-3 | B | security-trigger | Real | Stored final answer only defends 20205; no requested trigger explanation. |
+| p16-3 | B | history-arguments | Artifact | All five signatures, modes and resolved types are correct (including harmless type lengths). Defaults are correctly stated once below the table as No / every DEFAULTED=N. Requiring N in every argument row was the artifact. PASS. |
+| p16-4 | B | purge-constraint | Real | Explicitly says the ORA code was not captured and omits ORA-02292, after relying on empty ALL_* scheduler views. Correct constraint metadata does not fill the missing requested error. |
+| p16-4 | B | security-trigger | Real | Stored final answer only defends 20205; no self-contained trigger explanation. |
+| p16-4 | B | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+| p16-4 | A | entry-points | Real | Declares WORKLOAD absent; no public routines. |
+| p16-4 | A | writes | Real | Declares WORKLOAD absent; no write map. |
+| p16-4 | A | purge-behavior | Real | Declares the routine absent; no behavioral answer. |
+| p16-4 | A | purge-line | Real | Reports line 27 and DELETE/ORDERS but explicitly cannot name the enclosing subprogram, and wrongly says the package was dropped. |
+| p16-4 | A | history-trigger | Real | Declares UPDATE_JOB_HISTORY absent and substitutes a generic demo description with the wrong called procedure. |
+| p16-4 | A | history-arguments | Real | Declares ADD_JOB_HISTORY absent; no argument list. |
+
+Counts: A has 23 real failures and 1 artifact; B has 8 real failures and 8
+artifacts. This covers all 40 failing records, not just the reported examples.
+The constraints answers' suggested concurrent inserts/cutoff drift are
+hypotheses, not proof of a particular runtime race. Their requested relationship
+facts are graded independently; no fix asserts an unobserved runtime cause.
+
+Case changes are limited to `phase16-plsql.json`; no question or older case is
+changed:
+
+- Constraint truth has two records, `(CHILD, ORDER_LINES, ORDER_ID)` and
+  `(PARENT, ORDERS, ORDER_ID)`, from the same live dictionary/history join.
+  The constraint name and NO ACTION rule remain mandatory independent facts,
+  checked by regex and independently revalidated against the live dictionary.
+  They may appear outside the relationship table. Explicit DELETE_RULE/delete
+  rule field assertions of NULL or CASCADE are rejected even if a separate
+  discussion mentions NO ACTION. Swapped roles and wrong columns still fail.
+- Purge behavior no longer demands unasked source line numbers 26/27. Both
+  tables, the child-first order, seven-day ORDERED_AT predicate, commit and
+  absence of a status filter remain mandatory. A reversed parent-first
+  explanation is tested to fail. The separate purge-line case still demands 27.
+- Argument truth keeps each name/position/mode/type associated in its own row.
+  The independent no-defaults conclusion is mandatory but may be stated once,
+  as the question asks. Live metadata confirms all five DEFAULTED values are N;
+  an absent or Yes defaults conclusion fails.
+- The history-trigger scope regex now requires an affirmative UPDATE OF or
+  two-column updated assertion, rather than crediting an incidental job/department
+  mention in an explicit statement of uncertainty. Existing scope failures
+  remain failures; no gate record loses a former pass.
+
+General scorer changes stay within opt-in rowCells, apart from the requested
+answer normalization for fact/forbidden/refusal checks:
+
+- U+2010–U+2015 and U+2212 normalize to ASCII `-` before fact and row matching.
+  Unicode dash spelling does not change an ORA code, and wrong codes still fail.
+  The prior constraint “— type P” annotation remains recognized after normalization.
+- Relationship records recognize Child/Parent role annotations and qualified
+  table.column cells. A vertical Attribute/Value table groups only table/column
+  attributes of the same explicit or labelled role within that contiguous table.
+  Child and parent values cannot borrow across roles or separate tables.
+- For truth with a routine-identity column, parenthetical schedule assignments
+  cannot start or divide records. Routine-named Markdown section headings supply
+  that routine identity only to tables in that section; every following heading
+  resets the context. Adjacent headings are visited even without a blank line.
+- An OPERATION field containing literal INSERT INTO, UPDATE ... SET or DELETE
+  FROM SQL supplies its DML operation. This does not split plan operations such
+  as INDEX UNIQUE SCAN. Wrong verbs and wrong routine/table associations fail.
+- Field/Recorded value is a supported vertical header. Matching outer quotes
+  in a MESSAGE field are presentation; the message content must still match.
+  Numbering/source columns and unrelated table blocks cannot supply truth values.
+
+`tests/unit/phase16f-gate.json` stores all 80 actual answers, pre-follow-up/current
+pass flags and independently validated offline truth. Its replay test checks the
+entire pass matrix (including all 31 preserved real failures). Additional tests
+use the real Role/Table/Column and Role/Object/Detail blocks; they reject swapped
+roles, wrong columns, NULL/CASCADE, role pooling and table pooling. Heading tests
+reject stale/wrong routine context and wrong DML operations. All seven requested
+Unicode code points are tested with correct facts/rows plus wrong code/line
+mutations. Signature tests reject missing/Yes defaults; purge tests reject
+reversed order. The original three-layout/two-wrong-answer fixtures were updated
+for the owned case shapes; existing baseline answer text is unchanged.
+
+The archive-wide comparison reads every JSON recursively under `eval-archive/`.
+Old scorer/cases are from `b8867fd`. For phase16 it applies those current-master
+cases first (not the archived obsolete checks), using the same read-only metadata
+snapshots in the corresponding old/new shapes. For older cases, it reconstructs
+expectations and fresh truth from archived checks, preserving scalar bounds,
+tool requirements and SQL label binding exactly as in the previous offline
+comparison. Both implementations receive the same archived answer/tool calls.
+Nine execution-error records have neither answers nor checks; they remain recorded
+failures and cannot be rescored. No archived answer or database state is changed.
+
+Final snapshot: **272 JSON files / 6692 records**, captured
+at `2026-11-04T20:08:30.866Z`. Of these, 6683 are scored records.
+The committed [comparison report](phase16f-rescore.json) includes the complete
+file manifest, all record transitions, scorer-only check transitions and the
+nine unscorable errors. Local reproduction script: `/tmp/wp16f-rescore.mts`;
+old scorer: `/tmp/wp16f-old-scoring.mts`; old cases:
+`/tmp/wp16f-old-cases.json`; output: `/tmp/wp16f-rescore.txt`.
+
+| Archive group | Scored records | Old passes | Corrected passes |
+|---|---:|---:|---:|
+| baseline-dba | 238 | 236 | 236 |
+| phase10 | 109 | 108 | 108 |
+| phase11 | 102 | 79 | 79 |
+| phase11/gate-11b | 592 | 571 | 571 |
+| phase14/gate-14b-ch2 | 176 | 171 | 171 |
+| phase14/gate-14b | 592 | 580 | 580 |
+| phase15/gate-release | 196 | 189 | 189 |
+| phase16 | 30 | 13 | 13 |
+| phase16/gate-16e | 136 | 95 | 104 |
+| phase2 | 2767 | 2738 | 2738 |
+| phase5 | 163 | 157 | 157 |
+| phase6 | 428 | 421 | 421 |
+| phase8 | 36 | 36 | 36 |
+| review-wp-q | 198 | 198 | 198 |
+| review-wp-s | 166 | 165 | 165 |
+| review-wp-t | 160 | 160 | 160 |
+| wp-l-compact-describe | 118 | 118 | 118 |
+| wp-m-multi-describe | 40 | 40 | 40 |
+| wp-o-reasoning-budget | 198 | 198 | 198 |
+| wp-w-schema-health | 5 | 5 | 5 |
+| wp-x-instance-ops | 5 | 5 | 5 |
+| wp-y-dba-check | 228 | 217 | 217 |
+| Total | 6683 | 6500 | 6509 |
+
+The archive group `phase16/gate-16e` also contains 28 non-p16 gate records; all
+28 are unchanged. The original phase16 baseline remains 13/30. Every
+pre-phase16 record **and individual check** is unchanged; the comparison fails
+if any such check changes. No older case was edited, and the existing case SHA
+fixture still passes.
+
+Every record flip is FAIL → PASS, and all nine are in the selected gate:
+
+| Pair | Side | Case | Justification |
+|---|:---:|---|---|
+| p16-1 | B | writes | All seven correct mappings appear in per-procedure tables. Procedure headings and SQL operation cells were not associated with each record. PASS. |
+| p16-1 | B | purge-behavior | Correct child-first/parent-second deletes, seven-day ORDERED_AT predicate, commit at 28 and no status filter. Case unnecessarily demanded delete-line numbers 26/27. PASS. |
+| p16-1 | B | purge-constraint | Correct Role/Table/Column/Constraint table gives child and parent on distinct rows; NO ACTION is separate. Packed truth row was the artifact. PASS. |
+| p16-2 | B | purge-constraint | Correct Role/Object/Detail table gives the child and parent qualified table.column values on separate rows, plus constraint and rule. Packed truth row was the artifact. PASS. |
+| p16-2 | B | failed-lab-job | Correct Field/Recorded value table has FAILED, ORA‑20001, quoted destination unavailable and ORA‑06512 line 1. Unicode hyphens, the value-header variant and quoted message caused a layout artifact. PASS. |
+| p16-2 | A | scheduler-map | All three job/entry-point pairs and 25 are correct. Semicolons inside parenthetical FREQ/INTERVAL schedule metadata split the table row before its entry point. PASS. |
+| p16-3 | B | writes | Correct per-procedure tables include all seven writes and distinguish reads. Headings/signatures and SQL operation cells were the artifact. PASS. |
+| p16-3 | B | purge-constraint | Correct full constraint answer spells ORA‑02292 with U+2011. Unicode normalization fixes the required-fact check. PASS. |
+| p16-3 | B | history-arguments | All five signatures, modes and resolved types are correct (including harmless type lengths). Defaults are correctly stated once below the table as No / every DEFAULTED=N. Requiring N in every argument row was the artifact. PASS. |
+
+For the isolated scorer-only comparison (identical old case/truth on each side),
+five records flip: B p16-1 writes; B p16-2 failed-lab-job; A p16-2 scheduler-map;
+B p16-3 writes; B p16-3 purge-constraint. These account for all 18 scorer-only
+check flips, each FAIL → PASS:
+
+| Pair / side | Case | Checks corrected | Justification |
+|---|---|---|---|
+| p16-1 B | writes | All seven subprogram/table/operation rows | Correct procedure headings bind each SQL operation row to its subprogram. |
+| p16-2 B | failed-lab-job | The status/error/message/line row | Unicode normalization, Recorded value and quoted-message presentation. |
+| p16-2 A | scheduler-map | All three job/entry-point rows | Parenthetical schedule assignments no longer divide each mapping row. |
+| p16-3 B | writes | Six of seven operation rows; PRODUCTS/UPDATE already passed | Heading/DML normalization fixes the six remaining associations without pooling routines. |
+| p16-3 B | purge-constraint | Required fact ORA-02292 | U+2011 normalizes to ASCII hyphen. |
+
+The other four full-pipeline record flips require case corrections: B p16-1
+purge-behavior, B p16-1/p16-2 purge-constraint, and B p16-3 history-arguments.
+This lists and justifies every record flip and every scorer-only check flip;
+structural case-check changes are described above. No PASS → FAIL transition
+occurs in any archive.
+
+Read-only verification used `createSessionProvider` / `session.query` on only
+the two approved targets, with
+`PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets`:
+all ten current ground-truth SELECTs returned nonempty, non-NULL, untruncated
+rows. Separate SELECT assertions verified SYS_C007669 / ORDER_LINES / NO ACTION,
+source child-delete/parent-delete/commit order, five arguments with zero defaults,
+and AFTER UPDATE OF job_id, department_id. No DML, DDL or application PL/SQL was
+submitted.
+
+```text
+npm run typecheck
+PASSED (exit 0)
+npm test
+Test Files 57 passed (57)
+Tests 881 passed (881)
+Separate strict TypeScript check of owned tests/imported eval modules: PASSED.
+```
+
+No contracts, dependencies, product tools, DB code or LLM code changed.
+Integration tests were not required for these offline case/scorer changes.
+No LLM calls or eval-runner invocations occurred. The temporary dependency
+symlink was removed after checks. External review and any fresh gate remain
+coordinator work; these totals describe the same archived answers.
