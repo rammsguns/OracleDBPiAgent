@@ -289,3 +289,67 @@ shared contract changes.
 - No shared contract or dependency changes are needed. Concurrent-writer history
   serialization and differing owner scopes are outside this implementation;
   use consistent scopes and one scheduled writer per history directory.
+
+## Saved history and trends (WP-12A)
+
+```sh
+piagent report history --target d1-19c-lab
+piagent report history --target p1-19c-prod --last 10 --json
+```
+
+History reads saved files only: no database connection, agent or LLM calls. It uses
+`PIAGENT_REPORT_DIRECTORY`, or `<PIAGENT_HOME>/reports` (normally
+`~/.piagent/reports`). To inspect a custom `report --out` location, set
+`PIAGENT_REPORT_DIRECTORY` to that directory. Reading creates no directories.
+`--last` is an integer from 1 to 30 (default 30), selecting the newest N timestamped
+JSON filenames, including invalid files in that selection. Results run oldest to
+newest. An empty history is a successful result with no observations.
+
+The tab-separated table gives first/last observed values, min/max, change and a
+worsening flag. JSON includes `target`, `runs`, `scanned`, `skipped`, `notes`,
+`availability` and `series`. Each series has a stable `id`, `label`, `unit`,
+`points` (`generatedAt`, `value`, `source`), the five summary values and
+`worsening`. Each availability entry lists explicitly `unavailable` sections and
+`missing` expected trend sections at that timestamp. This API is exported as
+`loadReportHistory(dir, target, targets, last?)` from `history.ts` and
+`buildReportTrends(history)` / `renderTrends(result)` from `trends.ts`.
+
+Series cover each observed tablespace's used percent, visible failed scheduler
+runs, distinct stale-or-locked tables, distinct unusable-or-invisible indexes
+(including partition findings, counted once per index), and hours since the newest
+completed backup. Backup warnings count as completed, as in `diff.ts`; future or
+invalid backup times do not count. An empty completed-backup set is unknown age,
+not zero hours. Counts are bounded snapshot counts, not lifetime totals or rates.
+A never-analyzed table alone does not count as stale or locked.
+
+Worsening means the net first-to-last observed change: a count increases;
+tablespace usage rises at least 5 percentage points or crosses 85%; backup age
+crosses from at most 24 hours to over 24 hours. Numeric thresholds are imported
+from `DIFF_THRESHOLDS`, shared with diff. Intermediate spikes remain visible in
+max and points but do not alone set the net worsening flag. A single observation
+has no change. Changed sources suppress change and worsening for that series;
+first/last/min/max still describe the observations. Keep report owner and section
+scope consistent within a history directory, as with diffs.
+
+Missing sections, old column shapes, unavailable sections and missing individual
+tablespaces produce null observation gaps, with a counted note. Summaries use
+observed values only. Files with an invalid JSON/schema, duplicate sections,
+mismatched row widths, target or timestamp, symlinks, nonregular files or sizes
+above 2 MiB are skipped and counted; their raw contents never enter diagnostics.
+Files are opened without following symlinks and read with a fixed byte cap.
+Permission and I/O failures remain errors. Current partial reports remain usable
+for their valid sections. No history files or retention settings are changed.
+
+### WP-12A validation (2026-11-03)
+
+- `npm run typecheck`: passed.
+- `npm test`: 37 files, 638 tests passed.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- -t '^(?!.*answers one end-to-end)'`:
+  8 files passed; 26 tests passed, 1 LLM end-to-end test excluded.
+- Both live targets generated and saved three full reports in temporary private
+  directories, then loaded all three successfully with zero skipped files and
+  populated tablespace series. Temporary histories were removed afterwards.
+- Fixtures cover chronological summaries, source changes, unavailable/old sections,
+  count deduplication, backup age, corrupt/oversize/symlink/nonregular files,
+  retention and last-N boundaries, terminal controls and CLI isolation from DB/LLM.
+- No contract or dependency changes. Web files were untouched.

@@ -110,6 +110,13 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			}
 		} finally { await sessions.closeAll(); }
 	});
+	program.commands.find(command => command.name() === "report")!.command("history").description("Trends from saved reports; no database connection").option("--last <N>", "Newest saved files, 1–30", "30").option("--json").action(async (_options: unknown, command: Command) => {
+		const options = command.optsWithGlobals<{ target: string; last: string; json?: boolean }>();
+		const { loadReportHistory } = await import("../report/history.js");
+		const { buildReportTrends, renderTrends } = await import("../report/trends.js");
+		const result = buildReportTrends(await loadReportHistory(reportDirectory(), options.target, loadConfig().targets, /^\d+$/.test(options.last) ? Number(options.last) : NaN));
+		console.log(options.json ? JSON.stringify(result) : renderTrends(result));
+	});
 	program.command("targets").action(() => {
 		const cfg = loadConfig();
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
