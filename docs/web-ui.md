@@ -280,8 +280,11 @@ filtered by owner. Choose an object and **Document object** to see signatures,
 comments, status, errors, heuristic table operations, callers, jobs and redacted
 source. Expand the evidence sections to inspect dictionary availability and caps.
 The dependency SVG uses the documented `{nodes, edges}` JSON from
-[PL/SQL documentation](plsql.md). It lays nodes out left to right, labels edges,
-and scrolls independently at phone width. Long node labels have full SVG titles.
+[PL/SQL documentation](plsql.md). It lays nodes out left to right and fits the panel width, with independent scrolling
+below 600px. Edge colors and dash patterns distinguish calls, contains, reads,
+writes, dependencies and job runs; a legend explains them and hover titles preserve
+the original edge kind and operation. Parallel reads and writes have separate paths.
+Long node labels have full SVG titles.
 All dictionary labels are inserted as text, including SVG labels.
 
 The **Triage** tab accepts issue text, a target and a `since` window such as `24h`
@@ -313,3 +316,8 @@ In web chat, `/triage [--since <duration>] <issue text>` collects evidence for t
 then submits one bounded grounded question through the existing model path.
 Normal turns keep their original prompt and tools. This command uses Strata;
 the deterministic Triage panel does not. See [triage](triage.md).
+
+Oracle-supplied dependency nodes (owner `SYS` or `PUBLIC`) collapse to one
+`Oracle-supplied (N)` node in SVG and Mermaid rendering. Its tooltip lists the
+names; JSON graph nodes and edges remain complete. Source and dictionary evidence
+sections are unchanged.

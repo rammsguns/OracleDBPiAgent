@@ -60,3 +60,8 @@ td:nth-child(2) { max-width: 24rem; }
 	#plsql-panel, #triage-panel { background: #19282e; color: #e0edf0; padding: .5rem; --graph-fill: #223b45; }
 	.graph-scroll svg { color: #b8dce7; }
 }
+.graph-scroll svg { width: 100%; min-width: 600px; height: auto; }
+.graph-legend { display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: 0; list-style: none; font-size: .85rem; }
+.graph-legend li { display: flex; align-items: center; gap: .35rem; }
+.graph-legend svg { width: 32px; height: 12px; flex: none; }
+#triage-since { display: block; width: 12rem; font: inherit; padding: .5rem; margin-bottom: .75rem; }

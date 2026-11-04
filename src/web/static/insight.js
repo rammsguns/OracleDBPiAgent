@@ -11,66 +11,115 @@ function svgEl(tag, attrs = {}, text) {
 	return element;
 }
 
-function drawEdge(svg, edge, positions) {
+const edgeStyles = {
+	calls: { color: "#7853b5", dash: "2 4" },
+	contains: { color: "#64748b", dash: "" },
+	reads: { color: "#1684b3", dash: "7 4" },
+	writes: { color: "#c26516", dash: "12 3 2 3" },
+	"depends-on": { color: "#a04d78", dash: "3 3" },
+	"job runs": { color: "#25845b", dash: "10 4" },
+};
+
+function edgeKind(edge, nodes) {
+	if (/^(SELECT|reads)$/i.test(edge.label || edge.kind)) return "reads";
+	if (/^(INSERT|UPDATE|DELETE|MERGE|writes)$/i.test(edge.label || edge.kind)) return "writes";
+	if (nodes.get(edge.from)?.kind === "job") return "job runs";
+	if (edge.kind === "contains") return "contains";
+	if (edge.kind === "references" || edge.kind === "calls") return "calls";
+	return "depends-on";
+}
+
+function collapseOracleNodes(graph) {
+	const supplied = graph.nodes.filter(node =>
+		(node.kind === "object" || node.kind === "table") && /^(SYS|PUBLIC)\./.test(node.label));
+	if (!supplied.length) return graph;
+	const hidden = new Set(supplied.map(node => node.id));
+	let id = "oracle-supplied";
+	while (graph.nodes.some(node => node.id === id)) id += "_";
+	const nodes = graph.nodes.filter(node => !hidden.has(node.id));
+	nodes.push({
+		id,
+		kind: "object",
+		label: `Oracle-supplied (${supplied.length})`,
+		title: supplied.map(node => node.label).join("\n"),
+	});
+	const edges = graph.edges.map(edge => ({
+		...edge,
+		from: hidden.has(edge.from) ? id : edge.from,
+		to: hidden.has(edge.to) ? id : edge.to,
+	})).filter(edge => edge.from !== edge.to);
+	return { nodes, edges: [...new Map(edges.map(edge => [JSON.stringify(edge), edge])).values()] };
+}
+
+function graphLegend() {
+	const legend = el("ul");
+	legend.className = "graph-legend";
+	legend.setAttribute("aria-label", "Edge styles");
+	for (const [kind, style] of Object.entries(edgeStyles)) {
+		const item = el("li");
+		const swatch = svgEl("svg", { viewBox: "0 0 32 12", "aria-hidden": "true" });
+		swatch.append(svgEl("path", {
+			d: "M0 6 H32", stroke: style.color, "stroke-width": 2, "stroke-dasharray": style.dash,
+		}));
+		item.append(swatch, document.createTextNode(kind));
+		legend.append(item);
+	}
+	return legend;
+}
+
+function drawEdge(svg, edge, positions, nodes, nodeWidth, offset) {
 	const from = positions.get(edge.from);
 	const to = positions.get(edge.to);
 	if (!from || !to) return;
-	const x1 = from.x + 255;
-	const y1 = from.y + 30;
+	const x1 = from.x + nodeWidth;
+	const y1 = from.y + 52 + offset;
 	const x2 = to.x;
-	const y2 = to.y + 30;
+	const y2 = to.y + 52 + offset;
+	const kind = edgeKind(edge, nodes);
+	const style = edgeStyles[kind];
 	const path = svgEl("path", {
-		d: `M${x1} ${y1} C${x1 + 40} ${y1},${x2 - 40} ${y2},${x2} ${y2}`,
+		d: `M${x1} ${y1} C${x1 + 15} ${y1},${x2 - 15} ${y2},${x2} ${y2}`,
 		fill: "none",
-		stroke: "currentColor",
+		stroke: style.color,
+		"stroke-width": 2,
+		"stroke-dasharray": style.dash,
+		"data-edge-kind": kind,
 	});
-	const label = svgEl("text", {
-		x: (x1 + x2) / 2,
-		y: (y1 + y2) / 2 - 6,
-		"font-size": 12,
-	}, "→ " + (edge.label || edge.kind || "trace"));
+	path.append(svgEl("title", {}, `${kind} · ${edge.kind}${edge.label ? " · " + edge.label : ""}`));
 	svg.append(path);
-	svg.append(label);
 }
 
-function drawNode(svg, node, position) {
-	const group = svgEl("g");
+function drawNode(svg, node, position, nodeWidth) {
+	const group = svgEl("g", { "data-node-id": node.id });
 	const box = svgEl("rect", {
-		x: position.x,
-		y: position.y,
-		width: 255,
-		height: 65,
-		rx: 6,
-		fill: "var(--graph-fill, #edf5f6)",
-		stroke: "currentColor",
+		x: position.x, y: position.y, width: nodeWidth, height: 104, rx: 6,
+		fill: "var(--graph-fill, #edf5f6)", stroke: "currentColor",
 	});
-	group.append(svgEl("title", {}, node.label), box);
-	const text = svgEl("text", {
-		x: position.x + 8,
-		y: position.y + 20,
-		"font-size": 13,
-	});
+	group.append(svgEl("title", {}, node.title ?? node.label), box);
+	const text = svgEl("text", { x: position.x + 6, y: position.y + 20, "font-size": 13 });
 	const label = String(node.label);
-	for (let i = 0; i < Math.min(label.length, 90); i += 30) {
-		const line = svgEl("tspan", {
-			x: position.x + 8,
-			dy: i ? 17 : 0,
-		}, label.slice(i, i + 30));
-		text.append(line);
+	const chars = Math.max(4, Math.floor((nodeWidth - 12) / 7));
+	for (let i = 0; i < Math.min(label.length, chars * 5); i += chars) {
+		text.append(svgEl("tspan", {
+			x: position.x + 6, dy: i ? 17 : 0,
+		}, label.slice(i, i + chars)));
 	}
 	group.append(text);
 	svg.append(group);
 }
 
 export function drawGraph(graph) {
+	const view = collapseOracleNodes(graph);
 	const wrap = el("div");
-	wrap.className = "graph-scroll";
-	const svg = svgEl("svg", { role: "img", "aria-label": "Evidence dependency graph" });
-	const levels = new Map(graph.nodes.map(node => [node.id, 0]));
+	wrap.className = "graph-view";
+	const scroll = el("div");
+	scroll.className = "graph-scroll";
+	const svg = svgEl("svg", { role: "img", "aria-label": "Evidence dependency graph", width: "100%" });
+	const levels = new Map(view.nodes.map(node => [node.id, 0]));
 	// Bound relaxation so cyclic dependencies cannot keep moving nodes right.
-	for (let pass = 0; pass < Math.min(graph.nodes.length, 8); pass++) {
+	for (let pass = 0; pass < Math.min(view.nodes.length, 8); pass++) {
 		let changed = false;
-		for (const edge of graph.edges) {
+		for (const edge of view.edges) {
 			if (levels.has(edge.from) && levels.has(edge.to)) {
 				const next = Math.min(8, levels.get(edge.from) + 1);
 				if (next > levels.get(edge.to)) {
@@ -81,21 +130,37 @@ export function drawGraph(graph) {
 		}
 		if (!changed) break;
 	}
+	const columns = Math.max(0, ...levels.values()) + 1;
+	const width = 600;
+	const gap = 26;
+	const nodeWidth = (width - 30 - (columns - 1) * gap) / columns;
 	const counts = new Map();
 	const positions = new Map();
-	for (const node of graph.nodes) {
+	for (const node of view.nodes) {
 		const level = levels.get(node.id);
 		const row = counts.get(level) || 0;
 		counts.set(level, row + 1);
-		positions.set(node.id, { x: 15 + level * 320, y: 30 + row * 120 });
+		positions.set(node.id, { x: 15 + level * (nodeWidth + gap), y: 15 + row * 128 });
 	}
-	const width = 300 + Math.max(0, ...levels.values()) * 320;
-	const height = Math.max(140, ...[...counts.values()].map(count => count * 120));
+	const height = Math.max(140, ...[...counts.values()].map(count => count * 128));
 	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-	svg.style.width = width + "px";
-	for (const edge of graph.edges) drawEdge(svg, edge, positions);
-	for (const node of graph.nodes) drawNode(svg, node, positions.get(node.id));
-	wrap.append(svg);
+	const nodes = new Map(view.nodes.map(node => [node.id, node]));
+	// Separate parallel operations so reads and writes to one table remain visible.
+	const parallel = new Map();
+	for (const edge of view.edges) {
+		const key = JSON.stringify([edge.from, edge.to]);
+		if (!parallel.has(key)) parallel.set(key, []);
+		parallel.get(key).push(edge);
+	}
+	for (const edges of parallel.values()) {
+		for (const [index, edge] of edges.entries()) {
+			const offset = (index - (edges.length - 1) / 2) * 8;
+			drawEdge(svg, edge, positions, nodes, nodeWidth, offset);
+		}
+	}
+	for (const node of view.nodes) drawNode(svg, node, positions.get(node.id), nodeWidth);
+	scroll.append(svg);
+	wrap.append(scroll, graphLegend());
 	return wrap;
 }
 
@@ -282,6 +347,7 @@ function initTriage(api, targets) {
 	issue.rows = 8;
 	issue.required = true;
 	since.value = "24h";
+	view.form.append(view.run);
 	const download = el("button", "Download Markdown");
 	download.type = "button";
 	download.id = "triage-export";

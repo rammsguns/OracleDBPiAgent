@@ -5,8 +5,8 @@ test('PL/SQL tab, document, layered SVG, literal hostile labels at phone width',
 	await page.setViewportSize({ width: 375, height: 812 }); await page.goto(process.env.PIAGENT_BROWSER_URL!);
 	await page.locator('#plsql-tab').click(); await page.locator('#plsql-owner').fill('SHOPAPP'); await page.locator('#plsql-run').click();
 	await expect(page.locator('#plsql-object option')).toHaveCount(1); await page.locator('#plsql-doc').click();
-	await expect(page.locator('#plsql-content svg')).toHaveCount(1);
-	await expect(page.locator('#plsql-content svg title').first()).toHaveText(evil);
+	await expect(page.locator('#plsql-content .graph-scroll > svg')).toHaveCount(1);
+	await expect(page.locator('#plsql-content svg g title').first()).toHaveText(evil);
 	await expect(page.locator('#plsql-content svg text').first()).toContainText(evil);
 	await expect(page.locator('#plsql-content')).toContainText('Incomplete dictionary');
 	await expect(page.locator('#plsql-content script, #plsql-content img')).toHaveCount(0);
@@ -25,7 +25,7 @@ test('triage hypotheses, fixes, SQL, evidence, trace and Markdown download', asy
 	await expect(page.locator('#triage-content')).toContainText('Review retention policy');
 	await expect(page.locator('#triage-content pre')).toContainText('SELECT * FROM DBA_CONSTRAINTS');
 	await expect(page.locator('#triage-content td')).toHaveText(evil);
-	await expect(page.locator('#triage-content svg')).toHaveCount(1);
+	await expect(page.locator('#triage-content .graph-scroll > svg')).toHaveCount(1);
 	const download = page.waitForEvent('download'); await page.locator('#triage-export').click(); const file = await download; expect(file.suggestedFilename()).toBe('triage.md');
 	const stream = await file.createReadStream(); const chunks = []; for await (const chunk of stream!) chunks.push(chunk); expect(Buffer.concat(chunks).toString()).toContain('Foreign key child rows');
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -64,4 +64,46 @@ test("web chat rejects invalid windows with usage and no model prompt", async ({
 	}
 	const after = await (await request.get(process.env.PIAGENT_BROWSER_CONTROL!)).json();
 	expect(after.prompts).toBe(before.prompts);
+});
+
+test("graph collapses Oracle dependencies, distinguishes operations and fits a desktop panel", async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 1000 });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.locator("#plsql-tab").click();
+	await page.locator("#plsql-run").click();
+	await expect(page.locator("#plsql-object option")).toHaveCount(1);
+	await page.locator("#plsql-doc").click();
+	const graph = page.locator("#plsql-content .graph-scroll > svg");
+	await expect(graph.locator("g")).toHaveCount(6);
+	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("SYS.STANDARD");
+	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("PUBLIC.DBMS_RANDOM");
+	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("SYS." + evil);
+	await expect(graph.locator('[data-node-id="oracle-supplied"] text')).toHaveText("Oracle-supplied (3)");
+	await expect(graph.locator('[data-node-id="object:SYS.STANDARD"]')).toHaveCount(0);
+	await expect(page.locator("#plsql-content .graph-legend li")).toHaveCount(6);
+	await expect(page.locator("#plsql-content .graph-legend")).toContainText("reads");
+	await expect(page.locator("#plsql-content .graph-legend")).toContainText("writes");
+	await expect(graph.locator('path[data-edge-kind="writes"] title')).toContainText("INSERT");
+	await expect(graph.locator('path[data-edge-kind="reads"] title').first()).toContainText("SELECT");
+	expect(await graph.locator('path[data-edge-kind="writes"]').getAttribute("stroke"))
+		.not.toBe(await graph.locator('path[data-edge-kind="reads"]').first().getAttribute("stroke"));
+	expect(await graph.locator('path[data-edge-kind="writes"]').getAttribute("stroke-dasharray"))
+		.not.toBe(await graph.locator('path[data-edge-kind="reads"]').first().getAttribute("stroke-dasharray"));
+	expect(await graph.locator('path[data-edge-kind="writes"]').getAttribute("d"))
+		.not.toBe(await graph.locator('path[data-edge-kind="reads"]').last().getAttribute("d"));
+	await expect(graph.locator(":scope > text")).toHaveCount(0);
+	await expect(graph.locator("script, img")).toHaveCount(0);
+	expect(await graph.evaluate(svg => {
+		const parent = svg.parentElement!;
+		return parent.scrollWidth <= parent.clientWidth && svg.getBoundingClientRect().width <= parent.clientWidth;
+	})).toBe(true);
+});
+test("triage run follows a normally sized Since input", async ({ page }) => {
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.locator("#triage-tab").click();
+	const since = await page.locator("#triage-since").boundingBox();
+	const run = await page.locator("#triage-run").boundingBox();
+	expect(since!.width).toBeGreaterThan(120);
+	expect(since!.width).toBeLessThan(250);
+	expect(run!.y).toBeGreaterThanOrEqual(since!.y + since!.height);
 });
