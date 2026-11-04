@@ -1346,6 +1346,86 @@ on each side.
 ### Not in phase 11
 New tools, cloud LLMs, LLM-judged scoring, and changes to existing cases.
 
+## Phase 12: report history and scheduling (proposed 2026-11-03, awaiting owner approval)
+
+Phase 4 saves up to 30 report runs per target, but it only ever compares the
+newest two. It also leaves scheduling to the user's own cron. Phase 12 makes
+that history useful: trends across saved runs, an easy and safe way to
+schedule runs, and a local alert when something changes. It stays read-only,
+uses no LLM and costs no tokens. It starts after phase 11 closes, so eval
+gates are not disturbed.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-12A History and trends | `wp-12a-report-history` | `src/report/trends.ts` (new), `src/report/history.ts` (read helpers only), the `report history` subcommand in `src/cli/index.ts`, tests, `docs/report.md` | — |
+| WP-12B Schedule helper | `wp-12b-report-schedule` | `src/report/schedule.ts` (new), the `report schedule` subcommand in `src/cli/index.ts`, tests, `docs/report.md` | — |
+| WP-12C Web history view | `wp-12c-web-history` | `src/web/` (route and Report tab), browser tests, `docs/web-ui.md` | WP-12A |
+
+### WP-12A: history and trends
+- `piagent report history --target <t> [--last N] [--json]` reads saved runs
+  only. It never connects to a database.
+- Series per target:
+  - tablespace used % per tablespace;
+  - count of failed scheduler runs;
+  - count of stale or locked tables;
+  - count of unusable or invisible indexes;
+  - hours since the newest backup;
+  - which sections were unavailable.
+- Output is a compact table with first, last, min, max and change for each
+  series. It also gives a deterministic "worsening" flag, using the same
+  thresholds module as `diff.ts`, so the rules stay in one place.
+- Robust to old or partial saved files: a file with a missing section or an
+  older shape is skipped with a counted note, never a crash. Saved files are
+  treated as untrusted input; they are parsed with a schema, and their size is
+  capped.
+- Gate:
+  - Unit tests: fixture histories, including gaps, an unavailable section,
+    corrupt and oversize files, and retention boundaries.
+  - Typecheck.
+  - A live check on both targets after saving 3 runs each.
+
+### WP-12B: schedule helper
+- `piagent report schedule --target <t> --every <15m|1h|6h|1d>` **prints** a
+  systemd user service and timer pair, plus the matching crontab line, to
+  stdout. It installs nothing and does not run `systemctl`. The user copies
+  the output, or pipes it to the right files.
+  `--install` is out of scope for this phase.
+- The generated unit:
+  - runs `piagent report --target <t> --out <dir> --diff-only`;
+  - reads only `PIAGENT_HOME`'s env file;
+  - holds no secrets inline;
+  - adds systemd hardening (`NoNewPrivileges`, `ProtectSystem=strict`, a
+    `ReadWritePaths` limited to the report directory and audit file,
+    `PrivateTmp`).
+- Exit code 3 (changes) leads to a local notification only. The default is a
+  line appended to `<home>/alerts.log`, mode 0600. If `notify-send` exists,
+  that is optional. No email, Slack or network.
+- Target names are validated as in WP-4A, and the interval comes from a
+  fixed list, so no shell injection is possible in the generated text.
+- Gate:
+  - Unit tests: the generated text matches golden files, names are
+    validated, and quoting is safe.
+  - The Antigravity security review.
+  - A manual check by the coordinator: install the unit under a temporary
+    `HOME` with `systemd-analyze --user verify`, never in the real user
+    session.
+
+### WP-12C: web history view
+- The Report tab gains a "History" panel for the selected target. It has small
+  inline SVG sparklines for the WP-12A series, plus the worsening flags.
+  It reads saved runs only.
+- It uses the same token and Host/Origin checks as the other routes,
+  `textContent` rendering only, no new dependencies, and works at phone width.
+- Gate:
+  - Route unit tests.
+  - Browser tests: rendering, an XSS payload in a tablespace name, an empty
+    history, phone width.
+  - The Antigravity security review and a live smoke test.
+
+### Not in phase 12
+Installing timers automatically, a daemon in this repo, email, Slack or other
+network notifications, LLM summaries of trends, and new database queries.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
