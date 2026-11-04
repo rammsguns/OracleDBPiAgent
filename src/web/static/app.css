@@ -51,3 +51,12 @@ td:nth-child(2) { max-width: 24rem; }
 .sparkline { display: block; width: 240px; max-width: 100%; height: auto; color: #185b67; }
 .sparkline line { stroke: currentColor; stroke-width: 2; }
 .sparkline circle { fill: currentColor; }
+#plsql-panel, #triage-panel { overflow-wrap: anywhere; }
+#plsql-panel input, #plsql-panel select, #triage-panel input, #triage-panel select { max-width: 100%; }
+#plsql-panel pre, #triage-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.graph-scroll { overflow: auto; max-width: 100%; }
+.graph-scroll svg { display: block; max-width: none; color: #235663; }
+@media (prefers-color-scheme: dark) {
+	#plsql-panel, #triage-panel { background: #19282e; color: #e0edf0; padding: .5rem; --graph-fill: #223b45; }
+	.graph-scroll svg { color: #b8dce7; }
+}

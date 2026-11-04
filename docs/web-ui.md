@@ -272,3 +272,44 @@ It uses the existing bearer token and Host/Origin checks, sends `Cache-Control:
 no-store`, rejects other methods, and returns a generic error on read failures.
 Labels and notes use `textContent`; SVG coordinates are computed from numeric
 observations. No dependencies or shared contracts were added.
+
+### PL/SQL and triage
+
+The **PL/SQL** tab lists objects for its selected approved target, optionally
+filtered by owner. Choose an object and **Document object** to see signatures,
+comments, status, errors, heuristic table operations, callers, jobs and redacted
+source. Expand the evidence sections to inspect dictionary availability and caps.
+The dependency SVG uses the documented `{nodes, edges}` JSON from
+[PL/SQL documentation](plsql.md). It lays nodes out left to right, labels edges,
+and scrolls independently at phone width. Long node labels have full SVG titles.
+All dictionary labels are inserted as text, including SVG labels.
+
+The **Triage** tab accepts issue text, a target and a `since` window such as `24h`
+(maximum `30d`). **Run triage** collects deterministic, read-only evidence without
+an LLM. It shows ranked hypotheses, suggested fixes (never executed), limitations,
+frame excerpts, numbered SQL checks, evidence tables and a trace SVG.
+**Download Markdown** exports the latest successful result. A failed run disables
+export so a stale result cannot be mistaken for the new incident.
+
+Authenticated endpoints:
+
+| Method | Endpoint | Input |
+|---|---|---|
+| GET | `/api/plsql/list` | `target`, optional `owner` |
+| GET | `/api/plsql/doc` | `target`, `object=OWNER.NAME` |
+| POST | `/api/triage` | JSON `target`, nonempty `issue`, optional `since` |
+
+Targets default to the configured default and must be one of the two approved
+configured targets. Names must be unquoted Oracle identifiers (letters followed
+by letters, digits, `_`, `$`, `#`, at most 128 characters per component).
+The existing bearer token, Host and Origin checks apply. These three routes share
+a single-flight lock through session cleanup (`429` when busy). Issue text is
+limited to 64 KiB of UTF-8; the JSON envelope is capped at 400 KiB to allow JSON
+escaping. Responses including Markdown are capped at 1 MiB (`413`). Narrow the
+owner/object or incident when a cap is reached. Failures return generic messages.
+Neither the tab nor the panel sends evidence to Strata.
+
+In web chat, `/triage <issue text>` collects evidence for the conversation target,
+then submits one bounded grounded question through the existing model path.
+Normal turns keep their original prompt and tools. This command uses Strata;
+the deterministic Triage panel does not. See [triage](triage.md).

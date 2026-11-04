@@ -1,3 +1,4 @@
+import { insightFakes } from './insight-fixture.js';
 import { mkdtemp, appendFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,8 +12,8 @@ export async function startFakeServer() {
 	const dir = await mkdtemp(join(tmpdir(), 'piagent-browser-'));
 	const config = { ...loadConfig({}), secretDir: dir, auditFile: join(dir, 'audit.jsonl') };
 	let now = 0;
-	const stats = { aborted: 0, prompts: 0 };
-	const web = createWebServer({ port: 0, config, reportDirectory: join(dir, 'reports'),
+	const stats = { aborted: 0, prompts: 0, lastQuestion: '' };
+	const web = createWebServer({ ...insightFakes, port: 0, config, reportDirectory: join(dir, 'reports'),
 		loadHistory: async (_dir, target) => ({ target, scanned: target === 'p1-19c-prod' ? 0 : 3, skipped: 0, notes: [], reports: target === 'p1-19c-prod' ? [] : [60, 70, 90].map((used, i) => ({ target, generatedAt: `2026-10-${26 + i}T00:00:00.000Z`, sections: [
 			{ name: 'tablespaces', status: 'ok' as const, source: 'fake', columns: ['TABLESPACE_NAME', 'USED_PERCENT'], rows: [[hostile, used]], note: '' },
 			{ name: 'backups', status: 'unavailable' as const, source: 'fake', columns: [], rows: [], note: 'unavailable' },
@@ -48,7 +49,7 @@ export async function startFakeServer() {
 				abort: () => { if (!aborted) stats.aborted++; aborted = true; release(); },
 				waitForIdle: () => idle,
 				prompt: async question => {
-					stats.prompts++; aborted = false;
+					stats.prompts++; stats.lastQuestion = question; aborted = false;
 					idle = new Promise<void>(resolve => { release = resolve; });
 					try {
 						emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'Partial answer' } });

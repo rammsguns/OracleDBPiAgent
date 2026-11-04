@@ -136,3 +136,14 @@ Verification results:
 No shared contract changes are needed. The only WP-16A change is the optional
 dictionary redactor hook described above. The LLM remained unused during both
 the original implementation and coordinator review fixes.
+
+### Chat `/triage`
+
+In CLI chat or web chat, enter `/triage <issue text>` to gather deterministic
+triage evidence for the pinned target (or configured default), then ask Strata to
+explain the likely root cause and next read-only steps. Empty commands display
+usage; issue text is capped at 64 KiB of UTF-8. Evidence context is bounded to
+24,000 characters, with at most five rows per check. Incomplete evidence and
+hypotheses must remain qualified. This adds no tool and changes neither the
+default system prompt nor tool descriptions. Ordinary chat turns are unchanged.
+The web Triage panel and the CLI `triage` without `--summarize` need no LLM.
