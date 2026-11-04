@@ -1,0 +1,1388 @@
+{
+	"archive": "phase16/2026-11-04T19-12-56-382Z-86c2bdc9-3338-42c4-836f-b75dcd8522f0.json",
+	"records": [
+		{
+			"id": "hard-p16-entry-points",
+			"iteration": 1,
+			"answer": "I could not list any subprograms, because **`SHOPAPP.WORKLOAD` does not exist (or is not visible) on the pinned target `p1-19c-prod`.**\n\nWhat the read-only catalog checks returned:\n\n- `ALL_OBJECTS WHERE object_name='WORKLOAD'` (all owners) \u2192 **0 rows**. There is no `WORKLOAD` package, package body, procedure, or function anywhere visible to this connection.\n- `ALL_PROCEDURES WHERE object_name='WORKLOAD'` \u2192 **0 rows** (so there are no public/private subprograms to enumerate).\n- `describe_object` on `SHOPAPP.WORKLOAD` \u2192 \"No metadata rows.\"\n- The `SHOPAPP` schema itself does exist on `p1-19c-prod`, but it contains only **4 TABLEs and 8 INDEXes** \u2014 **no PL/SQL objects at all** (0 packages/procedures/functions).\n\nSo there is nothing to distinguish: the package object isn't present, and therefore it has no public subprograms. I'm reporting this against `p1-19c-prod` only and did not substitute another target.\n\nPossible reasons and read-only next steps (I can run any of these if you want):\n- **Name/owner mismatch** \u2014 the package may be under a different name or schema. I can search: `ALL_OBJECTS WHERE owner='SHOPAPP' AND object_type LIKE 'PACKAGE%'`, or a broader `object_name LIKE '%WORK%'`.\n- **Not yet created / not granted** \u2014 if it should exist, it may simply not be installed in this stand-in DB, or privileges aren't granted to the querying user. I can confirm by listing every `SHOPAPP` object name.\n\nIf you'd like, tell me and I'll run a broader name search (e.g. `LIKE '%WORK%'`) across all owners to find what you actually meant.",
+			"toolCalls": [
+				"describe_object",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-writes",
+			"iteration": 1,
+			"answer": "## Result\n\n**There is no `SHOPAPP.WORKLOAD` object on `p1-19c-prod`.**\n\nAfter exhaustively listing all objects in the SHOPAPP schema (and confirming it is the only application schema on this target), the complete inventory is:\n\n| Object | Type |\n|--------|------|\n| CUSTOMERS | TABLE |\n| ORDERS | TABLE |\n| ORDER_LINES | TABLE |\n| PRODUCTS | TABLE |\n| ORDERS_CUST_IX | INDEX |\n| ORDERS_STATUS_IX | INDEX |\n| ORDER_LINES_PK | INDEX |\n| ORDER_LINES_PROD_IX | INDEX |\n| SYS_C007649 / 655 / 656 / 661 | INDEX (constraint-backed) |\n\nNo **packages**, **package bodies**, **procedures**, **functions**, or **types** exist in SHOPAPP \u2014 so there is no `WORKLOAD` package (or any other PL/SQL program unit) whose subprograms could be mapped to table writes.\n\n### What I can offer instead\n\n- If you have the DDL/source for a `WORKLOAD` package that should be deployed, I can analyze it from text you paste here.\n- If the workload is driven by external application code (not stored in the DB), I can inspect `V$SQL` / top-SQL statistics to identify which SQL statements touch which tables and classify them as INSERT/UPDATE/DELETE/MERGE/SELECT \u2014 that would give a runtime \"write map\" without needing a named package.\n\nWould you like me to pull the top-SQL write profile from the shared pool instead?",
+			"toolCalls": [
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_schemas",
+				"list_objects",
+				"list_objects"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"PRODUCTS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDER_LINES\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDER_LINES\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDERS\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-purge-behavior",
+			"iteration": 1,
+			"answer": "The object you named does not exist on **p1-19c-prod**, so there is no source code to explain and I won't invent its behavior.\n\nWhat the tools show:\n\n- `describe_object` / `get_source` for `SHOPAPP.NIGHTLY_PURGE` (as PACKAGE BODY and PROCEDURE) \u2192 no rows.\n- `list_objects` in `SHOPAPP` filtered on `NIGHTLY_PURGE` and `WORKLOAD` \u2192 no matches.\n- A database-wide scan of `ALL_OBJECTS` for names containing `PURGE`/`NIGHTLY` or exactly `WORKLOAD` returned only Oracle built-ins (`PUBLIC` synonyms like `DBA_LOGMNR_PURGED_LOG`, `V$DIAG_DFW_PURGE`, and the SYS scheduler schedule `DAILY_PURGE_SCHEDULE`) \u2014 nothing in `SHOPAPP` and no schema/package named `WORKLOAD`.\n\nSo `SHOPAPP.WORKLOAD.NIGHTLY_PURGE` is not a package, procedure, function, or table on this target. I can't answer \"what it deletes, the order, how it selects old data, where it commits, or whether selection depends on order status,\" because there is no such code to read.\n\nFor context, the `SHOPAPP` schema on p1 contains only: `CUSTOMERS`, `ORDERS`, `ORDER_LINES`, `PRODUCTS` (tables) plus indexes \u2014 including an `ORDERS_STATUS_IX` index on ORDERS, but no purge routine.\n\nIf you want, I can read-only investigate the real cleanup mechanism instead \u2014 e.g. query `DBA_SCHEDULER_JOBS`/`DBA_SCHEDULER_JOB_RUN_DETAILS` for any purge job, or check whether `DAILY_PURGE_SCHEDULE` is actually attached to a SHOPAPP job. Just say which and I'll run it against p1-19c-prod.",
+			"toolCalls": [
+				"get_source",
+				"describe_object",
+				"get_source",
+				"get_source",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"list_objects"
+			],
+			"checks": [
+				{
+					"check": "fact: (7|seven).{0,30}day",
+					"pass": false
+				},
+				{
+					"check": "fact: order_lines.{0,100}(before|then|first|orders)|first.{0,100}order_lines",
+					"pass": true
+				},
+				{
+					"check": "fact: commit",
+					"pass": true
+				},
+				{
+					"check": "fact: (not|no|without|regardless).{0,60}status|status.{0,60}(not|no|irrelevant)",
+					"pass": true
+				},
+				{
+					"check": "fact: ordered_at",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [26,\"ORDER_LINES\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [27,\"ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-scheduler-map",
+			"iteration": 1,
+			"answer": "On **p1-19c-prod**, three SHOPAPP scheduler jobs invoke the `SHOPAPP.WORKLOAD` package. Each is a `PLSQL_BLOCK` (so `NUMBER_OF_ARGUMENTS = 0`; any argument is inline in the block, not a named scheduler argument). All are `ENABLED=TRUE`, `STATE=SCHEDULED`.\n\n| Job | Entry point invoked |\n|---|---|\n| `NIGHTLY_PURGE_JOB` | `SHOPAPP.WORKLOAD.NIGHTLY_PURGE` (no args) |\n| `PLACE_ORDERS_JOB` | `SHOPAPP.WORKLOAD.PLACE_ORDERS(25)` |\n| `SHIP_ORDERS_JOB` | `SHOPAPP.WORKLOAD.SHIP_ORDERS` (no args) |\n\n**Order-placement job argument:** Yes \u2014 `PLACE_ORDERS_JOB` supplies an argument to `PLACE_ORDERS`, and its value is **25**. Because the job is a `PLSQL_BLOCK`, this value is hard-coded inside the block text rather than registered as a scheduler argument (hence `NUMBER_OF_ARGUMENTS = 0`).\n\nSource: `DBA_SCHEDULER_JOBS` on p1-19c-prod.",
+			"toolCalls": [
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: \\b25\\b",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"NIGHTLY_PURGE\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS_JOB\",\"SHIP_ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-purge-constraint",
+			"iteration": 1,
+			"answer": "## Investigation Summary \u2014 `NIGHTLY_PURGE_JOB` Failure on `p1-19c-prod`\n\n### The Recorded Failure\n\n| Field | Value |\n|-------|-------|\n| **Job** | `SHOPAPP.NIGHTLY_PURGE_JOB` |\n| **Log date** | 2026-11-03 22:30:56 CST |\n| **Status** | FAILED (error# 2292) |\n| **Error** | `ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found` |\n\nThe stack trace shows it was raised at `SHOPAPP.WORKLOAD`, line 27.\n\n### Constraint Details\n\n| Attribute | Value |\n|-----------|-------|\n| **Constraint name** | `SYS_C007669` |\n| **Type** | `R` (foreign key) |\n| **Child table.column** | `SHOPAPP.ORDER_LINES.ORDER_ID` |\n| **Parent constraint** | `SYS_C007661` (Primary Key) |\n| **Parent table.column** | `SHOPAPP.ORDERS.ORDER_ID` |\n| **Delete rule** | **NO ACTION** |\n| **Status** | ENABLED |\n\n### Why the Delete Is Blocked\n\nThe purge job attempted to `DELETE` rows from the **parent** table (`ORDERS`). Oracle enforces referential integrity at statement completion: because the foreign key on `ORDER_LINES.ORDER_ID` uses the **`NO ACTION`** delete rule, Oracle will not allow a parent row to be removed while any child row in `ORDER_LINES` still references it.\n\nThere are currently **1,384,724** rows in `ORDER_LINES` that have a matching `ORDER_ID` in `ORDERS`. Unless the purge logic first deletes (or re-parents) those child rows\u2014or the constraint were changed to `ON DELETE CASCADE`\u2014the parent delete will continue to fail with ORA-02292.\n\n### Root Cause (inferred from evidence)\n\nThe job's purge logic deletes from `ORDERS` without first removing the dependent `ORDER_LINES` rows. A correct fix would be to delete child rows first (e.g., `DELETE FROM ORDER_LINES WHERE ORDER_ID IN (...)` before deleting from `ORDERS`), or to use a cascade strategy if business rules permit.",
+			"toolCalls": [
+				"list_schemas",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: ORA-02292",
+					"pass": true
+				},
+				{
+					"check": "fact: (child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SYS_C007669\",\"ORDER_LINES\",\"ORDER_ID\",\"ORDERS\",\"ORDER_ID\",\"NO ACTION\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-purge-line",
+			"iteration": 1,
+			"answer": "## Trace of the most recent `NIGHTLY_PURGE_JOB` failure \u2014 target `p1-19c-prod`\n\n**Recorded failure** (from `DBA_SCHEDULER_JOB_RUN_DETAILS`, owner `SHOPAPP`):\n- **Log date:** Tue Nov 03 2026 22:30:56 (Central Standard Time) \u2014 most recent; the prior runs (Oct 29, 28, 27, 26) all SUCCEEDED.\n- **Status / error:** `FAILED`, `ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found`\n- **Error stack:** `ORA-06512: at \"SHOPAPP.WORKLOAD\", line 27` then `ORA-06512: at line 1`\n\n### Package frame \u2014 `SHOPAPP.WORKLOAD` (package body), line 27\nFrom `DBA_SOURCE`, the package body is a single spec-less body with three subprograms. Line 27 falls inside **`PROCEDURE nightly_purge`** (lines 24\u201329):\n\n```\n24  PROCEDURE nightly_purge IS\n25   BEGIN\n26    DELETE FROM order_lines WHERE order_id IN (SELECT order_id FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY);\n27    DELETE FROM orders      WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;   <-- raised here\n28    COMMIT;\n29  END;\n```\n\n- **Failing operation:** `DELETE FROM SHOPAPP.ORDERS` (the parent table).\n- **Blocking table/constraint:** child rows still exist in **`SHOPAPP.ORDER_LINES`**, whose FK **`SYS_C007669`** references the ORDERS primary key **`SYS_C007661`** (confirmed via `ALL_CONSTRAINTS`: `SYS_C007669` = R on `ORDER_LINES` \u2192 parent `SYS_C007661` = P on `ORDERS`). The line-26 child delete did not clear every dependent `ORDER_LINES` row for the old orders, so the line-27 parent delete hits \"child record found.\"\n\n### Distinguishing the two frames\n- **Package frame** \u2014 `ORA-06512: at \"SHOPAPP.WORKLOAD\", line 27`: names a *named PL/SQL unit* (`SHOPAPP.WORKLOAD`). This is inside the package body, specifically within `PROCEDURE nightly_purge`, at the `DELETE FROM orders` statement.\n- **Outer block frame** \u2014 `ORA-06512: at line 1`: has **no unit name**, so it is the top-level anonymous PL/SQL block the Scheduler job executed (the call into `WORKLOAD.NIGHTLY_PURGE`). It is the invocation entry point, not part of the package; the actual error originates one frame deeper, at package line 27.\n\n**Summary:** The failure is a referential-integrity violation on `SHOPAPP.ORDERS` (parent) blocked by `SHOPAPP.ORDER_LINES` (child, FK `SYS_C007669`), raised at **package-body line 27 inside `PROCEDURE nightly_purge`**, invoked from the job's outer anonymous block (frame \"at line 1\").\n\nNote: this login could not see the package via `ALL_OBJECTS`/`ALL_SOURCE` or the job action via `ALL_SCHEDULER_JOBS`, but `DBA_SOURCE` and `DBA_SCHEDULER_JOB_RUN_DETAILS` were readable, which is what this trace is built on.",
+			"toolCalls": [
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [27,\"NIGHTLY_PURGE\",\"DELETE\",\"ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-history-trigger",
+			"iteration": 1,
+			"answer": "## HR.UPDATE_JOB_HISTORY \u2014 explanation (target `d1-19c-lab`)\n\nSource read from `ALL_TRIGGERS` (`get_source` returns empty for triggers because their body lives in `ALL_TRIGGERS.TRIGGER_BODY`, not `*_SOURCE`).\n\n**Trigger body:**\n```sql\nBEGIN\n  add_job_history(:old.employee_id, :old.hire_date, sysdate, :old.job_id, :old.department_id);\nEND;\n```\n\n### When it fires & granularity\n- **Base object:** `HR.EMPLOYEES` (`TABLE_OWNER=HR`, `TABLE_NAME=EMPLOYEES`).\n- **Event:** `UPDATE` only (`TRIGGERING_EVENT = UPDATE`) \u2014 it does not fire on INSERT or DELETE.\n- **Timing/granularity:** `AFTER EACH ROW` \u2014 fires once per updated row, after the row update completes. Status is `ENABLED`.\n\n### Procedure it calls\n- It calls **`HR.ADD_JOB_HISTORY`**, passing five arguments: `employee_id`, `hire_date`, `sysdate`, `job_id`, `department_id`.\n- Note on visibility: I could not read `ADD_JOB_HISTORY`'s body \u2014 it returns no rows in `ALL_SOURCE`/`ALL_OBJECTS` for my account (PL/SQL source isn't exposed to this grant, though the table is). So the procedure's internal INSERT statement isn't directly quoted here; the conclusion below rests on the trigger body plus column mapping.\n\n### Old vs new values\nAll recorded values are the **OLD** (`:OLD`) pre-update values, except `end_date`:\n- `employee_id` \u2192 `:old.employee_id` (old)\n- `start_date` \u2192 `:old.hire_date` (old hire date)\n- `end_date` \u2192 `sysdate` (the moment of the update \u2014 not an OLD/NEW column value)\n- `job_id` \u2192 `:old.job_id` (old job)\n- `department_id` \u2192 `:old.department_id` (old department)\n\nSo it snapshots the employee's **previous** job/department assignment, closing that historical period at `sysdate`. (No `:NEW` values are used.)\n\n### Destination table\n**`HR.JOB_HISTORY`**. Corroborated by column mapping \u2014 the five passed arguments line up exactly with `JOB_HISTORY`'s columns: `EMPLOYEE_ID`, `START_DATE`, `END_DATE`, `JOB_ID`, `DEPARTMENT_ID` (confirmed via `describe_object`; PK is `(EMPLOYEE_ID, START_DATE)`).\n\n**Caveat:** the direct proof that `ADD_JOB_HISTORY` inserts into `JOB_HISTORY` could not be obtained because the procedure's source is not readable by this account; the identification is inferred from the trigger body and the exact column correspondence to `HR.JOB_HISTORY`.",
+			"toolCalls": [
+				"get_source",
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"describe_object"
+			],
+			"checks": [
+				{
+					"check": "fact: ADD_JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: (old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_ID",
+					"pass": true
+				},
+				{
+					"check": "fact: DEPARTMENT_ID",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"AFTER EACH ROW\",\"UPDATE\",\"EMPLOYEES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-security-trigger",
+			"iteration": 1,
+			"answer": "## HR.SECURE_EMPLOYEES on d1-19c-lab\n\n**What the dictionary confirms** (source: `ALL_TRIGGERS`, target `d1-19c-lab`):\n\n| Attribute | Value |\n|---|---|\n| Object type | DML **trigger** on table `HR.EMPLOYEES` |\n| **Timing** | **BEFORE** (fires before the triggering statement) |\n| **Events** | **INSERT OR UPDATE OR DELETE** (all three) |\n| **Granularity** | **STATEMENT-level** (`TRIGGER_TYPE = BEFORE STATEMENT`) \u2014 fires once per DML statement, not once per row |\n| Status | **DISABLED** (it would not fire in its current state even if enabled by privileges) |\n\nSo it is a *BEFORE \u2026 INSERT OR UPDATE OR DELETE ON employees FOR EACH STATEMENT* style trigger \u2014 a statement-level guard that runs ahead of any DML against EMPLOYEES.\n\n## What I could NOT retrieve \u2014 and why\n\nI was **not able to read the trigger body, the routine it calls, or that routine's time/day check and application error.** The PL/SQL source for HR's programs is not exposed to this account (`HARNESS_LAB`). Every attempt returned zero rows:\n\n- `get_source(... type=TRIGGER)` \u2192 empty\n- `ALL_SOURCE` (filtered by name, and a broad text search for the trigger / security-package names) \u2192 empty\n- `ALL_OBJECTS` for HR's procedures/functions/packages \u2192 empty\n- `ALL_DEPENDENCIES` (to find the referenced routine) \u2192 empty\n\nThis is expected: `ALL_TRIGGERS` lists triggers on tables you have privileges on, but `ALL_SOURCE`/`ALL_OBJECTS`/`ALL_DEPENDENCIES` only expose PL/SQL **source and dependencies** for units you own or have been explicitly granted. I will not guess the routine name, the allowed time window, the day restriction, or the `RAISE_APPLICATION_ERROR` number/message \u2014 none of that is supported by tool output here, and fabricating it would be wrong.\n\n## How to obtain the missing pieces (read-only)\n\nTo describe the called routine and its business-hours/day rule and application error, query the source as a user with visibility (e.g., connected as `HR` or a `DBA`):\n\n- Trigger body: `SELECT line, text FROM dba_source WHERE owner='HR' AND name='SECURE_EMPLOYEES' AND type='TRIGGER' ORDER BY line;`\n- Then read the routine it calls from that body via `dba_source` for that `name`/`type`, where you'll see the time/day predicate (typically a check on `TO_CHAR(SYSDATE,'DY')` and `TO_CHAR(SYSDATE,'HH24MI')` against an allowed window) and the `RAISE_APPLICATION_ERROR(-20xxx, ...)` it raises when DML is attempted outside that window.\n\nI can run those for you if you point me at a target/account where HR's PL/SQL source is visible; on `d1-19c-lab` as currently configured, only the trigger's timing/events/granularity above are answerable from the available read-only views.",
+			"toolCalls": [
+				"describe_object",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: SECURE_DML",
+					"pass": false
+				},
+				{
+					"check": "fact: 08:00",
+					"pass": false
+				},
+				{
+					"check": "fact: 18:00",
+					"pass": false
+				},
+				{
+					"check": "fact: (SAT|Saturday).{0,40}(SUN|Sunday)",
+					"pass": false
+				},
+				{
+					"check": "fact: 20205",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"BEFORE STATEMENT\",\"INSERT OR UPDATE OR DELETE\",\"EMPLOYEES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"answer": "I could not list any arguments, because **`HR.ADD_JOB_HISTORY` does not exist on `d1-19c-lab`**.\n\nEvidence (target `d1-19c-lab`):\n- `describe_object` (schema `HR`, name `ADD_JOB_HISTORY`) \u2192 \"No metadata rows.\"\n- `ALL_ARGUMENTS` filtered to `OWNER='HR' AND OBJECT_NAME='ADD_JOB_HISTORY'` \u2192 0 rows.\n- `ALL_OBJECTS` for `OWNER='HR'` with type in (PROCEDURE, FUNCTION, PACKAGE) \u2192 0 rows (the HR schema here has no PL/SQL program units).\n- `ALL_OBJECTS` where name LIKE `%JOB_HISTORY%` \u2192 the only HR object is the **table** `HR.JOB_HISTORY` (VALID); everything else is SYS/PUBLIC autotask synonyms/views.\n\nSo there are no arguments, positions, modes, datatypes, or defaults to report \u2014 the procedure simply isn't present in this database. (Note: `ADD_JOB_HISTORY` is a sample procedure that ships in some HR installs, but it was not created in this particular HR schema.)\n\nRead-only alternatives I can run instead:\n- List the actual objects in `HR` (tables/views/indexes) so you can see what's available.\n- Describe the `HR.JOB_HISTORY` table (columns, PK/FK constraints, indexes).\n- If you expected the procedure to exist, I can search other schemas for a program unit named `ADD_JOB_HISTORY`.\n\nLet me know which you'd like.",
+			"toolCalls": [
+				"describe_object",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"P_EMP_ID\",1,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_START_DATE\",2,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_END_DATE\",3,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_JOB_ID\",4,\"IN\",\"VARCHAR2\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_DEPARTMENT_ID\",5,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-failed-lab-job",
+			"iteration": 1,
+			"answer": "## Most Recent Failed Run of `K7Q_OWNER.K7Q_FAILJOB` (target: d1-19c-lab)\n\n| Field | Value |\n|-------|-------|\n| **Log date** | Mon Oct 26 2026 00:12:12 (Central Standard Time) |\n| **Scheduler status** | `FAILED` |\n| **Oracle error code** | **ORA-20001** (ERROR# = 20001) |\n| **Application message** | `destination unavailable` |\n| **Source line** | `ORA-06512: at line 1` |\n\n### Diagnosis: Application-Raised Error, Not a Foreign-Key Violation\n\nThe evidence clearly distinguishes the two:\n\n1. **ORA-20001 falls in Oracle's user-defined error range**, which is reserved exclusively for exceptions raised by `RAISE_APPLICATION_ERROR` in PL/SQL code. The database engine itself never emits errors in this range.\n\n2. **A foreign-key constraint violation would produce a different ORA code** (one enforced by the database's referential-integrity machinery). No such code appears in the recorded history.\n\n3. **The message text \"destination unavailable\"** is a custom, application-authored string passed to `RAISE_APPLICATION_ERROR`. It describes an application-level condition (e.g., a remote endpoint or file target being unreachable), not a referential-integrity constraint failure.\n\n4. **`ORA-06512: at line 1`** confirms the raise occurred at the top level of the job's `job_action` PL/SQL block (line 1), consistent with a single-statement anonymous block that immediately calls `RAISE_APPLICATION_ERROR`.\n\n### Additional Context\n\nThe job and all objects in `K7Q_OWNER` have since been dropped (the schema currently contains no objects and the job is absent from `DBA_SCHEDULER_JOBS`), but the scheduler run history in `DBA_SCHEDULER_JOB_RUN_DETAILS` persists. All five most recent recorded runs show identical failures with the same ORA-20001 / \"destination unavailable\" pattern, indicating a persistent application-level condition rather than a transient constraint issue.",
+			"toolCalls": [
+				"run_query",
+				"run_query",
+				"list_objects",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: application.{0,40}(rais|error)|RAISE_APPLICATION_ERROR",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-entry-points",
+			"iteration": 2,
+			"answer": "I could not find `SHOPAPP.WORKLOAD` on **p1-19c-prod**, so there are no public subprograms to list.\n\nWhat the tools returned:\n\n- `describe_object` (schema=SHOPAPP, name=WORKLOAD): **No metadata rows.**\n- `get_source` (type=PACKAGE): **no source lines** (header only, zero rows).\n- `all_objects` filtered to `owner='SHOPAPP' AND object_name='WORKLOAD'`: **0 rows**.\n- Packages in SHOPAPP (`object_type IN ('PACKAGE','PACKAGE BODY')`): **0 rows**.\n- All SHOPAPP objects by type: only `TABLE` (4) and `INDEX` (8).\n\nConclusion: the schema `SHOPAPP` exists on p1-19c-prod, but it contains no PL/SQL packages at all \u2014 there is no package named `WORKLOAD`. Because the package doesn't exist, I can't distinguish a package specification from its public subprograms here.\n\nI did not substitute another target (e.g. d1-19c-lab). If you intended a different owner or a case-sensitive name, tell me and I'll re-check on p1. As a read-only next step I can list the 4 SHOPAPP tables and their columns if that helps locate the workload logic you're after.",
+			"toolCalls": [
+				"describe_object",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-writes",
+			"iteration": 2,
+			"answer": "I can't produce that mapping because **there is no `SHOPAPP.WORKLOAD` object on `p1-19c-prod`** \u2014 so there are no subprograms to map. This is a false premise, not a permissions issue.\n\nWhat I verified (tool: `run_query` / `list_objects`, target `p1-19c-prod`):\n\n- `ALL_OBJECTS WHERE UPPER(OBJECT_NAME)='WORKLOAD'` \u2192 **0 rows** (no such object in any schema).\n- `ALL_SOURCE WHERE UPPER(NAME)='WORKLOAD'` \u2192 **0 rows** (no PL/SQL package/procedure/function named WORKLOAD anywhere).\n- Listing the entire `SHOPAPP` schema returns only tables and indexes \u2014 **no packages, procedures, functions, or triggers at all**:\n\n| OBJECT_NAME | OBJECT_TYPE |\n|---|---|\n| CUSTOMERS | TABLE |\n| ORDERS | TABLE |\n| ORDER_LINES | TABLE |\n| PRODUCTS | TABLE |\n| ORDERS_CUST_IX | INDEX |\n| ORDERS_STATUS_IX | INDEX |\n| ORDER_LINES_PK | INDEX |\n| ORDER_LINES_PROD_IX | INDEX |\n| SYS_C007649 / 655 / 656 / 661 | INDEX (unique, constraint-backed) |\n\nSo `SHOPAPP` has no code objects to inspect for INSERT/UPDATE/DELETE/MERGE writes.\n\nI won't substitute another target or guess at a name. To move forward, pick one of these read-only options:\n\n1. **Correct the name** \u2014 if the package/procedure is named something else (or lives in another schema), tell me and I'll pull its `ALL_SOURCE` body and map each subprogram to the tables it writes (INSERT/UPDATE/DELETE/MERGE) vs. reads.\n2. **Analyze actual write activity** \u2014 I can run `top_sql` (metric: elapsed/buffer_gets/executions) on `p1-19c-prod` to show which DML statements are actually hitting the SHOPAPP tables, and `explain_plan` on them. That reflects the real workload rather than a named package.\n3. **Inspect the tables** \u2014 I can `describe_object` CUSTOMERS/ORDERS/ORDER_LINES/PRODUCTS for columns, PKs/FKs, and indexes.\n\nWhich would you like?",
+			"toolCalls": [
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"PRODUCTS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDER_LINES\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDER_LINES\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDERS\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-purge-behavior",
+			"iteration": 2,
+			"answer": "**SHOPAPP.WORKLOAD.NIGHTLY_PURGE does not exist on p1-19c-prod.**\n\nAfter searching the SHOPAPP schema on `p1-19c-prod`, I found:\n\n| Object Type | Objects Found |\n|---|---|\n| TABLE | CUSTOMERS, ORDERS, ORDER_LINES, PRODUCTS |\n| PACKAGE / PACKAGE BODY | *(none)* |\n| PROCEDURE | *(none)* |\n| FUNCTION | *(none)* |\n| VIEW | *(none)* |\n\nThere is no object matching `NIGHTLY_PURGE` (or even `NIGHTLY`) of any type in the SHOPAPP schema. The schema contains only four tables and no PL/SQL code whatsoever.\n\n**Possible explanations:**\n1. The object may exist on a different target (e.g., `d1-19c-lab`), but I cannot substitute targets per policy.\n2. It may have been dropped or was never created in this environment.\n3. The name may be slightly different \u2014 if you can provide an exact name or confirm the schema, I can re-check.\n\nI cannot answer questions about its deletion logic, commit placement, or order-status dependency because the source code is not present on this target.",
+			"toolCalls": [
+				"get_source",
+				"get_source",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects"
+			],
+			"checks": [
+				{
+					"check": "fact: (7|seven).{0,30}day",
+					"pass": false
+				},
+				{
+					"check": "fact: order_lines.{0,100}(before|then|first|orders)|first.{0,100}order_lines",
+					"pass": false
+				},
+				{
+					"check": "fact: commit",
+					"pass": true
+				},
+				{
+					"check": "fact: (not|no|without|regardless).{0,60}status|status.{0,60}(not|no|irrelevant)",
+					"pass": true
+				},
+				{
+					"check": "fact: ordered_at",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [26,\"ORDER_LINES\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [27,\"ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-scheduler-map",
+			"iteration": 2,
+			"answer": "## SHOPAPP scheduler jobs invoking `WORKLOAD` (target: p1-19c-prod, source: `DBA_SCHEDULER_JOBS`)\n\nThree enabled, SCHEDULED jobs of type `PLSQL_BLOCK` invoke the `SHOPAPP.WORKLOAD` package. Each maps to a distinct entry point:\n\n| Job name | Entry point invoked | Argument supplied? |\n|---|---|---|\n| `NIGHTLY_PURGE_JOB` | `shopapp.workload.nightly_purge` | No \u2014 `BEGIN shopapp.workload.nightly_purge; END;` |\n| `PLACE_ORDERS_JOB` | `shopapp.workload.place_orders` | **Yes \u2014 value `25`** (`shopapp.workload.place_orders(25)`) |\n| `SHIP_ORDERS_JOB` | `shopapp.workload.ship_orders` | No \u2014 `BEGIN shopapp.workload.ship_orders; END;` |\n\n### Order-placement job\nThe order-placement job is **`PLACE_ORDERS_JOB`**, and it **does supply an argument**: the literal value **`25`** passed to `place_orders`.\n\nNote: `NUMBER_OF_ARGUMENTS` shows `0` for all three because they are inline `PLSQL_BLOCK` jobs (no separate Scheduler program/argument metadata); the `25` is hard-coded inside the block's call to `place_orders`, not registered as a Scheduler argument.",
+			"toolCalls": [
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: \\b25\\b",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"NIGHTLY_PURGE\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS_JOB\",\"SHIP_ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-purge-constraint",
+			"iteration": 2,
+			"answer": "I have all the required details from the data dictionary. The `WORKLOAD` package source is not exposed to my connected user (it returns nothing in `ALL_SOURCE`/`ALL_OBJECTS` \u2014 likely wrapped or outside my grant scope), so I can't quote line 27's literal SQL, but the error stack plus the constraint metadata fully identify the cause.\n\n## NIGHTLY_PURGE_JOB referential-integrity failure \u2014 p1-19c-prod\n\n**The recorded failure** (`DBA_SCHEDULER_JOB_RUN_DETAILS`, job `SHOPAPP.NIGHTLY_PURGE_JOB`):\n- Run on **Tue Nov 03 2026 22:30:02 CST \u2192 FAILED**, `ERROR# = 2292`\n- Stack: `ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found` / `ORA-06512: at \"SHOPAPP.WORKLOAD\", line 27`\n- All prior nightly runs (Oct 24\u201329) **SUCCEEDED**, so this is a new break, not a chronic one.\n\n**Constraint resolution** (`ALL_CONSTRAINTS` joined to `ALL_CONS_COLUMNS`):\n\n| Item | Value |\n|---|---|\n| Error | **ORA-02292** \u2014 integrity constraint violated, *child record found* |\n| Constraint (FK) | **SHOPAPP.SYS_C007669** |\n| Child table.column | **SHOPAPP.ORDER_LINES.ORDER_ID** (position 1) |\n| Parent table.column | **SHOPAPP.ORDERS.ORDER_ID** (position 1) |\n| Parent key constraint | SHOPAPP.SYS_C007661 (the PK/unique on ORDERS.ORDER_ID) |\n| Delete rule | **NO ACTION** |\n\n## Why deleting the parent is blocked\n\nThe purge routine (`shopapp.workload.nightly_purge`, failing at `WORKLOAD` line 27) issues a `DELETE` against the **parent** table `SHOPAPP.ORDERS`. The foreign key `SYS_C007669` on `ORDER_LINES.ORDER_ID \u2192 ORDERS.ORDER_ID` is declared **`ON DELETE NO ACTION`**, which means:\n\n- Oracle enforces the parent-key relationship **immediately at statement execution time**.\n- Before a parent row in `ORDERS` can be removed, there must be **zero** child rows in `ORDER_LINES` still pointing to that `ORDER_ID`.\n- On the Nov 3 run, at least one `ORDERS` row the purge tried to delete still had one or more referencing rows in `ORDER_LINES`, so Oracle rejected the whole `DELETE` with ORA-02292 and rolled the statement back \u2014 aborting the job.\n\n`NO ACTION` differs from `ON DELETE CASCADE` (which would auto-remove the children) and from `ON DELETE SET NULL` (which would null the child FK). Because it is `NO ACTION`, the parent delete cannot proceed until the dependent `ORDER_LINES` rows are removed first.\n\n**Likely root cause / fix direction (suggestions only, not executed):** the purge deletes parents without first purging (or without ordering) the dependent `ORDER_LINES` children \u2014 e.g. an orphaned/late-arriving order line, or a delete-order bug where `ORDERS` is purged before `ORDER_LINES`. A read-only confirmation would be to find the offending rows, e.g.:\n\n```sql\nSELECT o.order_id\nFROM   shopapp.orders o\nWHERE  NOT EXISTS (SELECT 1 FROM shopapp.order_lines l WHERE l.order_id = o.order_id)\n       -- and conversely, child rows blocking a parent delete:\n;\n```\n\nThe corrective options (each a data/code change I have **not** performed) would be: delete `ORDER_LINES` before `ORDERS` in the purge, add proper transactional ordering, or \u2014 only if business-correct \u2014 change the FK to `ON DELETE CASCADE`. I can run read-only diagnostics to pinpoint the exact blocking rows if you'd like.",
+			"toolCalls": [
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: ORA-02292",
+					"pass": true
+				},
+				{
+					"check": "fact: (child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SYS_C007669\",\"ORDER_LINES\",\"ORDER_ID\",\"ORDERS\",\"ORDER_ID\",\"NO ACTION\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-purge-line",
+			"iteration": 2,
+			"answer": "## Trace of the Most Recent NIGHTLY_PURGE_JOB Failure (p1-19c-prod)\n\n### The Failure Record\n\n| Field | Value |\n|-------|-------|\n| **Job** | `SHOPAPP.NIGHTLY_PURGE_JOB` |\n| **Log date** | Tue Nov 03 2026 22:30:56 CST |\n| **Status** | FAILED (error# 2292) |\n| **additional_info** | `ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found`<br>`ORA-06512: at \"SHOPAPP.WORKLOAD\", line 27`<br>`ORA-06512: at line 1` |\n\n*(Source: `dba_scheduler_job_run_details`, target p1-19c-prod)*\n\n---\n\n### Call-Stack Frames (inner \u2192 outer)\n\n| Frame | Location | What it is |\n|-------|----------|------------|\n| **Package-body frame** | `\"SHOPAPP.WORKLOAD\", line 27` | Inside the package body `SHOPAPP.WORKLOAD`, subprogram **`nightly_purge`**, at line 27. This is where the failing DML statement executes. |\n| **Outer-block frame** | `at line 1` (no object name) | The scheduler job's anonymous PL/SQL block: `BEGIN shopapp.workload.nightly_purge; END;` \u2014 line 1 is the call to the package procedure. |\n\nThe distinction: the named frame (`\"SHOPAPP.WORKLOAD\"`) is the **package body**; the unnamed `at line 1` is the **anonymous outer block** (the `job_action` itself, confirmed from `dba_scheduler_jobs.job_action`).\n\n---\n\n### Failing Operation and Table\n\n| Item | Detail |\n|------|--------|\n| **Constraint** | `SHOPAPP.SYS_C007669` \u2014 a foreign-key (`R`) on **`ORDER_LINES(ORDER_ID)`** referencing **`ORDERS(ORDER_ID)`** (PK = `SYS_C007661`). |\n| **Failing DML** | A **DELETE on `SHOPAPP.ORDERS`** at line 27 of `nightly_purge`. The delete targets the parent table; it fails because child rows still exist in `ORDER_LINES`. |\n\n---\n\n### Caveat\n\nThe package body `SHOPAPP.WORKLOAD` no longer exists in the database (`all_objects` and `all_source` return no rows), so the exact SQL text at line 27 cannot be retrieved. The identification of the operation (DELETE on ORDERS) is inferred from the error semantics: ORA-02292 fires only when a parent-key DELETE/UPDATE is blocked by an existing child row under the FK `SYS_C007669`.",
+			"toolCalls": [
+				"list_schemas",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [27,\"NIGHTLY_PURGE\",\"DELETE\",\"ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-history-trigger",
+			"iteration": 2,
+			"answer": "## HR.UPDATE_JOB_HISTORY \u2014 d1-19c-lab\n\nSource of truth: `ALL_TRIGGERS` (the trigger body). Note: in this lab `ALL_OBJECTS`/`ALL_SOURCE` returned **no rows** for `UPDATE_JOB_HISTORY` or `ADD_JOB_HISTORY`, so the trigger definition below comes from `ALL_TRIGGERS`, and the procedure body could not be read directly.\n\n**Trigger body (from ALL_TRIGGERS):**\n```sql\nBEGIN\n  add_job_history(:old.employee_id, :old.hire_date, sysdate,\n                  :old.job_id, :old.department_id);\nEND;\n```\n\n### When it fires / granularity\n- **Object:** `AFTER EACH ROW` trigger on table **HR.EMPLOYEES** (not on JOB_HISTORY), `TRIGGERING_EVENT = UPDATE`, `STATUS = ENABLED`.\n- **Granularity:** row\u2011level \u2014 fires **once per updated row** of EMPLOYEES, after the row is updated.\n- **Scope:** there is **no `WHEN_CLAUSE` and no `COLUMN_NAME` filter**, so it fires for *any* UPDATE on any row of EMPLOYEES, regardless of which columns actually changed (e.g. even a pure salary/phone update triggers it).\n\n### Which procedure it calls\n- It calls **`add_job_history`** (resolved in the trigger's schema, HR), passing 5 arguments.\n\n### Old vs new values recorded\nAll employee/job/department values are taken from the **OLD (`:old`) image** \u2014 i.e. the **pre\u2011update** values:\n| Argument passed | Value used | Meaning |\n|---|---|---|\n| employee_id | `:old.employee_id` | OLD |\n| START_DATE | `:old.hire_date` | OLD (prior hire date) |\n| END_DATE | `sysdate` | the moment of the update (not from old/new) |\n| JOB_ID | `:old.job_id` | OLD (previous job) |\n| DEPARTMENT_ID | `:old.department_id` | OLD (previous department) |\n\nSo it archives the **previous (old) assignment** as a closed history row ending at SYSDATE \u2014 not the new values.\n\n### Destination table\n- The procedure inserts into **HR.JOB_HISTORY**. This is an **inference**, because `add_job_history`'s body is not retrievable via `ALL_SOURCE` in this lab. It is supported by: (a) the procedure name, and (b) an exact match between the 5 arguments and HR.JOB_HISTORY's columns (`EMPLOYEE_ID, START_DATE, END_DATE, JOB_ID, DEPARTMENT_ID`, per `describe_object`). The PK `(EMPLOYEE_ID, START_DATE)` and FKs to EMPLOYEES/DEPARTMENTS/JOBS are consistent with this.\n\n**Caveat:** Because the trigger sits on EMPLOYEES (a customization vs. the stock Oracle sample, where UPDATE_JOB_HISTORY is normally on JOB_HISTORY) and uses `:old.hire_date` as START_DATE, repeated updates to the same employee can attempt to insert duplicate `(employee_id, old hire_date)` keys and would raise a PK violation \u2014 but I have not executed anything to confirm runtime behavior.",
+			"toolCalls": [
+				"get_source",
+				"describe_object",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"describe_object"
+			],
+			"checks": [
+				{
+					"check": "fact: ADD_JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: (old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_ID",
+					"pass": true
+				},
+				{
+					"check": "fact: DEPARTMENT_ID",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"AFTER EACH ROW\",\"UPDATE\",\"EMPLOYEES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-security-trigger",
+			"iteration": 2,
+			"answer": "## HR.SECURE_EMPLOYEES \u2014 Full Breakdown\n\n### Trigger Metadata (from `ALL_TRIGGERS`, target `d1-19c-lab`)\n\n| Attribute | Value |\n|-----------|-------|\n| **Type** | BEFORE STATEMENT trigger (fires once per DML statement, not per row) |\n| **Base object** | TABLE `HR.EMPLOYEES` |\n| **Events** | `INSERT OR UPDATE OR DELETE` |\n| **Timing** | BEFORE \u2014 fires *before* the statement begins modifying any rows |\n| **Granularity** | Statement-level (not row-level) |\n| **Status** | **DISABLED** |\n\n### Trigger Body\n\n```sql\nBEGIN secure_dml; END secure_employees;\n```\n\nIt does nothing itself except delegate to a single procedure call.\n\n---\n\n### The Called Routine: `HR.SECURE_DML` (from `DBA_SOURCE`)\n\n```sql\nPROCEDURE secure_dml\nIS\nBEGIN\n  IF TO_CHAR(SYSDATE, 'HH24:MI') NOT BETWEEN '08:00' AND '18:00'\n     OR TO_CHAR(SYSDATE, 'DY') IN ('SAT', 'SUN') THEN\n    RAISE_APPLICATION_ERROR(-20205,\n      'You may only make changes during normal office hours');\n  END IF;\nEND secure_dml;\n```\n\n#### Time / Day Restriction Logic\n\n| Condition | Meaning |\n|-----------|---------|\n| `TO_CHAR(SYSDATE,'HH24:MI') NOT BETWEEN '08:00' AND '18:00'` | Current time is outside the 08:00\u201318:00 window (string comparison on a 24-hour clock) |\n| `TO_CHAR(SYSDATE,'DY') IN ('SAT','SUN')` | Today is Saturday or Sunday (NLS-dependent day abbreviation) |\n\nIf **either** condition is true, the procedure fires the error.\n\n#### Application Error\n\n| Attribute | Value |\n|-----------|-------|\n| Error code | **-20205** |\n| Message | *\"You may only make changes during normal office hours\"* |\n\n---\n\n### Summary of Behaviour\n\nWhen enabled, any `INSERT`, `UPDATE`, or `DELETE` against `HR.EMPLOYEES` is rejected **before the first row is touched** if the attempt occurs outside 08:00\u201318:00 or on a weekend. The trigger fires once per statement regardless of how many rows the DML would affect. Because it is currently **DISABLED**, no such restriction is in effect on this instance.",
+			"toolCalls": [
+				"describe_object",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: SECURE_DML",
+					"pass": true
+				},
+				{
+					"check": "fact: 08:00",
+					"pass": true
+				},
+				{
+					"check": "fact: 18:00",
+					"pass": true
+				},
+				{
+					"check": "fact: (SAT|Saturday).{0,40}(SUN|Sunday)",
+					"pass": true
+				},
+				{
+					"check": "fact: 20205",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"BEFORE STATEMENT\",\"INSERT OR UPDATE OR DELETE\",\"EMPLOYEES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-history-arguments",
+			"iteration": 2,
+			"answer": "HR.ADD_JOB_HISTORY does not exist (or is not visible) on **d1-19c-lab**, so there are no arguments to list and the \"defaulted\" question cannot be answered.\n\nEvidence from `run_query` on d1-19c-lab:\n\n- `ALL_ARGUMENTS WHERE owner='HR' AND object_name='ADD_JOB_HISTORY'` \u2192 **0 rows**\n- `ALL_OBJECTS WHERE object_name='ADD_JOB_HISTORY'` (all owners) \u2192 **0 rows**\n- `ALL_OBJECTS WHERE owner='HR' AND object_type IN ('PROCEDURE','FUNCTION','PACKAGE')` \u2192 **0 rows** (the HR schema in this lab instance has no PL/SQL program units at all)\n\nConclusion: the procedure is not present in this database's HR schema, so I cannot enumerate its arguments or determine whether any are defaulted. (Note: `ADD_JOB_HISTORY` ships with the standard Oracle HR demo schema, but it is not installed/visible in this particular d1-19c-lab instance.)\n\nIf you expected it to be there, it may need to be created via the sample-schema scripts \u2014 I can't run DDL/PL/SQL, but I can re-check existence or inspect a different owner/schema if you point me to one.",
+			"toolCalls": [
+				"describe_object",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"P_EMP_ID\",1,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_START_DATE\",2,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_END_DATE\",3,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_JOB_ID\",4,\"IN\",\"VARCHAR2\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_DEPARTMENT_ID\",5,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-failed-lab-job",
+			"iteration": 2,
+			"answer": "## Most Recent Failed Run of `K7Q_OWNER.K7Q_FAILJOB`\n\n**Source:** `DBA_SCHEDULER_JOB_RUN_DETAILS` on **d1-19c-lab**\n\n| Field | Value |\n|-------|-------|\n| **Log date** | Mon Oct 26 2026 00:12:12 (CST) |\n| **Scheduler status** | `FAILED` |\n| **Oracle error code** | `ORA-20001` |\n| **Application message** | `destination unavailable` |\n| **Source line** | `ORA-06512: at line 1` |\n\n---\n\n### Diagnosis: Application-Raised Error, Not a Foreign-Key Violation\n\nThe evidence clearly distinguishes the two:\n\n| Indicator | What we see | Meaning |\n|-----------|-------------|---------|\n| **Error number** | `20001` (as recorded in the `ERROR#` column) | Falls in Oracle's user-defined error range, meaning it was raised via `RAISE_APPLICATION_ERROR` by application code |\n| **Message text** | `destination unavailable` | A free-form string supplied by the application developer \u2014 not an Oracle-generated constraint message |\n| **Stack trace** | `ORA-06512: at line 1` only | The error was raised directly at the top level of the job action; no deeper FK-check frames appear anywhere in `ADDITIONAL_INFO` |\n\nA foreign-key violation would surface as an Oracle-generated integrity-constraint error (in the 02xxx range) with Oracle's own message text naming the violated constraint. None of that is present here.\n\n### Caveat\n\nThe job definition (`DBA_SCHEDULER_JOBS`) and any PL/SQL objects in `K7Q_OWNER` are no longer visible (the schema returns zero rows from `ALL_OBJECTS`), so I cannot show the literal source code. The diagnosis rests entirely on the recorded scheduler log entry, which is unambiguous: this is a deliberate `RAISE_APPLICATION_ERROR` signalling an application-level condition (\"destination unavailable\"), not a referential-integrity failure.",
+			"toolCalls": [
+				"run_query",
+				"list_objects",
+				"run_query",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: application.{0,40}(rais|error)|RAISE_APPLICATION_ERROR",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-entry-points",
+			"iteration": 3,
+			"answer": "**SHOPAPP.WORKLOAD does not exist on `p1-19c-prod`.**\n\nQuerying `ALL_OBJECTS` for owner = `SHOPAPP` and object_name matching `%WORKLOAD%` returned **zero rows**. The entire SHOPAPP schema on this target contains only:\n\n| Object | Type |\n|--------|------|\n| CUSTOMERS | TABLE |\n| ORDERS | TABLE |\n| ORDER_LINES | TABLE |\n| PRODUCTS | TABLE |\n| (various indexes) | INDEX |\n\nThere are **no packages, procedures, or functions** in SHOPAPP on this database.\n\n---\n\nIf you were thinking of a different target (e.g., `d1-19c-lab`) or a different schema name, let me know and I can look there instead.",
+			"toolCalls": [
+				"describe_object",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-writes",
+			"iteration": 3,
+			"answer": "**SHOPAPP.WORKLOAD does not exist on p1-19c-prod.**\n\nI searched the SHOPAPP schema for packages, procedures, and functions \u2014 all returned zero rows. A broader search across `ALL_OBJECTS` for any object with \"WORKLOAD\" in its name found only Oracle's built-in synonyms (`DBA_WORKLOAD_*`, `CDB_WORKLOAD_*`, `DBMS_WORKLOAD_*`, etc.) \u2014 none belong to SHOPAPP.\n\nThe SHOPAPP schema on this target contains only:\n\n| Object | Type |\n|--------|------|\n| CUSTOMERS | TABLE |\n| ORDERS | TABLE |\n| ORDER_LINES | TABLE |\n| PRODUCTS | TABLE |\n| ORDERS_CUST_IX | INDEX |\n| ORDERS_STATUS_IX | INDEX |\n| ORDER_LINES_PK | INDEX |\n| ORDER_LINES_PROD_IX | INDEX |\n| SYS_C007649 / 655 / 656 / 661 | INDEX (constraint-backed) |\n\nNo PL/SQL code objects (packages, procedures, functions, triggers) are present in SHOPAPP on this target. If the WORKLOAD package exists on a different target or under a different schema name, let me know and I can re-check.",
+			"toolCalls": [
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"PRODUCTS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDER_LINES\",\"INSERT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS\",\"ORDERS\",\"UPDATE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDER_LINES\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE\",\"ORDERS\",\"DELETE\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-purge-behavior",
+			"iteration": 3,
+			"answer": "## Result: Object Not Found on p1-19c-prod\n\n**`SHOPAPP.WORKLOAD.NIGHTLY_PURGE` does not exist** on target `p1-19c-prod`. Here's what I verified:\n\n| Check | Result |\n|-------|--------|\n| `list_objects` in SHOPAPP for pattern `NIGHTLY_PURGE`, `PURGE`, `NIGHTLY`, `WORKLOAD` | No matches |\n| All PACKAGE / PACKAGE BODY / PROCEDURE objects in SHOPAPP | None exist |\n| `ALL_SOURCE` search for name or text containing `NIGHTLY` | No rows |\n| `ALL_SCHEDULER_JOBS` referencing `NIGHTLY_PURGE` or `WORKLOAD` | No rows |\n| `ALL_OBJECTS` across entire DB for `%PURGE%`, `%NIGHTLY%`, or `WORKLOAD` | Only Oracle built-in synonyms and a SYS schedule (`DAILY_PURGE_SCHEDULE`) |\n\nThe SHOPAPP schema on this target contains only tables and indexes: **CUSTOMERS, ORDERS, ORDER_LINES, PRODUCTS** (plus their indexes). There are no PL/SQL program units at all.\n\n### Possible explanations\n\n1. **The procedure was never deployed** to this environment (it may exist in a different instance or a deployment script not yet applied).\n2. **The name is slightly different** \u2014 if you can share the exact package/procedure name or a DDL script, I can look it up again.\n3. **It lives in a schema not visible** to the current read-only role (though `ALL_OBJECTS` shows nothing matching across the entire database).\n\nIf you have the source code or a migration script that creates this procedure, I'm happy to analyze its logic for deletion order, selection criteria, and commit placement.",
+			"toolCalls": [
+				"get_source",
+				"get_source",
+				"get_source",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_schemas",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: (7|seven).{0,30}day",
+					"pass": false
+				},
+				{
+					"check": "fact: order_lines.{0,100}(before|then|first|orders)|first.{0,100}order_lines",
+					"pass": false
+				},
+				{
+					"check": "fact: commit",
+					"pass": true
+				},
+				{
+					"check": "fact: (not|no|without|regardless).{0,60}status|status.{0,60}(not|no|irrelevant)",
+					"pass": false
+				},
+				{
+					"check": "fact: ordered_at",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [26,\"ORDER_LINES\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [27,\"ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-scheduler-map",
+			"iteration": 3,
+			"answer": "On **p1-19c-prod**, all three SHOPAPP scheduler jobs are `PLSQL_BLOCK` type and call procedures inside the `SHOPAPP.WORKLOAD` package. Mapping each job to its entry point:\n\n| Job name | Entry point invoked | Enabled / State |\n|---|---|---|\n| `NIGHTLY_PURGE_JOB` | `SHOPAPP.WORKLOAD.NIGHTLY_PURGE` (no args) | TRUE / SCHEDULED |\n| `PLACE_ORDERS_JOB` | `SHOPAPP.WORKLOAD.PLACE_ORDERS` | TRUE / SCHEDULED |\n| `SHIP_ORDERS_JOB` | `SHOPAPP.WORKLOAD.SHIP_ORDERS` (no args) | TRUE / SCHEDULED |\n\n**Order-placement job argument:** Yes. `PLACE_ORDERS_JOB` supplies an argument to its entry point \u2014 the call is `shopapp.workload.place_orders(25)`, so the value passed is **25**.\n\nNote: the `NUMBER_OF_ARGUMENTS` column shows `0` for all three jobs because they are anonymous `PLSQL_BLOCK` jobs, not program-based jobs; the argument for `PLACE_ORDERS` is embedded inline in the block rather than registered as a scheduler argument.",
+			"toolCalls": [
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: \\b25\\b",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"NIGHTLY_PURGE\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"PLACE_ORDERS_JOB\",\"PLACE_ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHIP_ORDERS_JOB\",\"SHIP_ORDERS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-purge-constraint",
+			"iteration": 3,
+			"answer": "## Investigation Result \u2014 `NIGHTLY_PURGE_JOB` Failure on p1-19c-prod\n\n### Recorded Failure\n\n| Field | Value |\n|-------|-------|\n| **Job** | `SHOPAPP.NIGHTLY_PURGE_JOB` |\n| **Run time** | 2026-11-03 22:30:56 (Central) |\n| **Status** | FAILED |\n| **Error#** | 2292 |\n| **Message** | `ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found` |\n| **Stack** | `ORA-06512: at \"SHOPAPP.WORKLOAD\", line 27` |\n\nThe job action is `BEGIN shopapp.workload.nightly_purge; END;` \u2014 it attempted to delete a row from the **parent** table `ORDERS`.\n\n### Constraint Details (from `ALL_CONSTRAINTS` / `ALL_CONS_COLUMNS`)\n\n| Attribute | Value |\n|-----------|-------|\n| **Constraint name** | `SHOPAPP.SYS_C007669` |\n| **Type** | `R` (foreign key) |\n| **Child table** | `SHOPAPP.ORDER_LINES` |\n| **Child column** | `ORDER_ID` |\n| **Parent constraint** | `SHOPAPP.SYS_C007661` (PRIMARY KEY) |\n| **Parent table** | `SHOPAPP.ORDERS` |\n| **Parent column** | `ORDER_ID` |\n| **Delete rule** | **NO ACTION** |\n| **Status** | ENABLED |\n\n### Why the Delete Is Blocked\n\nThe purge procedure tried to `DELETE FROM shopapp.orders WHERE \u2026` for a particular `ORDER_ID`. Oracle checks the foreign key `SYS_C007669` before allowing the parent row to be removed:\n\n1. The FK is **ENABLED** and validated.\n2. The delete rule is **NO ACTION** \u2014 Oracle requires that no child rows in `ORDER_LINES` reference the parent `ORDER_ID` at the time the DELETE statement completes.\n3. One or more rows still exist in `ORDER_LINES` with that `ORDER_ID`, so Oracle raises **ORA-02292** and rolls back the statement (and the entire job transaction).\n\nIn short: the child table (`ORDER_LINES`) still holds line-item rows pointing to the order the purge wanted to remove. Because the FK uses `NO ACTION` (not `ON DELETE CASCADE`), Oracle refuses the parent deletion until those child rows are deleted first or the constraint is deferred/relaxed.",
+			"toolCalls": [
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"list_objects",
+				"run_query",
+				"get_source",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: ORA-02292",
+					"pass": true
+				},
+				{
+					"check": "fact: (child|referenc).{0,80}(remain|exist|found|block)|(remain|exist|found|block).{0,80}(child|referenc)",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SYS_C007669\",\"ORDER_LINES\",\"ORDER_ID\",\"ORDERS\",\"ORDER_ID\",\"NO ACTION\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-purge-line",
+			"iteration": 3,
+			"answer": "## Trace of the Most Recent NIGHTLY_PURGE_JOB Failure\n\n**Source:** `dba_scheduler_job_run_details` on **p1-19c-prod**, job `SHOPAPP.NIGHTLY_PURGE_JOB`, run at **2026-11-03 22:30:56 CST**.\n\n### Error Stack (verbatim from `ADDITIONAL_INFO`)\n\n```\nORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found\nORA-06512: at \"SHOPAPP.WORKLOAD\", line 27\nORA-06512: at line 1\n```\n\n### Frame-by-frame breakdown\n\n| Frame | Location | What it is |\n|-------|----------|------------|\n| **Outer block** | `at line 1` | The scheduler job's anonymous PL/SQL wrapper (the `job_action` itself, e.g. `BEGIN SHOPAPP.WORKLOAD.nightly_purge; END;`). No named object\u2014just the call site. |\n| **Package frame** | `\"SHOPAPP.WORKLOAD\", line 27` | Inside the **package body** of `SHOPAPP.WORKLOAD`, procedure **`nightly_purge`** (lines 24\u201329). |\n\n### The failing statement (package body, line 27)\n\n```sql\nDELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;\n```\n\n- **Operation:** `DELETE`\n- **Table:** `SHOPAPP.ORDERS`\n- **Enclosing subprogram:** `PROCEDURE nightly_purge` (package body lines 24\u201329)\n\n### Why it failed\n\nConstraint `SYS_C007669` is a **foreign key on `ORDER_LINES`** referencing the primary key of `ORDERS` (`SYS_C007661`). Line 26 attempts to delete child rows from `ORDER_LINES` first, but at least one child row in `ORDER_LINES` still references an order targeted by line 27's predicate\u2014so Oracle raises ORA-02292 before the parent `orders` row can be removed.\n\n### Summary\n\n| Attribute | Value |\n|-----------|-------|\n| Package | `SHOPAPP.WORKLOAD` (body) |\n| Line | **27** |\n| Subprogram | `nightly_purge` |\n| Failing operation | `DELETE FROM orders \u2026` |\n| Table | `SHOPAPP.ORDERS` |\n| Blocking constraint | FK `SYS_C007669` on `ORDER_LINES \u2192 ORDERS` |\n| Outer frame (`at line 1`) | Scheduler's anonymous call block (not a named PL/SQL unit) |",
+			"toolCalls": [
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"list_schemas",
+				"list_objects",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"get_source",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [27,\"NIGHTLY_PURGE\",\"DELETE\",\"ORDERS\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-history-trigger",
+			"iteration": 3,
+			"answer": "## HR.UPDATE_JOB_HISTORY \u2014 d1-19c-lab\n\n**What it is:** a row-level DML trigger on `HR.EMPLOYEES` (confirmed via `ALL_TRIGGERS`).\n\n| Property | Value |\n|---|---|\n| Triggering table | `HR.EMPLOYEES` |\n| Trigger type | `AFTER EACH ROW` |\n| Event | `UPDATE` |\n| Status | `ENABLED` |\n\n**When it fires / granularity:** It is an **AFTER UPDATE, FOR EACH ROW** trigger \u2014 it fires **once per updated row**, after the row update completes. There is no `OF <column>` list and no `WHEN` clause in the body, so it fires for **any** UPDATE of an EMPLOYEES row (not only job/department changes).\n\n**Procedure it calls:** `HR.ADD_JOB_HISTORY`, invoked as:\n```sql\nBEGIN\n  add_job_history(:old.employee_id, :old.hire_date, sysdate,\n                  :old.job_id, :old.department_id);\nEND;\n```\n\n**Old vs. new values:** all five arguments are taken from **`:OLD`** (the pre-update image), except the end date:\n- `EMPLOYEE_ID` = `:OLD.employee_id` (old)\n- `START_DATE` = `:OLD.hire_date` (old hire date \u2192 treated as the start of the prior job stint)\n- `END_DATE` = `SYSDATE` (the timestamp of the change, not an OLD/NEW column)\n- `JOB_ID` = `:OLD.job_id` (old)\n- `DEPARTMENT_ID` = `:OLD.department_id` (old)\n\nSo it archives the **previous (old)** job/department assignment, closing it out with `END_DATE = SYSDATE`.\n\n**Destination table:** `HR.JOB_HISTORY`. The argument list maps 1:1 onto its columns (`EMPLOYEE_ID, START_DATE, END_DATE, JOB_ID, DEPARTMENT_ID`), and the table's PK `(EMPLOYEE_ID, START_DATE)` plus FKs to employees/departments/jobs match those values.\n\n**One caveat (tool limitation):** I could read the trigger body via `ALL_TRIGGERS`, but the body of `HR.ADD_JOB_HISTORY` itself is **not exposed** to my account through `ALL_SOURCE`/`ALL_OBJECTS` (it returns no rows \u2014 a privilege/visibility limit, not an absence of the object; the ENABLED+VALID trigger proves it exists and resolves). The destination `HR.JOB_HISTORY` is therefore established from the column mapping, the FK/PK structure, and the standard Oracle HR sample definition rather than from a directly-read INSERT statement. If you need byte-for-byte confirmation of the procedure's INSERT target, that requires source-view privileges on the `HR` procedure.",
+			"toolCalls": [
+				"get_source",
+				"get_source",
+				"describe_object",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"get_source",
+				"run_query",
+				"run_query",
+				"describe_object"
+			],
+			"checks": [
+				{
+					"check": "fact: ADD_JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_HISTORY",
+					"pass": true
+				},
+				{
+					"check": "fact: (old|previous|prior).{0,100}(job|department)|(job|department).{0,100}(old|previous|prior)",
+					"pass": true
+				},
+				{
+					"check": "fact: JOB_ID",
+					"pass": true
+				},
+				{
+					"check": "fact: DEPARTMENT_ID",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"AFTER EACH ROW\",\"UPDATE\",\"EMPLOYEES\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": true
+		},
+		{
+			"id": "hard-p16-security-trigger",
+			"iteration": 3,
+			"answer": "You're right that **20000** and **20999** were my own annotation and not from any tool result \u2014 I'll remove them. However, **20205** does appear verbatim in the `DBA_SOURCE` tool output (`RAISE_APPLICATION_ERROR (-20205,`), so it stays.\n\nHere's the corrected section:\n\n---\n\n### The Called Routine: `HR.SECURE_DML` (PROCEDURE)\n\n```sql\nPROCEDURE secure_dml\nIS\nBEGIN\n IF TO_CHAR (SYSDATE, 'HH24:MI') NOT BETWEEN '08:00' AND '18:00'\n OR TO_CHAR (SYSDATE, 'DY') IN ('SAT', 'SUN') THEN\n  RAISE_APPLICATION_ERROR (-20205,\n   'You may only make changes during normal office hours');\n END IF;\nEND secure_dml;\n```\n\n#### Time / Day Restriction\n\n| Condition | Meaning |\n|-----------|---------|\n| `TO_CHAR(SYSDATE,'HH24:MI') NOT BETWEEN '08:00' AND '18:00'` | Current time is **outside 08:00\u201318:00** (string comparison on 24-hr clock) |\n| `TO_CHAR(SYSDATE,'DY') IN ('SAT','SUN')` | Current day is **Saturday or Sunday** |\n\nIf **either** condition is true, the procedure fires the error.\n\n#### Application Error\n\n| Attribute | Value |\n|-----------|-------|\n| **Error number** | **-20205** (user-defined) |\n| **Message** | `You may only make changes during normal office hours` |\n\n---\n\n### How It Works Together\n\n1. A user issues any INSERT, UPDATE, or DELETE on `HR.EMPLOYEES`.\n2. **Before** the statement executes, the statement-level trigger fires once.\n3. The trigger calls `secure_dml`, which inspects `SYSDATE`.\n4. If the current moment falls outside weekday business hours (Mon\u2013Fri, 08:00\u201318:00), the procedure raises **ORA-20205**, aborting the DML before any row is touched.\n5. Because it is **BEFORE STATEMENT** (not row-level), the check runs exactly once regardless of how many rows the statement would affect.\n\n> **Note:** The trigger is currently **DISABLED** on this instance, so it will not fire until re-enabled.",
+			"toolCalls": [
+				"describe_object",
+				"get_source",
+				"list_objects",
+				"get_source",
+				"get_source",
+				"get_source",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: SECURE_DML",
+					"pass": true
+				},
+				{
+					"check": "fact: 08:00",
+					"pass": true
+				},
+				{
+					"check": "fact: 18:00",
+					"pass": true
+				},
+				{
+					"check": "fact: (SAT|Saturday).{0,40}(SUN|Sunday)",
+					"pass": true
+				},
+				{
+					"check": "fact: 20205",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"BEFORE STATEMENT\",\"INSERT OR UPDATE OR DELETE\",\"EMPLOYEES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-history-arguments",
+			"iteration": 3,
+			"answer": "I could not list any arguments, because **HR.ADD_JOB_HISTORY does not exist** on the pinned target `d1-19c-lab` (it is not present in \u2014 or not visible to the connected user `HARNESS_LAB` in \u2014 the data dictionary).\n\nEvidence (all via `run_query` on `d1-19c-lab`):\n- `ALL_ARGUMENTS` filtered to `OWNER='HR' AND OBJECT_NAME='ADD_JOB_HISTORY'` \u2192 **0 rows** (so no argument metadata: name/position/mode/datatype/defaulted).\n- `ALL_OBJECTS` for that owner/name \u2192 **0 rows** (the object itself is absent, not merely invalid).\n- `ALL_OBJECTS` for `OWNER='HR'` with `OBJECT_TYPE IN ('PROCEDURE','FUNCTION','PACKAGE')` \u2192 **0 rows** \u2014 the HR schema on this target contains no PL/SQL program units at all.\n\nSo there are no arguments to enumerate and nothing is defaulted; the premise (that the procedure exists) does not hold here. This matches the standard 19c HR sample schema, which ships `JOB_HISTORY` as a *table* but no `ADD_JOB_HISTORY` procedure.\n\nRead-only next steps I can take if you'd like:\n- Search every accessible schema for an object named like `ADD_JOB_HISTORY` (`ALL_OBJECTS` with `OBJECT_NAME LIKE 'ADD_JOB_HIST%'`) in case it lives under a different owner (e.g., OE/PM/IX \u2014 note PM and IX are not granted to this user).\n- Confirm the exact spelling/case of the name you expect.\n\nTell me which you'd prefer, or give the correct schema/name and I'll resolve its arguments.",
+			"toolCalls": [
+				"describe_object",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fresh ground truth row: [\"P_EMP_ID\",1,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_START_DATE\",2,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_END_DATE\",3,\"IN\",\"DATE\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_JOB_ID\",4,\"IN\",\"VARCHAR2\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"P_DEPARTMENT_ID\",5,\"IN\",\"NUMBER\",\"N\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		},
+		{
+			"id": "hard-p16-failed-lab-job",
+			"iteration": 3,
+			"answer": "## Most Recent Failed Run of `K7Q_OWNER.K7Q_FAILJOB`\n\n**Source:** `dba_scheduler_job_run_details` on **d1-19c-lab**\n\n| Field | Value |\n|-------|-------|\n| **Log date** | Mon Oct 26 2026 00:12:12 (Central Standard Time) |\n| **Scheduler status** | `FAILED` |\n| **Oracle error code** | `ORA-20001` |\n| **Application message** | `destination unavailable` |\n| **Source line** | `ORA-06512: at line 1` |\n\n---\n\n## Diagnosis: Application-Raised Error, Not a Foreign-Key Error\n\nThe recorded evidence clearly distinguishes this as an **application-raised error**:\n\n1. **Error number range.** ORA-**20001** falls within the user-defined error band reserved for `RAISE_APPLICATION_ERROR`. This is the only mechanism by which Oracle emits errors in this band; it means the job's PL/SQL explicitly called `RAISE_APPLICATION_ERROR` with a custom code and message.\n\n2. **Message text.** \"destination unavailable\" is a free-form, human-readable string chosen by the developer\u2014characteristic of `RAISE_APPLICATION_ERROR`. A foreign-key violation would instead produce an Oracle-generated integrity-constraint message that names the offending constraint (e.g., *integrity constraint violated \u2013 parent key not found* or *child record found*).\n\n3. **Stack trace depth.** The `ORA-06512: at line 1` indicates the exception was raised directly at the top level of the job action (an anonymous block or single-line call), with no deeper PL/SQL call stack\u2014consistent with a deliberate `RAISE_APPLICATION_ERROR` rather than an engine-detected constraint violation that would typically show additional frames.\n\n4. **No constraint name in the message.** Oracle FK errors always embed the offending constraint name (e.g., `K7Q_OWNER.SOME_FK`). Its absence here further rules out a referential-integrity failure.\n\n**Conclusion:** The job intentionally signals a business-logic condition (\"destination unavailable\") via `RAISE_APPLICATION_ERROR`. It is not a database integrity error.",
+			"toolCalls": [
+				"run_query",
+				"run_query",
+				"list_objects",
+				"list_objects",
+				"run_query",
+				"run_query"
+			],
+			"checks": [
+				{
+					"check": "fact: application.{0,40}(rais|error)|RAISE_APPLICATION_ERROR",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"FAILED\",\"ORA-20001\",\"destination unavailable\",1]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"pass": false
+		}
+	],
+	"truth": {
+		"hard-p16-entry-points": [
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS"
+			]
+		],
+		"hard-p16-writes": [
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"PRODUCTS",
+				"UPDATE"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDER_LINES",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"SHIP_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDER_LINES",
+				"DELETE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDERS",
+				"DELETE"
+			]
+		],
+		"hard-p16-purge-behavior": [
+			[
+				26,
+				"ORDER_LINES"
+			],
+			[
+				27,
+				"ORDERS"
+			]
+		],
+		"hard-p16-scheduler-map": [
+			[
+				"NIGHTLY_PURGE_JOB",
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS_JOB",
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS_JOB",
+				"SHIP_ORDERS"
+			]
+		],
+		"hard-p16-purge-constraint": [
+			[
+				"SYS_C007669",
+				"ORDER_LINES",
+				"ORDER_ID",
+				"ORDERS",
+				"ORDER_ID",
+				"NO ACTION"
+			]
+		],
+		"hard-p16-purge-line": [
+			[
+				"27"
+			],
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"DELETE"
+			],
+			[
+				"ORDERS"
+			]
+		],
+		"hard-p16-history-trigger": [
+			[
+				"AFTER"
+			],
+			[
+				"ROW"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"UPDATE"
+			]
+		],
+		"hard-p16-security-trigger": [
+			[
+				"BEFORE"
+			],
+			[
+				"STATEMENT"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"INSERT"
+			],
+			[
+				"UPDATE"
+			],
+			[
+				"DELETE"
+			]
+		],
+		"hard-p16-history-arguments": [
+			[
+				"P_EMP_ID",
+				1,
+				"IN",
+				"NUMBER",
+				"N"
+			],
+			[
+				"P_START_DATE",
+				2,
+				"IN",
+				"DATE",
+				"N"
+			],
+			[
+				"P_END_DATE",
+				3,
+				"IN",
+				"DATE",
+				"N"
+			],
+			[
+				"P_JOB_ID",
+				4,
+				"IN",
+				"VARCHAR2",
+				"N"
+			],
+			[
+				"P_DEPARTMENT_ID",
+				5,
+				"IN",
+				"NUMBER",
+				"N"
+			]
+		],
+		"hard-p16-failed-lab-job": [
+			[
+				"FAILED",
+				"ORA-20001",
+				"destination unavailable",
+				1
+			]
+		]
+	}
+}
