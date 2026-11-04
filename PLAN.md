@@ -1754,6 +1754,129 @@ Pushed after the owner confirmed: origin/main 848670c and tag `v1.1.0`. CI run
 ### Not in phase 15
 Publishing to npm, GitHub release binaries, and Windows support.
 
+## Phase 16: PL/SQL insight and issue triage (approved 2026-11-04)
+
+The owner asked for PL/SQL features: document packages, explain them with
+diagrams, and, when a user reports an issue, take the report, find the relevant
+logs and code, and suggest debug steps toward the root cause.
+
+Design rules:
+- Read-only, through the existing session and SQL policy. Use `DBA_` dictionary
+  views and fall back to `ALL_` views; when a view is unreadable, say
+  "unavailable" with the ORA code instead of guessing.
+- Evidence gathering is deterministic code, not new chat tools. Phase 6 showed
+  that every tool schema costs uncached tokens on every session, and this model
+  rarely picks new tools unprompted. LLM use is opt-in (`--summarize`, and chat
+  `/triage`), grounded like `report --summarize`.
+- Diagrams: Mermaid text in Markdown, plus a `{nodes, edges}` graph JSON that
+  the web UI draws as its own SVG. No new dependencies (owner decision).
+- Source text stays local. Credential-looking literals (`IDENTIFIED BY …`,
+  `password := '…'`) are redacted in all output. The audit log keeps only SQL
+  hashes, as today. Caps: 2,000 source lines per object, ±8 lines per excerpt.
+
+Grants: `docs/grants-request-2026-11-04-plsql.sql` was applied on 2026-11-04,
+with the owner's authorization ("Write and run it"). It ran as `/ as sysdba` in
+oracle19c-prod after the identity check (PRODCDB 19.9.1). It granted SELECT on
+`DBA_SOURCE`, `DBA_ERRORS`, `DBA_DEPENDENCIES`, `DBA_PROCEDURES`, `DBA_ARGUMENTS`
+and `DBA_OBJECTS` to HARNESS_RO: 6/6 succeeded, and DBA_OBJECTS was already
+granted. d1 already reads these through SELECT_CATALOG_ROLE.
+
+Live material: p1 `SHOPAPP.WORKLOAD` (spec plus a 30-line body: `PLACE_ORDERS`,
+`SHIP_ORDERS`, `NIGHTLY_PURGE`), three scheduler jobs, and `NIGHTLY_PURGE_JOB`
+failing with ORA-02292 (`SHOPAPP.SYS_C007669`) at WORKLOAD line 27. d1 has HR
+procedures and triggers, OE triggers, a function and types, and the failing
+`K7Q_OWNER.K7Q_FAILJOB` (ORA-20001 at line 1). Neither target has application log
+tables, so logs come from Oracle sources plus per-target configured log tables.
+
+| WP | Branch | Owns | Depends on |
+|---|---|---|---|
+| WP-16A PL/SQL docs and diagrams | `wp-16a-plsql-doc` | `src/plsql/` (new), the `plsql` command in `src/cli/index.ts`, tests, `docs/plsql.md` | — |
+| WP-16B Issue triage | `wp-16b-triage` | `src/triage/` (new), the `triage` command, tests, `docs/triage.md` | WP-16A |
+| WP-16C Web and chat | `wp-16c-plsql-web` | `src/web/` (PL/SQL tab, triage panel, SVG graph), chat `/triage` in `src/cli/` and web chat, browser tests, `docs/web-ui.md` | WP-16B |
+| WP-16D PL/SQL evals | `wp-16d-plsql-evals` | `evals/cases-hard/phase16-*.json` (challenge split), `docs/evals-hard.md` | — |
+
+### WP-16A: PL/SQL docs and diagrams
+- `src/plsql/dictionary.ts`: a typed read layer over objects, procedures,
+  arguments, source, dependencies (both directions), errors, and scheduler jobs
+  whose `job_action` names the object. DBA→ALL fallback, recording which view
+  answered.
+- `piagent plsql list --target [--owner] [--json]`: PL/SQL objects with type,
+  status, line count and last DDL time.
+- `piagent plsql doc --target --object OWNER.NAME [--json] [--out dir]`:
+  - overview, status, and compile errors;
+  - each subprogram's signature (arguments, modes, types, defaults), with the
+    spec comments next to it;
+  - tables used, with per-table operations from a static text scan of the body
+    (SELECT/INSERT/UPDATE/DELETE/MERGE, labelled heuristic);
+  - callers and scheduler jobs, plus a line-numbered, redacted source appendix.
+- `src/plsql/diagram.ts`: a graph model, plus Mermaid output for a dependency
+  graph (object → subprograms → tables/objects, jobs → entry points).
+- Tests: unit tests with dictionary fixtures, including redaction, caps, and
+  overloads; integration on WORKLOAD (p1) and an HR procedure (d1).
+
+### WP-16B: issue triage
+`piagent triage --target [--issue TEXT | --issue-file F] [--since 24h] [--json]
+[--out dir] [--summarize]`:
+- Parse the report for ORA/PLS codes, ORA-06512 frames (`at "OWNER.NAME", line
+  N` and `at line N`), object and job names, and times.
+- Collect evidence:
+  - for each frame, a source excerpt around the line, with its subprogram and the
+    statement at that line;
+  - scheduler run history for the named or implicated jobs in the window;
+  - compile errors and invalid objects in the involved owners;
+  - for constraint errors (ORA-00001/02291/02292), the constraint, the parent and
+    child tables, and their columns;
+  - recent rows from configured log tables (`logTables` per target in config:
+    table, timestamp column and message columns, row cap). Candidate log tables
+    found by name are listed, not queried.
+- A local error-code guide (meaning, typical PL/SQL causes, next read-only
+  checks) for common codes: 00001, 00054, 00060, 00904, 00942, 01031, 01403, 01422,
+  01476, 01555, 01722, 02291, 02292, 04031, 04068, 04091, 06502, 06508, 06511,
+  06550, 20000–20999 and PLS-*.
+- Output: ranked root-cause hypotheses, each with its evidence, plus a numbered
+  debug checklist with the exact read-only SQL for each step and a Mermaid trace
+  diagram (job → subprogram/line → statement → table/constraint).
+  `--summarize` adds a grounded Strata narrative, with numbers checked as in
+  report summaries.
+- With no issue text, `triage --target` scans recent failures (failed job runs,
+  compile errors, invalid objects) and triages each.
+- Integration: NIGHTLY_PURGE_JOB on p1 must name SYS_C007669, its child table,
+  line 27 inside NIGHTLY_PURGE, and the DELETE statement there. K7Q_FAILJOB
+  must show ORA-20001 raised from the job's anonymous block.
+
+### WP-16C: web and chat
+- A web PL/SQL tab with an object picker, the doc view, and the dependency graph
+  as SVG drawn from the graph JSON (layered layout, no new dependency, XSS-safe).
+  Also a Triage panel (paste the issue → hypotheses, checklist, trace SVG,
+  Markdown export). Same token, Host/Origin checks, body caps and single-flight
+  lock as the drift endpoints.
+- Chat `/triage <issue text>` in CLI chat and web chat: runs the triage, then asks
+  the model one grounded question over the evidence. The default prompt and
+  tools stay unchanged, so normal sessions pay no extra tokens.
+
+### WP-16D: PL/SQL evals
+About ten blind challenge-split cases for plain chat: what a WORKLOAD subprogram
+does, which tables it writes, which job calls it, why NIGHTLY_PURGE_JOB fails,
+which line raises, what a d1 trigger does, and what an argument list is. Use
+`rowCells` where it fits. Validate ground truth read-only, and test scorers with
+correct and wrong answers in several layouts. The baseline is measured on
+current master; no product change is made in this WP.
+
+### Gate
+- The usual tests (unit, integration, browser).
+- Live smoke: `plsql doc` on WORKLOAD, `triage` on both failing jobs, and the web
+  tab.
+- WP-16C runs a token gate (hard dev 4×4, holdout ×3, regression, MVP) to show
+  default chat is unchanged.
+- Antigravity review per WP.
+
+### Not in phase 16
+- Compiling, debugging with DBMS_DEBUG, setting breakpoints, or running any
+  PL/SQL.
+- Reading trace or alert files from the server filesystem.
+- New chat tools.
+- Cloud LLMs.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
