@@ -931,3 +931,67 @@ after this change. `major = 190` and `major = 23` also fail.
 from B ch1/ch3 (key trace) and B ch2/ch3 (memory), with negative mutations
 for index names, types, labels, numbering, source-only values and unrelated
 tables. Verification is offline; no case JSON, database or LLM is involved.
+
+### WP-11F: second archived scorer follow-up (2026-11-04)
+
+Scope: `rowCells` only; no case, contract, product, DB or LLM changes.
+Qualified identifiers tolerate Markdown emphasis and spaces around their dots.
+Qualified field values agree with unqualified truth labels; explicit table/index/
+constraint qualifiers must agree with the corresponding truth owner column.
+Dictionary constraint identifiers may carry a trailing `— type P` (or another
+Oracle constraint-type letter) annotation. Parenthesized labelled values also
+accept a colon (`major version: **19**`); no major version is inferred from a
+full version or `19c`. Wider vertical tables recognize `Metric` alongside the
+existing label headers and still ignore source/number columns. Separate tables
+remain separate records.
+
+The unit fixtures preserve all 13 gate-14b answers whose archived rowCells
+checks failed. Their triage is:
+
+| Label / side | Case suffix | Diagnosis and new outcome |
+|---|---|---|
+| ch1 A | partial-memory | Only full version; no standalone major 19. FAIL. |
+| ch1 B | plan-line-tree | OP is `INDEX UNIQUE SCAN`, OPTIONS is `NONE`, rather than OP `INDEX`, OPTIONS `UNIQUE SCAN`. FAIL. |
+| ch1 B | warehouse-location-key | Never names parent table LOCATIONS. FAIL. |
+| ch1 B | partial-memory | Full version plus Oracle 19c, no standalone major 19. FAIL. |
+| ch2 B | order-customer-key | Artifact: emphasized qualified parent and constraint `— type P` annotation. PASS. |
+| ch2 B | partial-memory | Artifact: explicit `(major version: **19**)`. PASS. |
+| ch3 B | partial-memory | Only full version. FAIL. |
+| ch4 B | order-customer-key | Artifact in archived checks; **already PASS on master**. Qualified child and parent in wider vertical table. PASS. |
+| ch4 B | warehouse-location-key | Never names parent table LOCATIONS. FAIL. |
+| ch4 B | partial-memory | Only full version, labelled as full string. FAIL. |
+| ch4 A | order-customer-key | Correct facts, but index-column evidence is in a separate table. Retain FAIL under the no-pooling rule. |
+| ch4 A | warehouse-location-key | Artifact: `HR . LOCATIONS` in one value cell. PASS. |
+| ch4 A | stats-grain | Artifact: correct 10, 10, 7 in wider Metric/Value/Source table. PASS. |
+
+Offline rescore baseline: master `2ec667ab4979e5d6a53c55be54eec903adbbdf90`.
+Read every JSON result in `eval-archive/phase11/` and `phase14/`, recursively:
+46 files, 1,286 records. Reconstruct expected checks and truth rows/scalar bounds
+from archived checks, retaining each case's truth SQL for label binding. Both
+scorers receive identical archived answers, tool calls and truth. No runner or
+external service is used. The reusable comparison is `/tmp/wp11f-rescore.mts`
+(with old master scorer at `/tmp/wp11f-old-scoring.mts`); output is
+`/tmp/wp11f-rescore.txt`.
+
+| Archive group | Records | Master passes | New passes |
+|---|---:|---:|---:|
+| phase11 root | 102 | 79 | 79 |
+| phase11/gate-11b | 592 | 570 | 571 |
+| phase14/gate-14b | 592 | 576 | 580 |
+
+Every flip is FAIL → PASS (iteration 1); no other record or check changes:
+
+| Archive result JSON | Case | Justification |
+|---|---|---|
+| phase11/gate-11b/2026-11-04T11-07-33-960Z-d6fe417f-31bd-4375-acff-1fe2a03c0407.json (B ch2) | hard-p11b-stats-grain | Metric/Value/Source table contains dictionary 10, live 10, distinct 7 in separate evidence cells. |
+| phase14/gate-14b/2026-11-04T13-24-49-383Z-ffd31c53-44c1-4677-98e0-689b4b8e8083.json (B ch2) | hard-p11-order-customer-key | One Step/Detail table includes all eight truth cells, including SHOPAPP.**CUSTOMERS** and referenced SYS_C007649 — type P. |
+| phase14/gate-14b/2026-11-04T13-24-49-383Z-ffd31c53-44c1-4677-98e0-689b4b8e8083.json (B ch2) | hard-p11b-partial-memory | Explicit major version: **19**, alongside the full version; instance and privilege-gap checks already pass. |
+| phase14/gate-14b/2026-11-04T13-55-30-480Z-107a1d11-ff0a-4338-b728-35272a704712.json (A ch4) | hard-p11-warehouse-location-key | Parent owner/table cell HR . LOCATIONS and all remaining eight truth values are present in one Attribute/Value table. |
+| phase14/gate-14b/2026-11-04T13-55-30-480Z-107a1d11-ff0a-4338-b728-35272a704712.json (A ch4) | hard-p11b-stats-grain | Metric/Value/Source table contains 10, 10, 7; trailing source annotation is not evidence. |
+
+Validation: `npm run typecheck` passes; `npm test` passes 798 tests in 46 files.
+This worktree lacked dependency binaries, so validation used a local
+`node_modules` symlink to the existing needlefish installation (Vitest 5.1.0).
+No dependency manifest changed. Integration/eval execution was intentionally
+excluded: no DB or LLM code changed and this package is offline-only.
+No contract changes are needed. Live behavior was not exercised.
