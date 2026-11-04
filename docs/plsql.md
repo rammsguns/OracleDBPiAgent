@@ -76,7 +76,7 @@ contracts. WP-16C can render `graph` directly as SVG; no Mermaid runtime is need
 ## WP-16A verification (2026-11-04)
 
 - `npm run typecheck`: pass.
-- `npm test`: 818 tests passed across 50 files.
+- `npm test`: 837 tests passed across 51 files.
 - `PIAGENT_SECRET_DIR=… npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask)'`:
   28 passed, one deliberately filtered LLM test skipped, ten files passed.
 - Live `plsql doc` on SHOPAPP.WORKLOAD: complete evidence from DBA views,
@@ -100,3 +100,13 @@ point matching. Callers omit the PACKAGE BODY → PACKAGE self-dependency.
 Markdown includes a summary, tight lists and fenced declarations where no spec
 comment exists. Live WORKLOAD ranges: PLACE_ORDERS 2–18, SHIP_ORDERS 19–23,
 NIGHTLY_PURGE 24–29. HR.ADD_JOB_HISTORY spans lines 1–13 and inserts JOB_HISTORY.
+
+
+Antigravity findings fixed: DELETE target FROM clauses no longer count as
+SELECT, while nested subqueries still contribute reads of their own tables.
+MERGE USING sources contribute SELECT, including direct table references.
+The shared scanner masks comments and ordinary/q-quoted literals first.
+Declaration boundaries and parameter matching ignore comment/literal semicolons;
+trailing line-comment newlines are preserved before the terminating semicolon.
+The refreshed live WORKLOAD example shows ORDER_LINES as DELETE-only inside
+NIGHTLY_PURGE; ORDERS retains SELECT from the subquery and DELETE as a target.

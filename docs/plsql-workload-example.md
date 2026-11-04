@@ -63,14 +63,14 @@ Body range (heuristic): PACKAGE BODY lines 24–29.
 Table operations (heuristic):
 
 - SHOPAPP.ORDERS: SELECT, DELETE
-- SHOPAPP.ORDER_LINES: SELECT, DELETE
+- SHOPAPP.ORDER_LINES: DELETE
 
 ## Tables used (package/object union; heuristic static scan)
 
 Dictionary table dependencies; operations are lexical hints, not runtime proof. Dynamic SQL, synonyms and quoted identifiers may be missed.
 
 - SHOPAPP.ORDERS: SELECT, INSERT, UPDATE, DELETE
-- SHOPAPP.ORDER_LINES: SELECT, INSERT, DELETE
+- SHOPAPP.ORDER_LINES: INSERT, DELETE
 - SHOPAPP.PRODUCTS: SELECT, UPDATE
 
 ## Callers
@@ -118,7 +118,6 @@ flowchart LR
   n7 -.->|UPDATE| n12
   n8 -.->|UPDATE| n11
   n9 -.->|DELETE| n10
-  n9 -.->|SELECT| n10
   n9 -.->|DELETE| n11
   n9 -.->|SELECT| n11
 ```
