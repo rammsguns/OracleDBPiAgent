@@ -41,61 +41,74 @@ configured read-only accounts and grants. The local OpenAI-compatible LLM endpoi
 must be loaded Strata at `http://127.0.0.1:8080/v1`, with the model named in
 [.env.example](.env.example). A generic cloud endpoint is not supported.
 
-From a clone of this repository:
+After the clone/global install above, `piagent init` creates a private
+`~/.piagent/.env`. Edit its placeholder paths:
+
+- `PIAGENT_SECRET_DIR`: private directory containing `d1_lab.pw` for `HARNESS_LAB`
+  and `p1_harness_ro.pw` for `HARNESS_RO`.
+- `PIAGENT_LLM_API_KEY_FILE`: private file containing the existing Strata key.
+
+Credential files contain only their credential with an optional trailing newline;
+use mode 600 and a private directory. Setup creates no accounts or grants.
+The CLI automatically loads the private env file; existing environment variables
+win. It never automatically loads the working directory's `.env`.
 
 ```bash
-npm ci
-cp .env.example .env
-chmod 600 .env
+piagent targets
+piagent report --target d1-19c-lab --sections identity
 ```
 
-Edit `.env` before continuing: replace the example machine paths with your own
-absolute paths, such as `PIAGENT_SECRET_DIR=/absolute/path/to/db-secrets` and
-`PIAGENT_LLM_API_KEY_FILE=/absolute/path/to/strata-api-key`. Keep the loopback URL
-and approved target definitions. `.env` holds settings and file paths, never
-passwords or the API key, and must stay uncommitted.
+Reports use bounded read-only queries and no LLM unless `--summarize` is supplied.
+Audit defaults to `~/.piagent/audit.jsonl`; saved report history defaults to
+`~/.piagent/reports`. Set `PIAGENT_HOME` for another private home, or explicit
+`PIAGENT_AUDIT_FILE` / `PIAGENT_REPORT_DIRECTORY` paths to retain clone-local
+artifacts. Reports save only with `--out` or a diff option. See
+[installation and migration](docs/install.md).
 
-Provision these existing credentials outside the repository; setup does not
-create accounts or change database grants:
+Before LLM use, have the operator confirm Strata is loaded. Stop if it is unloaded;
+do not restart or reconfigure it. Run requests one at a time:
 
-| File | Format |
+```bash
+piagent ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab
+piagent web
+```
+
+Open the private loopback URL printed by `web`; stop with Ctrl-C.
+Starting the server alone makes no LLM call; browser health checks contact Strata.
+For clone development, the equivalent invocation is
+`node --env-file=.env dist/cli/index.js targets` after building and configuring a
+private `.env`. See the [documentation index](docs/README.md).
+
+## Commands
+
+`piagent --help` lists commands; each command accepts `--help`.
+
+| Command | Behavior / options |
 |---|---|
-| `<PIAGENT_SECRET_DIR>/d1_lab.pw` | Plain UTF-8 password for the configured `HARNESS_LAB` account on d1. |
-| `<PIAGENT_SECRET_DIR>/p1_harness_ro.pw` | Plain UTF-8 password for the configured `HARNESS_RO` account on p1. |
-| `<PIAGENT_LLM_API_KEY_FILE>` | Plain UTF-8 Strata API key. |
+| `piagent --version` | Installed package version. |
+| `piagent init` | Create private configuration without overwriting it. |
+| `piagent targets` | List approved targets; no DB or LLM call. |
+| `piagent doctor` | Check Strata health, both 19c targets and account privileges. |
+| `piagent ask "question" --target d1-19c-lab --json` | One agent question; target and JSON are optional. Uses the LLM. |
+| `piagent chat --target d1-19c-lab` | Interactive agent conversation; optional target. Uses the LLM. |
+| `piagent web --port 8765` | Loopback web server; port is optional. |
+| `piagent report --target d1-19c-lab` | Fourteen fixed checks; `--md` (default), `--json`, `--sections`, `--owner`, `--out`, `--diff`, `--diff-only`, optional LLM `--summarize`. |
+| `piagent report history --target d1-19c-lab --last 10 --json` | Saved-file trends; last 1–30 (default 30), optional JSON. No DB/LLM. |
+| `piagent report schedule --target d1-19c-lab --every 1h` | Print setup, systemd service/timer and alternative cron line; optional `--out`. No installation or DB/LLM. |
+| `piagent report schedule run --target d1-19c-lab` | Run the scheduled read-only report; optional absolute `--home` and `--out`. |
+| `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`; optional JSON and `--out`. No LLM. |
 
-Each file contains only its credential, with an optional trailing newline (the
-reader trims surrounding whitespace); use mode `600` and a private directory.
-Do not put credentials into commands, docs or git.
+Manual `schedule run` defaults to `<PIAGENT_HOME>/reports`; pass `--out`
+explicitly when using a separate report directory. The generated schedule pins
+the directory selected when it was printed.
 
-Load the settings explicitly; copying `.env` alone does not load it:
-
-```bash
-npm run build
-node --env-file=.env dist/cli/index.js report --target d1-19c-lab
-```
-
-The report runs bounded read-only checks without the LLM. Before asking a
-question, check Strata:
-
-```bash
-curl --fail --silent --show-error http://127.0.0.1:8080/health
-```
-
-Continue only if health reports the model loaded. If it is unloaded or
-unavailable, stop and ask its operator; do not restart or reconfigure it.
-Run requests one at a time:
-
-```bash
-node --env-file=.env dist/cli/index.js ask "How many rows are in SH.CHANNELS?" --target d1-19c-lab
-node --env-file=.env dist/cli/index.js web
-```
-
-Open the private loopback URL printed by `web`, then stop the server with
-Ctrl-C when finished. Starting the UI does not itself ask the LLM a question.
-The compiled CLI needs no global installation. `ask` also accepts `--json`;
-`targets`, `doctor` and `chat` are available through the same Node invocation. See the [documentation index](docs/README.md)
-and [changelog](CHANGELOG.md) for more.
+Before `report schedule run`, initialize the private home env file and execute the
+printed one-time setup outside the service sandbox. Choose either timer or cron
+and one writer per output directory. Exit 3 from a report diff records a local
+alert and the schedule runner succeeds. See [reports and scheduling](docs/report.md).
+Drift exits 0 for complete equality, 3 for observed differences, or 1 for incomplete
+results without observed differences/failure. Inspect `complete` even on exit 3;
+p1 parameter visibility can be unavailable. See [drift](docs/drift.md).
 
 `report` requires `--target` and runs 14 bounded read-only DBA checks without the
 LLM. Markdown is the default (`--md`); `--json` emits one report object.
@@ -120,7 +133,9 @@ See [grounding details](docs/grounding.md).
 `web` binds only to `127.0.0.1` on port 8765 (`--port N` overrides it).
 Open the printed `http://127.0.0.1:N/#token=...` URL and keep it private.
 The page shows a target picker, streamed chat, tool-call trace, session audit and
-health checks, with a Stop button. The Report tab runs the selected target's DBA
+health checks, with a Stop button. The Report tab includes a saved-file History panel with sparklines and worsening
+flags. The Drift tab compares parameters, schema or object metadata without an
+LLM. The Report tab runs the selected target's DBA
 checks with an optional summary; chat and report summaries show Unverified notes
 when facts remain unsupported. Export Markdown downloads the displayed conversation,
 grounding notes and trace; trace arguments omit SQL, binds and connection fields.
@@ -159,6 +174,9 @@ npm run optimize:report
 
 Unit tests need no DB or LLM. Integration tests skip with a reason when a dependency
 is down. Evals need both targets and loaded Strata; run only one eval or optimizer
-process at a time. Results go to ignored `evals/results/`.
+process at a time. Hard splits are `dev`, fresh `holdout`, `regression` and
+separately reported `challenge`; opt-in `rowCells` checks row attribution. The
+[secondary endpoint](docs/evals-two-servers.md) is eval-only and opt-in; gates
+remain on the primary. Results go to ignored `evals/results/`.
 
 See the [documentation index](docs/README.md) for status, evals, reports and reviews.
