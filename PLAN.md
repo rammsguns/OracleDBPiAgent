@@ -1965,6 +1965,60 @@ All WPs are merged on local master with Antigravity review APPROVE:
 - New chat tools.
 - Cloud LLMs.
 
+## Phase 17: close the phase 16 gaps (owner request 2026-11-04: "fix the remaining gaps")
+
+| WP | Branch | Owns | Gate |
+|---|---|---|---|
+| WP-17A Grounding precision | `wp-17a-grounding` | `src/agent/grounding.ts`, the correction text in `src/agent/index.ts`, tests | eval gate with 17C |
+| WP-17B Triage name recognition | `wp-17b-triage-names` | `src/triage/` (parse and lookup), tests, `docs/triage.md` | unit, integration, live smoke |
+| WP-17C Hint comma joins | `wp-17c-hint-joins` | `emptyDictionaryHint` in `src/tools/index.ts`, tests | eval gate with 17A |
+| WP-17D Multi-value cells | `wp-17d-scorer-cells` | `evals/scoring.ts` (rowCells), tests, `docs/evals-hard.md` | offline rescore, every flip justified |
+
+### WP-17A: grounding precision
+gate-16g hard-p16-security-trigger failed 5 of 8 times. On every failing record,
+the grounding check flagged supported facts as unverified:
+- `EACH` and `ROW` from `FOR EACH ROW`;
+- `HR.SECURE_DML`, whose source the model had read;
+- `20205`, which the source shows as `-20205`.
+
+The correction turn ("only fix or remove the listed numbers") then got a short
+reply defending 20205, and that reply became the final answer, losing the
+explanation.
+
+Fix:
+- Treat PL/SQL and SQL keywords as constants.
+- Accept a number whose evidence differs only by a leading minus sign.
+- Accept OWNER.NAME when both parts appear in the same tool result.
+- Make the correction text ask for the complete revised answer, which replaces
+  the previous one.
+
+The system prompt and tools stay unchanged. Unit tests use the gate-16g records
+as fixtures.
+
+### WP-17B: triage name recognition
+Issue text that names a job or object without the `_JOB` suffix
+(`NO_SUCH_JOB_X`, `K7Q_FAILJOB`, `daily_load`) must be recognized. Fix:
+- Check upper-cased identifier-like tokens (at most 20 per issue) against the
+  scheduler jobs, run history and objects views, with one bounded, bound-variable
+  lookup.
+- When a name is not found, name it in the answer and suggest checking the
+  spelling.
+
+### WP-17C: hint comma joins
+`FROM all_objects o, all_tables t` should get the empty-dictionary hint. Track
+the FROM-list context, so that a comma-separated item at the top level of the
+FROM clause counts as a view position. Keep every existing conservative refusal.
+
+### WP-17D: multi-value cells
+`| Events | INSERT OR UPDATE OR DELETE |` should satisfy the single-value truth
+rows INSERT, UPDATE and DELETE, under these rules:
+- Only in rowCells mode, and only for single-column truth.
+- Only for a cell made of the truth value joined to others by OR, `,`, `/` or
+  "and".
+- Negated cells ("not DELETE") must still fail.
+
+Rescore every archive and justify each flip.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
