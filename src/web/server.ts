@@ -1,3 +1,6 @@
+import { listPlsql, documentPlsql } from '../plsql/index.js';
+import { identifier, objectName } from '../plsql/dictionary.js';
+import { triage, sinceHours, renderTriageMarkdown } from '../triage/index.js';
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
@@ -15,6 +18,9 @@ import { createSessions } from "../agent/dbToolsAdapter.js";
 import { JsonlAuditSink } from "../audit/index.js";
 
 export interface WebServerOptions extends SessionOptions {
+	plsqlList?: typeof listPlsql;
+	plsqlDoc?: typeof documentPlsql;
+	triage?: typeof triage;
 	report?: typeof generateReport;
 	drift?: typeof compareTargets;
 	/** Local history seams; no shared configuration fields. */
@@ -31,12 +37,12 @@ export interface WebServerOptions extends SessionOptions {
 	staticDir?: string;
 }
 const types: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".txt": "text/plain; charset=utf-8" };
-async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function body(req: IncomingMessage, cap = 64 * 1024): Promise<Record<string, unknown>> {
 	const chunks: Buffer[] = [];
 	let size = 0;
 	for await (const chunk of req) {
 		size += chunk.length;
-		if (size > 64 * 1024) throw new WebError(413, "Request too large");
+		if (size > cap) throw new WebError(413, "Request too large");
 		chunks.push(chunk);
 	}
 	try {
@@ -50,12 +56,13 @@ function json(res: ServerResponse, status: number, data: unknown) {
 	res.end(JSON.stringify(data));
 }
 export function createWebServer(options: WebServerOptions = {}) {
-	const manager = options.manager ?? new SessionManager(options);
+	const manager = options.manager ?? new SessionManager({ ...options, triageRunner: options.triage ?? options.triageRunner });
 	const token = options.token ?? randomBytes(32).toString("hex");
 	const digest = (value: string) => createHash("sha256").update(value).digest();
 	const expected = digest(`Bearer ${token}`);
 	const staticRoot = options.staticDir ?? resolve(dirname(fileURLToPath(import.meta.url)), "static");
 	let driftActive = false;
+	let insightActive = false;
 	const server = createServer((req, res) => {
 		res.setHeader("Content-Security-Policy", "default-src 'self'");
 		res.setHeader("X-Content-Type-Options", "nosniff");
@@ -77,6 +84,36 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage'].includes(raw)) {
+				const isTriage = raw === '/api/triage';
+				if (req.method !== (isTriage ? 'POST' : 'GET')) throw new WebError(405, 'Method not allowed');
+				const data: Record<string, unknown> = isTriage ? await body(req, 400 * 1024) : Object.fromEntries(new URL(req.url!, 'http://localhost').searchParams);
+				const target = data.target ?? manager.config.defaultTarget;
+				if (typeof target !== 'string' || !['d1-19c-lab', 'p1-19c-prod'].includes(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, 'Invalid target');
+				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
+				try {
+					if (isTriage) {
+						if (typeof data.issue !== 'string' || !data.issue.trim() || (data.since !== undefined && typeof data.since !== 'string')) throw new Error();
+						sinceHours(data.since as string | undefined);
+					} else if (raw.endsWith('/doc')) {
+						if (typeof data.object !== 'string') throw new Error(); objectName(data.object);
+					} else if (data.owner !== undefined && data.owner !== '') {
+						if (typeof data.owner !== 'string') throw new Error(); identifier(data.owner);
+					}
+				} catch { throw new WebError(400, 'Invalid insight input'); }
+				if (insightActive) throw new WebError(429, 'An insight request is already running');
+				insightActive = true;
+				let sessions;
+				try {
+					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
+					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
+					const result = isTriage ? await (options.triage ?? triage)(ctx, { target, issue: data.issue as string, since: data.since as string | undefined }) : raw.endsWith('/doc') ? await (options.plsqlDoc ?? documentPlsql)(ctx, target, data.object as string) : await (options.plsqlList ?? listPlsql)(ctx, target, data.owner as string || undefined);
+					const output = isTriage ? { result, markdown: renderTriageMarkdown(result as Awaited<ReturnType<typeof triage>>) } : result;
+					if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
+					const finished = sessions; sessions = undefined; await finished.closeAll();
+					return json(res, 200, output);
+				} finally { try { await sessions?.closeAll(); } finally { insightActive = false; } }
+			}
 			if (raw === "/api/drift") {
 				if (req.method !== "POST") throw new WebError(405, "Method not allowed");
 				const data = await body(req);
@@ -165,12 +202,13 @@ export function createWebServer(options: WebServerOptions = {}) {
 				const entry = manager.get(id);
 				const release = acquireLlm();
 				entry.active = true;
-				const disconnect = () => { if (!res.writableEnded) entry.agent.abort(); };
+				let disconnected = false;
+				const disconnect = () => { disconnected = true; if (!res.writableEnded) entry.agent.abort(); };
 				res.on("close", disconnect);
 				try {
 					res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Connection": "keep-alive" });
 					res.flushHeaders();
-					await ask(entry, data.question, (event, payload) => { if (!res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`); });
+					await ask(entry, data.question, (event, payload) => { if (!res.destroyed) res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`); }, () => disconnected);
 				} finally { entry.active = false; manager.touch(entry); release(); res.off("close", disconnect); }
 				return res.end();
 			}

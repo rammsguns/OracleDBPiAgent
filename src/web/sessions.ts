@@ -1,3 +1,4 @@
+import { prepareChatQuestion } from '../cli/chatTriage.js';
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Agent, AgentEvent } from "@earendil-works/pi-agent-core";
@@ -15,12 +16,14 @@ export interface Conversation {
 	agent: WebAgent;
 	lastUsed: number;
 	active: boolean;
+	prepareQuestion?: (question: string) => Promise<string>;
 	close(): Promise<void>;
 }
 export class WebError extends Error {
 	constructor(readonly status: number, message: string) { super(message); }
 }
 export interface SessionOptions {
+	triageRunner?: typeof import('../triage/index.js').triage;
 	config?: AppConfig;
 	agentFactory?: (context: ToolContext) => Promise<WebAgent>;
 	checkHealth?: typeof checkStrataHealth;
@@ -66,7 +69,7 @@ export class SessionManager {
 			const runId = randomUUID();
 			const agent = await (this.options.agentFactory ?? createOracleAgent)({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId, pinnedTarget: target });
 			let closed: Promise<void> | undefined;
-			const entry: Conversation = { id: randomUUID(), runId, agent, lastUsed: this.now(), active: false,
+			const entry: Conversation = { id: randomUUID(), runId, agent, prepareQuestion: question => prepareChatQuestion({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId, pinnedTarget: target }, question, this.options.triageRunner), lastUsed: this.now(), active: false,
 				close: () => {
 					agent.abort();
 					return closed ??= (async () => { try { await agent.waitForIdle(); } finally { await sessions.closeAll(); } })();
@@ -113,7 +116,7 @@ export class SessionManager {
 	}
 }
 export type StreamEvent = "text" | "tool_start" | "tool_end" | "done" | "error";
-export async function ask(entry: Conversation, question: string, emit: (event: StreamEvent, data: unknown) => void) {
+export async function ask(entry: Conversation, question: string, emit: (event: StreamEvent, data: unknown) => void, cancelled = () => false) {
 	const offset = entry.agent.state.messages.length;
 	const unsubscribe = entry.agent.subscribe((event: AgentEvent) => {
 		if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") emit("text", { delta: event.assistantMessageEvent.delta });
@@ -121,7 +124,9 @@ export async function ask(entry: Conversation, question: string, emit: (event: S
 		if (event.type === "tool_execution_end") emit("tool_end", { name: event.toolName, isError: event.isError, error: event.isError ? "Tool execution failed" : undefined, resultBytes: Buffer.byteLength(JSON.stringify(event.result)) });
 	});
 	try {
-		await entry.agent.prompt(question);
+		const prepared = entry.prepareQuestion ? await entry.prepareQuestion(question) : question;
+		if (cancelled()) return;
+		await entry.agent.prompt(prepared);
 		if (entry.agent.state.errorMessage) throw new Error("Agent failed");
 		const replies = entry.agent.state.messages.slice(offset).filter(m => m.role === "assistant");
 		const answer = replies.at(-1)?.content.filter(c => c.type === "text").map(c => c.text).join("") ?? "";
