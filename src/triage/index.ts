@@ -1,6 +1,8 @@
+import { diagnosePredicates } from './diagnose.js';
+import { redactCredentials } from './redact.js';
 import { validateLogTables } from '../config/logTables.js';
 import type { ToolContext } from '../contracts.js';
-import { Dictionary, identifier, objectName, redact, type SourceRow } from '../plsql/dictionary.js';
+import { Dictionary, identifier, objectName, type SourceRow } from '../plsql/dictionary.js';
 import { routines } from '../plsql/analysis.js';
 import { renderMermaid, type PlsqlGraph } from '../plsql/diagram.js';
 import { parseIssue, sinceHours, type Frame } from './parse.js';
@@ -15,7 +17,7 @@ const unique = <T>(items: T[]) => [...new Set(items)];
 export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	const target = ctx.config.targets.find(t => t.name === options.target);
 	if (!target || (ctx.pinnedTarget && ctx.pinnedTarget !== target.name)) throw new Error('Unknown or unpinned triage target');
-	const hours = sinceHours(options.since), reader = new TriageReader(ctx, target.name), dictionary = new Dictionary(ctx, target.name);
+	const hours = sinceHours(options.since), reader = new TriageReader(ctx, target.name), dictionary = new Dictionary(ctx, target.name, redactCredentials);
 	const parsed = parseIssue(options.issue ?? '');
 	parsed.objects = unique([...parsed.objects, ...parsed.unqualifiedObjects.map(n => `${target.defaultSchema}.${n}`)]);
 	const jobNames = unique([...parsed.jobs, ...parsed.objects.map(o => objectName(o).name)]);
@@ -33,10 +35,14 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		reader.checks.push({ label: `Jobs referencing ${owner}.${name} (lexical heuristic)`, sql: `SELECT OWNER, JOB_NAME, JOB_TYPE, JOB_ACTION FROM ${implicated.view} WHERE INSTR(UPPER(JOB_ACTION), :name) > 0 ORDER BY OWNER, JOB_NAME`, binds: { name }, status: implicated.status, view: implicated.view, columns: ['OWNER', 'JOB_NAME', 'JOB_TYPE', 'JOB_ACTION'], rows: implicated.rows.slice(0, 16).map(j => [j.owner, j.name, j.type, j.action]), truncated: implicated.truncated || implicated.rows.length > 16, attempts: implicated.attempts });
 		if (implicated.status === 'unavailable') jobs.attempts.push(...implicated.attempts);
 	}
-	const runPredicates = jobs.rows.map((_, i) => `(OWNER = :owner${i} AND JOB_NAME = :job${i})`);
 	const runBinds: Record<string, unknown> = { hours };
-	for (const [i, name] of jobNames.entries()) { runPredicates.push(`JOB_NAME = :namedJob${i}`); runBinds[`namedJob${i}`] = name; }
-	jobs.rows.forEach((r, i) => { runBinds[`owner${i}`] = identifier(asText(r[0])); runBinds[`job${i}`] = identifier(asText(r[1])); });
+	const runPredicates = jobs.rows.map((r, i) => { runBinds[`owner${i}`] = identifier(asText(r[0])); runBinds[`job${i}`] = identifier(asText(r[1])); return `(OWNER = :owner${i} AND JOB_NAME = :job${i})`; });
+	for (const [i, name] of jobNames.filter(name => !jobs.rows.some(r => r[1] === name)).entries()) {
+		runBinds[`missingJob${i}`] = name;
+		const qualified = parsed.objects.map(objectName).find(o => o.name === name);
+		if (qualified) { runBinds[`missingOwner${i}`] = qualified.owner; runPredicates.push(`(OWNER = :missingOwner${i} AND JOB_NAME = :missingJob${i})`); }
+		else runPredicates.push(`JOB_NAME = :missingJob${i}`);
+	}
 	const runs = await reader.read('Scheduler run history in window', 'SCHEDULER_JOB_RUN_DETAILS', 'OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO', `WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(:hours, 'HOUR')${runPredicates.length ? ' AND (' + runPredicates.join(' OR ') + ')' : options.issue ? ' AND 1 = 0' : " AND STATUS = 'FAILED'"} ORDER BY ACTUAL_START_DATE DESC`, runBinds, 30);
 	const combined = parseIssue([options.issue ?? '', ...runs.rows.map(r => `${Number(r[3]) ? `ORA-${String(r[3]).padStart(5, '0')}` : ''} ${asText(r[5])}`)].join('\n'));
 	const owners = unique([...parsed.objects.map(o => objectName(o).owner), ...combined.frames.flatMap(f => f.owner ? [f.owner] : []), ...jobs.rows.map(r => asText(r[0])), ...runs.rows.map(r => asText(r[0]))]);
@@ -101,17 +107,16 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		validateLogTables([log]);
 		await reader.query(`Configured log ${log.table}`, [{ view: log.table, sql: `SELECT ${unique([log.timestampColumn, ...log.columns]).join(', ')} FROM ${log.table} WHERE ${log.timestampColumn} >= SYSTIMESTAMP - NUMTODSINTERVAL(:hours, 'HOUR') ORDER BY ${log.timestampColumn} DESC` }], { hours }, 50);
 	}
-	const hypotheses: Hypothesis[] = [];
+	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
+	const hypotheses: Hypothesis[] = [...diagnosis.hypotheses];
 	for (const constraint of constraints.filter(c => c.rows.length)) {
 		const row = constraint.rows[0]!;
-		const deleting = combined.codes.includes('ORA-02292');
-		const preceding = excerpts.flatMap(e => e.source.filter(s => s.line < e.line)).find(s => /DELETE\s+FROM\s+ORDER_LINES/i.test(s.text));
-		hypotheses.push({ rank: 0, title: deleting ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`), ...(preceding && asText(row[3]) !== 'ORDER_LINES' ? [`Line ${preceding.line} already clears ORDER_LINES; the failing child table ${row[3]} is another reference to old ORDERS rows. Matching row values have not been queried.`] : [])] });
+		hypotheses.push({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
 	}
-	const clearedExcerpt = excerpts.find(e => /DELETE\s+FROM\s+ORDERS\b/i.test(e.statement) && e.source.some(s => s.line < e.line && /DELETE\s+FROM\s+ORDER_LINES/i.test(s.text)));
-	if (combined.codes.includes('ORA-02292') && clearedExcerpt) {
-		const clearedLine = clearedExcerpt.source.find(s => s.line < clearedExcerpt.line && /DELETE\s+FROM\s+ORDER_LINES/i.test(s.text))!.line;
-		hypotheses.push({ rank: 0, title: 'A child table other than ORDER_LINES may still reference old ORDERS rows (unconfirmed).', evidence: [`Line ${clearedLine} already deletes from ORDER_LINES before the ORDERS delete at line ${clearedExcerpt.line}.`, ...constraints.flatMap(c => c.rows.map(r => `The recorded constraint currently resolves to ${r[0]}.${r[3]}; this does not prove another child table.`)), 'Review all visible child foreign keys. ALL_ fallback can hide other owners; request DBA visibility if needed. Concurrent child inserts or differences between the two DELETE predicates also require investigation.'] });
+	const limitations: string[] = [];
+	for (const excerpt of excerpts.filter(e => e.subprogram.includes('job_action unavailable'))) {
+		limitations.push(`${excerpt.object} has run history but no row in ${jobs.view}: the job was dropped or auto-dropped, or is no longer visible. The exact job type/action, raising condition, source text and historical dependencies cannot be verified.`);
+		if (combined.codes.includes('ORA-20001')) hypotheses.push({ rank: 0, title: 'ORA-20001 at anonymous line 1 indicates RAISE_APPLICATION_ERROR in the job’s own PLSQL_BLOCK.', evidence: [`${excerpt.object}: scheduler history reports ORA-20001 and ORA-06512 at line ${excerpt.line}.`, 'This is the anonymous job-block interpretation of the recorded stack; the dropped job_action is unavailable, so the exact call and guard cannot be inspected.'] });
 	}
 	for (const excerpt of excerpts.filter(e => /RAISE_APPLICATION_ERROR/i.test(e.statement))) hypotheses.push({ rank: 0, title: 'The application explicitly raises an error from its guard or failure path.', evidence: [`${excerpt.object} ${excerpt.subprogram} line ${excerpt.line}: ${excerpt.statement}`, ...combined.codes.filter(c => /^ORA-20/.test(c))] });
 	for (const check of reader.checks.filter(c => /Compile errors|Invalid objects/.test(c.label) && c.rows.length)) hypotheses.push({ rank: 0, title: 'An invalid or uncompilable object may explain the failure; correlate it with the failing call.', evidence: [check.label, ...check.rows.slice(0, 3).map(r => r.join(' | '))] });
@@ -123,7 +128,8 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	for (const excerpt of excerpts) {
 		const frame = node(`frame:${excerpt.object}:${excerpt.line}`, 'subprogram', `${excerpt.object}.${excerpt.subprogram} line ${excerpt.line}`);
 		const statement = node(`statement:${excerpt.object}:${excerpt.line}`, 'object', excerpt.statement || 'Statement unavailable'); edge(frame, statement, false);
-		for (const job of jobs.rows) edge(node(`job:${job[0]}.${job[1]}`, 'job', `${job[0]}.${job[1]}`), frame);
+		const traceJobs = [...new Map([...jobs.rows, ...runs.rows].map(r => [`${r[0]}.${r[1]}`, r])).values()];
+		for (const job of traceJobs) edge(node(`job:${job[0]}.${job[1]}`, 'job', `${job[0]}.${job[1]}${jobs.rows.some(j => j[0] === job[0] && j[1] === job[1]) ? '' : ' (historical; current job unavailable)'}`), frame);
 		for (const c of constraints) for (const r of c.rows) {
 			const table = node(`table:${r[0]}.${r[3]}`, 'table', `${r[0]}.${r[3]}`);
 			const constraint = node(`constraint:${r[0]}.${r[1]}`, 'object', `${r[0]}.${r[1]}`);
@@ -135,7 +141,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 
 	}
 	graph.edges = [...new Map(graph.edges.map(e => [JSON.stringify(e), e])).values()];
-	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, excerpts, checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
+	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
 }
 async function columns(reader: TriageReader, owner: string, name: string) {
 	const existing = reader.checks.find(c => c.label === `Columns for ${owner}.${name}`); if (existing) return existing;
@@ -164,15 +170,33 @@ export async function triage(ctx: ToolContext, options: TriageOptions) {
 }
 export type TriageResult = Awaited<ReturnType<typeof triage>>;
 const safe = (v: unknown) => asText(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/`/g, 'ˋ').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
+const inline = (value: string) => '`' + value.replace(/`/g, 'ˋ').replace(/\r?\n/g, ' ') + '`';
+const evidenceText = (value: string) => { const m = /^([\s\S]*?:\s*)((?:DELETE|UPDATE|SELECT|INSERT|BEGIN)\b[\s\S]*)$/i.exec(value); return m ? safe(m[1]) + inline(m[2]!) : safe(value); };
 const block = (language: string, value: string) => '```' + language + '\n' + value.replace(/`/g, 'ˋ') + '\n```';
 export function renderTriageMarkdown(result: TriageResult): string {
-	return [`# Issue triage: ${safe(result.target)}`, 'Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Source and job literals are redacted; graph call associations and statement ranges are heuristic.', ...(result.scan ? [`Scan cap: ${result.scan.cap}; ${result.scan.truncated ? 'partial' : 'complete within visible window'}.`, ...result.scan.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)} ${c.attempts.map(a => a.code).join(', ')} (${c.rows.length} rows)`)] : []), ...result.issues.map((issue, i) => [
+	return [`# Issue triage: ${safe(result.target)}`, 'Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Credential-looking literals are redacted; ordinary business literals are preserved; graph call associations and statement ranges are heuristic.', ...(result.scan ? [`Scan cap: ${result.scan.cap}; ${result.scan.truncated ? 'partial' : 'complete within visible window'}.`, ...result.scan.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)} ${c.attempts.map(a => a.code).join(', ')} (${c.rows.length} rows)`)] : []), ...result.issues.map((issue, i) => [
 		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ')}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
-		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.map(e => '- ' + safe(e)).join('\n')}`),
-		'### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${safe(e.statement)}\n\n${block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n'))}`),
+		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.map(e => '- ' + evidenceText(e)).join('\n')}`),
+		'### Limitations', ...(issue.limitations.length ? issue.limitations.map(safe) : ['No additional limitations identified; view failures and caps are reported below.']), '### Concurrency review', ...(issue.concurrency.length ? issue.concurrency.map(safe) : ['No supported concurrent child-insert path identified from the available source and job evidence.']), '### Suggested fixes (not executed)', 'Suggestions for a developer; no changes were run.', ...(issue.suggestions.length ? issue.suggestions.map(s => '- ' + safe(s)) : ['Inspect the unavailable source and raising condition before choosing a remediation; preserve exception/backtrace logging without credentials.']), '### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${inline(e.statement)}\n\n${e.source.length ? block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n')) : 'Source unavailable; historical job_action and raising condition cannot be inspected.'}`),
 		'### Evidence', ...issue.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)}${c.truncated ? '; row cap reached (partial)' : ''}${c.attempts.map(a => `; ${a.view} ${a.code}`).join('')}\n\n${c.rows.length ? '| ' + c.columns.map(safe).join(' | ') + ' |\n| ' + c.columns.map(() => '---').join(' | ') + ' |\n' + c.rows.map(r => '| ' + r.map(safe).join(' | ') + ' |').join('\n') : c.label.startsWith('Source around') ? 'See the redacted frame excerpt above; source was collected through the bounded dictionary reader.' : 'No rows returned; absence is limited to visible evidence.'}`),
 		'### Local error guide', ...issue.guide.map(g => `${g.code}: ${g.meaning}. Typical causes: ${g.causes} Read-only checks: ${g.checks}`),
-		'### Numbered debug checklist', ...issue.checks.map((c, n) => `${n + 1}. ${safe(c.label)}. Review the rows above and correlate keys and timestamps.\n\n${block('sql', displaySql(c))}`),
+		'### Numbered debug checklist', ...issue.checks.map((c, n) => `${n + 1}. ${safe(c.label)}. ${lookFor(c)}\n\n${block('sql', displaySql(c))}`),
 		'### Trace diagram', block('mermaid', issue.mermaid),
 	].join('\n\n'))].join('\n\n') + '\n';
+}
+function lookFor(check: Check): string {
+	if (check.label.startsWith('Current child')) return 'Look for a nonzero CHILD_ROWS count: children currently reference parents eligible for the parent operation; zero does not disprove a past boundary race.';
+	if (check.label.includes('run history')) return 'Look for FAILED runs, their exact error stack and start time; compare repeated failures with the reported incident window.';
+	if (check.label.startsWith('Source around')) return 'Look for the raising statement and the enclosing subprogram; compare the child and parent selection predicates and their evaluation times.';
+	if (check.label.includes('concurrency')) return 'Look for job entry points that insert child rows, then verify whether their keys can refer to the same eligible parents.';
+	if (check.label.includes('job actions') || check.label.startsWith('Jobs referencing')) return 'Look for the job type and entry point; an empty current dictionary result with retained history can mean a dropped or auto-dropped job.';
+	if (check.label.startsWith('Compile errors')) return 'Look for compiler line/position and messages naming the failing object or its dependencies.';
+	if (check.label.startsWith('Invalid objects')) return 'Look for INVALID status on the failing unit or a dependency and compare LAST_DDL_TIME with the incident.';
+	if (check.label.startsWith('Candidate log')) return 'Look for plausible application log names; only explicitly configured log tables may be read.';
+	if (check.label.startsWith('Constraint ')) return 'Look for constraint type, owning child table, referenced parent key, delete rule and enabled status.';
+	if (check.label.startsWith('Columns for')) return 'Look for columns ordered by POSITION; pair child and parent key columns at the same position.';
+	if (check.label.startsWith('Parent/key')) return 'Look for the parent table and primary/unique key referenced by the failing foreign key.';
+	if (check.label.startsWith('All visible child')) return 'Look for every child foreign key to this parent key, including other owners; ALL visibility can hide additional children.';
+	if (check.label.startsWith('Configured log')) return 'Look for messages matching the error code, job, module and incident time; a row cap makes this evidence partial.';
+	return 'Look for failures or object diagnostics inside the requested time window; check visibility and cap markers before treating an empty result as absence.';
 }

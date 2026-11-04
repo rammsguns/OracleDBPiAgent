@@ -1,4 +1,4 @@
-import { redact } from '../plsql/dictionary.js';
+import { redactCredentials as redact } from './redact.js';
 export interface Frame { owner?: string; name?: string; line: number }
 const id = '[A-Z][A-Z0-9_$#]{0,127}';
 export function parseIssue(text: string) {

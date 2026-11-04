@@ -21,9 +21,16 @@ it('triages live NIGHTLY_PURGE_JOB with read-only source and constraint evidence
 	expect(constraint?.rows[0]?.slice(0, 3)).toEqual(['SHOPAPP', 'SYS_C007669', 'R']);
 	expect(issue.checks.find(c => c.label === 'Columns for SHOPAPP.SYS_C007669')?.rows[0]?.[3]).toBe('ORDER_ID');
 	expect(issue.checks.some(c => c.label.startsWith('All visible child foreign keys') && c.rows.length)).toBe(true);
-	expect(issue.hypotheses.some(h => /other than ORDER_LINES/.test(h.title))).toBe(true);
+	expect(issue.hypotheses[0]?.title).toMatch(/Cutoff evaluated twice/);
+	expect(issue.hypotheses[0]?.evidence.join(' ')).toMatch(/line 26[\s\S]*line 27/);
+	expect(issue.excerpts[0]?.statement).toContain("INTERVAL '7' DAY");
+	const count = issue.checks.find(c => c.label.startsWith('Current child references'));
+	expect(count).toBeDefined();
+	if (count?.status === 'ok') expect(Number(count.rows[0]?.[0])).toBeGreaterThanOrEqual(0);
+	else expect(count?.attempts.length).toBeGreaterThan(0);
+	expect(issue.concurrency.join(' ')).toContain('cannot explain child rows for old parents');
 	expect(renderTriageMarkdown(result)).toContain('SYS_C007669');
-	console.log(`p1 triage: SYS_C007669 child=${constraint?.rows[0]?.[3]}; frame=WORKLOAD.NIGHTLY_PURGE:27. Other child references remain a hypothesis when DBA_CONSTRAINTS is unavailable.`);
+	console.log(`p1 triage: SYS_C007669 child=${constraint?.rows[0]?.[3]}; frame=WORKLOAD.NIGHTLY_PURGE:27. Cutoff/predicate mismatch is the leading hypothesis; the aggregate count is a current snapshot.`);
 }, 120000);
 it('triages K7Q_FAILJOB history and job_action when the live job still exists', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
@@ -37,6 +44,8 @@ it('triages K7Q_FAILJOB history and job_action when the live job still exists', 
 	const job = issue.checks.find(c => c.label === 'Named scheduler job actions');
 	if (!job?.rows.length) {
 		expect(frame?.status).toBe('unavailable');
+		expect(issue.limitations.join(' ')).toMatch(/dropped or auto-dropped/);
+		expect(issue.hypotheses.some(h => h.title.includes('RAISE_APPLICATION_ERROR'))).toBe(true);
 		console.log('d1: ORA-20001 history and anonymous line 1 verified; job is absent from DBA_SCHEDULER_JOBS, so historical job_action cannot be verified.');
 		return;
 	}

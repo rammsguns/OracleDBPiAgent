@@ -49,15 +49,15 @@ describe('issue triage', () => {
 		expect(issue.checks.find(c => c.label.startsWith('All visible child'))?.rows).toHaveLength(2);
 		expect(issue.checks.some(c => c.label === 'Columns for SHOPAPP.PK_ORDERS')).toBe(true);
 		expect(issue.hypotheses[0]?.evidence.join(' ')).toContain('OTHER_CHILD');
-		expect(issue.hypotheses.some(h => h.title.includes('other than ORDER_LINES'))).toBe(true);
+		expect(issue.hypotheses.some(h => h.title.includes('other than ORDER_LINES'))).toBe(false);
 		expect(issue.graph.nodes.some(n => n.kind === 'job')).toBe(true);
 		for (const e of issue.graph.edges) expect(issue.graph.nodes.some(n => n.id === e.to)).toBe(true);
 		const markdown = renderTriageMarkdown(result); expect(markdown).toContain('```mermaid'); expect(markdown).toContain("OWNER = 'SHOPAPP'"); expect(markdown).toContain('Numbered debug checklist');
 	});
-	it('attributes an anonymous stack frame to the job_action and redacts literals', async () => {
+	it('attributes an anonymous stack frame to the job_action and preserves ordinary error messages', async () => {
 		const issue = (await triage(fixture(true), { target: 'p1-19c-prod', issue: 'NIGHTLY_PURGE_JOB' })).issues[0]!;
 		expect(issue.codes).toContain('ORA-20001'); expect(issue.excerpts[0]?.subprogram).toContain('anonymous block');
-		expect(issue.excerpts[0]?.statement).toContain('raise_application_error(-20001'); expect(JSON.stringify(issue)).not.toContain('hidden');
+		expect(issue.excerpts[0]?.statement).toContain('raise_application_error(-20001'); expect(issue.excerpts[0]?.statement).toContain("'hidden'");
 		expect(issue.hypotheses[0]?.title).toContain('explicitly raises');
 	});
 	it('falls back only for view/privilege errors and audits hashes without SQL or binds', async () => {

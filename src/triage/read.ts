@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError, type ToolContext } from '../contracts.js';
-import { redact } from '../plsql/dictionary.js';
+import { redactCredentials as redact } from './redact.js';
 export interface Check { label: string; sql: string; binds: Record<string, unknown>; status: 'ok' | 'unavailable'; view: string; columns: string[]; rows: unknown[][]; truncated: boolean; attempts: { view: string; code: string }[] }
 export class TriageReader {
 	readonly checks: Check[] = [];
