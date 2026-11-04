@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,8 +8,14 @@ import { dropPriorThinking, systemPrompt } from '../../src/agent/index.js';
 import { parseArgs, runEvals } from '../../evals/run.js';
 import { appendLedger, leaderboard, loadVariant, parseOptimizeArgs, validateVariant, variantEnvironment, type LedgerRecord } from '../../evals/optimize.js';
 
+vi.mock('../../evals/endpoint-lock.js', async importOriginal => {
+	const original = await importOriginal<typeof import('../../evals/endpoint-lock.js')>();
+	return { acquireEndpointLock: (endpoint: Parameters<typeof original.acquireEndpointLock>[0]) => original.acquireEndpointLock(endpoint, lockDirectory) };
+});
+let lockDirectory: string;
 const dirs: string[] = [];
 const results: string[] = [];
+beforeEach(async () => { lockDirectory = await temp(); });
 afterEach(async () => {
 	vi.restoreAllMocks();
 	await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));

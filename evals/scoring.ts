@@ -28,7 +28,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(result.answer, row) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(result.answer, row, truth.length === 1, truthLabels(test.groundTruth.sql)) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -45,9 +45,32 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	return { pass: checks.every(check => check.pass), checks };
 }
 
+/** Recover explicit aliases and simple column names without changing the truth contract.
+ * Expressions without aliases have no stable label and retain value matching. */
+function truthLabels(sql: string): string[] {
+	const fields: string[] = [];
+	let depth = 0, quoted = false, start = sql.search(/SELECT\s/i) + 7;
+	for (let i = start; i < sql.length; i++) {
+		if (sql[i] === "'") {
+			if (quoted && sql[i + 1] === "'") { i++; continue; }
+			quoted = !quoted;
+		}
+		if (quoted) continue;
+		if (sql[i] === '(') depth++;
+		if (sql[i] === ')') depth--;
+		if (depth === 0 && (sql[i] === ',' || /^\sFROM\s/i.test(sql.slice(i)))) {
+			fields.push(sql.slice(start, i).trim());
+			start = i + 1;
+			if (sql[i] !== ',') break;
+		}
+	}
+	return fields.map(field => /\s+(?:AS\s+)?([A-Za-z_][\w$]*)$/i.exec(field)?.[1]
+		?? /^(?:[A-Za-z_][\w$]*\.)*([A-Za-z_][\w$]*)$/.exec(field)?.[1] ?? '');
+}
+
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[]): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[]): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
@@ -70,18 +93,34 @@ function rowMatches(answer: string, row: unknown[]): boolean {
 		return records.flatMap(record => record.split(/(?<=\S)\s*\|\s*\|\s*(?=\S)/));
 	});
 	// Column-oriented markdown tables are also records: transpose each contiguous table.
-	const candidates = [...lines];
+	const inlineRecord = /\(([^()]*[A-Za-z_][\w$]*\s*=[^()]*)\)/g;
+	const candidates = lines.map(line => singleRow ? line.replace(inlineRecord, '') : line);
+	if (singleRow) {
+		for (const line of lines) {
+			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!);
+		}
+	}
 	for (let start = 0; start < lines.length; start++) {
 		if (!lines[start]!.startsWith('|')) continue;
 		const block: string[][] = [];
+		const indices: number[] = [];
 		while (start < lines.length && lines[start]!.startsWith('|')) {
 			const cells = lines[start++]!.split('|').slice(1, -1).map(clean);
-			if (!cells.every(cell => /^:?-+:?$/.test(cell))) block.push(cells);
+			if (!cells.every(cell => /^:?-+:?$/.test(cell))) { block.push(cells); indices.push(start - 1); }
 		}
-		if (!/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
-		for (let col = 1; col < (block[0]?.length ?? 0); col++) candidates.push('|' + block.map(cells => cells[col] ?? '').join('|') + '|');
+		if (block[0]?.some(cell => labels.some(label => label && label.toLowerCase() === cell.toLowerCase()))) {
+			for (let i = 1; i < block.length; i++) candidates[indices[i]!] = block[i]!.map((value, col) => `${block[0]![col]}=${value}`).join(' / ');
+			continue;
+		}
+		if (!singleRow && !/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
+		if (singleRow && !block.every(cells => cells.length === 2) && !/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
+		for (let col = 1; col < (block[0]?.length ?? 0); col++) candidates.push(block.slice(1).map(cells => `${cells[0]}=${(cells[col] ?? '').replace(/\s+\([^)]*\)\s*$/, '')}`).join(' / '));
 	}
 	return candidates.some(line => {
+		// Named values must agree with their own truth column, even when the
+		// unordered multiset of values would otherwise match a swapped record.
+		const bindings = [...line.matchAll(/(?:^|[|;,/(]\s*)([A-Za-z_][\w$]*)\s*=\s*([^|;,/)]*)/g)];
+		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index])))) return false;
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
 		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
 		if (structured) {

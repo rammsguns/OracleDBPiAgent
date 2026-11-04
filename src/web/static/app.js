@@ -1,9 +1,12 @@
 import { initDrift } from './drift.js';
+
+import { renderHistory } from './history.js';
 import { createSseParser, updateTrace } from './lib.js';
 
 const $ = id => document.getElementById(id);
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
 history.replaceState(null, '', location.pathname + location.search);
+let historyRequest = 0;
 let sessionId = null, controller = null, running = false, rows = [];
 
 function status(message) { $('status').textContent = message; }
@@ -30,6 +33,7 @@ function sessionPath(suffix = '') { return `/api/sessions/${encodeURIComponent(s
 function clearSessionView() {
 	$('messages').replaceChildren(); $('trace').replaceChildren(); $('audit').replaceChildren();
 	$('report-save').disabled = true; $('report-content').replaceChildren(); $('report-status').textContent = '';
+	historyRequest++; $('history-content').replaceChildren(); $('history-status').textContent = '';
 	rows = []; $('audit-status').textContent = '';
 }
 async function newSession() {
@@ -140,6 +144,7 @@ function tab(selected) {
 		$(`${id}-tab`).tabIndex = id === selected ? 0 : -1; $(`${id}-panel`).hidden = id !== selected;
 	}
 	if (selected === 'audit') void audit();
+	if (selected === 'report') void loadHistory();
 }
 async function runReport(saving = false) {
 	const target = $('target').value;
@@ -182,6 +187,7 @@ async function runReport(saving = false) {
 		}
 		for (const text of data.diff.notes) { const note = document.createElement('p'); note.textContent = text; panel.append(note); }
 		$('report-content').append(panel); $('report-save').disabled = false;
+		if (saving) void loadHistory();
 		$('report-status').textContent = saving ? 'Report saved (' + data.savedAt + ').' : 'Report complete.';
 	} catch (error) { $('report-status').textContent = error.message; }
 	finally { $('report-run').disabled = false; $('target').disabled = running; }
@@ -207,7 +213,7 @@ $('question').addEventListener('keydown', event => {
 });
 $('stop').addEventListener('click', () => controller?.abort());
 $('target').addEventListener('change', async () => {
-	try { await newSession(); } catch (error) { status(error.message); } finally { busy(false); }
+	try { await newSession(); if (!$('report-panel').hidden) void loadHistory(); } catch (error) { status(error.message); } finally { busy(false); }
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
@@ -235,3 +241,16 @@ async function init() {
 	} catch (error) { status(error.message); } finally { busy(false); }
 }
 void init();
+
+async function loadHistory() {
+	const request = ++historyRequest;
+	const target = $('target').value;
+	$('history-content').replaceChildren(); $('history-status').textContent = 'Loading history…';
+	try {
+		const data = await (await api('/api/report/history?' + new URLSearchParams(target ? { target } : {}))).json();
+		if (request !== historyRequest) return;
+		renderHistory($('history-content'), data);
+		$('history-status').textContent = data.runs ? `${data.target}: ${data.runs} saved runs · ${data.skipped} skipped` : 'No saved history yet. Run and save a report to start history.';
+	} catch (error) { if (request === historyRequest) $('history-status').textContent = error.message; }
+}
+$('history-refresh').addEventListener('click', loadHistory);

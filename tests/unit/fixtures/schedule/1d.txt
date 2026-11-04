@@ -1,0 +1,33 @@
+# one-time setup (run once before enabling the timer)
+mkdir -p -m 700 -- '/private/piagent/reports'
+touch -- '/private/piagent/audit.jsonl' && chmod 600 -- '/private/piagent/audit.jsonl'
+touch -- '/private/piagent/alerts.log' && chmod 600 -- '/private/piagent/alerts.log'
+
+# piagent-report-d1-19c-lab.service
+[Unit]
+Description=Read-only Oracle report for d1-19c-lab
+
+[Service]
+Type=oneshot
+UMask=0077
+EnvironmentFile=/private/piagent/.env
+ExecStart="/usr/bin/node" "/opt/piagent/dist/cli/index.js" "report" "schedule" "run" "--target" "d1-19c-lab" "--home" "/private/piagent" "--out" "/private/piagent/reports"
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths="-/private/piagent/reports" "-/private/piagent/audit.jsonl" "-/private/piagent/alerts.log"
+PrivateTmp=true
+
+# piagent-report-d1-19c-lab.timer
+[Unit]
+Description=Schedule Oracle report for d1-19c-lab
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=piagent-report-d1-19c-lab.service
+
+[Install]
+WantedBy=timers.target
+
+# crontab (use instead of the timer)
+0 0 * * * '/usr/bin/node' '/opt/piagent/dist/cli/index.js' 'report' 'schedule' 'run' '--target' 'd1-19c-lab' '--home' '/private/piagent' '--out' '/private/piagent/reports'

@@ -246,10 +246,10 @@
 		"id": "hard-p11b-partial-memory",
 		"rows": [
 			[
-				"PRODCDB",
-				"19",
-				"V$PARAMETER",
-				"unavailable"
+				"PRODCDB"
+			],
+			[
+				"19"
 			]
 		]
 	},
@@ -257,10 +257,10 @@
 		"id": "hard-p11b-partial-backup",
 		"rows": [
 			[
-				"PRODCDB",
-				"READ WRITE",
-				"V$RMAN_BACKUP_JOB_DETAILS",
-				"unavailable"
+				"PRODCDB"
+			],
+			[
+				"READ WRITE"
 			]
 		]
 	}

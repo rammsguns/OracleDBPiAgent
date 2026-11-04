@@ -199,3 +199,49 @@ test('unchanged history shows no changes', async ({ page }) => {
 	await page.locator('#report-tab').click(); await page.locator('#report-run').click();
 	await expect(page.locator('#report-changes')).toContainText('No changes.');
 });
+
+test('history shows sparklines, worsening and literal tablespace XSS at phone width', async ({ page }) => {
+	await page.setViewportSize({ width: 375, height: 812 });
+	const dialogs: string[] = [];
+	page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
+	await ready(page); await page.locator('#report-tab').click();
+	await expect(page.locator('#history-status')).toContainText('3 saved runs');
+	const series = page.locator('.history-series').first();
+	await expect(series.locator('h4')).toHaveText('Tablespace ' + hostile);
+	await expect(series).toContainText('Worsening');
+	await expect(series).toContainText('First: 60 · Last: 90 · Min: 60 · Max: 90 · Change: 30');
+	await expect(series.locator('svg circle')).toHaveCount(3);
+	await expect(series.locator('svg line')).toHaveCount(2);
+	await expect(page.locator('#history-content img, #history-content script')).toHaveCount(0);
+	await page.getByText('Section availability by saved run').click();
+	await expect(page.locator('#history-content details')).toContainText('unavailable: backups');
+	expect(dialogs).toEqual([]);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.locator('#history-refresh').click();
+	await expect(page.locator('.history-series').first()).toContainText(hostile);
+});
+
+test('history refreshes for selected target and shows empty history', async ({ page }) => {
+	await ready(page); await page.locator('#report-tab').click();
+	await expect(page.locator('#history-status')).toContainText('3 saved runs');
+	await page.locator('#target').selectOption('p1-19c-prod');
+	await expect(page.locator('#history-status')).toContainText('No saved history yet.');
+	await expect(page.locator('#history-content svg')).toHaveCount(0);
+	await expect(page.locator('#history-content')).not.toContainText(hostile);
+});
+
+test('history preserves gaps, source changes and single observations', async ({ page }) => {
+	await ready(page);
+	await page.route('**/api/report/history?*', async route => {
+		const response = await route.fetch(); const data = await response.json();
+		const point = data.series[0].points[0];
+		data.series[0].points = [point, { ...point, value: null }, { ...point, value: 90 }, { ...point, value: 95, source: 'different' }];
+		data.series[1].points = [{ ...point, value: 0 }];
+		await route.fulfill({ response, json: data });
+	});
+	await page.locator('#report-tab').click();
+	await expect(page.locator('.history-series').first().locator('svg circle')).toHaveCount(3);
+	await expect(page.locator('.history-series').first().locator('svg line')).toHaveCount(0);
+	await expect(page.locator('.history-series').nth(1).locator('svg circle')).toHaveCount(1);
+	await expect(page.locator('.history-series').nth(1).locator('svg line')).toHaveCount(0);
+});

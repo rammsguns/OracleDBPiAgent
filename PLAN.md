@@ -1469,6 +1469,50 @@ baselines.
     history, phone width.
   - The Antigravity security review and a live smoke test.
 
+### Phase 12 results (2026-11-04): complete
+- **WP-12A: merged** (6479625, 6f2752f; merge 420c5a2). The Antigravity
+  review approved:
+  - files are opened with `O_NOFOLLOW` and capped at 2 MiB;
+  - TypeBox schema plus semantic checks;
+  - bad files are skipped and counted, never echoed;
+  - trend edge cases (single point, gaps, empty) are handled.
+  Live: 3 saved runs per target, 0 skipped.
+- **WP-12B: merged** (adef1ff, 7900f00, 7b32a47, 3ea688f, ca17433; merge
+  6241d7b) after two rounds of changes.
+  - The Antigravity security review found a quoted `EnvironmentFile=` that
+    systemd ignores as "not absolute".
+  - The coordinator's review of the generated unit found three more problems:
+    - about 900 characters of inline `node -e` JavaScript in `ExecStart` and
+      in the cron line, now the tested `piagent report schedule run`
+      subcommand;
+    - `ReadWritePaths` on paths that may be missing, now `-` prefixed, with
+      printed, non-destructive one-time setup commands and a preflight that
+      names the missing path;
+    - the pinned `process.execPath` (documented).
+  - Coordinator checks in a temporary HOME:
+    - `systemd-analyze --user verify` is clean;
+    - the run before setup fails with one clear message;
+    - after setup, the first run sets a baseline and the second reports
+      "No changes";
+    - all files are 0600 and directories 0700;
+    - under a bubblewrap read-only root with only the three
+      `ReadWritePaths` writable (emulating `ProtectSystem=strict`), the run
+      succeeds, and a write elsewhere fails as read-only.
+    - Units were never installed in the real user session.
+  - Merge fix: WP-12B enables positional options on `report`, which broke
+    `report history --target` ("unknown option"). History now declares its
+    own `--target`. The WP-12A CLI test fails without that fix.
+- **WP-12C: merged** (741ccb1, ff7db2e; merge 2ec1c63). The Antigravity
+  security review approved. Live smoke through the real server:
+  - no token → 401, bad origin → 403, bad target or `last=0` → 400,
+    POST → 405;
+  - d1 returned 2 runs with 8 series;
+  - p1 returned an empty history;
+  - the token was not in the audit log.
+- After the merges: typecheck and 764 unit tests pass, and integration has 28
+  passed. That integration run included the single local Strata
+  end-to-end call, made while Strata was otherwise idle.
+
 ### Not in phase 12
 Installing timers automatically, a daemon in this repo, email, Slack or other
 network notifications, LLM summaries of trends, and new database queries.
