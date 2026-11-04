@@ -16,7 +16,7 @@ Window: 24h. Codes: ORA-02292, ORA-06512. Reported times: none.
 - SHOPAPP.WORKLOAD.NIGHTLY_PURGE, line 27: `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
 - Both statements evaluate a time-relative cutoff separately; the later statement can include parents that crossed the boundary.
 - This is a source-based hypothesis; current aggregates cannot reconstruct the failing transaction.
-- Current matching child row count: 772720 (a new read-only snapshot, not proof of the historical cause).
+- Current matching child row count: 790696 (a new read-only snapshot, not proof of the historical cause).
 
 2. A child foreign key still references the parent rows being deleted.
 
@@ -137,7 +137,7 @@ Current child references matching parent predicate (SHOPAPP.ORDER_LINES → SHOP
 
 | CHILD_ROWS |
 | --- |
-| 772720 |
+| 790696 |
 
 Other jobs referencing SHOPAPP.WORKLOAD (concurrency review): ok; DBA_SCHEDULER_JOBS
 
@@ -162,7 +162,7 @@ SELECT OWNER, JOB_NAME, JOB_TYPE, JOB_ACTION FROM DBA_SCHEDULER_JOBS WHERE (JOB_
 2. Scheduler run history in window. Look for FAILED runs, their exact error stack and start time; compare repeated failures with the reported incident window.
 
 ```sql
-SELECT OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO FROM DBA_SCHEDULER_JOB_RUN_DETAILS WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(24, 'HOUR') AND ((OWNER = 'SHOPAPP' AND JOB_NAME = 'NIGHTLY_PURGE_JOB')) ORDER BY ACTUAL_START_DATE DESC
+SELECT OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO FROM DBA_SCHEDULER_JOB_RUN_DETAILS WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(24, 'HOUR') AND ((OWNER = 'SHOPAPP' AND JOB_NAME = 'NIGHTLY_PURGE_JOB')) ORDER BY ACTUAL_START_DATE DESC NULLS LAST, LOG_ID DESC
 ```
 
 3. Source around SHOPAPP.WORKLOAD line 27 (from bounded dictionary source). Look for the raising statement and the enclosing subprogram; compare the child and parent selection predicates and their evaluation times.
