@@ -1,3 +1,5 @@
+import { layoutGraph, columnGap } from "./graphLayout.js";
+
 function el(tag, text) {
 	const element = document.createElement(tag);
 	if (text !== undefined) element.textContent = text;
@@ -67,42 +69,50 @@ function graphLegend() {
 	return legend;
 }
 
-function drawEdge(svg, edge, positions, nodes, nodeWidth, offset) {
-	const from = positions.get(edge.from);
-	const to = positions.get(edge.to);
+function drawEdge(svg, edge, layout, nodes) {
+	const from = layout.positions.get(edge.from);
+	const to = layout.positions.get(edge.to);
 	if (!from || !to) return;
-	const x1 = from.x + nodeWidth;
-	const y1 = from.y + 52 + offset;
+	const x1 = from.x + from.width;
+	const y1 = layout.outgoing.get(edge);
 	const x2 = to.x;
-	const y2 = to.y + 52 + offset;
+	const y2 = layout.incoming.get(edge);
+	const bend = columnGap * 0.45;
 	const kind = edgeKind(edge, nodes);
 	const style = edgeStyles[kind];
 	const path = svgEl("path", {
-		d: `M${x1} ${y1} C${x1 + 15} ${y1},${x2 - 15} ${y2},${x2} ${y2}`,
+		d: `M${x1} ${y1} C${x1 + bend} ${y1},${x2 - bend} ${y2},${x2} ${y2}`,
 		fill: "none",
 		stroke: style.color,
 		"stroke-width": 2,
 		"stroke-dasharray": style.dash,
 		"data-edge-kind": kind,
+		"data-from": edge.from,
+		"data-to": edge.to,
 	});
 	path.append(svgEl("title", {}, `${kind} · ${edge.kind}${edge.label ? " · " + edge.label : ""}`));
 	svg.append(path);
 }
 
-function drawNode(svg, node, position, nodeWidth) {
+function drawNode(svg, node, position) {
 	const group = svgEl("g", { "data-node-id": node.id });
 	const box = svgEl("rect", {
-		x: position.x, y: position.y, width: nodeWidth, height: 104, rx: 6,
+		x: position.x, y: position.y, width: position.width, height: position.height, rx: 6,
 		fill: "var(--graph-fill, #edf5f6)", stroke: "currentColor",
 	});
 	group.append(svgEl("title", {}, node.title ?? node.label), box);
-	const text = svgEl("text", { x: position.x + 6, y: position.y + 20, "font-size": 13 });
-	const label = String(node.label);
-	const chars = Math.max(4, Math.floor((nodeWidth - 12) / 7));
-	for (let i = 0; i < Math.min(label.length, chars * 5); i += chars) {
-		text.append(svgEl("tspan", {
-			x: position.x + 6, dy: i ? 17 : 0,
-		}, label.slice(i, i + chars)));
+	const x = position.x + 12;
+	group.append(svgEl("text", {
+		x, y: position.y + 21, "font-size": 14, class: "node-kind",
+	}, position.kind));
+	let y = position.y + 43;
+	for (const line of position.owner) {
+		group.append(svgEl("text", { x, y, "font-size": 16, class: "node-owner" }, line));
+		y += 20;
+	}
+	const text = svgEl("text", { x, y, "font-size": 19, class: "node-label" });
+	for (const [index, line] of position.lines.entries()) {
+		text.append(svgEl("tspan", { x, dy: index ? 24 : 0 }, line));
 	}
 	group.append(text);
 	svg.append(group);
@@ -115,52 +125,15 @@ export function drawGraph(graph) {
 	const scroll = el("div");
 	scroll.className = "graph-scroll";
 	const svg = svgEl("svg", { role: "img", "aria-label": "Evidence dependency graph", width: "100%" });
-	const levels = new Map(view.nodes.map(node => [node.id, 0]));
-	// Bound relaxation so cyclic dependencies cannot keep moving nodes right.
-	for (let pass = 0; pass < Math.min(view.nodes.length, 8); pass++) {
-		let changed = false;
-		for (const edge of view.edges) {
-			if (levels.has(edge.from) && levels.has(edge.to)) {
-				const next = Math.min(8, levels.get(edge.from) + 1);
-				if (next > levels.get(edge.to)) {
-					levels.set(edge.to, next);
-					changed = true;
-				}
-			}
-		}
-		if (!changed) break;
-	}
-	const columns = Math.max(0, ...levels.values()) + 1;
-	const width = 600;
-	const gap = 26;
-	const nodeWidth = (width - 30 - (columns - 1) * gap) / columns;
-	const counts = new Map();
-	const positions = new Map();
-	for (const node of view.nodes) {
-		const level = levels.get(node.id);
-		const row = counts.get(level) || 0;
-		counts.set(level, row + 1);
-		positions.set(node.id, { x: 15 + level * (nodeWidth + gap), y: 15 + row * 128 });
-	}
-	const height = Math.max(140, ...[...counts.values()].map(count => count * 128));
-	svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+	const context = document.createElement("canvas").getContext("2d");
+	context.font = "19px system-ui, sans-serif";
+	const layout = layoutGraph(view, text => context.measureText(text).width);
+	svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
 	const nodes = new Map(view.nodes.map(node => [node.id, node]));
-	// Separate parallel operations so reads and writes to one table remain visible.
-	const parallel = new Map();
-	for (const edge of view.edges) {
-		const key = JSON.stringify([edge.from, edge.to]);
-		if (!parallel.has(key)) parallel.set(key, []);
-		parallel.get(key).push(edge);
-	}
-	for (const edges of parallel.values()) {
-		for (const [index, edge] of edges.entries()) {
-			const offset = (index - (edges.length - 1) / 2) * 8;
-			drawEdge(svg, edge, positions, nodes, nodeWidth, offset);
-		}
-	}
-	for (const node of view.nodes) drawNode(svg, node, positions.get(node.id), nodeWidth);
+	for (const edge of view.edges) drawEdge(svg, edge, layout, nodes);
+	for (const node of view.nodes) drawNode(svg, node, layout.positions.get(node.id));
 	scroll.append(svg);
-	wrap.append(scroll, graphLegend());
+	wrap.append(graphLegend(), scroll);
 	return wrap;
 }
 
@@ -249,7 +222,15 @@ function renderDocument(content, result) {
 	content.append(
 		el("h3", result.owner + "." + result.name),
 		el("p", result.complete ? "Complete dictionary evidence" : "Incomplete dictionary evidence"),
-		drawGraph(result.graph),
+		drawGraph({
+			...result.graph,
+			nodes: result.graph.nodes.map(node => ({
+				...node,
+				displayKind: node.label === result.owner + "." + result.name
+					? result.objects.rows.find(object => !object.type.endsWith("BODY"))?.type || node.displayKind
+					: node.displayKind,
+			})),
+		}),
 	);
 	for (const signature of result.signatures) {
 		content.append(

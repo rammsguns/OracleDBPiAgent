@@ -321,3 +321,10 @@ Oracle-supplied dependency nodes (owner `SYS` or `PUBLIC`) collapse to one
 `Oracle-supplied (N)` node in SVG and Mermaid rendering. Its tooltip lists the
 names; JSON graph nodes and edges remain complete. Source and dictionary evidence
 sections are unchanged.
+
+The SVG layout gives edges room between roughly 200px boxes, orders each column
+with three alternating neighbour-barycenter sweeps, and spreads attachments along
+each box side. Box heights follow their text. Owners appear on a muted line above
+identifier labels; labels wrap at dots and underscores, splitting inside a token
+only when that token cannot fit. Kind tags distinguish jobs, packages, procedures,
+tables and Oracle-supplied nodes. The legend sits immediately above the diagram.

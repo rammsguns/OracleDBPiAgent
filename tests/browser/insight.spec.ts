@@ -7,7 +7,7 @@ test('PL/SQL tab, document, layered SVG, literal hostile labels at phone width',
 	await expect(page.locator('#plsql-object option')).toHaveCount(1); await page.locator('#plsql-doc').click();
 	await expect(page.locator('#plsql-content .graph-scroll > svg')).toHaveCount(1);
 	await expect(page.locator('#plsql-content svg g title').first()).toHaveText(evil);
-	await expect(page.locator('#plsql-content svg text').first()).toContainText(evil);
+	await expect(page.locator('#plsql-content svg .node-label').first()).toContainText(evil);
 	await expect(page.locator('#plsql-content')).toContainText('Incomplete dictionary');
 	await expect(page.locator('#plsql-content script, #plsql-content img')).toHaveCount(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -78,7 +78,7 @@ test("graph collapses Oracle dependencies, distinguishes operations and fits a d
 	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("SYS.STANDARD");
 	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("PUBLIC.DBMS_RANDOM");
 	await expect(graph.locator('[data-node-id="oracle-supplied"] title')).toContainText("SYS." + evil);
-	await expect(graph.locator('[data-node-id="oracle-supplied"] text')).toHaveText("Oracle-supplied (3)");
+	await expect(graph.locator('[data-node-id="oracle-supplied"] .node-label')).toHaveText("Oracle-supplied (3)");
 	await expect(graph.locator('[data-node-id="object:SYS.STANDARD"]')).toHaveCount(0);
 	await expect(page.locator("#plsql-content .graph-legend li")).toHaveCount(6);
 	await expect(page.locator("#plsql-content .graph-legend")).toContainText("reads");
@@ -106,4 +106,42 @@ test("triage run follows a normally sized Since input", async ({ page }) => {
 	expect(since!.width).toBeGreaterThan(120);
 	expect(since!.width).toBeLessThan(250);
 	expect(run!.y).toBeGreaterThanOrEqual(since!.y + since!.height);
+});
+test("WORKLOAD uses wide columns, compact tagged nodes and separate edge ports", async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 1000 });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.locator("#plsql-tab").click();
+	await page.locator("#plsql-owner").fill("WORKLOAD_FIXTURE");
+	await page.locator("#plsql-run").click();
+	await expect(page.locator("#plsql-object option")).toHaveCount(1);
+	await page.locator("#plsql-doc").click();
+	const graph = page.locator("#plsql-content .graph-scroll > svg");
+	const job = graph.locator('[data-node-id="job:NIGHTLY_PURGE"]');
+	await expect(job.locator(".node-owner")).toHaveText("SHOPAPP.");
+	await expect(job.locator(".node-label tspan")).toHaveText(["NIGHTLY_PURGE_JOB"]);
+	await expect(job.locator(".node-kind")).toHaveText("JOB");
+	await expect(graph.locator('[data-node-id="package"] .node-kind')).toHaveText("PACKAGE");
+	await expect(graph.locator('[data-node-id="ORDERS"] .node-kind')).toHaveText("TABLE");
+	const geometry = await graph.evaluate(svg => {
+		const group = (id: string) => svg.querySelector(`[data-node-id="${id}"]`)!;
+		const job = group("job:NIGHTLY_PURGE").querySelector("rect")!.getBoundingClientRect();
+		const procedure = group("NIGHTLY_PURGE").querySelector("rect")!.getBoundingClientRect();
+		const ports = [...svg.querySelectorAll('path[data-from="package"]')].map(path =>
+			path.getAttribute("d")!.match(/^M[^ ]+ ([^ ]+)/)![1]);
+		const textFits = [...svg.querySelectorAll("g")].every(node => {
+			const box = node.querySelector("rect")!.getBoundingClientRect();
+			return [...node.querySelectorAll("text")].every(text => {
+				const rect = text.getBoundingClientRect();
+				return rect.right <= box.right && rect.bottom <= box.bottom;
+			});
+		});
+		return { gap: procedure.x - job.right, height: job.height, ports, textFits };
+	});
+	expect(geometry.gap).toBeGreaterThan(100);
+	expect(geometry.height).toBeLessThan(90);
+	expect(new Set(geometry.ports).size).toBe(geometry.ports.length);
+	expect(geometry.textFits).toBe(true);
+	const legend = await page.locator("#plsql-content .graph-legend").boundingBox();
+	const diagram = await graph.boundingBox();
+	expect(legend!.y + legend!.height).toBeLessThan(diagram!.y);
 });
