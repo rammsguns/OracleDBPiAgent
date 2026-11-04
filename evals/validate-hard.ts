@@ -24,7 +24,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (!test.id.startsWith('hard-') || ids.has(test.id)) throw new Error('Invalid/duplicate hard ID');
 		ids.add(test.id);
 		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target)) throw new Error('Unapproved target');
-		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression') throw new Error('Missing split');
+		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge') throw new Error('Missing split');
 		if (Boolean(test.question) === Boolean(test.turns) || (test.turns && (test.turns.length < 2 || test.turns.some(turn => !turn.trim())))) throw new Error('Invalid prompts');
 		const splits = categories.get(test.category) ?? new Set<string>();
 		splits.add(test.split);
@@ -42,11 +42,20 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...categories.keys()])) {
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge').map(test => test.category)])) {
 		if (!categories.get(category)?.has('dev') || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
+	const challenge = cases.filter(test => test.split === 'challenge');
+	if (challenge.length) {
+		const expectedCategories = ['multi-step-diagnosis', 'column-traps', 'false-premises', 'ambiguity', 'multi-turn-dependency', 'wide-exact'];
+		if (challenge.length !== 12 || expectedCategories.some(category => challenge.filter(test => test.category === category).length !== 2)) throw new Error('Challenge needs two cases in each of six categories');
+		for (const test of challenge) {
+			if (!test.groundTruth || test.groundTruth.mode !== 'allCells') throw new Error('Challenge needs allCells truth');
+			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
+		}
+	}
 	const dev = cases.filter(test => test.split === 'dev').length;
-	if (dev / cases.filter(test => test.split !== 'regression').length < 0.55 || dev / cases.filter(test => test.split !== 'regression').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+	if (dev / cases.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / cases.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
 }
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
@@ -57,6 +66,14 @@ export function checkPinnedFacts(test: EvalCase, rows: unknown[][]): void {
 	for (const pattern of test.expect.requiredFacts.slice(0, count)) {
 		if (!new RegExp(pattern, 'i').test(text)) throw new Error(`Pinned fact disagrees with ground truth: ${test.id}`);
 	}
+}
+
+/** Challenge prerequisites fail closed when the intended trap or wide answer disappears. */
+export function checkChallengeRows(test: EvalCase, rows: unknown[][]): void {
+	if (test.split !== 'challenge') return;
+	if (test.category === 'wide-exact' && (rows.length < 8 || new Set(rows.map(row => String(row[0]))).size !== rows.length)) throw new Error(`Challenge needs at least eight distinct records: ${test.id}`);
+	if (test.id === 'hard-p11-sales-primary-key' && !/^PK_CONSTRAINTS=0 \/ /.test(String(rows[0]?.[0]))) throw new Error('SALES primary-key premise changed');
+	if (test.id === 'hard-p11-commission-zero' && !/^NULL_COMMISSION=[1-9]\d* \/ ZERO_COMMISSION=0 \/ POSITIVE_COMMISSION=[1-9]\d*$/.test(String(rows[0]?.[0]))) throw new Error('Commission premise changed');
 }
 
 /** A missing grant is a prerequisite, not an arbitrary connection/query failure. */
@@ -85,6 +102,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 				const rows = result.rows;
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 				checkPinnedFacts(test, rows);
+				checkChallengeRows(test, rows);
 				if (test.category === 'grant-limited-p1') {
 					for (const row of rows) {
 						const view = row[0];

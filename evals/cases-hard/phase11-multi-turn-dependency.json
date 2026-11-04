@@ -1,0 +1,46 @@
+[
+	{
+		"id": "hard-p11-second-department",
+		"target": "d1-19c-lab",
+		"category": "multi-turn-dependency",
+		"split": "challenge",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT d.department_id,d.department_name,r.n,r.salary_total,m.first_name||' '||m.last_name FROM (SELECT department_id,COUNT(*) n,SUM(salary) salary_total,ROW_NUMBER() OVER(ORDER BY COUNT(*) DESC,department_id) rn FROM hr.employees WHERE department_id IS NOT NULL GROUP BY department_id) r JOIN hr.departments d ON d.department_id=r.department_id JOIN hr.employees m ON m.employee_id=d.manager_id WHERE r.rn=2",
+			"mode": "allCells"
+		},
+		"turns": [
+			"On d1, rank HR departments by employee count descending, breaking ties by department ID ascending. Give the top three department IDs, names and counts.",
+			"For the second department in that ranking, report its ID, name, employee count, exact salary total and manager full name (first name, space, last name). Keep the same count-based ranking rather than ranking by salary."
+		]
+	},
+	{
+		"id": "hard-p11-second-warehouse",
+		"target": "d1-19c-lab",
+		"category": "multi-turn-dependency",
+		"split": "challenge",
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT w.warehouse_id,w.warehouse_name,l.city,c.country_name,r.region_name FROM (SELECT warehouse_id,ROW_NUMBER() OVER(ORDER BY SUM(quantity_on_hand) DESC,warehouse_id) rn FROM oe.inventories GROUP BY warehouse_id) q JOIN oe.warehouses w ON w.warehouse_id=q.warehouse_id JOIN hr.locations l ON l.location_id=w.location_id JOIN hr.countries c ON c.country_id=l.country_id JOIN hr.regions r ON r.region_id=c.region_id WHERE q.rn=2",
+			"mode": "allCells"
+		},
+		"turns": [
+			"On d1 in OE, rank warehouses by total quantity on hand descending, ties by warehouse ID ascending. Give the top three IDs, names and total quantities.",
+			"For the second warehouse from that ranking, report its ID and name, city, country name and region name by following its location relationships. Keep the stock-quantity ranking from the previous turn."
+		]
+	}
+]

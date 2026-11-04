@@ -10,7 +10,7 @@ import type { EvalCase } from './types.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export interface RunOptions { endpoint?: EvalEndpoint; suite: string; split?: 'dev' | 'holdout' | 'regression'; repeat: number; ids: string[] }
+export interface RunOptions { endpoint?: EvalEndpoint; suite: string; split?: 'dev' | 'holdout' | 'regression' | 'challenge'; repeat: number; ids: string[] }
 export function parseArgs(args: string[]): RunOptions {
 	const options: RunOptions = { suite: 'evals/cases', repeat: 1, ids: [] };
 	for (let i = 0; i < args.length; i++) {
@@ -24,7 +24,7 @@ export function parseArgs(args: string[]): RunOptions {
 			}
 			if (arg === '--suite') options.suite = value;
 			if (arg === '--split') {
-				if (value !== 'dev' && value !== 'holdout' && value !== 'regression') throw new Error('Split must be dev, holdout or regression');
+				if (value !== 'dev' && value !== 'holdout' && value !== 'regression' && value !== 'challenge') throw new Error('Split must be dev, holdout, regression or challenge');
 				options.split = value;
 			}
 			if (arg === '--repeat') {
