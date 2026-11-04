@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { SessionManager, WebError, acquireLlm, ask, type SessionOptions } from "./sessions.js";
 
 import { generateReport, renderMarkdown, sectionNames } from "../report/index.js";
-import { loadLatestReport, saveReport, reportDirectory, validateReportTarget } from "../report/history.js";
+import { loadLatestReport, loadReportHistory, HISTORY_RETENTION, saveReport, reportDirectory, validateReportTarget } from "../report/history.js";
+import { buildReportTrends } from "../report/trends.js";
 import { webReportDiff } from "./reportDiff.js";
 import { summarizeReport, checkReportSummary } from "../report/summarize.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
@@ -17,6 +18,7 @@ export interface WebServerOptions extends SessionOptions {
 	/** Local history seams; no shared configuration fields. */
 	reportDirectory?: string;
 	loadReport?: typeof loadLatestReport;
+	loadHistory?: typeof loadReportHistory;
 	saveReport?: typeof saveReport;
 	summarize?: typeof summarizeReport;
 	port?: number;
@@ -72,6 +74,18 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (raw === "/api/report/history") {
+				if (req.method !== "GET") throw new WebError(405, "Method not allowed");
+				const params = new URL(req.url!, "http://localhost").searchParams;
+				const target = params.get("target") ?? manager.config.defaultTarget;
+				try { validateReportTarget(target, manager.config.targets); } catch { throw new WebError(400, "Invalid target"); }
+				const rawLast = params.get("last");
+				const last = rawLast === null ? HISTORY_RETENTION : Number(rawLast);
+				if (rawLast !== null && !/^[1-9][0-9]*$/.test(rawLast) || !Number.isInteger(last) || last < 1 || last > HISTORY_RETENTION) throw new WebError(400, "Invalid history limit");
+				try {
+					return json(res, 200, buildReportTrends(await (options.loadHistory ?? loadReportHistory)(options.reportDirectory ?? reportDirectory(), target, manager.config.targets, last)));
+				} catch { throw new WebError(500, "History unavailable"); }
+			}
 			if ((raw === "/api/report" && req.method === "GET") || (raw === "/api/report/save" && req.method === "POST")) {
 				const saving = req.method === "POST";
 				const params = new URL(req.url!, "http://localhost").searchParams;
