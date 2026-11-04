@@ -94,3 +94,45 @@ Add a fake-fetch wire regression test using fixture credentials, with no actual
 socket, DB, Strata, eval or LLM e2e request. Run typecheck, existing unit tests,
 integration excluding the LLM e2e by name, and npm audit. Same-day model quality,
 token comparisons and Antigravity review remain coordinator gates.
+
+## Implementation and verification
+
+No src adapter changes were necessary. Production guards, secondary isolation
+and all pre-existing tests are unchanged. Added `tests/unit/pi-sdk-wire.test.ts`
+with two fake-fetch cases (budget unset and 512), capturing health and inference
+requests and asserting exact body, loopback URL, redirect rejection, bearer/JSON
+headers, versioned User-Agent, absent attribution and cached-token accounting.
+For this model the captured limit field is `max_completion_tokens`, the system
+role is `developer`, and tools are ordinary non-strict function JSON Schemas.
+No real credentials are used in that test.
+
+The lockfile preserves all unrelated dependency versions; only the two approved
+SDKs, pi-telemetry, pi-schema and removal of SDK-private TypeBox copies differ.
+`npm ci --ignore-scripts` succeeds against that lockfile on Node v24.18.1.
+
+- `npm run typecheck`: PASS (exit 0).
+- `npm test`: PASS, 44 files, 769 tests (including the two new cases).
+- `npm audit`: PASS, found 0 vulnerabilities.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`:
+  26 passed, 1 failed, 1 skipped (the excluded LLM e2e); 8 files passed, 1 failed.
+  Drift's repeated cross-target schema comparison saw p1 query availability
+  change from ok to unavailable (`query failed; check local service availability`).
+  No drift implementation uses the PI SDK; this is outside WP-14B's paths.
+
+No evals, live agent, live report summary or LLM e2e calls were run. No endpoint
+lock was acquired by this work. Unit runner mocks use their existing isolated
+locks. Model pass rates/token changes and Antigravity review remain unverified
+and must be completed by the coordinator when the eval endpoint is available.
+No shared application contract changes are needed.
+
+The isolated unchanged drift test subsequently passed (1/1, 6.67 s).
+Schema's reference resolver only indexes provided documents; it has no HTTP
+loader. Its `https://json-schema.invalid/root.json` base is an identifier,
+not a request. Newly added OAuth/schema/parser/cost helpers introduce no
+background network operation.
+
+Final full non-LLM integration rerun used the same command above plus
+`--no-file-parallelism` to reduce concurrent DB load: PASS, 9 files,
+27 passed, 1 skipped (the explicitly excluded LLM e2e), 32.84 s, exit 0.
+The initial availability failure is retained above for transparency.
+`git diff --check` is clean.
