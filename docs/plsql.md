@@ -26,13 +26,20 @@ combined across specification and body. All quoted literals are conservatively
 redacted, including q quotes and multiline literals; numeric defaults remain
 visible. Signatures retain subprogram IDs, overloads, argument sequence and
 nesting, modes, return types, named types and default flags. Oracle does not
-expose usable default expressions through these views: adjacent specification
-comments and declaration text supply visible defaults when available. A missing
+expose usable default expressions through these views: DEFAULT / := expressions
+are parsed from the matched specification declaration and attached as argument
+`default` values (null when unavailable). A missing
 comment or declaration remains empty rather than being invented.
 
 Table operations come from a static scan with comments and literals removed.
-They are heuristic object-level hints, not runtime or individual-subprogram
-proof. Dynamic SQL, synonyms, quoted identifiers and indirect calls can be
+The package/object-level union is retained. Each signature additionally has
+`bodyRange` (source type, startLine, endLine, heuristic) or null, and `tables`
+containing only operations observed in that range. These remain heuristic hints,
+not runtime proof. The range scanner tracks nested blocks, excludes local nested
+routine bodies from the enclosing routine scan, and skips forward declarations.
+Overloads match parameter names/types; ambiguous or incomplete bodies stay
+unavailable. A single non-overloaded routine may match names/counts when `%TYPE`
+cannot be resolved statically. Dynamic SQL, synonyms, quoted identifiers and indirect calls can be
 missed. Scheduler matching is also a lexical hint; indirect scheduler program
 references are not resolved. A cap or unavailable section makes `complete: false`.
 List line counts are visible fetched counts; `sourceTruncated` marks lower bounds.
@@ -50,11 +57,15 @@ A symlink destination is rejected. Existing directories retain their permissions
 - `object:OWNER.NAME`, `table:OWNER.NAME`, `job:OWNER.NAME`
 - `subprogram:OWNER.NAME:SUBPROGRAM_ID:OVERLOAD` (empty final field if absent)
 
-Edges have `from`, `to` (node IDs), `kind`, `heuristic` (boolean). Kinds:
+Edges have `from`, `to` (node IDs), `kind`, `heuristic` (boolean), and an optional
+`label` string (additive schemaVersion 1 field). Kinds:
 `contains` object → subprogram; `depends-on` object → dictionary dependency;
-`may-use` subprogram → object-level dependency candidate; `references` job →
-matching entry point, or root object when no entry point can be identified.
-Only contains/depends-on are non-heuristic. Overloaded job entry points yield
+`may-use` subprogram → table observed in its range, with `label` set to the
+operation (SELECT/INSERT/UPDATE/DELETE/MERGE), one edge per operation;
+`references` job → matching entry point parsed from OWNER.PACKAGE.SUBPROGRAM,
+or root object when no entry point can be identified. Object-level depends-on
+edges remain for unresolved ranges, unattributed tables, and non-table
+dependencies. Only contains/depends-on are non-heuristic. Overloaded job entry points yield
 multiple candidates. Nodes and deduplicated edges are sorted for deterministic
 JSON; UI code must treat IDs/labels as text, never markup. `mermaid` renders
 this graph with generated safe node IDs and sanitized labels.
@@ -65,7 +76,7 @@ contracts. WP-16C can render `graph` directly as SVG; no Mermaid runtime is need
 ## WP-16A verification (2026-11-04)
 
 - `npm run typecheck`: pass.
-- `npm test`: 814 tests passed across 49 files.
+- `npm test`: 818 tests passed across 50 files.
 - `PIAGENT_SECRET_DIR=… npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask)'`:
   28 passed, one deliberately filtered LLM test skipped, ten files passed.
 - Live `plsql doc` on SHOPAPP.WORKLOAD: complete evidence from DBA views,
@@ -81,3 +92,11 @@ not a claim that scheduler state remains unchanged.
 No shared contract changes or dependencies are needed. Remaining limits are the
 explicit static-analysis caveats above; runtime call paths, dynamic SQL and
 indirect scheduler program resolution were not verified or inferred.
+
+
+The coordinator review added per-subprogram operations and body ranges, parsed
+argument defaults, operation-labelled graph edges and fully qualified job entry
+point matching. Callers omit the PACKAGE BODY → PACKAGE self-dependency.
+Markdown includes a summary, tight lists and fenced declarations where no spec
+comment exists. Live WORKLOAD ranges: PLACE_ORDERS 2–18, SHIP_ORDERS 19–23,
+NIGHTLY_PURGE 24–29. HR.ADD_JOB_HISTORY spans lines 1–13 and inserts JOB_HISTORY.
