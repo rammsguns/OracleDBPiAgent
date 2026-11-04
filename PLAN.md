@@ -1726,6 +1726,30 @@ new features.
 3. Bump `version` to 1.1.0, tag `v1.1.0`, and push `master` and the tag to
    origin, only after the owner confirms (the repo is public).
 
+### Phase 15 results (2026-11-04): ready to push
+WP-15A merged (8ab6cae, review APPROVE); changelog placeholders filled (f0c9fc8);
+version 1.1.0 committed (cc214c3). Checks on cc214c3:
+
+- typecheck, build, unit 800/800, integration 28/28, browser 19 passed plus the
+  live web-chat smoke (`PIAGENT_BROWSER_LIVE=1`) passed.
+- LLM commands, run once each from a fresh `piagent init` private home: `ask`
+  (HR.EMPLOYEES 107 rows), `chat` (27 departments), `report --summarize` on p1
+  (six prioritised findings).
+- `npm pack` and `npm install -g --prefix <tmp>`: `--version` 1.1.0, plus
+  targets, doctor, drift, report, report history, report schedule and web all
+  work; the tarball has no `.env`, secrets, tests or evals.
+- Release gate (single side, primary Strata; `eval-archive/phase15/gate-release/`):
+  hard dev 2× 55/56, challenge 2× 41/44, holdout 3× 33/36, regression 21/21,
+  MVP 39/39, all refusals pass. The misses are cases that also missed in the 11B
+  and 14B gates (`description-language` 0/3, as in the 11B gate's A side).
+
+Notes: after `init`, `ask` fails with a generic message until the placeholder
+`PIAGENT_LLM_API_KEY_FILE` is edited (documented); a clearer error is a candidate
+follow-up. `report schedule` pins `process.execPath`, which on this machine
+resolves to a Playwright-bundled Node via `~/.local/bin/node`.
+
+Remaining: the owner confirms, then push `master` and `v1.1.0` and check CI.
+
 ### Not in phase 15
 Publishing to npm, GitHub release binaries, and Windows support.
 
