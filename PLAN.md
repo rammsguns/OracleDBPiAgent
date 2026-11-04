@@ -1387,6 +1387,32 @@ Scoped from the 11C failure triage: the agent collapses requested rows into rang
 usual gate (hard dev 4×4, holdout ×3, regression ×1, MVP) plus challenge ×4
 on each side.
 
+### WP-11E: scorer follow-ups from the 11B gate
+Two scorer artifacts seen in the 11B gate. (1) `hard-p11-order-customer-key`:
+correct values in a vertical table with extra columns (`# | Item | Value | Source`)
+fail `rowCells`. (2) `hard-p11b-partial-memory`: "19.9.1.0.0 (major = 19)" fails the
+single-value truth row `["19"]`. Fix the matcher without loosening wrong-answer
+rejection; rescore archived results, no LLM calls.
+
+### Phase 11 results (2026-11-04): complete
+WP-11B merged (ad36a19) after the gate (A=835128b, B=+11B, alternating, primary
+Strata; archive `eval-archive/phase11/gate-11b/`):
+
+| Split | A | B |
+|---|---|---|
+| hard dev 4× | 107/112 | 112/112 |
+| challenge 4× | 82/88 | 80/88 |
+| holdout 3× | 33/36 | 34/36 |
+| regression | 21/21 | 21/21 |
+| MVP | 37/39 | 39/39 |
+
+All refusals pass on both sides. Tokens B/A: dev +0.8% [−4.8, +6.6], challenge
+−0.6% [−5.8, +5.2], so no measurable cost. Target `nullable-manager` 1/4 → 3/4.
+The challenge losses (`order-customer-key` 4→2, `partial-memory` 3→0) were read
+by hand: order-customer-key answers were correct (scorer artifact, WP-11E);
+two partial-memory answers said "major = 19" (artifact), two gave only the full
+version (an answer-format miss A also made once).
+
 ### Not in phase 11
 New tools, cloud LLMs, LLM-judged scoring, and changes to existing cases.
 
