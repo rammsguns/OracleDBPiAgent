@@ -482,3 +482,20 @@ Validation: `npm run typecheck` passed; `npm test` passed (31 files, 593 tests).
 The extended short-prefix test requires the sentence with either pinned target
 and unpinned, while retaining the original size cap and existing rule checks.
 No DB, integration, eval or LLM calls were run.
+
+## WP-11B requested rows and format (2026-11-04)
+
+The Phase 11 baselines found omitted rows through range summaries and ignored
+requested record formats. Default answer guidance adds one sentence:
+
+> List every requested row without merging rows into ranges or "N more", and follow the requested output format exactly.
+
+Guidance grows from 543 to 662 characters; the system prompt and total
+prefix each grow by 119 characters, including the newline (about
+39.7 tokens at 3 characters per token; no tokenizer measurement). Unit tests
+assert the guidance and cap prefix growth at 120 characters (about 40 tokens).
+With the configured targets and no appendix or pin, the system prompt measures
+1,408 → 1,527 characters, and the prefix including serialized tool definitions
+measures 4,915 → 5,034. The historical WP-S size check allows the same
+120-character WP-11B increment. No tools, parameters or contracts change. No agent, LLM or eval runs were made;
+behavioral verification remains with the coordinator's gate.
