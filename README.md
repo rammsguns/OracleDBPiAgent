@@ -133,10 +133,10 @@ See [grounding details](docs/grounding.md).
 `web` binds only to `127.0.0.1` on port 8765 (`--port N` overrides it).
 Open the printed `http://127.0.0.1:N/#token=...` URL and keep it private.
 The page shows a target picker, streamed chat, tool-call trace, session audit and
-health checks, with a Stop button. The Report tab includes a saved-file History panel with sparklines and worsening
-flags. The Drift tab compares parameters, schema or object metadata without an
-LLM. The Report tab runs the selected target's DBA
-checks with an optional summary; chat and report summaries show Unverified notes
+health checks, with a Stop button. The Report tab runs the selected target's DBA
+checks with an optional summary and includes a saved-file History panel with
+sparklines and worsening flags. The Drift tab compares parameters, schema or object
+metadata without an LLM. Chat and report summaries show Unverified notes
 when facts remain unsupported. Export Markdown downloads the displayed conversation,
 grounding notes and trace; trace arguments omit SQL, binds and connection fields.
 The token stays in browser memory; reopen the original URL after reloading. The build copies the page into `dist/web/static/`.

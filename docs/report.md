@@ -199,7 +199,8 @@ npm run piagent -- report --target p1-19c-prod --diff --json
 
 `--out <dir>` saves the ordinary report JSON and Markdown under
 `<dir>/<target>/<UTC timestamp>.json` and `.md` (timestamp colons become hyphens).
-`--diff` and `--diff-only` imply saving, defaulting to `var/reports`; `--out`
+`--diff` and `--diff-only` imply saving, defaulting to `<PIAGENT_HOME>/reports` (`~/.piagent/reports`, or
+`PIAGENT_REPORT_DIRECTORY` when set); `--out`
 overrides that directory. Comparison loads the latest run **before** saving the
 current one. Without these options, output and saving behavior are unchanged.
 Target names must be configured and match `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`.
