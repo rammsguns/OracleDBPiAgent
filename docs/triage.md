@@ -6,7 +6,7 @@ unless `--summarize` is given.
 ```sh
 piagent triage --target p1-19c-prod --issue NIGHTLY_PURGE_JOB
 piagent triage --target p1-19c-prod --issue-file issue.txt --since 24h --json
-piagent triage --target d1-19c-lab --issue K7Q_OWNER.K7Q_FAILJOB --since 30d
+piagent triage --target d1-19c-lab --issue "K7Q_FAILJOB on the lab keeps failing, what is wrong?"
 piagent triage --target p1-19c-prod --out ./triage-reports
 piagent triage --target p1-19c-prod --issue NIGHTLY_PURGE_JOB --summarize
 ```
@@ -16,7 +16,19 @@ minute/hour/day durations up to 30d are accepted. Issue text is capped at 64 KiB
 With no issue text, recent failed runs, compile errors and invalid objects seed
 at most 10 triages. Compile/invalid recency uses LAST_DDL_TIME because dictionary
 errors do not have an occurrence timestamp. Scan limits and unavailable views
-are reported. An empty window is not evidence that no historical failure exists.
+are reported. For a named job or an object’s implicated jobs, an empty window
+search triggers
+one bounded read-only lookup of the latest five runs per missing job scope,
+without a time filter. Historical evidence is labelled **outside the requested
+window (last run …)** and does not change the requested window. A per-row
+OUTSIDE_WINDOW marker distinguishes historical runs from any recent run omitted
+by a cap or appearing between reads. Codes and hypotheses use the retained runs;
+compile/invalid-object diagnostics use their discovered owners, not the default
+schema. Unqualified object names also get bounded dictionary owner discovery.
+An entirely empty search states names, views, window and owner scope, then
+suggests `--since 30d`, checking spelling/qualification, and asking a DBA about a
+dropped job or an owner hidden from this account. Empty code lists render as
+`Codes: none`, and hypothesis evidence never contains empty bullets.
 
 Evidence includes job actions and bounded run history, both ORA-06512 stack
 forms, redacted source excerpts ±8 lines with enclosing subprogram and a lexical
@@ -113,7 +125,10 @@ snapshot count). PLACE_ORDERS_JOB calls a path that inserts a new order and uses
 its returned key to insert child rows; that path cannot explain old-parent rows.
 
 On d1 K7Q_FAILJOB no longer exists in DBA_SCHEDULER_JOBS, but its historical runs
-remain visible with `--since 10d`: ORA-20001 and anonymous line 1. The report
+are found even with the default 24h window: the latest-five fallback shows
+ORA-20001 and anonymous line 1, explicitly outside that window (last run
+2026-10-26T06:12:12.333Z). Diagnostics are scoped to K7Q_OWNER rather than SH.
+The report
 explains RAISE_APPLICATION_ERROR in the job's own PLSQL_BLOCK as the recorded
 stack's interpretation and explicitly lists what the dropped/auto-dropped action
 prevents verifying: exact action/type, guard, source and historical dependencies.
@@ -122,13 +137,13 @@ No job was recreated or executed.
 Complete generated Markdown examples:
 
 - [triage-nightly-purge.md](triage-nightly-purge.md) — p1, 24h window.
-- [triage-k7q-failjob.md](triage-k7q-failjob.md) — d1, 10d window.
+- [triage-k7q-failjob.md](triage-k7q-failjob.md) — d1, default 24h window with explicitly labelled historical evidence.
 
 Verification results:
 
 - `npm run typecheck`: passed.
-- `npm test`: 55 files, 867 tests passed.
-- `PIAGENT_SECRET_DIR=… npm run test:integration -- --no-file-parallelism -t '^(?!.*answers one end-to-end ask)'`: 11 files passed; 30 tests passed, 1 skipped (the LLM e2e).
+- `npm test`: 61 files, 921 tests passed.
+- `PIAGENT_SECRET_DIR=… npm run test:integration -- --no-file-parallelism -t '^(?!.*answers one end-to-end ask)'`: 12 files passed; 32 tests passed, 1 skipped (the LLM e2e).
 - The initial parallel integration run had 3 existing drift/report availability
   failures on p1; two sequential runs passed in full with the LLM test excluded.
 - Live p1 and d1 triage smoke runs used only the approved read-only sessions.

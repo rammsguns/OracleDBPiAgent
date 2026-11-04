@@ -32,14 +32,18 @@ it('triages live NIGHTLY_PURGE_JOB with read-only source and constraint evidence
 	expect(renderTriageMarkdown(result)).toContain('SYS_C007669');
 	console.log(`p1 triage: SYS_C007669 child=${constraint?.rows[0]?.[3]}; frame=WORKLOAD.NIGHTLY_PURGE:27. Cutoff/predicate mismatch is the leading hypothesis; the aggregate count is a current snapshot.`);
 }, 120000);
-it('triages K7Q_FAILJOB history and job_action when the live job still exists', async context => {
+it('triages older K7Q_FAILJOB failures with the default window and labels historical evidence', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
 	let result;
-	try { result = await live('d1-19c-lab', 'K7Q_OWNER.K7Q_FAILJOB', '30d'); }
+	try { result = await live('d1-19c-lab', 'K7Q_FAILJOB on the lab keeps failing, what is wrong?'); }
 	catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved d1 listener unavailable'); return; } throw error; }
 	const issue = result.issues[0]!;
-	if (!issue.codes.length) { context.skip('K7Q_FAILJOB has no history in the 30d window'); return; }
 	expect(issue.codes).toContain('ORA-20001');
+	expect(issue.since).toBe('24h');
+	expect(issue.limitations.join(' ')).toContain('outside the requested window (last run ');
+	const latest = issue.checks.find(c => c.label.startsWith('Latest scheduler runs'));
+	expect(latest?.rows.length).toBeGreaterThan(0); expect(latest?.rows.length).toBeLessThanOrEqual(5);
+	expect(issue.checks.filter(c => c.label.startsWith('Compile errors') || c.label.startsWith('Invalid objects')).map(c => c.binds.owner)).toEqual(['K7Q_OWNER', 'K7Q_OWNER']);
 	const frame = issue.excerpts.find(e => e.object === 'K7Q_OWNER.K7Q_FAILJOB'); expect(frame?.line).toBe(1);
 	const job = issue.checks.find(c => c.label === 'Named scheduler job actions');
 	if (!job?.rows.length) {

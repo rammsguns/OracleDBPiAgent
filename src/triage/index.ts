@@ -1,3 +1,4 @@
+import { collectRunHistory, scopeName, type RunScope } from './history.js';
 import { diagnosePredicates } from './diagnose.js';
 import { redactCredentials } from './redact.js';
 import { validateLogTables } from '../config/logTables.js';
@@ -19,33 +20,43 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	if (!target || (ctx.pinnedTarget && ctx.pinnedTarget !== target.name)) throw new Error('Unknown or unpinned triage target');
 	const hours = sinceHours(options.since), reader = new TriageReader(ctx, target.name), dictionary = new Dictionary(ctx, target.name, redactCredentials);
 	const parsed = parseIssue(options.issue ?? '');
-	parsed.objects = unique([...parsed.objects, ...parsed.unqualifiedObjects.map(n => `${target.defaultSchema}.${n}`)]);
-	const jobNames = unique([...parsed.jobs, ...parsed.objects.map(o => objectName(o).name)]);
-	const jobPredicates = jobNames.map((_, i) => `JOB_NAME = :job${i}`);
-	const jobBinds = Object.fromEntries(jobNames.map((name, i) => [`job${i}`, name]));
+	const explicitObjects = [...parsed.objects], discoveredObjects: string[] = [];
+	for (const name of parsed.unqualifiedObjects) {
+		const found = await reader.read(`Owners for named object ${name}`, 'OBJECTS', 'OWNER, OBJECT_NAME, OBJECT_TYPE, STATUS', "WHERE OBJECT_NAME = :name ORDER BY OWNER, OBJECT_TYPE", { name }, 16);
+		discoveredObjects.push(...found.rows.map(r => `${identifier(asText(r[0]))}.${identifier(asText(r[1]))}`));
+		parsed.objects.push(...found.rows.map(r => `${r[0]}.${r[1]}`));
+	}
+	parsed.objects = unique(parsed.objects);
+	const jobNames = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects.map(o => objectName(o).name)]);
+	const jobBinds: Record<string, unknown> = {};
+	const jobPredicates = jobNames.map((name, i) => {
+		jobBinds[`job${i}`] = name;
+		const requestedOwners = unique([...explicitObjects, ...discoveredObjects].map(objectName).filter(o => o.name === name).map(o => o.owner));
+		const owners = requestedOwners.map((owner, j) => { jobBinds[`namedOwner${i}_${j}`] = owner; return `OWNER = :namedOwner${i}_${j}`; });
+		return owners.length ? `(JOB_NAME = :job${i} AND (${owners.join(' OR ')}))` : `JOB_NAME = :job${i}`;
+	});
 	// Look up named jobs first. For a source object, dictionary.jobs finds lexical job_action references.
 	const namedJobs = await reader.read('Named scheduler job actions', 'SCHEDULER_JOBS', 'OWNER, JOB_NAME, JOB_TYPE, JOB_ACTION', `WHERE ${jobPredicates.length ? '(' + jobPredicates.join(' OR ') + ')' : '1 = 0'} ORDER BY OWNER, JOB_NAME`, jobBinds, 16);
 	const jobs = { ...namedJobs, rows: [...namedJobs.rows], attempts: [...namedJobs.attempts] };
+	const implicatedObjects = new Set<string>();
 	for (const object of parsed.objects) {
 		const { owner, name } = objectName(object);
 		const implicated = await dictionary.jobs(owner, name);
+		if (implicated.rows.length) implicatedObjects.add(name);
 		for (const job of implicated.rows) if (!jobs.rows.some(r => r[0] === job.owner && r[1] === job.name)) {
 			if (jobs.rows.length < 16) jobs.rows.push([job.owner, job.name, job.type, job.action]); else jobs.truncated = true;
 		}
 		reader.checks.push({ label: `Jobs referencing ${owner}.${name} (lexical heuristic)`, sql: `SELECT OWNER, JOB_NAME, JOB_TYPE, JOB_ACTION FROM ${implicated.view} WHERE INSTR(UPPER(JOB_ACTION), :name) > 0 ORDER BY OWNER, JOB_NAME`, binds: { name }, status: implicated.status, view: implicated.view, columns: ['OWNER', 'JOB_NAME', 'JOB_TYPE', 'JOB_ACTION'], rows: implicated.rows.slice(0, 16).map(j => [j.owner, j.name, j.type, j.action]), truncated: implicated.truncated || implicated.rows.length > 16, attempts: implicated.attempts });
 		if (implicated.status === 'unavailable') jobs.attempts.push(...implicated.attempts);
 	}
-	const runBinds: Record<string, unknown> = { hours };
-	const runPredicates = jobs.rows.map((r, i) => { runBinds[`owner${i}`] = identifier(asText(r[0])); runBinds[`job${i}`] = identifier(asText(r[1])); return `(OWNER = :owner${i} AND JOB_NAME = :job${i})`; });
-	for (const [i, name] of jobNames.filter(name => !jobs.rows.some(r => r[1] === name)).entries()) {
-		runBinds[`missingJob${i}`] = name;
+	const scopes: RunScope[] = jobs.rows.map(r => ({ owner: asText(r[0]), name: asText(r[1]) }));
+	for (const name of jobNames.filter(name => !jobs.rows.some(r => r[1] === name) && !implicatedObjects.has(name))) {
 		const qualified = parsed.objects.map(objectName).find(o => o.name === name);
-		if (qualified) { runBinds[`missingOwner${i}`] = qualified.owner; runPredicates.push(`(OWNER = :missingOwner${i} AND JOB_NAME = :missingJob${i})`); }
-		else runPredicates.push(`JOB_NAME = :missingJob${i}`);
+		scopes.push({ name, ...(qualified ? { owner: qualified.owner } : {}) });
 	}
-	const runs = await reader.read('Scheduler run history in window', 'SCHEDULER_JOB_RUN_DETAILS', 'OWNER, JOB_NAME, STATUS, ERROR#, ACTUAL_START_DATE, ADDITIONAL_INFO', `WHERE ACTUAL_START_DATE >= SYSTIMESTAMP - NUMTODSINTERVAL(:hours, 'HOUR')${runPredicates.length ? ' AND (' + runPredicates.join(' OR ') + ')' : options.issue ? ' AND 1 = 0' : " AND STATUS = 'FAILED'"} ORDER BY ACTUAL_START_DATE DESC`, runBinds, 30);
+	const runs = await collectRunHistory(reader, scopes, hours, options.since ?? '24h');
 	const combined = parseIssue([options.issue ?? '', ...runs.rows.map(r => `${Number(r[3]) ? `ORA-${String(r[3]).padStart(5, '0')}` : ''} ${asText(r[5])}`)].join('\n'));
-	const owners = unique([...parsed.objects.map(o => objectName(o).owner), ...combined.frames.flatMap(f => f.owner ? [f.owner] : []), ...jobs.rows.map(r => asText(r[0])), ...runs.rows.map(r => asText(r[0]))]);
+	const owners = unique([...[...explicitObjects, ...discoveredObjects].map(o => objectName(o).owner), ...combined.frames.flatMap(f => f.owner ? [f.owner] : []), ...jobs.rows.map(r => asText(r[0])), ...runs.rows.map(r => asText(r[0]))]);
 	if (!owners.length) owners.push(target.defaultSchema);
 	const excerpts: Excerpt[] = [];
 	const sourceCache = new Map<string, Awaited<ReturnType<Dictionary['source']>>>();
@@ -113,14 +124,28 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		const row = constraint.rows[0]!;
 		hypotheses.push({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
 	}
-	const limitations: string[] = [];
+	const limitations: string[] = [...runs.notes];
 	for (const excerpt of excerpts.filter(e => e.subprogram.includes('job_action unavailable'))) {
 		limitations.push(`${excerpt.object} has run history but no row in ${jobs.view}: the job was dropped or auto-dropped, or is no longer visible. The exact job type/action, raising condition, source text and historical dependencies cannot be verified.`);
 		if (combined.codes.includes('ORA-20001')) hypotheses.push({ rank: 0, title: 'ORA-20001 at anonymous line 1 indicates RAISE_APPLICATION_ERROR in the job’s own PLSQL_BLOCK.', evidence: [`${excerpt.object}: scheduler history reports ORA-20001 and ORA-06512 at line ${excerpt.line}.`, 'This is the anonymous job-block interpretation of the recorded stack; the dropped job_action is unavailable, so the exact call and guard cannot be inspected.'] });
 	}
 	for (const excerpt of excerpts.filter(e => /RAISE_APPLICATION_ERROR/i.test(e.statement))) hypotheses.push({ rank: 0, title: 'The application explicitly raises an error from its guard or failure path.', evidence: [`${excerpt.object} ${excerpt.subprogram} line ${excerpt.line}: ${excerpt.statement}`, ...combined.codes.filter(c => /^ORA-20/.test(c))] });
 	for (const check of reader.checks.filter(c => /Compile errors|Invalid objects/.test(c.label) && c.rows.length)) hypotheses.push({ rank: 0, title: 'An invalid or uncompilable object may explain the failure; correlate it with the failing call.', evidence: [check.label, ...check.rows.slice(0, 3).map(r => r.join(' | '))] });
-	if (!hypotheses.length) hypotheses.push({ rank: 0, title: 'The recorded failure needs correlation with the frame statement and error guide; root cause is unconfirmed.', evidence: [...combined.codes, ...runs.rows.slice(0, 3).map(r => `${r[0]}.${r[1]} ${r[2]} ${r[4]}`), ...excerpts.map(e => `${e.object} line ${e.line}: ${e.statement}`)] });
+	if (!hypotheses.length) {
+		const evidence = [...combined.codes, ...runs.rows.slice(0, 3).map(r => `${r[0]}.${r[1]} ${r[2]} ${r[4]}`), ...excerpts.map(e => `${e.object} line ${e.line}: ${e.statement}`)].filter(e => e.trim());
+		if (evidence.length) hypotheses.push({ rank: 0, title: 'The recorded run or error is visible, but the cause is not yet established.', evidence });
+		else {
+			const searched = reader.checks.filter(c => /scheduler|Compile errors|Invalid objects|Owners for named object/i.test(c.label));
+			const views = unique(searched.flatMap(c => [c.view, ...c.attempts.map(a => `${a.view} (${a.code})`)]));
+			const names = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects]);
+			hypotheses.push({ rank: 0, title: `No recorded failure was found${names.length ? ' for ' + names.join(', ') : '; no job or object name was recognized'}.`, evidence: [
+				`Searched ${views.join(', ')} for ${runs.scopes.map(scopeName).join(', ') || 'no recognizable job name'}, in the requested ${options.since ?? '24h'} window and (for named jobs/objects) up to 5 latest runs without a time filter.`,
+				`Owner scope for compile errors and invalid objects: ${owners.join(', ')}. No matching run history, compiler errors or invalid objects were returned; unavailable views and caps are listed in the evidence.`,
+			] });
+			diagnosis.suggestions.push('Try a wider window, for example --since 30d, to inspect more history; the latest-run lookup is limited to 5 rows.', 'Check the spelling and provide OWNER.JOB_NAME or OWNER.OBJECT_NAME to remove owner ambiguity.', 'The job may have been dropped or may belong to an owner this account cannot see; ask the DBA to confirm its owner and retained scheduler history.');
+		}
+	}
+	for (const hypothesis of hypotheses) hypothesis.evidence = unique([...hypothesis.evidence, ...runs.notes]).filter(e => e.trim());
 	hypotheses.forEach((h, i) => { h.rank = i + 1; });
 	const graph: PlsqlGraph = { nodes: [], edges: [] };
 	const node = (id: string, kind: PlsqlGraph['nodes'][number]['kind'], label: string) => { if (!graph.nodes.some(n => n.id === id)) graph.nodes.push({ id, kind, label }); return id; };
@@ -175,8 +200,8 @@ const evidenceText = (value: string) => { const m = /^([\s\S]*?:\s*)((?:DELETE|U
 const block = (language: string, value: string) => '```' + language + '\n' + value.replace(/`/g, 'ˋ') + '\n```';
 export function renderTriageMarkdown(result: TriageResult): string {
 	return [`# Issue triage: ${safe(result.target)}`, 'Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Credential-looking literals are redacted; ordinary business literals are preserved; graph call associations and statement ranges are heuristic.', ...(result.scan ? [`Scan cap: ${result.scan.cap}; ${result.scan.truncated ? 'partial' : 'complete within visible window'}.`, ...result.scan.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)} ${c.attempts.map(a => a.code).join(', ')} (${c.rows.length} rows)`)] : []), ...result.issues.map((issue, i) => [
-		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ')}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
-		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.map(e => '- ' + evidenceText(e)).join('\n')}`),
+		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ') || 'none'}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
+		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.filter(e => e.trim()).map(e => '- ' + evidenceText(e)).join('\n')}`),
 		'### Limitations', ...(issue.limitations.length ? issue.limitations.map(safe) : ['No additional limitations identified; view failures and caps are reported below.']), '### Concurrency review', ...(issue.concurrency.length ? issue.concurrency.map(safe) : ['No supported concurrent child-insert path identified from the available source and job evidence.']), '### Suggested fixes (not executed)', 'Suggestions for a developer; no changes were run.', ...(issue.suggestions.length ? issue.suggestions.map(s => '- ' + safe(s)) : ['Inspect the unavailable source and raising condition before choosing a remediation; preserve exception/backtrace logging without credentials.']), '### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${inline(e.statement)}\n\n${e.source.length ? block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n')) : 'Source unavailable; historical job_action and raising condition cannot be inspected.'}`),
 		'### Evidence', ...issue.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)}${c.truncated ? '; row cap reached (partial)' : ''}${c.attempts.map(a => `; ${a.view} ${a.code}`).join('')}\n\n${c.rows.length ? '| ' + c.columns.map(safe).join(' | ') + ' |\n| ' + c.columns.map(() => '---').join(' | ') + ' |\n' + c.rows.map(r => '| ' + r.map(safe).join(' | ') + ' |').join('\n') : c.label.startsWith('Source around') ? 'See the redacted frame excerpt above; source was collected through the bounded dictionary reader.' : 'No rows returned; absence is limited to visible evidence.'}`),
 		'### Local error guide', ...issue.guide.map(g => `${g.code}: ${g.meaning}. Typical causes: ${g.causes} Read-only checks: ${g.checks}`),
@@ -186,6 +211,8 @@ export function renderTriageMarkdown(result: TriageResult): string {
 }
 function lookFor(check: Check): string {
 	if (check.label.startsWith('Current child')) return 'Look for a nonzero CHILD_ROWS count: children currently reference parents eligible for the parent operation; zero does not disprove a past boundary race.';
+	if (check.label.startsWith('Latest scheduler runs')) return 'These are the latest retained runs without a time filter, capped at 5; check OUTSIDE_WINDOW and the last-run timestamp before treating an old failure as current.';
+	if (check.label.startsWith('Owners for named object')) return 'Look for the named object in the returned owners; compile diagnostics follow those owners rather than the default schema.';
 	if (check.label.includes('run history')) return 'Look for FAILED runs, their exact error stack and start time; compare repeated failures with the reported incident window.';
 	if (check.label.startsWith('Source around')) return 'Look for the raising statement and the enclosing subprogram; compare the child and parent selection predicates and their evaluation times.';
 	if (check.label.includes('concurrency')) return 'Look for job entry points that insert child rows, then verify whether their keys can refer to the same eligible parents.';
