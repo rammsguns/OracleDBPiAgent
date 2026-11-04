@@ -32,6 +32,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		for (const pattern of [...test.expect.requiredFacts, ...test.expect.forbiddenClaims]) new RegExp(pattern, 'i');
 		if (test.expect.mustRefuse && (test.groundTruth || test.expect.requiredTools.some(tool => ['run_query', 'explain_plan'].includes(tool)))) throw new Error('Refusal must not execute SQL');
 		if (test.groundTruth) {
+			if (!['scalar', 'allCells', 'rowCells'].includes(test.groundTruth.mode)) throw new Error('Unknown truth mode');
 			classifySql(test.groundTruth.sql);
 			if (test.groundTruth.setupSql) {
 				classifySql(test.groundTruth.setupSql);
@@ -48,9 +49,11 @@ export function checkHardCases(cases: EvalCase[]): void {
 	const challenge = cases.filter(test => test.split === 'challenge');
 	if (challenge.length) {
 		const expectedCategories = ['multi-step-diagnosis', 'column-traps', 'false-premises', 'ambiguity', 'multi-turn-dependency', 'wide-exact'];
-		if (challenge.length !== 12 || expectedCategories.some(category => challenge.filter(test => test.category === category).length !== 2)) throw new Error('Challenge needs two cases in each of six categories');
+		if (challenge.filter(test => test.id.startsWith('hard-p11-')).length !== 12 || expectedCategories.some(category => challenge.filter(test => test.id.startsWith('hard-p11-') && test.category === category).length !== 2)) throw new Error('Challenge needs two cases in each of six categories');
+		const harder = challenge.filter(test => test.id.startsWith('hard-p11b-'));
+		if (harder.length && (harder.length !== 10 || ['sql-semantics', 'long-diagnosis', 'conflicting-evidence', 'partial-grants'].some(category => !harder.some(test => test.category === category)))) throw new Error('Harder challenge needs ten cases covering four categories');
 		for (const test of challenge) {
-			if (!test.groundTruth || test.groundTruth.mode !== 'allCells') throw new Error('Challenge needs allCells truth');
+			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells') throw new Error('Challenge needs rowCells truth');
 			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
 		}
 	}
@@ -72,8 +75,13 @@ export function checkPinnedFacts(test: EvalCase, rows: unknown[][]): void {
 export function checkChallengeRows(test: EvalCase, rows: unknown[][]): void {
 	if (test.split !== 'challenge') return;
 	if (test.category === 'wide-exact' && (rows.length < 8 || new Set(rows.map(row => String(row[0]))).size !== rows.length)) throw new Error(`Challenge needs at least eight distinct records: ${test.id}`);
-	if (test.id === 'hard-p11-sales-primary-key' && !/^PK_CONSTRAINTS=0 \/ /.test(String(rows[0]?.[0]))) throw new Error('SALES primary-key premise changed');
-	if (test.id === 'hard-p11-commission-zero' && !/^NULL_COMMISSION=[1-9]\d* \/ ZERO_COMMISSION=0 \/ POSITIVE_COMMISSION=[1-9]\d*$/.test(String(rows[0]?.[0]))) throw new Error('Commission premise changed');
+	if (test.id === 'hard-p11b-salary-ties' && (rows.length <= 3 || !rows.some((row, i) => rows.some((other, j) => i !== j && row[2] === other[2])))) throw new Error('Salary tie prerequisite changed');
+	if (test.id === 'hard-p11b-timestamp-boundary' && !(Number(rows[0]?.[0]) > Number(rows[0]?.[1]))) throw new Error('Date boundary prerequisite changed');
+	if (test.id === 'hard-p11b-commission-denominators' && !rows.some(row => Number(row[1]) > Number(row[2]) && Number(row[3]) !== Number(row[4]))) throw new Error('NULL denominator prerequisite changed');
+	if (test.id === 'hard-p11b-nullable-manager' && !rows.some(row => row[1] === 0 && row[3] === 'NONE')) throw new Error('Empty department prerequisite changed');
+	if (test.id === 'hard-p11b-stats-grain' && !(Number(rows[0]?.[1]) > Number(rows[0]?.[2]))) throw new Error('History grain prerequisite changed');
+	if (test.id === 'hard-p11-sales-primary-key' && Number(rows[0]?.[0]) !== 0) throw new Error('SALES primary-key premise changed');
+	if (test.id === 'hard-p11-commission-zero' && !(Number(rows[0]?.[0]) > 0 && Number(rows[0]?.[1]) === 0 && Number(rows[0]?.[2]) > 0)) throw new Error('Commission premise changed');
 }
 
 /** A missing grant is a prerequisite, not an arbitrary connection/query failure. */
@@ -103,6 +111,10 @@ export async function validateHardCases(input?: EvalCase[]) {
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
+				if (test.category === 'partial-grants') {
+					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$PARAMETER' : 'V_$RMAN_BACKUP_JOB_DETAILS';
+					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${view} WHERE ROWNUM=1`));
+				}
 				if (test.category === 'grant-limited-p1') {
 					for (const row of rows) {
 						const view = row[0];

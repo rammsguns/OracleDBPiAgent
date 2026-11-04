@@ -1,0 +1,330 @@
+[
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 1,
+    "answer": "Here are the live `CUSTOMERS` row counts across all three accessible schemas on **d1-19c-lab**:\n\n| Record |\n|--------|\n| OWNER=CO / TABLE=CUSTOMERS / ROWS=392 |\n| OWNER=OE / TABLE=CUSTOMERS / ROWS=319 |\n| OWNER=SH / TABLE=CUSTOMERS / ROWS=55500 |\n\nEach count was obtained via `COUNT(*)` against the fully-qualified table name (`<schema>.CUSTOMERS`) — no default-schema resolution was used.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 1,
+    "answer": "Neither schema has a column literally named `STATUS`. Both use **`ORDER_STATUS`**, but with different representations:\n\n| # | OWNER | COLUMN | TYPE | NULLABLE |\n|---|-------|--------|------|----------|\n| 1 | CO | ORDER_STATUS | VARCHAR2(40) | N |\n| 2 | OE | ORDER_STATUS | NUMBER(22) | Y |\n\n**Key differences:**\n\n- **CO.ORDERS.ORDER_STATUS** — a `VARCHAR2(40)` with a `NOT NULL` constraint (`SYS_C007905`) and a check constraint (`ORDERS_STATUS_C`). Status values are stored as text strings.\n- **OE.ORDERS.ORDER_STATUS** — a `NUMBER(22)` with **no** NOT NULL constraint (only `CUSTOMER_ID` and `ORDER_DATE` have NN constraints). Status values are stored as numeric codes and may be null.\n\n(Source: `describe_object`, target **d1-19c-lab**.)",
+    "toolCalls": [
+      "describe_object",
+      "describe_object"
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 1,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Key observations:**\n\n- **Columns used:** `CALENDAR_YEAR` (filter), `CALENDAR_QUARTER_DESC` (group/label), `FISCAL_YEAR` (min/max aggregate), `TIME_ID` (distinct date count).\n- All four calendar quarters in CY 2000 fall entirely within fiscal year 2000, so min = max = 2000 for every quarter.\n- The distinct-date totals (91 + 91 + 92 + 92 = **366**) confirm 2000 is a leap year.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 1,
+    "answer": "## Result\n\n**Target:** `p1-19c-prod`  \n**SQL_ID:** `6scf5afs3262d`, **child_number:** 0  \n**Statement:** `SELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011`\n\n(The other candidate, `4dbj5kdmmdpak`, was excluded because it is a dictionary query whose text merely *searches for* the string `p11_order_probe`.)\n\n---\n\n### Cached Plan Tree (from `v$sql_plan`)\n\n| LINE | PARENT | DEPTH | OP | OPTIONS |\n|------|--------|-------|----|---------|\n| 0 | ROOT | 0 | SELECT STATEMENT | NONE |\n| 1 | 0 | 1 | INDEX | UNIQUE SCAN |\n\n---\n\n### Notes\n\n- **Source:** `v$sql_plan` columns `ID`, `PARENT_ID`, `DEPTH`, `OPERATION`, `OPTIONS` — the static optimizer-chosen plan structure. This is **not** measured runtime data (which would require `v$sql_plan_statistics_all` or `V$SQL_PLAN_MONITOR`).\n- The index name visible in the formatted plan output (`SYS_C007661`) corresponds to the unique constraint/index backing the `ORDER_ID` primary key; `v$sql_plan` stores it in the `OBJECT_NAME` column (not shown above because the requested columns were OPERATION and OPTIONS).",
+    "toolCalls": [
+      "run_query",
+      "explain_plan",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 1,
+    "answer": "**Premise corrected.** On **d1-19c-lab**, `HR.EMPLOYEES` stores employees without commission as **NULL**, not zero. There are no rows with `COMMISSION_PCT = 0`.\n\n| NULL_COMMISSION | ZERO_COMMISSION | POSITIVE_COMMISSION |\n|---|---|---|\n| 72 | 0 | 35 |\n\nThe correct filter for \"no commission\" is `commission_pct IS NULL`, not `commission_pct = 0`.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 1,
+    "answer": "The premise is **false**: SH.SALES on **d1-19c-lab** has **no declared primary key**.\n\nFrom `describe_object` (SH.SALES), the constraint list contains only:\n- **Type `R` (referential / foreign-key) constraints — 5:** `SALES_CHANNEL_FK`, `SALES_CUSTOMER_FK`, `SALES_PRODUCT_FK`, `SALES_PROMO_FK`, `SALES_TIME_FK`\n- **Type `C` (check/NOT NULL) constraints — 7:** `SYS_C007748`–`SYS_C007754`\n\nThere is **no constraint of type `P`**, so no primary key is declared. I did not infer one from any index or business key — and notably every index on the table (`SALES_*_BIX`) is **NONUNIQUE**, so there isn't even a unique index backing a PK. The five FK columns (PROD_ID, CUST_ID, TIME_ID, CHANNEL_ID, PROMO_ID) are a plausible composite business key, but that is *not* a declared primary key.\n\n```\nPK_CONSTRAINTS=0\nFK_CONSTRAINTS=5\n```",
+    "toolCalls": [
+      "describe_object"
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 1,
+    "answer": "Here is the full trace from `SHOPAPP.ORDERS` to its customer parent, backed by dictionary views on **p1-19c-prod**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `CUSTOMER_ID` (on `SHOPAPP.ORDERS`) |\n| **FK constraint name** | `SYS_C007662` |\n| **Parent table** | `SHOPAPP.CUSTOMERS` |\n| **Referenced constraint** | `SYS_C007649` (type **P** — Primary Key) |\n| **Backing index** | `SYS_C007649` |\n| **Index uniqueness** | `UNIQUE` |\n| **Indexed position** | 1 |\n| **Parent column** | `CUSTOMER_ID` |\n| **Data type** | `NUMBER` (no precision/scale declared; max storage 22 bytes) |\n\n### How it was traced (dictionary path)\n\n1. **ALL_CONSTRAINTS + ALL_CONS_COLUMNS** → found the `R`-type FK on ORDERS and its `R_OWNER`/`R_CONSTRAINT_NAME` pointing to `SHOPAPP.CUSTOMERS` / `SYS_C007649`.\n2. **ALL_INDEXES** → confirmed a `UNIQUE` index on `CUSTOMERS` whose columns exactly match the PK constraint columns (position-aligned via `ALL_IND_COLUMNS`).\n3. **ALL_TAB_COLUMNS** → retrieved the parent column's declared type.\n\nThe index name happens to equal the constraint name (`SYS_C007649`) because Oracle auto-creates a system-named unique index for a PK constraint — this was confirmed by joining on column name *and* position, not by assuming name equality.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 1,
+    "answer": "Here is the full resolution chain for the FK on `OE.WAREHOUSES`:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `LOCATION_ID` (position 1) |\n| **Parent owner** | `HR` |\n| **Parent table** | `LOCATIONS` |\n| **Referenced constraint** | `LOC_ID_PK` (Primary Key, ENABLED) |\n| **Backing index** | `LOC_ID_PK` (owned by HR) |\n| **Index uniqueness** | UNIQUE |\n| **Indexed position** | 1 |\n| **Indexed column** | `LOCATION_ID` |\n| **Column type** | NUMBER |\n\nThe FK `WAREHOUSES_LOCATION_FK` in schema **OE** crosses into schema **HR**, referencing the primary key of `HR.LOCATIONS`. The backing index is the auto-created unique index `HR.LOC_ID_PK` on a single column (`LOCATION_ID NUMBER`).",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 1,
+    "answer": "For **Department 80 – Sales** (2nd in the employee-count ranking, target: **d1-19c-lab**):\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Name | Sales |\n| Employee Count | 34 |\n| Exact Salary Total | 304,500 |\n| Manager Full Name | John Russell |",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 1,
+    "answer": "Second-ranked warehouse (by total quantity on hand from the previous turn) is **warehouse_id 6 — Sydney**. Following its location relationships:\n\n| Field | Value |\n|-------|-------|\n| Warehouse ID | 6 |\n| Warehouse Name | Sydney |\n| City | Sydney |\n| Country Name | Australia |\n| Region Name | Asia |\n\nNote on this target (d1-19c-lab): the OE schema here does **not** contain `LOCATIONS`, `COUNTRIES`, or `REGIONS` — those tables reside in the **HR** schema. The relationship chain used was:\n\n`oe.warehouses.location_id → hr.locations.location_id → hr.countries.country_id → hr.regions.region_id`\n\n(An initial all-OE join failed with ORA-00942 because those location tables aren't present in OE on this instance.)",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "list_objects",
+      "list_objects",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 1,
+    "answer": "Here are all 19 job definitions from **HR.JOBS** on **d1-19c-lab**, ordered by JOB_ID:\n\n| # | Record |\n|---|--------|\n| 1 | JOB=AC_ACCOUNT / MIN=4200 / MAX=9000 |\n| 2 | JOB=AC_MGR / MIN=8200 / MAX=16000 |\n| 3 | JOB=AD_ASST / MIN=3000 / MAX=6000 |\n| 4 | JOB=AD_PRES / MIN=20080 / MAX=40000 |\n| 5 | JOB=AD_VP / MIN=15000 / MAX=30000 |\n| 6 | JOB=FI_ACCOUNT / MIN=4200 / MAX=9000 |\n| 7 | JOB=FI_MGR / MIN=8200 / MAX=16000 |\n| 8 | JOB=HR_REP / MIN=4000 / MAX=9000 |\n| 9 | JOB=IT_PROG / MIN=4000 / MAX=10000 |\n| 10 | JOB=MK_MAN / MIN=9000 / MAX=15000 |\n| 11 | JOB=MK_REP / MIN=4000 / MAX=9000 |\n| 12 | JOB=PR_REP / MIN=4500 / MAX=10500 |\n| 13 | JOB=PU_CLERK / MIN=2500 / MAX=5500 |\n| 14 | JOB=PU_MAN / MIN=8000 / MAX=15000 |\n| 15 | JOB=SA_MAN / MIN=10000 / MAX=20080 |\n| 16 | JOB=SA_REP / MIN=6000 / MAX=12008 |\n| 17 | JOB=SH_CLERK / MIN=2500 / MAX=5500 |\n| 18 | JOB=ST_CLERK / MIN=2008 / MAX=5000 |\n| 19 | JOB=ST_MAN / MIN=5500 / MAX=8500 |\n\n**Total: 19 jobs** — all rows in HR.JOBS, regardless of whether any employee currently holds them.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 1,
+    "answer": "Here are all 21 product subcategories in the SH schema on **d1-19c-lab**, with product row counts (all products counted regardless of sales activity):\n\n| SUBCATEGORY | PRODUCTS |\n|---|---|\n| Accessories | 10 |\n| Bulk Pack Diskettes | 2 |\n| CD-ROM | 6 |\n| Camcorders | 1 |\n| Camera Batteries | 5 |\n| Camera Media | 3 |\n| Cameras | 1 |\n| Desktop PCs | 1 |\n| Documentation | 6 |\n| Game Consoles | 1 |\n| Home Audio | 2 |\n| Memory | 2 |\n| Modems/Fax | 2 |\n| Monitors | 2 |\n| Operating Systems | 1 |\n| Portable PCs | 1 |\n| Printer Supplies | 4 |\n| Recordable CDs | 7 |\n| Recordable DVD Discs | 5 |\n| Y Box Accessories | 2 |\n| Y Box Games | 8 |\n\n**Total: 72 product definitions across 21 subcategories.**\n\nNote: This SH instance does not have a separate `PRODUCT_SUBCATEGORIES` dimension table; the subcategory name is stored directly in `SH.PRODUCTS.PROD_SUBCATEGORY`, so grouping on that column gives every subcategory that has at least one product definition.",
+    "toolCalls": [
+      "run_query",
+      "list_objects",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 2,
+    "answer": "Here are the three accessible `CUSTOMERS` tables on **d1-19c-lab**, each with its live count:\n\n| Record |\n|--------|\n| OWNER=CO / TABLE=CUSTOMERS / ROWS=392 |\n| OWNER=OE / TABLE=CUSTOMERS / ROWS=319 |\n| OWNER=SH / TABLE=CUSTOMERS / ROWS=55500 |\n\nAll three schemas contain a `CUSTOMERS` table with different row counts, confirming the ambiguity. The SH schema's table is by far the largest (55,500 rows), consistent with its role as the sales-history sample. CO and OE hold smaller customer sets typical of their respective sample workloads.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 2,
+    "answer": "Both schemas have a column named **ORDER_STATUS**, but their representations differ significantly:\n\n| | CO | OE |\n|---|---|---|\n| **OWNER** | CO | OE |\n| **COLUMN** | ORDER_STATUS | ORDER_STATUS |\n| **TYPE** | VARCHAR2(40) | NUMBER |\n| **NULLABLE** | N | Y |\n\n### Key differences\n\n- **CO.ORDERS.ORDER_STATUS** — `VARCHAR2(40)`, **NOT NULL** (enforced by check constraint `SYS_C007905`). Values are text labels like `'Received'`, `'Shipped'`, etc.\n- **OE.ORDERS.ORDER_STATUS** — `NUMBER`, **NULLABLE** (no NOT NULL constraint listed). Values are numeric codes (e.g., 1–8 corresponding to order lifecycle stages).\n\nThese are not interchangeable: CO stores human-readable strings while OE stores numeric status codes, and OE permits NULLs where CO does not.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object"
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 2,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Key observations:**\n\n- **Columns used:** `CALENDAR_YEAR` for filtering (not `FISCAL_YEAR`), `CALENDAR_QUARTER_DESC` for grouping, and `FISCAL_YEAR` for the min/max aggregates.\n- All four calendar quarters in CY 2000 fall entirely within fiscal year 2000 (min = max = 2000), meaning the SH sample calendar and fiscal calendars align for this year.\n- The total distinct dates across all quarters is **366**, confirming 2000 was a leap year.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 2,
+    "answer": "## Result\n\n**SQL_ID:** `6scf5afs3262d`, child_number 0 (lowest SQL_ID, lowest child number)\n\n**Text (not executed):**\n```sql\nSELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011\n```\n\n**Plan hash value:** 1672001257\n\n### Plan tree (from `explain_plan`, target `p1-19c-prod`)\n\nThe plan-view columns returned by the tool are: **Id, Operation, Name, Rows, Bytes, Cost (%CPU), Time**. There is no separate `OPTIONS` column in this output; the \"UNIQUE\" qualifier is embedded within the `Operation` value itself. The `Rows`, `Bytes`, `Cost (%CPU)`, and `Time` values are **optimizer estimates**, not measured runtime statistics.\n\n| LINE | PARENT | DEPTH | OP | OPTIONS |\n|------|--------|-------|----|---------|\n| 0 | ROOT | 0 | SELECT STATEMENT | NONE |\n| 1 | 0 | 1 | INDEX UNIQUE SCAN | NONE |\n\n**Additional detail from the plan view:**\n\n- **Name** (line 1): `SYS_C007661` — the unique index backing the primary-key constraint on `SHOPAPP.ORDERS(ORDER_ID)`.\n- **Predicate Information** (operation id 1): `access(\"ORDER_ID\"=(-110011))` — an equality access predicate pushed into the index scan.\n\nNo table access occurs; the query is satisfied entirely from the index (index-only scan, no TABLE ACCESS BY INDEX ROWID step), consistent with selecting only the indexed column.",
+    "toolCalls": [
+      "run_query",
+      "explain_plan"
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 2,
+    "answer": "Your premise is **incorrect**. On `d1-19c-lab`, employees without commission are stored with `COMMISSION_PCT` as **NULL**, not zero — the zero bucket is empty (0 rows).\n\n**Result (one record):**\n\n```\nNULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35\n```\n\n- Source: single conditional-aggregation query against `HR.EMPLOYEES` via `run_query` on target **d1-19c-lab**.\n- Correction: \"no commission\" is represented by `COMMISSION_PCT IS NULL` (72 employees), not `= 0`. If your application logic filters on `commission_pct = 0` to find non-commissioned staff, it will match nothing; use `commission_pct IS NULL` instead.\n- Sanity check: 72 + 0 + 35 = 107, consistent with the full employee row count (no negative values fall outside the three buckets).",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 2,
+    "answer": "Verified against the data dictionary on **d1-19c-lab** (`ALL_CONSTRAINTS` / `ALL_CONS_COLUMNS`).\n\n**Premise check — no primary key is declared.** The query filtering for `constraint_type = 'P'` on `SH.SALES` returned **zero rows**, and the constraint-type breakdown for the table shows only:\n- `C` (check constraints): 7\n- `R` (referential / foreign-key constraints): 5\n\nThere is no `P` row, so SH.SALES has **no declared primary key**. I am not inferring one from any index or business key (e.g., the time/product/customer/channel combination) — none is declared as a PK constraint.\n\n**Foreign keys:** 5 declared referential (`R`) constraints.\n\n```\nPK_CONSTRAINTS=0\nFK_CONSTRAINTS=5\n```",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 2,
+    "answer": "Here is the complete trace from `SHOPAPP.ORDERS` to its indexed parent columns, based entirely on data-dictionary evidence from **p1-19c-prod**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `CUSTOMER_ID` (on `SHOPAPP.ORDERS`) |\n| **FK constraint name** | `SYS_C007662` |\n| **Parent table** | `SHOPAPP.CUSTOMERS` |\n| **Referenced constraint** | `SYS_C007649` (type **P** — Primary Key) |\n| **Backing index** | `SYS_C007649` (system-generated, same name as the constraint) |\n| **Index uniqueness** | **UNIQUE** |\n| **Indexed position** | 1 |\n| **Parent column** | `CUSTOMER_ID` |\n| **Data type** | `NUMBER` (length 22, no precision/scale specified → unconstrained NUMBER) |\n\n**Key observations:**\n\n- The FK constraint name (`SYS_C007662`) and the PK constraint name (`SYS_C007649`) are both system-generated; they do **not** share a name, confirming the importance of using `R_OWNER`/`R_CONSTRAINT_NAME` rather than assuming name matching.\n- The backing index happens to carry the same name as the PK constraint (Oracle's default for system-created PK indexes), and it is a single-column UNIQUE index on `CUSTOMERS.CUSTOMER_ID`.\n- Both sides of the FK use `NUMBER` with no declared precision/scale, so there is no implicit conversion risk at the join.",
+    "toolCalls": [
+      "run_query",
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 2,
+    "answer": "Here is the full resolution chain on **d1-19c-lab**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `OE.WAREHOUSES.LOCATION_ID` (position 1 in FK) |\n| **FK constraint** | `OE.WAREHOUSES_LOCATION_FK` |\n| **Parent owner / table** | **HR**.LOCATIONS |\n| **Referenced constraint** | `HR.LOC_ID_PK` (type **P** — Primary Key) |\n| **Backing index** | `HR.LOC_ID_PK` |\n| **Index uniqueness** | UNIQUE |\n| **Index status** | VALID |\n| **Indexed position** | 1 |\n| **Indexed column** | `LOCATION_ID` |\n| **Column type** | NUMBER |\n\nAs the tool metadata warned, the parent is **not** in OE — it lives in the **HR** schema. The FK's `R_OWNER`/`R_CONSTRAINT_NAME` columns in `ALL_CONSTRAINTS` were the authoritative link; no inference was needed.",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 2,
+    "answer": "For **Department 80 – Sales** (2nd in the employee-count ranking, target **d1-19c-lab**):\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Name | Sales |\n| Employee Count | 34 |\n| Salary Total | 304,500 |\n| Manager Full Name | John Russell |",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 2,
+    "answer": "The second-ranked warehouse (by total quantity on hand) has these location details:\n\n| Field | Value |\n|-------|-------|\n| **Warehouse ID** | 6 |\n| **Name** | Sydney |\n| **City** | Sydney |\n| **Country Name** | Australia |\n| **Region Name** | Asia |\n\nThe relationship chain followed was:\n`OE.WAREHOUSES.location_id` → `HR.LOCATIONS` → `HR.COUNTRIES` (via `country_id`) → `HR.REGIONS` (via `region_id`).",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 2,
+    "answer": "Here are all 19 job definitions from **HR.JOBS** on **d1-19c-lab**, ordered by `JOB_ID`:\n\n```\nJOB=AC_ACCOUNT / MIN=4200 / MAX=9000\nJOB=AC_MGR / MIN=8200 / MAX=16000\nJOB=AD_ASST / MIN=3000 / MAX=6000\nJOB=AD_PRES / MIN=20080 / MAX=40000\nJOB=AD_VP / MIN=15000 / MAX=30000\nJOB=FI_ACCOUNT / MIN=4200 / MAX=9000\nJOB=FI_MGR / MIN=8200 / MAX=16000\nJOB=HR_REP / MIN=4000 / MAX=9000\nJOB=IT_PROG / MIN=4000 / MAX=10000\nJOB=MK_MAN / MIN=9000 / MAX=15000\nJOB=MK_REP / MIN=4000 / MAX=9000\nJOB=PR_REP / MIN=4500 / MAX=10500\nJOB=PU_CLERK / MIN=2500 / MAX=5500\nJOB=PU_MAN / MIN=8000 / MAX=15000\nJOB=SA_MAN / MIN=10000 / MAX=20080\nJOB=SA_REP / MIN=6000 / MAX=12008\nJOB=SH_CLERK / MIN=2500 / MAX=5500\nJOB=ST_CLERK / MIN=2008 / MAX=5000\nJOB=ST_MAN / MIN=5500 / MAX=8500\n```\n\nAll 19 rows from the `HR.JOBS` table are included (not just those referenced by employees), each as a single record in the requested format.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 2,
+    "answer": "Counted product rows directly from `SH.PRODUCTS` (which carries `PROD_SUBCATEGORY`), grouped by subcategory — no join to SALES, so products with no sales are included. Source: `run_query` on **d1-19c-lab**. The 21 subcategory counts sum to 72, matching the table's NUM_ROWS.\n\nSUBCATEGORY=Accessories / PRODUCTS=10\nSUBCATEGORY=Bulk Pack Diskettes / PRODUCTS=2\nSUBCATEGORY=CD-ROM / PRODUCTS=6\nSUBCATEGORY=Camcorders / PRODUCTS=1\nSUBCATEGORY=Camera Batteries / PRODUCTS=5\nSUBCATEGORY=Camera Media / PRODUCTS=3\nSUBCATEGORY=Cameras / PRODUCTS=1\nSUBCATEGORY=Desktop PCs / PRODUCTS=1\nSUBCATEGORY=Documentation / PRODUCTS=6\nSUBCATEGORY=Game Consoles / PRODUCTS=1\nSUBCATEGORY=Home Audio / PRODUCTS=2\nSUBCATEGORY=Memory / PRODUCTS=2\nSUBCATEGORY=Modems/Fax / PRODUCTS=2\nSUBCATEGORY=Monitors / PRODUCTS=2\nSUBCATEGORY=Operating Systems / PRODUCTS=1\nSUBCATEGORY=Portable PCs / PRODUCTS=1\nSUBCATEGORY=Printer Supplies / PRODUCTS=4\nSUBCATEGORY=Recordable CDs / PRODUCTS=7\nSUBCATEGORY=Recordable DVD Discs / PRODUCTS=5\nSUBCATEGORY=Y Box Accessories / PRODUCTS=2\nSUBCATEGORY=Y Box Games / PRODUCTS=8\n\nNote: my first attempt joined `SH.PRODUCT_SUBCATEGORIES` and returned ORA-00942 (that dimension table isn't readable by HARNESS_LAB on this target), so I used the denormalized `PROD_SUBCATEGORY` column on `PRODUCTS` instead. This lists every subcategory that has at least one product definition; if you specifically need subcategories with zero products to also appear, that would require access to the `PRODUCT_SUBCATEGORIES` dimension table, which is not granted here.",
+    "toolCalls": [
+      "run_query",
+      "list_objects",
+      "describe_object",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-customers-scope",
+    "iteration": 3,
+    "answer": "Here are the live `CUSTOMERS` row counts across all three accessible schemas on **d1-19c-lab**:\n\n| OWNER | TABLE | ROWS |\n|-------|-------|------|\n| CO | CUSTOMERS | 392 |\n| OE | CUSTOMERS | 319 |\n| SH | CUSTOMERS | 55,500 |\n\nEach is a distinct table in its own schema — no default-schema substitution was used.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-orders-status-scope",
+    "iteration": 3,
+    "answer": "Here are the results from **d1-19c-lab**, confirmed via `ALL_TAB_COLUMNS`:\n\n| # | OWNER | COLUMN | TYPE | NULLABLE |\n|---|-------|--------|------|----------|\n| 1 | CO | ORDER_STATUS | VARCHAR2(40) | N |\n| 2 | OE | ORDER_STATUS | NUMBER | Y |\n\n### Key differences\n\n- **CO.ORDERS.ORDER_STATUS** — `VARCHAR2(40)`, **NOT NULL**. It is further constrained by a check constraint (`ORDERS_STATUS_C`) limiting it to specific text values (e.g. 'Shipped', 'Received', etc.).\n- **OE.ORDERS.ORDER_STATUS** — `NUMBER`, **nullable**. It stores numeric codes (1–8 in the sample data) with no NOT NULL or CHECK constraint enforcing a domain.\n\nA status value from one schema cannot be assumed to map directly to the other: CO uses descriptive strings, OE uses opaque numeric codes.",
+    "toolCalls": [
+      "describe_object",
+      "describe_object",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-fiscal-calendar",
+    "iteration": 3,
+    "answer": "Here are the results from **SH.TIMES** on **d1-19c-lab**, filtered on `CALENDAR_YEAR = 2000`:\n\n| CALENDAR_QUARTER_DESC | MIN_FISCAL_YEAR | MAX_FISCAL_YEAR | DISTINCT_DATES |\n|---|---|---|---|\n| 2000-01 | 2000 | 2000 | 91 |\n| 2000-02 | 2000 | 2000 | 91 |\n| 2000-03 | 2000 | 2000 | 92 |\n| 2000-04 | 2000 | 2000 | 92 |\n\n**Notes:**\n\n- **Filter column:** `CALENDAR_YEAR` (not `FISCAL_YEAR`) was used to select dates in calendar year 2000, as requested.\n- **Quarter label:** `CALENDAR_QUARTER_DESC` (format `YYYY-QQ`).\n- **Distinct dates:** `COUNT(DISTINCT TIME_ID)` — the primary key of TIMES. The total is 366 (91+91+92+92), consistent with 2000 being a leap year.\n- In this sample dataset, the fiscal year for all calendar-2000 dates happens to equal 2000, so min and max are identical within each quarter.",
+    "toolCalls": [
+      "describe_object",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-plan-line-tree",
+    "iteration": 3,
+    "answer": "## Result\n\n**Target:** `p1-19c-prod`  \n**SQL_ID:** `6scf5afs3262d`, **child_number:** `0`  \n**Statement:** `SELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011`\n\n### Cached Plan Tree (from `V$SQL_PLAN`)\n\n| LINE | PARENT | DEPTH | OP | OPTIONS |\n|------|--------|-------|----|---------|\n| 0 | ROOT | 0 | SELECT STATEMENT | NONE |\n| 1 | 0 | 1 | INDEX | UNIQUE SCAN |\n\n### Notes\n\n- **Source columns used:** `ID`, `PARENT_ID`, `DEPTH`, `OPERATION`, `OPTIONS` from `V$SQL_PLAN` (the actual column names in the plan view).\n- **Plan structure vs. runtime:** This is the *optimizer-generated* plan tree (static structure). The `explain_plan` tool output additionally shows estimated `Rows`, `Bytes`, `Cost`, and `Time`—those are optimizer estimates, not measured runtime statistics. No execution statistics (e.g., from `V$SQL_PLAN_STATISTICS_ALL`) were requested or reported here.\n- The plan is minimal: a single `INDEX UNIQUE SCAN` on the primary-key index (`SYS_C007661`) at depth 1 under the root `SELECT STATEMENT`.",
+    "toolCalls": [
+      "run_query",
+      "explain_plan",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-commission-zero",
+    "iteration": 3,
+    "answer": "**Premise corrected.** On **d1-19c-lab**, `HR.EMPLOYEES` does **not** store employees without commission as `COMMISSION_PCT = 0`. It uses **NULL** for that case — there are zero rows with a literal zero value.\n\n| NULL_COMMISSION | ZERO_COMMISSION | POSITIVE_COMMISSION |\n|---|---|---|\n| 72 | 0 | 35 |\n\nSo the correct statement is: employees without commission have `COMMISSION_PCT IS NULL` (72 rows), not `= 0`.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-sales-primary-key",
+    "iteration": 3,
+    "answer": "Verified from the constraint metadata (`describe_object`, target **d1-19c-lab**, schema SH, table SALES).\n\n**Premise check — no primary key is declared.** The constraint list for `SH.SALES` contains no constraint of type `P`. So the assumption that a fact table must have a PK does not hold here: **there is no declared primary key on SH.SALES.** I am not inferring one from an index or a business key — and notably every index on the table (`SALES_PROD_BIX`, `SALES_CUST_BIX`, `SALES_TIME_BIX`, `SALES_CHANNEL_BIX`, `SALES_PROMO_BIX`) is `NONUNIQUE`, so no unique index backs a PK either.\n\n**Declared foreign-key constraints (type `R`), 5 total:**\n| Constraint | Column |\n|---|---|\n| SALES_PRODUCT_FK | PROD_ID |\n| SALES_CUSTOMER_FK | CUST_ID |\n| SALES_TIME_FK | TIME_ID |\n| SALES_CHANNEL_FK | CHANNEL_ID |\n| SALES_PROMO_FK | PROMO_ID |\n\n(The `SYS_C0077xx` entries are type `C` check/NOT-NULL constraints, not PKs or FKs, so they are excluded from both counts.)\n\n**Result:**\n```\nPK_CONSTRAINTS=0\nFK_CONSTRAINTS=5\n```",
+    "toolCalls": [
+      "describe_object"
+    ]
+  },
+  {
+    "id": "hard-p11-order-customer-key",
+    "iteration": 3,
+    "answer": "## FK Trace: SHOPAPP.ORDERS → CUSTOMERS\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `CUSTOMER_ID` |\n| **Parent table** | `SHOPAPP.CUSTOMERS` |\n| **Referenced constraint** | `SYS_C007649` (type **P** — Primary Key) |\n| **Backing index** | `SYS_C007649` |\n| **Index uniqueness** | **UNIQUE** |\n| **Indexed position** | 1 |\n| **Parent column** | `CUSTOMER_ID` |\n| **Parent data type** | `NUMBER` |\n\n### How the chain was traced (dictionary evidence)\n\n1. **ALL_CONSTRAINTS** (`SHOPAPP.ORDERS`, type `R`) → yielded `R_OWNER = SHOPAPP`, `R_CONSTRAINT_NAME = SYS_C007649`.\n2. **ALL_CONS_COLUMNS** on the FK → child column is `CUSTOMER_ID`.\n3. **ALL_CONSTRAINTS** for `SYS_C007649` → confirmed it's a Primary Key (`constraint_type = 'P'`) on `SHOPAPP.CUSTOMERS`.\n4. **ALL_INDEXES** matched by owner + table_name, then filtered to the index whose columns overlap the PK columns → backing index is also named `SYS_C007649` (Oracle auto-names the supporting index identically for system-generated PK constraints).\n5. **ALL_IND_COLUMNS** → position 1 = `CUSTOMER_ID`; **ALL_TAB_COLUMNS** → data type `NUMBER`.\n\nNo name-matching assumption was made — the join path is entirely through `R_CONSTRAINT_NAME` → constraint → index columns that overlap the PK's columns.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-warehouse-location-key",
+    "iteration": 3,
+    "answer": "Here is the full FK resolution chain for **OE.WAREHOUSES → parent**, queried on **d1-19c-lab**:\n\n| Attribute | Value |\n|-----------|-------|\n| **Child column** | `LOCATION_ID` (position 1 in FK `WAREHOUSES_LOCATION_FK`) |\n| **Parent owner / table** | **HR**.LOCATIONS *(not OE)* |\n| **Referenced constraint** | `LOC_ID_PK` (PRIMARY KEY, ENABLED) |\n| **Backing index** | `LOC_ID_PK` (owner HR) |\n| **Uniqueness** | UNIQUE |\n| **Indexed position** | 1 |\n| **Indexed column** | `LOCATION_ID` |\n| **Column type** | NUMBER |\n\n### How it was resolved\n\n1. **describe_object** on `OE.WAREHOUSES` revealed FK `WAREHOUSES_LOCATION_FK` on child column `LOCATION_ID`.\n2. **ALL_CONSTRAINTS** (`R_OWNER`, `R_CONSTRAINT_NAME`) pointed to **HR / LOC_ID_PK** — confirming the parent lives in the **HR** schema, not OE.\n3. **ALL_INDEXES + ALL_IND_COLUMNS + ALL_TAB_COLUMNS** confirmed the backing index `LOC_ID_PK` is a single-column UNIQUE index on `HR.LOCATIONS.LOCATION_ID (NUMBER)`.",
+    "toolCalls": [
+      "describe_object",
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-department",
+    "iteration": 3,
+    "answer": "For department **80 – Sales** (2nd in the employee-count ranking, target: **d1-19c-lab**):\n\n| Field | Value |\n|-------|-------|\n| Department ID | 80 |\n| Department Name | Sales |\n| Employee Count | 34 |\n| Exact Salary Total | 304,500 |\n| Manager Full Name | John Russell |",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-second-warehouse",
+    "iteration": 3,
+    "answer": "The second-ranked warehouse (by total quantity on hand) is **Sydney**, warehouse ID **6**. Following its location relationships (`WAREHOUSES.location_id → LOCATIONS`, `LOCATIONS.country_id → COUNTRIES`, `COUNTRIES.region_id → REGIONS`):\n\n| Field | Value |\n|-------|-------|\n| Warehouse ID | 6 |\n| Warehouse Name | Sydney |\n| City | Sydney |\n| Country Name | Australia |\n| Region Name | Asia |\n\nSource: `run_query` on d1-19c-lab, joining `OE.WAREHOUSES` → `HR.LOCATIONS` → `HR.COUNTRIES` → `HR.REGIONS`, filtered to `warehouse_id = 6`.",
+    "toolCalls": [
+      "run_query",
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-job-salary-bands",
+    "iteration": 3,
+    "answer": "Here are all 19 job definitions from **HR.JOBS** on **d1-19c-lab**, ordered by `JOB_ID`:\n\n| # | Result |\n|---|--------|\n| 1 | JOB=AC_ACCOUNT / MIN=4200 / MAX=9000 |\n| 2 | JOB=AC_MGR / MIN=8200 / MAX=16000 |\n| 3 | JOB=AD_ASST / MIN=3000 / MAX=6000 |\n| 4 | JOB=AD_PRES / MIN=20080 / MAX=40000 |\n| 5 | JOB=AD_VP / MIN=15000 / MAX=30000 |\n| 6 | JOB=FI_ACCOUNT / MIN=4200 / MAX=9000 |\n| 7 | JOB=FI_MGR / MIN=8200 / MAX=16000 |\n| 8 | JOB=HR_REP / MIN=4000 / MAX=9000 |\n| 9 | JOB=IT_PROG / MIN=4000 / MAX=10000 |\n| 10 | JOB=MK_MAN / MIN=9000 / MAX=15000 |\n| 11 | JOB=MK_REP / MIN=4000 / MAX=9000 |\n| 12 | JOB=PR_REP / MIN=4500 / MAX=10500 |\n| 13 | JOB=PU_CLERK / MIN=2500 / MAX=5500 |\n| 14 | JOB=PU_MAN / MIN=8000 / MAX=15000 |\n| 15 | JOB=SA_MAN / MIN=10000 / MAX=20080 |\n| 16 | JOB=SA_REP / MIN=6000 / MAX=12008 |\n| 17 | JOB=SH_CLERK / MIN=2500 / MAX=5500 |\n| 18 | JOB=ST_CLERK / MIN=2008 / MAX=5000 |\n| 19 | JOB=ST_MAN / MIN=5500 / MAX=8500 |\n\nAll 19 rows from the `HR.JOBS` table are included — this is the complete job catalog regardless of whether any employee currently holds the position.",
+    "toolCalls": [
+      "run_query"
+    ]
+  },
+  {
+    "id": "hard-p11-subcategory-counts",
+    "iteration": 3,
+    "answer": "Here are all product subcategories in the SH schema on **d1-19c-lab**, ordered by name (queried from `SH.PRODUCTS`, counting product rows only — no join to SALES):\n\n| SUBCATEGORY | PRODUCTS |\n|---|---|\n| Accessories | 10 |\n| Bulk Pack Diskettes | 2 |\n| CD-ROM | 6 |\n| Camcorders | 1 |\n| Camera Batteries | 5 |\n| Camera Media | 3 |\n| Cameras | 1 |\n| Desktop PCs | 1 |\n| Documentation | 6 |\n| Game Consoles | 1 |\n| Home Audio | 2 |\n| Memory | 2 |\n| Modems/Fax | 2 |\n| Monitors | 2 |\n| Operating Systems | 1 |\n| Portable PCs | 1 |\n| Printer Supplies | 4 |\n| Recordable CDs | 7 |\n| Recordable DVD Discs | 5 |\n| Y Box Accessories | 2 |\n| Y Box Games | 8 |\n\n**Total: 21 subcategories, 72 products.**",
+    "toolCalls": [
+      "run_query",
+      "list_objects",
+      "run_query"
+    ]
+  }
+]

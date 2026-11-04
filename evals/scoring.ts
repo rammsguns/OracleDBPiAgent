@@ -27,6 +27,8 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			// approximations and optimizer-statistics figures are not claims about the live count.
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
+		} else if (test.groundTruth.mode === 'rowCells') {
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(result.answer, row) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -41,4 +43,65 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		checks.push({ check: 'nonempty ground truth', pass: truth.length > 0 });
 	}
 	return { pass: checks.every(check => check.pass), checks };
+}
+
+/** Opt-in row matching. Structured fields match whole values, never fragments of
+ * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
+function rowMatches(answer: string, row: unknown[]): boolean {
+	if (!row.length || row.some(value => value == null)) return false;
+	const clean = (text: string) => text.replace(/[`*]/g, '').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
+	const decimal = (text: string) => {
+		const negative = text.startsWith('-');
+		const [integer = '', fraction = ''] = text.replace(/^[-+]/, '').split('.');
+		const magnitude = integer.replace(/^0+(?=\d)/, '') + (fraction.replace(/0+$/, '') ? '.' + fraction.replace(/0+$/, '') : '');
+		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
+	};
+	const same = (actual: string, expected: unknown) => {
+		const text = clean(actual).replace(/\s+\([^)]*\)\s*$/, ''), value = String(expected);
+		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
+		return text.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
+	};
+	const lines = answer.split(/\r?\n/).map(clean).flatMap(line => {
+		// Repeated record keys and adjacent markdown rows delimit separate records,
+		// even when a response puts them on one physical line.
+		const firstKey = /(?:^[-•]?\s*|[|;])\s*([A-Za-z_]+)\s*=/.exec(line)?.[1];
+		const records = firstKey ? line.split(new RegExp(`(?:[;,]\\s*|\\s+/\\s+|\\s*\\|\\s*)(?=${firstKey}\\s*=)`, 'i')) : [line];
+		return records.flatMap(record => record.split(/(?<=\S)\s*\|\s*\|\s*(?=\S)/));
+	});
+	// Column-oriented markdown tables are also records: transpose each contiguous table.
+	const candidates = [...lines];
+	for (let start = 0; start < lines.length; start++) {
+		if (!lines[start]!.startsWith('|')) continue;
+		const block: string[][] = [];
+		while (start < lines.length && lines[start]!.startsWith('|')) {
+			const cells = lines[start++]!.split('|').slice(1, -1).map(clean);
+			if (!cells.every(cell => /^:?-+:?$/.test(cell))) block.push(cells);
+		}
+		if (!/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
+		for (let col = 1; col < (block[0]?.length ?? 0); col++) candidates.push('|' + block.map(cells => cells[col] ?? '').join('|') + '|');
+	}
+	return candidates.some(line => {
+		const structured = /[|=]/.test(line) || / \/ /.test(line);
+		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
+		if (structured) {
+			const available = fields.flatMap(field => {
+				const value = field.replace(/\s+\([^)]*\)\s*$/, '');
+				return /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(value) ? value.split('.') : [value];
+			});
+			return row.every(value => { const index = available.findIndex(field => same(field, value)); if (index < 0) return false; available.splice(index, 1); return true; });
+		}
+		// Plain prose/list rows: consume distinct bounded occurrences on this line.
+		let remaining = line;
+		return row.every(value => {
+			const escaped = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const pattern = new RegExp(`(?<![\\w.])${escaped}(?!\\w|\\.\\d)`, 'i');
+			const match = numeric(String(value))
+				? [...remaining.matchAll(/(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)].find(candidate => same(candidate[0], value))
+				: pattern.exec(remaining);
+			if (!match) return false;
+			remaining = remaining.slice(0, match.index) + ' '.repeat(match[0].length) + remaining.slice(match.index + match[0].length);
+			return true;
+		});
+	});
 }

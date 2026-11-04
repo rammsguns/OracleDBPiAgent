@@ -14,7 +14,7 @@
 		},
 		"groundTruth": {
 			"sql": "SELECT calendar_quarter_desc,MIN(fiscal_year),MAX(fiscal_year),COUNT(DISTINCT time_id) FROM sh.times WHERE calendar_year=2000 GROUP BY calendar_quarter_desc ORDER BY calendar_quarter_desc",
-			"mode": "allCells"
+			"mode": "rowCells"
 		},
 		"question": "In SH.TIMES on d1, for dates in calendar year 2000, report the calendar quarter label and the minimum and maximum fiscal year within each quarter, plus the number of distinct dates. Order by calendar quarter label. Discover the actual calendar and fiscal columns before calculating /  do not substitute fiscal-year filtering for calendar-year filtering."
 	},
@@ -34,8 +34,8 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'LINE='||p.id||' / PARENT='||NVL(TO_CHAR(p.parent_id),'ROOT')||' / DEPTH='||p.depth||' / OP='||p.operation||' / OPTIONS='||NVL(p.options,'NONE') FROM v$sql_plan p WHERE (p.sql_id,p.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE UPPER(sql_text) LIKE 'SELECT /* P11_ORDER_PROBE */ ORDER_ID FROM SHOPAPP.ORDERS WHERE ORDER_ID = -110011%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) ORDER BY p.id",
-			"mode": "allCells",
+			"sql": "SELECT p.id,NVL(TO_CHAR(p.parent_id),'ROOT'),p.depth,p.operation,NVL(p.options,'NONE') FROM v$sql_plan p WHERE (p.sql_id,p.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE UPPER(sql_text) LIKE 'SELECT /* P11_ORDER_PROBE */ ORDER_ID FROM SHOPAPP.ORDERS WHERE ORDER_ID = -110011%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) ORDER BY p.id",
+			"mode": "rowCells",
 			"setupSql": "SELECT /* p11_order_probe */ order_id FROM shopapp.orders WHERE order_id = -110011"
 		},
 		"question": "On p1, locate the cached SELECT bearing the comment p11_order_probe, excluding dictionary queries that merely search for that text. Choose lowest SQL_ID then lowest child number. Do not execute its text. Inspect the cached plan tree and report each line as LINE=<line identifier> / PARENT=<parent identifier or ROOT> / DEPTH=<depth> / OP=<operation> / OPTIONS=<options or NONE>. Use the actual plan-view column names, not guessed names, and distinguish plan structure from measured runtime."

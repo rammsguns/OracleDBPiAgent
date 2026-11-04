@@ -15,8 +15,8 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'NULL_COMMISSION='||COUNT(CASE WHEN commission_pct IS NULL THEN 1 END)||' / ZERO_COMMISSION='||COUNT(CASE WHEN commission_pct=0 THEN 1 END)||' / POSITIVE_COMMISSION='||COUNT(CASE WHEN commission_pct>0 THEN 1 END) FROM hr.employees",
-			"mode": "allCells"
+			"sql": "SELECT COUNT(CASE WHEN commission_pct IS NULL THEN 1 END),COUNT(CASE WHEN commission_pct=0 THEN 1 END),COUNT(CASE WHEN commission_pct>0 THEN 1 END) FROM hr.employees",
+			"mode": "rowCells"
 		},
 		"question": "On d1, I believe HR stores employees without commission with COMMISSION_PCT equal to zero. Check that premise using exact counts for null commission, zero commission and positive commission, and explicitly correct it if necessary. Report NULL_COMMISSION=<count> / ZERO_COMMISSION=<count> / POSITIVE_COMMISSION=<count> as one record."
 	},
@@ -29,15 +29,13 @@
 			"requiredFacts": [
 				"(no|not|zero|0)[^.\\n]{0,65}primary|primary[^.\\n]{0,65}(no|not|absent|0)"
 			],
-			"requiredTools": [
-				"run_query"
-			],
+			"requiredTools": [],
 			"forbiddenClaims": [],
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'PK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='P' THEN 1 END)||' / FK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='R' THEN 1 END) FROM all_constraints WHERE owner='SH' AND table_name='SALES'",
-			"mode": "allCells"
+			"sql": "SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='P' UNION ALL SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='R'",
+			"mode": "rowCells"
 		},
 		"question": "On d1, which columns make up the declared primary key of SH.SALES? I assume there is one because it is a fact table. Verify the premise from constraints, explicitly say if no primary key is declared, and separately count declared foreign-key constraints. Return PK_CONSTRAINTS=<count> / FK_CONSTRAINTS=<count>. Do not infer a primary key from an index or a plausible business key."
 	}

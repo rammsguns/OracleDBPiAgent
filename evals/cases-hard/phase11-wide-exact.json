@@ -13,8 +13,8 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'JOB='||job_id||' / MIN='||min_salary||' / MAX='||max_salary FROM hr.jobs ORDER BY job_id",
-			"mode": "allCells"
+			"sql": "SELECT job_id,min_salary,max_salary FROM hr.jobs ORDER BY job_id",
+			"mode": "rowCells"
 		},
 		"question": "On d1, return all HR job definitions ordered by JOB_ID, showing each job ID and its minimum and maximum salary. Return exactly one record per job in the format JOB=<id> / MIN=<minimum> / MAX=<maximum>, using integer amounts without separators. Include every job, not just jobs currently held by employees."
 	},
@@ -32,8 +32,8 @@
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT 'SUBCATEGORY='||prod_subcategory||' / PRODUCTS='||COUNT(*) FROM sh.products GROUP BY prod_subcategory ORDER BY prod_subcategory",
-			"mode": "allCells"
+			"sql": "SELECT prod_subcategory,COUNT(*) FROM sh.products GROUP BY prod_subcategory ORDER BY prod_subcategory",
+			"mode": "rowCells"
 		},
 		"question": "On d1, count all SH product definitions by product subcategory (including products with no sales). Return every subcategory in name order, exactly one record each as SUBCATEGORY=<name> / PRODUCTS=<count>. Count product rows, not sales rows or distinct customers."
 	}

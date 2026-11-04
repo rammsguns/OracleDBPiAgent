@@ -1,0 +1,352 @@
+[
+	{
+		"id": "hard-p11-customers-scope",
+		"rows": [
+			[
+				"CO",
+				"CUSTOMERS",
+				392
+			],
+			[
+				"OE",
+				"CUSTOMERS",
+				319
+			],
+			[
+				"SH",
+				"CUSTOMERS",
+				55500
+			]
+		]
+	},
+	{
+		"id": "hard-p11-orders-status-scope",
+		"rows": [
+			[
+				"CO",
+				"ORDER_STATUS",
+				"VARCHAR2",
+				"N"
+			],
+			[
+				"OE",
+				"ORDER_STATUS",
+				"NUMBER",
+				"Y"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-fiscal-calendar",
+		"rows": [
+			[
+				"2000-01",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-02",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-03",
+				2000,
+				2000,
+				92
+			],
+			[
+				"2000-04",
+				2000,
+				2000,
+				92
+			]
+		]
+	},
+	{
+		"id": "hard-p11-plan-line-tree",
+		"rows": [
+			[
+				0,
+				"ROOT",
+				0,
+				"SELECT STATEMENT",
+				"NONE"
+			],
+			[
+				1,
+				"0",
+				1,
+				"INDEX",
+				"UNIQUE SCAN"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-commission-zero",
+		"rows": [
+			[
+				72,
+				0,
+				35
+			]
+		]
+	},
+	{
+		"id": "hard-p11-sales-primary-key",
+		"rows": [
+			[
+				0
+			],
+			[
+				5
+			]
+		]
+	},
+	{
+		"id": "hard-p11-order-customer-key",
+		"rows": [
+			[
+				"CUSTOMER_ID",
+				"CUSTOMERS",
+				"SYS_C007649",
+				"SYS_C007649",
+				"UNIQUE",
+				1,
+				"CUSTOMER_ID",
+				"NUMBER"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-warehouse-location-key",
+		"rows": [
+			[
+				"LOCATION_ID",
+				"HR",
+				"LOCATIONS",
+				"LOC_ID_PK",
+				"LOC_ID_PK",
+				"UNIQUE",
+				1,
+				"LOCATION_ID",
+				"NUMBER"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-second-department",
+		"rows": [
+			[
+				80,
+				"Sales",
+				34,
+				304500,
+				"John Russell"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-second-warehouse",
+		"rows": [
+			[
+				6,
+				"Sydney",
+				"Sydney",
+				"Australia",
+				"Asia"
+			]
+		]
+	},
+	{
+		"id": "hard-p11-job-salary-bands",
+		"rows": [
+			[
+				"AC_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"AC_MGR",
+				8200,
+				16000
+			],
+			[
+				"AD_ASST",
+				3000,
+				6000
+			],
+			[
+				"AD_PRES",
+				20080,
+				40000
+			],
+			[
+				"AD_VP",
+				15000,
+				30000
+			],
+			[
+				"FI_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"FI_MGR",
+				8200,
+				16000
+			],
+			[
+				"HR_REP",
+				4000,
+				9000
+			],
+			[
+				"IT_PROG",
+				4000,
+				10000
+			],
+			[
+				"MK_MAN",
+				9000,
+				15000
+			],
+			[
+				"MK_REP",
+				4000,
+				9000
+			],
+			[
+				"PR_REP",
+				4500,
+				10500
+			],
+			[
+				"PU_CLERK",
+				2500,
+				5500
+			],
+			[
+				"PU_MAN",
+				8000,
+				15000
+			],
+			[
+				"SA_MAN",
+				10000,
+				20080
+			],
+			[
+				"SA_REP",
+				6000,
+				12008
+			],
+			[
+				"SH_CLERK",
+				2500,
+				5500
+			],
+			[
+				"ST_CLERK",
+				2008,
+				5000
+			],
+			[
+				"ST_MAN",
+				5500,
+				8500
+			]
+		]
+	},
+	{
+		"id": "hard-p11-subcategory-counts",
+		"rows": [
+			[
+				"Accessories",
+				10
+			],
+			[
+				"Bulk Pack Diskettes",
+				2
+			],
+			[
+				"CD-ROM",
+				6
+			],
+			[
+				"Camcorders",
+				1
+			],
+			[
+				"Camera Batteries",
+				5
+			],
+			[
+				"Camera Media",
+				3
+			],
+			[
+				"Cameras",
+				1
+			],
+			[
+				"Desktop PCs",
+				1
+			],
+			[
+				"Documentation",
+				6
+			],
+			[
+				"Game Consoles",
+				1
+			],
+			[
+				"Home Audio",
+				2
+			],
+			[
+				"Memory",
+				2
+			],
+			[
+				"Modems/Fax",
+				2
+			],
+			[
+				"Monitors",
+				2
+			],
+			[
+				"Operating Systems",
+				1
+			],
+			[
+				"Portable PCs",
+				1
+			],
+			[
+				"Printer Supplies",
+				4
+			],
+			[
+				"Recordable CDs",
+				7
+			],
+			[
+				"Recordable DVD Discs",
+				5
+			],
+			[
+				"Y Box Accessories",
+				2
+			],
+			[
+				"Y Box Games",
+				8
+			]
+		]
+	}
+]
