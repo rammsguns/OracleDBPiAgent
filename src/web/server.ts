@@ -8,6 +8,7 @@ import { SessionManager, WebError, acquireLlm, ask, type SessionOptions } from "
 import { generateReport, renderMarkdown, sectionNames } from "../report/index.js";
 import { loadLatestReport, loadReportHistory, HISTORY_RETENTION, saveReport, reportDirectory, validateReportTarget } from "../report/history.js";
 import { buildReportTrends } from "../report/trends.js";
+import { compareTargets, parseScope } from "../drift/index.js";
 import { webReportDiff } from "./reportDiff.js";
 import { summarizeReport, checkReportSummary } from "../report/summarize.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
@@ -15,6 +16,7 @@ import { JsonlAuditSink } from "../audit/index.js";
 
 export interface WebServerOptions extends SessionOptions {
 	report?: typeof generateReport;
+	drift?: typeof compareTargets;
 	/** Local history seams; no shared configuration fields. */
 	reportDirectory?: string;
 	loadReport?: typeof loadLatestReport;
@@ -53,6 +55,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 	const digest = (value: string) => createHash("sha256").update(value).digest();
 	const expected = digest(`Bearer ${token}`);
 	const staticRoot = options.staticDir ?? resolve(dirname(fileURLToPath(import.meta.url)), "static");
+	let driftActive = false;
 	const server = createServer((req, res) => {
 		res.setHeader("Content-Security-Policy", "default-src 'self'");
 		res.setHeader("X-Content-Type-Options", "nosniff");
@@ -74,6 +77,33 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (raw === "/api/drift") {
+				if (req.method !== "POST") throw new WebError(405, "Method not allowed");
+				const data = await body(req);
+				const approved = new Set(["d1-19c-lab", "p1-19c-prod"]);
+				for (const target of [data.left, data.right]) {
+					if (typeof target !== "string" || !approved.has(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
+				}
+				if (typeof data.scope !== "string" || data.scope.length > 136) throw new WebError(400, "Invalid scope");
+				try { parseScope(data.scope); } catch { throw new WebError(400, "Invalid scope"); }
+				if (driftActive) throw new WebError(429, "A drift comparison is already running");
+				driftActive = true;
+				let sessions;
+				try {
+					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
+					const result = await (options.drift ?? compareTargets)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID() }, { left: data.left as string, right: data.right as string, scope: data.scope });
+					const output = JSON.stringify(result);
+					if (Buffer.byteLength(output) > 1024 * 1024) throw new WebError(413, "Drift output exceeds 1 MiB; choose a narrower scope");
+					const finished = sessions; sessions = undefined; await finished.closeAll();
+					return json(res, 200, result);
+				} catch (error) {
+					if (error instanceof WebError) throw error;
+					throw new WebError(500, "Drift failed");
+				} finally {
+					try { await sessions?.closeAll(); } catch { throw new WebError(500, "Drift failed"); }
+					finally { driftActive = false; }
+				}
+			}
 			if (raw === "/api/report/history") {
 				if (req.method !== "GET") throw new WebError(405, "Method not allowed");
 				const params = new URL(req.url!, "http://localhost").searchParams;

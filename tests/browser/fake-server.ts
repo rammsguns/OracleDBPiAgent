@@ -24,6 +24,13 @@ export async function startFakeServer() {
 			{ name: 'identity', status: 'ok', source: 'fake', columns: ['VALUE'], rows: [[hostile + 'x'.repeat(500)]], note: 'Fake identity' },
 			{ name: 'backups', status: 'unavailable', source: 'fake', columns: [], rows: [], note: 'not available: needs SELECT on SYS.V_$RMAN_BACKUP_JOB_DETAILS' },
 		] }),
+		drift: async (_ctx, options) => {
+			await new Promise(resolve => setTimeout(resolve, 600));
+			return { ...options, generatedAt: '2026-11-04T00:00:00Z', complete: false, hasDrift: true, sections: [
+				{ name: 'columns', source: 'ALL_TAB_COLUMNS', status: 'ok', notes: [], onlyLeft: [{ key: hostile, values: [hostile] }], onlyRight: [], different: [{ key: hostile, left: ['NUMBER'], right: ['VARCHAR2'] }] },
+				{ name: 'parameters', source: 'V$PARAMETER', status: 'unavailable', notes: ['needs SELECT on V$PARAMETER'], onlyLeft: [], onlyRight: [], different: [] },
+			] };
+		},
 		summarize: async () => hostile + ' Invented 98,765 rows.',
 		checkHealth: async () => {},
 		health: async () => [{ name: 'Fake Strata', status: 'ok' }, { name: 'Fake Oracle', status: 'fail' }],

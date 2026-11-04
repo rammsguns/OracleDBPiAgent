@@ -226,6 +226,31 @@ WP-4B validation (2026-10-29):
   Validation used a temporary node_modules symlink to the coordinator worktree's
   installed dependencies; the symlink was removed afterward.
 
+### Cross-target drift
+
+The Drift tab compares the two approved targets without an agent or LLM call.
+Choose left/right targets, then Parameters, Schema or Objects. Schema and Objects
+also require an owner (for example HR). Self-comparisons are allowed. Results
+show source views, unavailable-section notes, and collapsible Only left, Only
+right and Different groups. An incomplete comparison does not establish equality
+for unavailable sections. Object and column names render as literal text.
+
+The authenticated `POST /api/drift` accepts JSON
+`{"left":"d1-19c-lab","right":"p1-19c-prod","scope":"schema:HR"}`.
+It uses the existing bearer-token, loopback Host and same-origin Origin checks;
+other methods are rejected. Targets must be both approved and configured, and
+scope validation reuses the drift engine. Queries use its read-only policy,
+audit and row limits unchanged. One comparison per server is allowed through
+provider cleanup; concurrent requests return 429. JSON responses over 1 MiB
+return 413 instead of partial results; choose a narrower scope. Internal failures
+return a generic error without connection details. No results are saved.
+
+WP-13B validation: route tests cover authentication, Host/Origin, method and
+selection validation, cleanup locking, error scrubbing and response bounds.
+Mocked browser tests cover literal hostile object/column names, unavailable
+sections, collapsible groups, 375px layout and concurrent rejection. Live browser
+and LLM smoke tests are deliberately excluded from this work package's run.
+
 ### Saved report history
 
 The Report tab's History panel reads up to the newest 30 saved runs for the selected

@@ -1,3 +1,5 @@
+import { initDrift } from './drift.js';
+
 import { renderHistory } from './history.js';
 import { createSseParser, updateTrace } from './lib.js';
 
@@ -137,7 +139,7 @@ async function audit() {
 	}
 }
 function tab(selected) {
-	for (const id of ['audit', 'trace', 'report']) {
+	for (const id of ['audit', 'trace', 'report', 'drift']) {
 		$(`${id}-tab`).setAttribute('aria-selected', String(id === selected));
 		$(`${id}-tab`).tabIndex = id === selected ? 0 : -1; $(`${id}-panel`).hidden = id !== selected;
 	}
@@ -215,7 +217,7 @@ $('target').addEventListener('change', async () => {
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
-const tabs = ['trace', 'audit', 'report'];
+const tabs = ['trace', 'audit', 'report', 'drift'];
 for (const [index, id] of tabs.entries()) {
 	$(`${id}-tab`).addEventListener('click', () => tab(id));
 	$(`${id}-tab`).addEventListener('keydown', event => {
@@ -234,6 +236,7 @@ async function init() {
 			option.textContent = `${target.name} · ${target.environment} — ${target.description}`;
 			$('target').append(option);
 		}
+		initDrift(api, targets);
 		await newSession(); await health();
 	} catch (error) { status(error.message); } finally { busy(false); }
 }
