@@ -34,8 +34,43 @@ export function buildGraph(object: string, signatures: { name: string; subprogra
 	}
 	return { nodes: [...nodes.values()].sort((a, b) => a.id.localeCompare(b.id)), edges: [...new Map(edges.map(e => [JSON.stringify(e), e])).values()].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) };
 }
+/** Rendering only: the dictionary graph stays complete. */
+function collapseOracleNodes(graph: PlsqlGraph) {
+	const supplied = graph.nodes.filter(node =>
+		(node.kind === "object" || node.kind === "table") && /^(SYS|PUBLIC)\./.test(node.label));
+	if (!supplied.length) return { ...graph, supplied: [], collapsedId: "" };
+	const hidden = new Set(supplied.map(node => node.id));
+	let collapsedId = "oracle-supplied";
+	while (graph.nodes.some(node => node.id === collapsedId)) collapsedId += "_";
+	const nodes: GraphNode[] = graph.nodes.filter(node => !hidden.has(node.id));
+	nodes.push({ id: collapsedId, kind: "object", label: `Oracle-supplied (${supplied.length})` });
+	const edges = graph.edges.map(edge => ({
+		...edge,
+		from: hidden.has(edge.from) ? collapsedId : edge.from,
+		to: hidden.has(edge.to) ? collapsedId : edge.to,
+	})).filter(edge => edge.from !== edge.to);
+	return {
+		nodes,
+		edges: [...new Map(edges.map(edge => [JSON.stringify(edge), edge])).values()],
+		supplied,
+		collapsedId,
+	};
+}
+
 export function renderMermaid(graph: PlsqlGraph): string {
-	const ids = new Map(graph.nodes.map((n, i) => [n.id, `n${i}`]));
-	const label = (s: string) => s.replace(/[^A-Za-z0-9_.$# :()-]/g, '_');
-	return ['flowchart LR', ...graph.nodes.map(n => `  ${ids.get(n.id)}["${label(n.label)}"]`), ...graph.edges.map(e => `  ${ids.get(e.from)} ${e.heuristic ? '-.->' : '-->'}|${label(e.label ?? e.kind)}| ${ids.get(e.to)}`)].join('\n');
+	const view = collapseOracleNodes(graph);
+	const ids = new Map(view.nodes.map((node, i) => [node.id, `n${i}`]));
+	const label = (text: string) => text.replace(/[^A-Za-z0-9_.$# :()-]/g, "_");
+	const lines = [
+		"flowchart LR",
+		...view.nodes.map(node => `  ${ids.get(node.id)}["${label(node.label)}"]`),
+		...view.edges.map(edge =>
+			`  ${ids.get(edge.from)} ${edge.heuristic ? "-.->" : "-->"}` +
+			`|${label(edge.label ?? edge.kind)}| ${ids.get(edge.to)}`),
+	];
+	if (view.supplied.length) {
+		const names = view.supplied.map(node => label(node.label)).join(", ");
+		lines.push(`  click ${ids.get(view.collapsedId)} href "#" "${names}"`);
+	}
+	return lines.join("\n");
 }
