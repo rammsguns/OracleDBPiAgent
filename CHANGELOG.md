@@ -2,6 +2,53 @@
 
 All notable changes are documented here, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `piagent plsql list` and `piagent plsql doc` document PL/SQL packages,
+  procedures and triggers. The output covers:
+  - each subprogram's signature, with spec comments;
+  - the tables each subprogram reads and writes (a heuristic scan of the body);
+  - callers and scheduler jobs, and compile errors;
+  - a line-numbered, redacted source appendix;
+  - a Mermaid dependency diagram.
+  See [PL/SQL docs](docs/plsql.md) and the
+  [WORKLOAD example](docs/plsql-workload-example.md).
+- `piagent triage` turns a reported issue into read-only evidence:
+  - ORA/PLS codes and ORA-06512 frames;
+  - source excerpts with their subprogram and statement;
+  - scheduler run history and compile errors;
+  - constraint details and configured log tables (`logTables`).
+  From that it gives ranked root-cause hypotheses, a numbered debug checklist with
+  the exact SQL for each step, a trace diagram, and suggested fixes, none of which
+  are run. Named jobs with no runs in the window fall back to their latest runs,
+  clearly labelled. `--summarize` adds a grounded Strata narrative.
+  See [triage](docs/triage.md) and the examples for the
+  [nightly purge](docs/triage-nightly-purge.md) and
+  [dropped lab job](docs/triage-k7q-failjob.md).
+- Web PL/SQL tab with a dependency graph drawn as SVG, and a Triage panel (paste an
+  issue, choose a window, export Markdown). Chat `/triage [--since 7d] <issue>` in
+  CLI and web chat. See [web UI](docs/web-ui.md).
+- Ten PL/SQL challenge eval cases. See [hard evals](docs/evals-hard.md).
+
+### Changed
+
+- `list_objects`, `describe_object` and `get_source` fall back to the matching
+  `DBA_` view when the `ALL_` view hides an object the account can read through a
+  grant. The result names the view that answered; tool definitions are unchanged.
+  On PL/SQL challenge questions this raised the score from 17/40 to 32/40, and hard
+  dev used fewer tokens. See [tool fallback](docs/wp-16e-tool-fallback.md).
+- p1 `HARNESS_RO` gained SELECT on six DBA_ PL/SQL dictionary views. This was
+  applied once at the owner's request; see
+  [the grant script](docs/grants-request-2026-11-04-plsql.sql).
+
+### Fixed
+
+- Challenge scoring: Unicode dashes in ORA codes, and child/parent rows of a
+  constraint table, are now matched; wrong layouts still fail. Earlier records
+  are unchanged.
+
 ## [1.1.0] - 2026-11-04
 
 ### Added
