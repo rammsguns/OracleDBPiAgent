@@ -15,6 +15,7 @@ Or install a packed tarball from the prepared clone:
 
 ```bash
 npm pack
+# Replace the filename below with the one printed by npm pack.
 npm install -g ./oracledb-pi-agent-1.0.0.tgz
 ```
 
@@ -75,3 +76,42 @@ Clone users can keep artifacts in `var/` by setting
 in their `.env` (uncomment the report setting in the template).
 
 Explicit `--env-file` settings win over automatic private-home settings.
+
+## Migration and scheduled reports
+
+Since phase 9, unset audit/report path settings use `~/.piagent/`, rather than
+working-directory `var/` paths. Existing files are not moved. To inspect older
+history, set `PIAGENT_REPORT_DIRECTORY` to its directory. `report history` reads
+saved files only and creates nothing.
+
+```bash
+piagent report history --target d1-19c-lab --last 10 --json
+piagent report schedule --target d1-19c-lab --every 1h
+```
+
+The schedule helper only prints configuration and one-time setup; it installs no
+units and runs no `systemctl`. Intervals are `15m`, `1h`, `6h`, `1d`. Initialize
+the private home and edit its `.env` first, including `PIAGENT_SECRET_DIR`.
+Inspect and run the printed setup once outside the service sandbox: create the
+private report directory and touch/chmod the audit and alert files without
+truncating them. Existing paths must be owned by you, private and not symlinks.
+Choose either the printed systemd timer or cron alternative, with one writer per
+output directory. Then test manually:
+
+```bash
+piagent report schedule run --target d1-19c-lab
+```
+
+Manual `schedule run` defaults to `<PIAGENT_HOME>/reports`; pass `--out`
+explicitly when using a separate report directory. The generated schedule pins
+the directory selected when it was printed.
+
+The runner reads only `<PIAGENT_HOME>/.env`, ignores ambient `PIAGENT_ENV_FILE`,
+and preflights the report directory and both log files. Explicit absolute
+`--home` / `--out` override defaults. Generated commands pin Node and CLI paths;
+regenerate after either changes. Exit 3 from the report appends a private local
+alert and succeeds; other failures remain failures. See the
+[schedule helper](report.md#schedule-helper-wp-12b) for sandbox details.
+
+See the [full command list](../README.md#commands), [drift guide](drift.md) and
+[web UI](web-ui.md) for the new metadata comparison and saved-history views.

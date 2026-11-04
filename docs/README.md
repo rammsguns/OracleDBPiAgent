@@ -16,20 +16,22 @@ revision they checked; use the status page and current code for today's behavior
 ## Development
 
 - [ci.md](ci.md) — Node 24 CI, clean-clone checks and local verification.
+- PI SDK 1.5.0: TODO — add `pi-sdk-1.5.md` after WP-14B closes; upgrade still gated.
 - [Changelog](../CHANGELOG.md) — Release history.
 
 ## Evals and optimization
 
-- [evals-two-servers.md](evals-two-servers.md) — Secondary tunnel setup and balanced eval gates.
+- [evals-two-servers.md](evals-two-servers.md) — Opt-in eval-only secondary tunnel, endpoint isolation and comparison methodology.
 - [wp-10a-eval-secondary.md](wp-10a-eval-secondary.md) — WP-10A implementation and verification notes.
-- [evals-hard.md](evals-hard.md) — Hard-suite cases, splits and ground-truth checks.
+- [evals-hard.md](evals-hard.md) — Hard dev, fresh holdout, regression and challenge splits; rowCells ground truth.
 - [model-optimization.md](model-optimization.md) — Variant results, promotions and rejected token-saving experiments.
 
 ## Reports, grounding and web UI
 
 - [report.md](report.md) — Read-only DBA report sections, CLI options, summary grounding and live verification.
+- [drift.md](drift.md) — Read-only cross-target metadata comparisons, scopes, exports and incomplete results.
 - [grounding.md](grounding.md) — Evidence checks, numeric-only corrections, unverified facts and measurement results.
-- [web-ui.md](web-ui.md) — Local server API, authentication, chat, Report tab and Markdown export.
+- [web-ui.md](web-ui.md) — Local server API, authentication, chat, Report/History panels, Drift tab and Markdown export.
 
 ## Compatibility and grants
 
