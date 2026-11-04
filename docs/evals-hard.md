@@ -875,3 +875,31 @@ consistent with the instruction not to run an agent or any LLM. No shared
 contracts or dependencies need changing. The generated validation report was
 used to capture the owned test fixtures; the existing shared report is left
 for the coordinator to refresh after merging.
+
+### Phase 11D baseline scorer fixes
+
+The archived 11C baseline at
+`phase11/2026-11-04T09-32-03-897Z-1b5f630d-2694-4d3e-960b-6c61bb4ab961.json`
+is replayed offline over all 66 records using truth rows extracted from its
+stored checks with jq. The fixture retains answers and scoring inputs only.
+All nine case/scorer bugs pass, all 54 former passes remain passes, and the
+three nullable-manager answers still fail for omitting individual departments.
+
+For a single truth row, rowCells accepts any two-column label/value table
+(including Metric/Count and Step/Detail) and an inline parenthesized K=V
+record. Separate parenthesized records remain separate. Existing attribute,
+field and property table support remains available for multi-row truth;
+separate table blocks never combine. Explicit truth SQL aliases and simple
+column names bind matching answer labels to values, including table headers.
+Swapping those values fails even if the same unordered values remain.
+Expressions without aliases retain existing value matching.
+
+Partial-memory and partial-backup return one accessible fact per truth row.
+The required facts also name V$PARAMETER or V$RMAN_BACKUP_JOB_DETAILS, alongside
+the existing unavailability and explanation requirements. No requested value
+or grant prerequisite was removed. Validation still probes the unavailable
+views and requires ORA-00942 or ORA-01031. Optimizer runner unit tests acquire
+real locks inside a fresh temporary directory, never the host endpoint lock.
+
+Validation: 62 truth queries for 83 cases passed on the two approved targets.
+No agent or LLM was run. Antigravity review remains a coordinator gate.
