@@ -903,3 +903,31 @@ real locks inside a fresh temporary directory, never the host endpoint lock.
 
 Validation: 62 truth queries for 83 cases passed on the two approved targets.
 No agent or LLM was run. Antigravity review remains a coordinator gate.
+
+### Phase 11E rowCells follow-ups
+
+The 11B gate exposed two parsing artifacts. Vertical tables were transposed
+only if they had two columns or began with Attribute/Field/Property. This
+excluded `# | Item | Value | Source view` and `Step | Detail | Value`.
+For a single truth record, the matcher now recognizes Item, Step, Attribute,
+Field, or Property as the label column and uses only Value/Detail columns
+in that same contiguous table. Detail and Value may jointly describe the
+record. Numbering, labels and source columns cannot supply truth values.
+Raw rows of these recognized tables are excluded so numbering cannot bypass
+label binding. Existing truth-label binding and distinct-value consumption
+still apply; separate tables and multi-record truth are never pooled by
+this extension.
+
+The second artifact was `19.9.1.0.0 (major = 19)`: trailing parentheses were
+removed from structured fields, while inline K=V extraction was limited to
+truth containing one row. Explicit parenthesized assignments are now also
+candidates for individual single-cell truth rows, even when several such
+rows are expected. Assignments from separate parentheses still cannot form
+a multi-cell record. This does not infer a major version: `19c` alone,
+`19.9.1.0.0` alone, and `19.9.1.0.0 (Oracle 19c)` fail `["19"]` before and
+after this change. `major = 190` and `major = 23` also fail.
+
+`tests/unit/phase11e-scorer.test.ts` embeds verbatim archived table blocks
+from B ch1/ch3 (key trace) and B ch2/ch3 (memory), with negative mutations
+for index names, types, labels, numbering, source-only values and unrelated
+tables. Verification is offline; no case JSON, database or LLM is involved.
