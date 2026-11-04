@@ -1238,7 +1238,8 @@ failures.
 | WP | Branch | Owns | Depends on |
 |---|---|---|---|
 | WP-11A Challenge cases | `wp-11a-challenge-evals` | new `evals/cases-hard/phase11-*.json`; `evals/types.ts` (split value only); `evals/run.ts` (split option only); `evals/validate-hard.ts`; `evals/scoring.ts` (only new, opt-in check kinds); their tests; `docs/evals-hard.md` | — |
-| WP-11B Quality fixes | decided after the 11A baseline | decided after the 11A baseline | WP-11A baseline |
+| WP-11C Fair row scoring and harder round | `wp-11c-row-scoring` | see WP-11C below | WP-11A baseline |
+| WP-11B Quality fixes | decided after the 11C baseline | decided after the 11C baseline | WP-11C baseline |
 
 ### WP-11A: challenge cases
 - Add a new split, `challenge`, with about 12 cases. Gates keep their current
@@ -1278,8 +1279,67 @@ failures.
   ground truth, ambiguity, answer leaks and independence; baseline results
   recorded with the failure triage.
 
+- **Result (2026-11-03): merged** (972ceac, 08ae44c, 6ffa35f; merge 463fc88).
+  Validation checked 52 truth queries for 73 cases on both targets, with no
+  fixes needed; 630 unit tests pass. The Antigravity review approved: 36 of
+  36 scorer checks (one correct and two wrong answers per case) behaved as
+  expected.
+- **Baseline (2026-11-03), challenge ×3 on 463fc88: 22/36 (61.1%)**, all
+  refusals passed, 4 tool errors in 76 calls (archived in
+  `eval-archive/phase11/`). Triage: **13 of the 14 failures are case or
+  scorer bugs, and 1 is an agent error.**
+  - Each `allCells` cell packs a whole row into one string
+    (`OWNER=CO / COLUMN=ORDER_STATUS / ...`), which must appear verbatim. The
+    agent gave the right values in a markdown table, or on separate lines, or
+    with `55,500` for 55500. The review missed this because its correct
+    answers were written in the exact format.
+  - `orders-status-scope` and `sales-primary-key` require `run_query`, but
+    `describe_object` answers them correctly.
+  - The one agent error: `plan-line-tree` run 2 merged OP and OPTIONS into
+    `INDEX UNIQUE SCAN` (it read `explain_plan` output, not `v$sql_plan`).
+  - Real substance pass rate is about 35 of 36. The agent handled false
+    premises, cross-schema traces, multi-turn references and 21-row answers.
+    It ignored a requested output format in 13 of 36 runs.
+- Owner decision: fix the scorer fairly, then write a second, harder round
+  aimed at substance (WP-11C).
+
+### WP-11C: fair row scoring and a harder round
+| Branch | Owns |
+|---|---|
+| `wp-11c-row-scoring` | `evals/scoring.ts` (a new opt-in check kind only), `evals/types.ts`, `evals/validate-hard.ts`, `evals/cases-hard/phase11-*.json` (challenge cases only), new `evals/cases-hard/phase11b-*.json`, their tests, `docs/evals-hard.md` |
+
+- **Row scoring.** Add an opt-in ground-truth mode, `rowCells`. Truth SQL
+  returns one value per column. Each truth row passes when all of its values
+  appear together in one line of the answer: a markdown table row, a list
+  item, or a `KEY=VALUE` record. Numbers match after removing thousands
+  separators, and trailing zeros follow the existing numeric rules. A value
+  from another row on the same line must not satisfy a row. Unit tests cover
+  tables, records, separators, swapped values across rows, and a missing row.
+  Existing modes and cases are unchanged, which tests prove.
+- Convert the 12 challenge cases to `rowCells`. Remove `tool: run_query`
+  where another read-only tool can answer. Questions may still suggest a
+  layout, but no check may depend on it. Do not loosen any value check.
+- **Harder round.** Add about 10 `challenge` cases in `phase11b-*.json`,
+  written blind, aimed at substance the agent may get wrong:
+  - **SQL semantics traps:** join fan-out that double-counts, AVG and COUNT
+    over NULLs, top-N with ties, date-range end boundaries.
+  - **Long diagnoses:** 5 or more dependent steps.
+  - **Conflicting evidence:** dictionary statistics against live counts, or
+    two views that disagree. The answer must use the right source and say
+    why.
+  - **Partial grants on p1:** part of the question can be answered and part
+    cannot. The answer must give the first part and name the gap for the
+    second.
+  - Same rules as WP-11A: plain-SELECT truth, `validate-hard.ts` on both
+    targets, negation-aware `forbiddenClaims`, no tool names or answer leaks,
+    no near-copies.
+- Gate: validation, typecheck and unit tests pass. The Antigravity review
+  must include realistic correct answers in **several layouts** (a table,
+  prose, records), as well as wrong answers. Then a coordinator baseline:
+  challenge ×3 on main, with every failure triaged as before.
+
 ### WP-11B: quality fixes
-Scoped from the 11A failure triage, then approved by the owner. It uses the
+Scoped from the 11C failure triage, then approved by the owner. It uses the
 usual gate (hard dev 4×4, holdout ×3, regression ×1, MVP) plus challenge ×4
 on each side.
 
