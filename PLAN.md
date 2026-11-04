@@ -1564,6 +1564,26 @@ can already read.
 - Gate: route unit tests, browser tests (including an XSS payload in an
   object name), the Antigravity security review and a live smoke test.
 
+### Phase 13 results (2026-11-04): complete
+- **WP-13A: merged** (670a031, 4892f5e, 354c030; merge 5bb891c). The
+  Antigravity review asked for atomic export publication: private temp
+  files, Markdown renamed first, JSON last as the commit marker, cleanup on
+  failure, with tests. That was applied. The merge added the missing
+  `drift --help` description.
+  - Live: self-compares are empty, and d1 against p1 is stable.
+  - p1 cannot read `V_$PARAMETER`, so its parameter section reports
+    unavailable and the result is `complete: false`.
+- **WP-13B: merged** (0004b2a, d9fd65e, 2e49556; merge 84c19f8). The
+  Antigravity security review approved. The worker merged `master` to keep
+  the WP-12C History panel and the Drift tab together, and 776 unit and 19
+  browser tests pass. Live smoke through the real server:
+  - no token → 401, GET → 405, cross-origin POST → 403;
+  - an unapproved target (`FREEPDB1`) or a scope with injected SQL → 400;
+  - a d1 self-compare of HR → 200 with no drift;
+  - d1 against p1 parameters → 200, `complete: false`;
+  - a concurrent drift → 429 while the first finished with 200;
+  - the token was not in the audit log.
+
 ### Not in phase 13
 Generating DDL to fix drift, any target outside the approved two, data
 comparison (row contents), and an agent tool for drift.
