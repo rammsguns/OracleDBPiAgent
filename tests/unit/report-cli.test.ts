@@ -71,3 +71,17 @@ it('saves and compares before saving; diff-only exits 0 then 3 then 0', async ()
 it('rejects summaries with diff-only', async () => {
 	await expect(main(['node', 'piagent', 'report', '--target', 'lab', '--diff-only', '--summarize'])).rejects.toThrow('--diff-only cannot summarize');
 });
+
+it('reads history with no database or LLM calls and supports the child target option', async () => {
+	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const { mkdtemp, rm } = await import('node:fs/promises');
+	const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+	const dir = await mkdtemp(join(tmpdir(), 'history-cli-'));
+	vi.stubEnv('PIAGENT_REPORT_DIRECTORY', dir);
+	try {
+		await main(['node', 'piagent', 'report', 'history', '--target', 'lab', '--last', '3', '--json']);
+		expect(JSON.parse(log.mock.calls[0]?.[0])).toMatchObject({ target: 'lab', runs: 0 });
+		expect(mocks.query).not.toHaveBeenCalled(); expect(mocks.closeAll).not.toHaveBeenCalled(); expect(mocks.summary).not.toHaveBeenCalled();
+		await expect(main(['node', 'piagent', 'report', 'history', '--target', 'lab', '--last', '3x'])).rejects.toThrow('--last');
+	} finally { vi.unstubAllEnvs(); log.mockRestore(); await rm(dir, { recursive: true, force: true }); }
+});

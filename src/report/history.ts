@@ -1,3 +1,7 @@
+import { Type } from "typebox";
+import { Check } from "typebox/value";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { ensureAgentHome } from "../config/environment.js";
 import { agentHome } from "../config/paths.js";
 import { chmod, lstat, mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
@@ -53,4 +57,50 @@ export async function saveReport(dir: string, report: DatabaseReport, targets: T
 	} finally { await Promise.all(temps.map(p => unlink(p).catch(error => { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }))); }
 	for (const old of (await runs(path)).slice(HISTORY_RETENTION)) for (const ext of ['md', 'json']) await unlink(join(path, old.replace(/json$/, ext))).catch(error => { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; });
 	return { json, markdown };
+}
+
+/** Maximum bytes read from one untrusted saved snapshot. */
+export const MAX_HISTORY_FILE_BYTES = 2 * 1024 * 1024;
+export interface ReportHistory { target: string; reports: DatabaseReport[]; scanned: number; skipped: number; notes: string[] }
+const savedReportSchema = Type.Object({
+	target: Type.String(), generatedAt: Type.String(),
+	sections: Type.Array(Type.Object({
+		name: Type.String(), status: Type.Union([Type.Literal('ok'), Type.Literal('unavailable')]),
+		source: Type.String(), columns: Type.Array(Type.String()),
+		rows: Type.Array(Type.Array(Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()]))), note: Type.String(),
+	})),
+});
+/** Reads the newest N filenames (not N valid files), returning valid snapshots chronologically. */
+export async function loadReportHistory(dir: string, target: string, targets: Targets, last = HISTORY_RETENTION): Promise<ReportHistory> {
+	validateReportTarget(target, targets);
+	if (!Number.isInteger(last) || last < 1 || last > HISTORY_RETENTION) throw new Error(`--last must be an integer from 1 to ${HISTORY_RETENTION}`);
+	const result: ReportHistory = { target, reports: [], scanned: 0, skipped: 0, notes: [] };
+	let path: string, names: string[];
+	try { path = await directory(dir, target, targets, false); names = (await runs(path)).slice(0, last); }
+	catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return result; throw error; }
+	for (const name of names.reverse()) {
+		result.scanned++;
+		try {
+			// O_NOFOLLOW prevents a file being swapped for a symlink between inspection and open.
+			const file = await open(join(path, name), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+			try {
+				const stat = await file.stat();
+				if (!stat.isFile() || stat.size > MAX_HISTORY_FILE_BYTES) throw new Error('Invalid saved file');
+				const buffer = Buffer.alloc(MAX_HISTORY_FILE_BYTES + 1);
+				let bytes = 0;
+				while (bytes < buffer.length) { const read = await file.read(buffer, bytes, buffer.length - bytes, null); if (!read.bytesRead) break; bytes += read.bytesRead; }
+				if (bytes > MAX_HISTORY_FILE_BYTES) throw new Error('Oversize saved file');
+				const report: unknown = JSON.parse(buffer.subarray(0, bytes).toString('utf8'));
+				if (!Check(savedReportSchema, report)) throw new Error('Invalid saved schema');
+				const parsed = report as DatabaseReport;
+				if (parsed.target !== target || !Number.isFinite(Date.parse(parsed.generatedAt)) || new Date(parsed.generatedAt).toISOString().replace(/:/g, '-') + '.json' !== name || new Set(parsed.sections.map(s => s.name)).size !== parsed.sections.length || parsed.sections.some(s => s.rows.some(r => r.length !== s.columns.length))) throw new Error('Invalid saved report');
+				result.reports.push(parsed);
+			} finally { await file.close(); }
+		} catch (error) {
+			if (['EACCES', 'EPERM', 'EIO'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+			result.skipped++;
+		}
+	}
+	if (result.skipped) result.notes.push(`${result.skipped} saved file(s) skipped: invalid, incompatible, oversize or unsafe.`);
+	return result;
 }
