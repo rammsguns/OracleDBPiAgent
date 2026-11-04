@@ -117,6 +117,9 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const result = buildReportTrends(await loadReportHistory(reportDirectory(), options.target, loadConfig().targets, /^\d+$/.test(options.last) ? Number(options.last) : NaN));
 		console.log(options.json ? JSON.stringify(result) : renderTrends(result));
 	});
+	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
+		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
+	});
 	const plsql = program.command("plsql").description("Read-only PL/SQL documentation and dependency diagrams; no LLM");
 	plsql.command("list").requiredOption("--target <target>").option("--owner <owner>").option("--json").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("list", options);

@@ -7,6 +7,8 @@ import { homedir } from "node:os";
 import { resolve, basename } from "node:path";
 import type { AppConfig, TargetConfig } from "../contracts.js";
 
+import { validateLogTables } from "./logTables.js";
+
 export function assertLoopbackUrl(value: string): URL {
 	const url = new URL(value);
 	if (url.protocol !== "http:" || !["127.0.0.1", "[::1]", "localhost"].includes(url.hostname) || url.username || url.password || url.search || url.hash)
@@ -30,6 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): TunableAppConf
 	for (const t of raw.targets) {
 		const expected = APPROVED_TARGETS.find(expected => expected.name === t.name);
 		if (!expected || seen.has(t.name) || typeof t.description !== "string" || !t.description || basename(t.passwordFile ?? "") !== t.passwordFile || Object.entries(expected).some(([key, value]) => t[key] !== value)) throw new Error("Invalid or unapproved target configuration");
+		if (t.logTables !== undefined) validateLogTables(t.logTables);
 		seen.add(t.name);
 	}
 	const targets = raw.targets as TargetConfig[];
