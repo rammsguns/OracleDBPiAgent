@@ -1394,6 +1394,14 @@ fail `rowCells`. (2) `hard-p11b-partial-memory`: "19.9.1.0.0 (major = 19)" fails
 single-value truth row `["19"]`. Fix the matcher without loosening wrong-answer
 rejection; rescore archived results, no LLM calls.
 
+### WP-11F: second scorer follow-up (from the 14B gate)
+Correct answers in `eval-archive/phase14/gate-14b/` still fail `rowCells` when a
+truth value appears owner-qualified (`SHOPAPP.CUSTOMERS`, `HR.LOCATIONS`), with
+Markdown emphasis inside a qualified name (`SHOPAPP.**CUSTOMERS**`), or as a
+labelled singleton with emphasis (`major version: **19**`). Same rules as WP-11E:
+general fix, strict wrong-answer rejection, offline rescore with every flip
+justified, no LLM calls.
+
 ### Phase 11 results (2026-11-04): complete
 WP-11B merged (ad36a19) after the gate (A=835128b, B=+11B, alternating, primary
 Strata; archive `eval-archive/phase11/gate-11b/`):
