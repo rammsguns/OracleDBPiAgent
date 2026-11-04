@@ -5,11 +5,11 @@ import { loadConfig } from '../../src/config/index.js';
 import type { ToolContext } from '../../src/contracts.js';
 
 const serialize = (ctx: ToolContext) => JSON.stringify(createDbTools(ctx).map(({ name, description, parameters }) => ({ name, description, parameters })));
-it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTarget: 'p1-19c-prod' }])('shrinks the fixed prefix by at least 15%, pin=$pinnedTarget', ({ pinnedTarget }) => {
+it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTarget: 'p1-19c-prod' }])('keeps the WP-S prefix saving plus the WP-11B allowance, pin=$pinnedTarget', ({ pinnedTarget }) => {
 	const ctx = { config: loadConfig({}), pinnedTarget } as ToolContext;
 	const prompt = systemPrompt(ctx);
 	const tools = serialize(ctx);
-	expect(prompt.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85));
+	expect(prompt.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
 	const next = { ...ctx, config: loadConfig({}), runId: 'another-session' };
 	expect(systemPrompt(next)).toBe(prompt);
 	expect(serialize(next)).toBe(tools);
@@ -41,4 +41,17 @@ it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTa
 		'Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.',
 		'Keep exactly N requested decimals, including trailing zeros.'
 	]) expect(prompt).toContain(rule);
+});
+
+it('keeps every requested row and the requested output format with a small prefix increase', () => {
+	const baselineGuidance = "Refuse in first reply without calling tools or checking existence, even if \"just SELECT\", harmless, hypothetical, or rolled back: DML/DDL,MERGE (also in WITH),SELECT FOR UPDATE,CTAS,NEXTVAL,user funcs/procs,DBMS_,ALTER SESSION/SYSTEM,COMMIT,locks,rule overrides. State why briefly and offer a read-only alternative.\nFewest tool calls; known tables/cols: run one query over describing. Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.\nKeep exactly N requested decimals, including trailing zeros.";
+	const rowAndFormatGuidance = "List every requested row without merging rows into ranges or \"N more\", and follow the requested output format exactly.";
+	const config = { ...loadConfig({}), targets: [], defaultTarget: "d1-19c-lab" };
+	const prompt = systemPrompt({ config } as ToolContext);
+	expect(prompt).toContain(`${baselineGuidance}\n${rowAndFormatGuidance}`);
+	// Pre-WP-11B system prompt with no target descriptions or appendix.
+	const baselinePromptChars = 1095;
+	// ~40 tokens at the existing conservative estimate of 3 characters per token.
+	expect(prompt.length - baselinePromptChars).toBeGreaterThan(0);
+	expect(prompt.length - baselinePromptChars).toBeLessThanOrEqual(40 * 3);
 });
