@@ -1,7 +1,7 @@
 # Hard Oracle 19c eval suite (WP-H)
 
-The suite has 61 cases: 28 dev, 12 fresh holdout and 21 regression. IDs begin with
-`hard-`. Every category has dev and fresh holdout coverage. The old 21 holdout
+The suite has 73 cases: 28 dev, 12 fresh holdout, 21 regression and 12 challenge. IDs begin with
+`hard-`. Every original category has dev and fresh holdout coverage. The old 21 holdout
 cases now use `split: "regression"`; their other fields are unchanged. The dev
 ratio uses only dev + holdout: 28/40 = 70%. Regression cases never count toward
 that ratio or substitute for fresh holdout category coverage.
@@ -668,3 +668,77 @@ it is outside WP-8A ownership. No shared product contracts or dependencies need
 changes. The local EvalCase and RunOptions split unions now accept regression.
 No product, scorer, agent or LLM implementation changed. The fresh holdout
 baseline and independent review are not yet verified and belong to the coordinator.
+
+## Phase 11: blind challenge split (WP-11A)
+
+Added 12 cases in six `evals/cases-hard/phase11-*.json` files, two per
+category. The suite now contains 73 cases: 28 dev, 12 holdout, 21 regression
+and 12 challenge. Challenge is selected separately with `--split challenge`.
+Existing split selections and the dev/holdout coverage and ratio are unchanged.
+All 61 existing case objects are preserved; a SHA-256 fixture checks this.
+
+These cases were written blind. No agent, eval runner or LLM was run. Truth
+queries and the one cursor prerequisite are plain SELECTs. No scorer change,
+contract change or dependency addition is needed. The only type change is the
+local split union. No product code changed.
+
+**Validation is blocked, and these cases are not ready for the coordinator's
+baseline.** Both configured listeners refused connections during authoring:
+`127.0.0.1:1522` and `127.0.0.1:1523`, each with NJS-503 / ECONNREFUSED.
+The containers were not changed. Consequently no new Oracle result values,
+view visibility, cross-schema constraint visibility or cache prerequisites have
+been verified. The expected outputs below are definitions from the independent
+truth SQL, not observed results. The numeric values must be recorded after the
+owner restores the approved targets; no seed-data guesses are presented as truth.
+The historical generated validation JSON was left unchanged.
+
+Every ID below has prefix `hard-p11-`. Each case has `allCells` truth. Labels
+inside one cell bind metrics to their dimension so that values from different
+rows cannot satisfy each other. Questions explicitly request that record
+format; synthetic tests prove a missing row or swapped counts fail. This uses
+the existing scorer rather than introducing new checks. Such tests establish
+scoring mechanics, not Oracle result values or model solvability.
+
+| ID suffix / category | What makes it hard; independence from prior cases | Expected ground-truth output (values awaiting DB validation) |
+|---|---|---|
+| order-customer-key / multi-step-diagnosis | Resolve an ORDERS foreign key, its referenced parent constraint and index, then the indexed parent column type. Prior SHOPAPP FK cases stop at relationships; the PK-index case inspects ORDER_LINES itself. | Child column, parent table, referenced constraint, backing index, uniqueness, indexed position, parent column and type, from joined dictionary rows on p1. No index/constraint names are guessed. |
+| warehouse-location-key / multi-step-diagnosis | Follow OE.WAREHOUSES across schema ownership to the referenced constraint, backing index and typed columns. Earlier warehouse valuation does not inspect its parent key/index. | Child column, parent owner/table, referenced constraint, backing index, uniqueness, indexed position, parent column and type on d1. Cross-schema metadata visibility remains a prerequisite to verify. |
+| fiscal-calendar / column-traps | Distinguish calendar filtering from fiscal-year extrema and discover the real column names. Earlier SH analytics use revenue/calendar joins rather than fiscal boundary facts. | One row per calendar quarter in 2000: quarter label, minimum fiscal year, maximum fiscal year, distinct date count, in quarter order. Exact quarter boundaries and counts remain unverified. |
+| plan-line-tree / column-traps | Discover the right cursor/child and actual tree columns instead of guessing PLAN_ID. Earlier cached-plan cases score access paths, not line/parent/depth records. | Every `LINE=<id> / PARENT=<id or ROOT> / DEPTH=<depth> / OP=<operation> / OPTIONS=<options or NONE>` record for the selected p1 cursor, ordered by line ID. These values are plan-dependent and deliberately unpinned. |
+| commission-zero / false-premises | Distinguish NULL from zero; an equality-only count can confirm the wrong premise. Earlier HR cases do not test commission storage semantics. | `NULL_COMMISSION=<count> / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=<count>`. The validator requires both other counts to be positive. Exact counts remain unverified. The answer must address the premise. |
+| sales-primary-key / false-premises | Distinguish a declared primary key from plausible dimensional uniqueness or an index. Earlier SH relationship cases inspect SALES foreign-key endpoints rather than the absence of a primary key. | `PK_CONSTRAINTS=0 / FK_CONSTRAINTS=<count>`. The validator fails if the presumed absence of a primary key changes. The foreign-key count remains unverified; an explicit no-primary-key explanation is required. |
+| customers-scope / ambiguity | Reconcile three independently qualified tables rather than silently choosing CURRENT_SCHEMA; counts stay attached to owners. Earlier customer cases calculate metrics in one schema. | Three records `OWNER=CO|OE|SH / TABLE=CUSTOMERS / ROWS=<live count>` (one owner per record), ordered by owner. All three counts remain unverified. |
+| orders-status-scope / ambiguity | The same table name has differently named and represented status columns. Earlier CO order grouping never compares its representation to OE. | `OWNER=<owner> / COLUMN=<actual status column> / TYPE=<type> / NULLABLE=<Y or N>` for every status-named column in CO.ORDERS and OE.ORDERS. Names/types/nullability remain unverified. |
+| second-department / multi-turn-dependency | Preserve the second item of a count-based ranking, then resolve its manager and salaries; reranking by salary changes the referent. Earlier HR questions do not retain a ranked department into a manager lookup. | ID, name, employee count, salary total and manager full name for the second department by employee count descending, ties by ID. All values remain unverified. |
+| second-warehouse / multi-turn-dependency | Retain the second warehouse by quantity, then follow location/country/region rather than reuse a value ranking. Earlier warehouse valuation uses price-weighted totals and does not ask for the retained warehouse's geography. | ID, name, city, country and region of the second warehouse by total quantity descending, ties by ID. All values remain unverified. |
+| job-salary-bands / wide-exact | Return every job definition, including unfilled jobs, with two correctly associated salary boundaries. Earlier JOBS questions inspect a cached plan or segment allocation. | Every `JOB=<id> / MIN=<salary> / MAX=<salary>` record from HR.JOBS, ordered by ID. At least eight distinct records required; the full set and bounds remain unverified. |
+| subcategory-counts / wide-exact | Preserve every product subcategory and its count, including products without sales; a sales join drops definitions. Earlier product analytics aggregate revenue by category. | Every `SUBCATEGORY=<name> / PRODUCTS=<count>` record from SH.PRODUCTS, ordered by subcategory. At least eight distinct records required; the full set/counts remain unverified. |
+
+The plan case's validator setup populates only its own tagged SELECT cursor,
+using a negative order ID and no application write. The question supplies the
+search marker, not an answer or SQL_ID, and prohibits executing the selected
+text. Truth picks the lowest SQL_ID and child, joins the exact pair and reads
+all plan lines. Revalidate immediately before baseline because cursor aging and
+plan differences can change this prerequisite. Estimates are not measurements.
+
+Verification during authoring:
+
+```text
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-hard.ts
+FAILED: NJS-503 / ECONNREFUSED 127.0.0.1:1522
+validateHardCases with the same suite ordered to visit p1 first
+FAILED: NJS-503 / ECONNREFUSED 127.0.0.1:1523
+npm run typecheck
+PASSED (exit 0)
+npm test
+Test Files 36 passed (36)
+Tests 630 passed (630)
+```
+
+A separate strict TypeScript check of the changed eval modules and the new test
+also passed (including `src/oracle/driver.d.ts`; the product tsconfig excludes
+evals). Unit tests include all prior scorer tests. No DB or LLM product code was
+changed, so integration tests were not required. The requested live validation,
+expected numeric result transcription, Antigravity review, challenge ×3 baseline,
+failure triage and confirmation of the intended 40–80% difficulty remain pending.
+Do not loosen cases based on agent answers.
