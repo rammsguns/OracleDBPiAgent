@@ -154,7 +154,7 @@ the original implementation and coordinator review fixes.
 
 ### Chat `/triage`
 
-In CLI chat or web chat, enter `/triage <issue text>` to gather deterministic
+In CLI chat or web chat, enter `/triage [--since <duration>] <issue text>` to gather deterministic
 triage evidence for the pinned target (or configured default), then ask Strata to
 explain the likely root cause and next read-only steps. Empty commands display
 usage; issue text is capped at 64 KiB of UTF-8. Evidence context is bounded to
@@ -162,3 +162,10 @@ usage; issue text is capped at 64 KiB of UTF-8. Evidence context is bounded to
 hypotheses must remain qualified. This adds no tool and changes neither the
 default system prompt nor tool descriptions. Ordinary chat turns are unchanged.
 The web Triage panel and the CLI `triage` without `--summarize` need no LLM.
+
+The optional leading window flag uses the same validation as CLI `triage --since`:
+positive integer minutes (`m`), hours (`h`) or days (`d`), at most 30 days.
+For example, `/triage --since 7d NIGHTLY_PURGE_JOB ORA-02292` searches seven days;
+omitting the flag keeps the 24-hour default. Invalid windows show usage without
+collecting evidence or sending a model prompt. The web Triage panel's **Since**
+field accepts the same durations and defaults to `24h`.

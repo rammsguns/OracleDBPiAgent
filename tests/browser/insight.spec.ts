@@ -15,7 +15,12 @@ test('PL/SQL tab, document, layered SVG, literal hostile labels at phone width',
 test('triage hypotheses, fixes, SQL, evidence, trace and Markdown download', async ({ page }) => {
 	await page.setViewportSize({ width: 375, height: 812 });
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#triage-tab').click();
-	await page.locator('#triage-issue').fill('ORA-02292'); await page.locator('#triage-run').click();
+	await expect(page.locator("#triage-since")).toHaveValue("24h");
+	await page.locator("#triage-since").fill("7d");
+	await page.locator("#triage-issue").fill("ORA-02292");
+	const response = page.waitForResponse(r => r.url().endsWith("/api/triage"));
+	await page.locator("#triage-run").click();
+	expect((await response).request().postDataJSON()).toMatchObject({ since: "7d", issue: "ORA-02292" });
 	await expect(page.locator('#triage-content')).toContainText('Foreign key child rows');
 	await expect(page.locator('#triage-content')).toContainText('Review retention policy');
 	await expect(page.locator('#triage-content pre')).toContainText('SELECT * FROM DBA_CONSTRAINTS');
@@ -38,7 +43,25 @@ test('insight errors are shown and buttons recover', async ({ page }) => {
 test('web slash triage prepares evidence for one fake prompt; normal chat still works', async ({ page, request }) => {
 	const before = await (await request.get(process.env.PIAGENT_BROWSER_CONTROL!)).json();
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await expect(page.locator('#question')).toBeEnabled();
-	await page.locator('#question').fill('/triage ORA-02292'); await page.locator('#send').click();
+	await page.locator('#question').fill('/triage --since 7d ORA-02292'); await page.locator('#send').click();
 	await expect(page.locator('#messages')).toContainText('Final answer');
 	const after = await (await request.get(process.env.PIAGENT_BROWSER_CONTROL!)).json(); expect(after.prompts - before.prompts).toBe(1); expect(after.lastQuestion).toContain('Foreign key child rows'); expect(after.lastQuestion).toContain('Do not call tools');
+	expect(JSON.parse(after.lastQuestion.split('\n')[1])[0]).toMatchObject({ since: '7d', issue: 'ORA-02292' });
+});
+
+test("web chat rejects invalid windows with usage and no model prompt", async ({ page, request }) => {
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await expect(page.locator("#question")).toBeEnabled();
+	const before = await (await request.get(process.env.PIAGENT_BROWSER_CONTROL!)).json();
+	for (const window of ["31d", "0h", "oops"]) {
+		await page.locator("#question").fill(`/triage --since ${window} ORA-02292`);
+		const response = page.waitForResponse(r => /\/api\/sessions\/[^/]+\/ask$/.test(new URL(r.url()).pathname));
+		await page.locator("#send").click();
+		expect((await response).status()).toBe(400);
+		await expect(page.locator("#status")).toContainText("Usage: /triage [--since <duration>] <issue text>");
+		await expect(page.locator("#status")).toContainText("at most 30d");
+		await expect(page.locator("#send")).toBeEnabled();
+	}
+	const after = await (await request.get(process.env.PIAGENT_BROWSER_CONTROL!)).json();
+	expect(after.prompts).toBe(before.prompts);
 });

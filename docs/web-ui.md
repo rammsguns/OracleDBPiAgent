@@ -309,7 +309,7 @@ escaping. Responses including Markdown are capped at 1 MiB (`413`). Narrow the
 owner/object or incident when a cap is reached. Failures return generic messages.
 Neither the tab nor the panel sends evidence to Strata.
 
-In web chat, `/triage <issue text>` collects evidence for the conversation target,
+In web chat, `/triage [--since <duration>] <issue text>` collects evidence for the conversation target,
 then submits one bounded grounded question through the existing model path.
 Normal turns keep their original prompt and tools. This command uses Strata;
 the deterministic Triage panel does not. See [triage](triage.md).

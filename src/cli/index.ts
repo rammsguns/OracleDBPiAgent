@@ -170,14 +170,14 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				const offset = agent.state.messages.length;
 				let prepared = q;
 				if (question === undefined) {
-					let issue: string | undefined;
+					let command: ReturnType<typeof parseTriageCommand>;
 					try {
-						issue = parseTriageCommand(q);
+						command = parseTriageCommand(q);
 					} catch (error) {
 						console.error((error as Error).message);
 						return;
 					}
-					if (issue !== undefined) {
+					if (command !== undefined) {
 						try {
 							prepared = await prepareChatQuestion(ctx, q);
 						} catch {

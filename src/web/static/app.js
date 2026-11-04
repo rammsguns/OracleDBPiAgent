@@ -25,6 +25,12 @@ async function api(path, options = {}) {
 	if (!response.ok) {
 		const error = new Error(response.status === 409 ? 'The server is busy. Try again shortly.' :
 			response.status === 401 ? 'Authorization failed. Open the token URL printed by piagent web.' : 'Request failed. Please try again.');
+		if (response.status === 400 && /^\/api\/sessions\/[^/]+\/ask$/.test(path)) {
+			const data = await response.json().catch(() => null);
+			if (typeof data?.message === "string" && data.message.startsWith("Usage: /triage")) {
+				error.message = data.message;
+			}
+		}
 		error.status = response.status;
 		throw error;
 	}
