@@ -198,3 +198,15 @@ it('rejects an empty slash triage before opening the model stream', async () => 
 	expect(result.status).toBe(400); expect(result.text).toContain('Usage: /triage');
 	expect(f.agents[0]!.prompt).not.toHaveBeenCalled();
 });
+
+it.each(["31d", "0h", "bad"])("rejects invalid chat window %s before prompting", async since => {
+	const f = await fixture();
+	const id = await f.session();
+	const result = await f.call(`/api/sessions/${id}/ask`, "POST", {
+		question: `/triage --since ${since} ORA-02292`,
+	});
+	expect(result.status).toBe(400);
+	expect(JSON.parse(result.text).message).toContain("Usage: /triage [--since <duration>] <issue text>");
+	expect(JSON.parse(result.text).message).toContain("at most 30d");
+	expect(f.agents[0]!.prompt).not.toHaveBeenCalled();
+});

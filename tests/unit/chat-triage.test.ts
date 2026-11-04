@@ -6,7 +6,7 @@ import { loadConfig } from '../../src/config/index.js';
 import { parseTriageCommand, prepareChatQuestion } from '../../src/cli/chatTriage.js';
 import type { ToolContext } from '../../src/contracts.js';
 it('parses only the slash command, requires issue and caps UTF-8 bytes', () => {
-	expect(parseTriageCommand('/triage ORA-02292\nline 27')).toBe('ORA-02292\nline 27');
+	expect(parseTriageCommand('/triage ORA-02292\nline 27')).toEqual({ issue: 'ORA-02292\nline 27', since: '24h' });
 	for (const q of ['ordinary question', '/triageOther issue', 'what is /triage']) expect(parseTriageCommand(q)).toBeUndefined();
 	expect(() => parseTriageCommand('/triage ')).toThrow('Usage');
 	expect(() => parseTriageCommand('/triage ' + 'é'.repeat(32769))).toThrow('64 KiB');
@@ -16,7 +16,7 @@ it('leaves normal turns alone and grounds a single question on deterministic evi
 	const ctx = { config: { defaultTarget: 'd1-19c-lab' } } as ToolContext;
 	expect(await prepareChatQuestion(ctx, 'hello', run)).toBe('hello'); expect(run).not.toHaveBeenCalled();
 	expect(await prepareChatQuestion(ctx, '/triage ORA-02292', run)).toContain('Do not call tools');
-	expect(run).toHaveBeenCalledExactlyOnceWith(ctx, { target: 'd1-19c-lab', issue: 'ORA-02292' });
+	expect(run).toHaveBeenCalledExactlyOnceWith(ctx, { target: 'd1-19c-lab', issue: 'ORA-02292', since: '24h' });
 });
 it('snapshots default agent prompt and tool schemas/descriptions against master', async () => {
 	// Captured only after verifying the constructors byte-for-byte against the recorded master commit.
@@ -32,4 +32,34 @@ it('does not start a model prompt if web chat disconnects during evidence gather
 	const entry = { agent: { state: { messages: [] }, subscribe: () => unsubscribe, prompt }, prepareQuestion: async () => 'grounded evidence' };
 	await ask(entry as any, '/triage ORA-02292', vi.fn(), () => true);
 	expect(prompt).not.toHaveBeenCalled(); expect(unsubscribe).toHaveBeenCalledOnce();
+});
+
+it.each(["1m", "90m", "12h", "7d", "30d", "720h", "43200m"])(
+	"forwards a leading window %s to deterministic triage",
+	async since => {
+		const run = vi.fn(async () => ({ target: "p1-19c-prod", issues: [], scan: null }));
+		const ctx = { config: { defaultTarget: "d1-19c-lab" }, pinnedTarget: "p1-19c-prod" } as ToolContext;
+		const question = `/triage --since ${since} ORA-02292\nline 27`;
+		expect(parseTriageCommand(question)).toEqual({ since, issue: "ORA-02292\nline 27" });
+		await prepareChatQuestion(ctx, question, run);
+		expect(run).toHaveBeenCalledExactlyOnceWith(ctx, {
+			target: "p1-19c-prod", since, issue: "ORA-02292\nline 27",
+		});
+	},
+);
+it.each(["", "7d", "0h issue", "31d issue", "721h issue", "-1d issue", "1.5h issue", "7D issue", "oops issue"])(
+	"rejects missing or invalid window/issue: %s before collecting evidence or prompting",
+	async suffix => {
+		const run = vi.fn();
+		await expect(prepareChatQuestion({} as ToolContext, `/triage --since ${suffix}`, run)).rejects.toThrow(
+			"Usage: /triage [--since <duration>] <issue text>",
+		);
+		expect(run).not.toHaveBeenCalled();
+	},
+);
+it("preserves flags inside issue text and caps the issue after parsing a window", () => {
+	expect(parseTriageCommand("/triage ORA-02292 --since 7d")).toEqual({
+		issue: "ORA-02292 --since 7d", since: "24h",
+	});
+	expect(() => parseTriageCommand("/triage --since 7d " + "é".repeat(32769))).toThrow("64 KiB");
 });

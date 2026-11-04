@@ -1,18 +1,38 @@
 import type { ToolContext } from "../contracts.js";
-import { triage, type TriageResult } from "../triage/index.js";
+import { triage, sinceHours, type TriageResult } from "../triage/index.js";
 
-export function parseTriageCommand(question: string): string | undefined {
+interface ChatTriageCommand {
+	issue: string;
+	since: string;
+}
+
+const triageUsage = "Usage: /triage [--since <duration>] <issue text>";
+
+export function parseTriageCommand(question: string): ChatTriageCommand | undefined {
 	const prefix = /^\/triage(?:\s|$)/.exec(question);
 	if (!prefix) return undefined;
-	const issue = question.slice(prefix[0].length).trim();
-	if (!issue) throw new Error("Usage: /triage <issue text>");
+	let issue = question.slice(prefix[0].length).trim();
+	let since = "24h";
+	if (/^--since(?:\s|=|$)/.test(issue)) {
+		const window = /^--since\s+(\S+)(?:\s+([\s\S]*))?$/.exec(issue);
+		if (!window?.[1]) throw new Error(triageUsage);
+		since = window[1];
+		try {
+			sinceHours(since);
+		} catch (error) {
+			throw new Error(`${triageUsage}. ${(error as Error).message}`);
+		}
+		issue = (window[2] ?? "").trim();
+	}
+	if (!issue) throw new Error(triageUsage);
 	if (Buffer.byteLength(issue) > 65536) throw new Error("Issue exceeds 64 KiB");
-	return issue;
+	return { issue, since };
 }
 
 function conciseIssue(issue: TriageResult["issues"][number]) {
 	return {
 		issue: issue.issue.text.slice(0, 1000),
+		since: issue.since,
 		codes: issue.codes,
 		hypotheses: issue.hypotheses,
 		limitations: issue.limitations,
@@ -50,8 +70,8 @@ export async function prepareChatQuestion(
 	question: string,
 	run = triage,
 ): Promise<string> {
-	const issue = parseTriageCommand(question);
-	if (issue === undefined) return question;
-	const options = { target: ctx.pinnedTarget ?? ctx.config.defaultTarget, issue };
+	const command = parseTriageCommand(question);
+	if (command === undefined) return question;
+	const options = { target: ctx.pinnedTarget ?? ctx.config.defaultTarget, ...command };
 	return groundedTriageQuestion(await run(ctx, options));
 }
