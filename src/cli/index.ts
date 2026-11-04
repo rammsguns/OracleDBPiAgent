@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { parseTriageCommand, prepareChatQuestion } from './chatTriage.js';
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
@@ -15,6 +14,7 @@ import { createOracleAgent } from "../agent/index.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
 import { UnsupportedVersionError, type SessionProvider } from "../contracts.js";
 import type { AppConfig } from "../contracts.js";
+import { parseTriageCommand, prepareChatQuestion } from "./chatTriage.js";
 
 export interface DoctorDependencies {
 	report?: (name: string, ok: boolean) => void;
@@ -171,11 +171,19 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				let prepared = q;
 				if (question === undefined) {
 					let issue: string | undefined;
-					try { issue = parseTriageCommand(q); }
-					catch (error) { console.error((error as Error).message); return; }
+					try {
+						issue = parseTriageCommand(q);
+					} catch (error) {
+						console.error((error as Error).message);
+						return;
+					}
 					if (issue !== undefined) {
-						try { prepared = await prepareChatQuestion(ctx, q); }
-						catch { console.error('Triage failed; check local database availability'); return; }
+						try {
+							prepared = await prepareChatQuestion(ctx, q);
+						} catch {
+							console.error("Triage failed; check local database availability");
+							return;
+						}
 					}
 				}
 				await agent.prompt(prepared);
