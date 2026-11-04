@@ -38,3 +38,10 @@ td:nth-child(2) { max-width: 24rem; }
 #report-panel label { display: inline-block; }
 .unverified { border-left: 3px solid #a55c00; padding-left: .6rem; color: #754000; overflow-wrap: anywhere; }
 [role="tablist"] { flex-wrap: wrap; }
+
+#history-content { overflow-wrap: anywhere; }
+.history-series { border-top: 1px solid #d4dfe3; padding: .6rem 0; }
+.history-series h4, .history-series p { margin: .4rem 0; }
+.sparkline { display: block; width: 240px; max-width: 100%; height: auto; color: #185b67; }
+.sparkline line { stroke: currentColor; stroke-width: 2; }
+.sparkline circle { fill: currentColor; }

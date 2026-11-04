@@ -111,3 +111,36 @@ it('returns the pre-save comparison and reads existing history without changing 
 	const saved = JSON.parse((await f.call('/save', {}, 'POST')).text);
 	expect(saved.diff.previousGeneratedAt).toBe('2026-10-29T12:00:00.000Z'); expect(saved.diff.changes).toEqual([]);
 });
+
+it('history shares authentication and Host/Origin guards before reading', async () => {
+	const loadHistory = vi.fn(); const f = await fixture({ loadHistory });
+	for (const [headers, status] of [[{ Authorization: '' }, 401], [{ Host: 'evil.test' }, 403], [{ Origin: 'null' }, 403], [{ Origin: 'http://evil.test' }, 403]] as const) expect((await f.call('/history', headers)).status).toBe(status);
+	expect(loadHistory).not.toHaveBeenCalled(); expect(f.report).not.toHaveBeenCalled();
+});
+it.each(['?target=unknown', '?target=', '?target=../etc', '?last=0', '?last=31', '?last=-1', '?last=1.5', '?last=', '?last=NaN'])('history rejects invalid selection %s', async query => {
+	const loadHistory = vi.fn(); const f = await fixture({ loadHistory });
+	expect((await f.call('/history' + query)).status).toBe(400); expect(loadHistory).not.toHaveBeenCalled();
+});
+it('history reads saved snapshots only, including empty history, while LLM is busy', async () => {
+	const sessionFactory = vi.fn(async () => { throw new Error('No database access permitted'); });
+	const f = await fixture({ sessionFactory }); const release = acquireLlm();
+	try {
+		const response = await f.call('/history'); expect(response.status).toBe(200);
+		expect(JSON.parse(response.text)).toMatchObject({ target: 'd1-19c-lab', runs: 0, scanned: 0, skipped: 0 });
+		expect(await readdir(f.dir)).toEqual([]);
+		expect(sessionFactory).not.toHaveBeenCalled(); expect(f.report).not.toHaveBeenCalled(); expect(f.summarize).not.toHaveBeenCalled();
+	} finally { release(); }
+});
+it('history forwards the bounded selection and returns WP-12A trends', async () => {
+	const loadHistory = vi.fn(async (_dir, target) => ({ target, reports: [60, 90].map((used, i) => ({ target, generatedAt: `2026-10-${28 + i}T00:00:00.000Z`, sections: [{ name: 'tablespaces', status: 'ok' as const, source: 'fixture', columns: ['TABLESPACE_NAME', 'USED_PERCENT'], rows: [['<img src=x onerror=alert(1)>', used]], note: '' }] })), scanned: 3, skipped: 1, notes: ['Skipped file'] }));
+	const f = await fixture({ loadHistory }); const response = await f.call('/history?target=p1-19c-prod&last=3');
+	expect(response.status).toBe(200);
+	expect(loadHistory).toHaveBeenCalledWith(f.dir, 'p1-19c-prod', expect.any(Array), 3);
+	expect(JSON.parse(response.text)).toMatchObject({ runs: 2, scanned: 3, skipped: 1, series: expect.arrayContaining([expect.objectContaining({ first: 60, last: 90, change: 30, worsening: true })]) });
+	expect(f.report).not.toHaveBeenCalled();
+});
+it('history scrubs read errors and rejects mutation methods', async () => {
+	const loadHistory = vi.fn(async () => { throw new Error('secret path ORA-123'); }); const f = await fixture({ loadHistory });
+	expect(await f.call('/history')).toEqual({ status: 500, text: JSON.stringify({ message: 'History unavailable' }) });
+	loadHistory.mockClear(); expect((await f.call('/history', {}, 'POST')).status).toBe(405); expect(loadHistory).not.toHaveBeenCalled();
+});

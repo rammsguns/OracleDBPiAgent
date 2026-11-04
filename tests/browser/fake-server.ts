@@ -13,6 +13,10 @@ export async function startFakeServer() {
 	let now = 0;
 	const stats = { aborted: 0, prompts: 0 };
 	const web = createWebServer({ port: 0, config, reportDirectory: join(dir, 'reports'),
+		loadHistory: async (_dir, target) => ({ target, scanned: target === 'p1-19c-prod' ? 0 : 3, skipped: 0, notes: [], reports: target === 'p1-19c-prod' ? [] : [60, 70, 90].map((used, i) => ({ target, generatedAt: `2026-10-${26 + i}T00:00:00.000Z`, sections: [
+			{ name: 'tablespaces', status: 'ok' as const, source: 'fake', columns: ['TABLESPACE_NAME', 'USED_PERCENT'], rows: [[hostile, used]], note: '' },
+			{ name: 'backups', status: 'unavailable' as const, source: 'fake', columns: [], rows: [], note: 'unavailable' },
+		] })) }),
 		loadReport: async (_dir, target) => target === 'p1-19c-prod' ? null : ({ target, generatedAt: '2026-10-28T00:00:00.000Z', sections: [{ name: 'top_sql', status: 'ok', source: 'fake', columns: ['SQL_ID'], rows: [], note: '' }] }),
 		now: () => now, idleMs: 1000,
 		report: async (_ctx, options) => ({ target: options?.target ?? 'd1-19c-lab', generatedAt: '2026-10-29T00:00:00.000Z', sections: [
@@ -46,7 +50,8 @@ export async function startFakeServer() {
 						if (aborted) return;
 						for (const isError of [false, true]) {
 							emit({ type: 'tool_execution_start', toolName: isError ? 'failed_query' : 'run_query', args: { name: hostile, binds: { secret: "never-export-bind" }, sql: "never-export-sql" } });
-							await new Promise(resolve => setTimeout(resolve, 100));
+							// Keep the transient running state observable by browser polling.
+							await new Promise(resolve => setTimeout(resolve, 500));
 							emit({ type: 'tool_execution_end', toolName: isError ? 'failed_query' : 'run_query', isError, result: { content: [{ type: 'text', text: 'fake result' }] } });
 						}
 						emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: ' streamed tail' } });

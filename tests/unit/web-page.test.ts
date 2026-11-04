@@ -64,7 +64,8 @@ describe('trace model', () => {
 it('static assets exclude executable HTML sinks, dynamic code, inline handlers and external URLs', () => {
 	const root = new URL('../../src/web/static/', import.meta.url);
 	for (const filename of readdirSync(root)) {
-		const source = readFileSync(new URL(filename, root), 'utf8');
+		// The SVG namespace identifies DOM elements; it performs no network request.
+		const source = readFileSync(new URL(filename, root), 'utf8').replaceAll('http://www.w3.org/2000/svg', 'SVG_NAMESPACE');
 		for (const forbidden of [/innerHTML/i, /insertAdjacentHTML/i, /document\s*\.\s*write/i, /\beval\s*\(/i, /\bnew\s+Function\s*\(/, /\bon[a-z]+\s*=/i, /https?:\/\//i, /(?:src|href)\s*=\s*["']\/\//i]) {
 			expect(source, `${filename}: ${forbidden}`).not.toMatch(forbidden);
 		}
