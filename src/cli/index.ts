@@ -14,6 +14,7 @@ import { createOracleAgent } from "../agent/index.js";
 import { createSessions } from "../agent/dbToolsAdapter.js";
 import { UnsupportedVersionError, type SessionProvider } from "../contracts.js";
 import type { AppConfig } from "../contracts.js";
+import { parseTriageCommand, prepareChatQuestion } from "./chatTriage.js";
 
 export interface DoctorDependencies {
 	report?: (name: string, ok: boolean) => void;
@@ -167,7 +168,25 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			const ask = async (q: string) => {
 				toolCalls = [];
 				const offset = agent.state.messages.length;
-				await agent.prompt(q);
+				let prepared = q;
+				if (question === undefined) {
+					let issue: string | undefined;
+					try {
+						issue = parseTriageCommand(q);
+					} catch (error) {
+						console.error((error as Error).message);
+						return;
+					}
+					if (issue !== undefined) {
+						try {
+							prepared = await prepareChatQuestion(ctx, q);
+						} catch {
+							console.error("Triage failed; check local database availability");
+							return;
+						}
+					}
+				}
+				await agent.prompt(prepared);
 				if (agent.state.errorMessage) throw new Error("Local model request failed");
 				const replies = agent.state.messages.slice(offset).filter(m => m.role === "assistant");
 				const last = replies.at(-1);

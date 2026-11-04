@@ -192,3 +192,9 @@ describe("loopback web API", () => {
 		expect((await f.call("/%zz")).status).toBe(400);
 	});
 });
+it('rejects an empty slash triage before opening the model stream', async () => {
+	const f = await fixture(); const id = await f.session();
+	const result = await f.call(`/api/sessions/${id}/ask`, 'POST', { question: '/triage ' });
+	expect(result.status).toBe(400); expect(result.text).toContain('Usage: /triage');
+	expect(f.agents[0]!.prompt).not.toHaveBeenCalled();
+});
