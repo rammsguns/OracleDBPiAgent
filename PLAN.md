@@ -2205,6 +2205,40 @@ The agent answers through its existing `run_query` tool. The scorer reuses the
 existing check types. The gate reports p18 ×4 as a measurement, and the other
 splits must not change, because there are no product changes in 18D.
 
+### WP-18G: timestamps in tool results (branch `wp-18g-timestamps`)
+In gate-18, tool results rendered Oracle date values with JavaScript
+`String(Date)`. For example, an alert time showed as `Tue Nov 03 2026 22:30:56
+GMT-0600 (Central Standard Time)` (`src/tools/index.ts` cell rendering). On a
+question asked in UTC, the agent then compared against a session-local literal
+and counted an extra incident.
+
+Owns:
+- `src/oracle/index.ts` (column types);
+- the cell rendering in `src/tools/index.ts`;
+- one authorized contract line in `src/contracts.ts`: optional
+  `columnTypes?: string[]` on `QueryResult`, from `metaData[i].dbTypeName`;
+- tests and `docs/`.
+
+Rendering (tool text only):
+- TIMESTAMP WITH TIME ZONE and WITH LOCAL TIME ZONE become ISO 8601 UTC with
+  `Z` and milliseconds (`2026-11-04T04:30:56.298Z`).
+- DATE and plain TIMESTAMP keep their stored wall-clock time, with no time-zone
+  conversion: `YYYY-MM-DD HH24:MI:SS`, plus fractional seconds for TIMESTAMP.
+  The driver reads them as client-local, so local getters recover the stored
+  value.
+- A Date with an unknown type falls back to the wall-clock format.
+
+Unchanged:
+- Other consumers of `rows` (triage, report, alert log, web, evals) still get
+  the same Date objects.
+- No tool definitions or system prompt change.
+- No `ALTER SESSION`.
+
+Gate:
+- A/B alternating: p18 ×4, p16 ×4, dev 4×4, holdout ×3, regression and MVP.
+- The scorer is unchanged.
+- Merge only with no regression. The audit log also stays unchanged.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
