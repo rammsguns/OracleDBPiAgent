@@ -1,4 +1,10 @@
-# Single-SQL performance insight (WP-19A)
+# Single-SQL Performance Insight
+
+Current presentation and refreshed live smokes: [WP-19E](wp-19e-sql-polish.md).
+Text candidates now exclude the session user’s diagnostic statements and report
+the excluded count. Raw JSON timing remains in microseconds; displayed per-execution
+time uses milliseconds with three significant digits. Object status lives on each
+statistics row, with one summary per section.
 
 Use the deterministic, read-only CLI without an LLM:
 
@@ -56,7 +62,10 @@ Findings contain Check evidence rows for execution-time plan instability,
 stale/missing statistics, large full scans on nested-loop inner branches, and
 high child counts. A finding is a diagnostic lead, not proof of causality.
 
-## Live smoke, 2026-11-05 (repeated after review fixes)
+## Historical WP-19A Smoke, 2026-11-05
+
+This earlier diagnostic-probe text lookup is intentionally excluded by WP-19E.
+Use the workload-based smokes linked above for current validation.
 
 Both approved accounts ran the integration SELECT probe:
 
