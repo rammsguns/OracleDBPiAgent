@@ -171,3 +171,22 @@ td:nth-child(2) { max-width: 24rem; }
 .sql-evidence > p { overflow-wrap: anywhere; }
 .sql-evidence .sql-table td { white-space: nowrap; }
 .sql-evidence .sql-findings td { min-width: 12rem; max-width: 32rem; white-space: normal; overflow-wrap: anywhere; }
+
+#security-panel { min-width: 0; overflow-wrap: anywhere; }
+#security-panel input { display: block; width: 100%; max-width: 28rem; padding: .5rem; font: inherit; }
+#security-panel > label { display: block; margin: .75rem 0 .35rem; font-weight: 600; }
+#security-export { margin: .5rem; }
+.security-table { max-width: 100%; min-width: 0; overflow-x: auto; }
+.security-table table { min-width: 38rem; }
+.security-table td { min-width: 9rem; max-width: 30rem; white-space: normal; overflow-wrap: anywhere; }
+.security-table td:first-child { white-space: nowrap; }
+.security-check { margin: .75rem 0; border-top: 1px solid #859ba5; padding-top: .6rem; }
+.security-check summary { cursor: pointer; }
+.security-advice { font-size: .9rem; }
+.security-paths { padding-left: 1.4rem; }
+.security-paths p { margin: .25rem 0 .75rem; }
+#security-content .graph-scroll { max-height: 36rem; }
+#security-content .graph-scroll svg { min-width: 700px; }
+@media (min-width: 801px) { main:has(#security-tab[aria-selected="true"]) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
+.security-table td:nth-child(2) { min-width: 16rem; }
+.security-table td:last-child { white-space: nowrap; }
