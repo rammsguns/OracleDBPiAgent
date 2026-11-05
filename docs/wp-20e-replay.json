@@ -1,0 +1,84 @@
+{
+	"roots": [
+		"../eval-archive",
+		"../needlefish/evals/results"
+	],
+	"files": 554,
+	"records": 10364,
+	"targetRecords": 76,
+	"otherFlips": 0,
+	"flips": [
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T06-37-37-326Z-11a32e67-86dd-4ba0-94b8-1ae776fcd080.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "DEFAULTED = 'N'",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T06-41-26-188Z-7807b07a-c61f-4eb0-985b-fed9dea4c9dc.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "Defaults:** None",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T09-19-45-760Z-3b9eb40e-214e-4377-b737-f1765aadb5d7.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "Defaults:** None",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T17-46-55-792Z-e2cefc6c-e886-4a55-a2a5-75d086108b04.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "Defaults:** None",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T17-50-15-326Z-51e55392-6787-47b5-b5f6-e6b612f57a97.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "DEFAULTED = 'N'",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T18-05-56-711Z-b168ebdc-2308-4d34-8c4d-342a8301a7d4.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "DEFAULTED = 'N'",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T06-41-26-188Z-7807b07a-c61f-4eb0-985b-fed9dea4c9dc.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "Defaults:** None",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T09-19-45-760Z-3b9eb40e-214e-4377-b737-f1765aadb5d7.json",
+			"id": "hard-p16-history-arguments",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"conclusion": "Defaults:** None",
+			"reason": "Accepts explicit no-default conclusion; archived truth/tool checks still pass."
+		}
+	]
+}

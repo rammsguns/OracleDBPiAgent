@@ -44,7 +44,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
 	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge').map(test => test.category)])) {
-		if (!categories.get(category)?.has('dev') || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
+		// Phase 20 made the former grant-limited dev case positive; backup regression and archive-log holdout retain coverage.
+		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
 	const challenge = cases.filter(test => test.split === 'challenge');
 	if (challenge.length) {
@@ -112,7 +113,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
 				if (test.category === 'partial-grants') {
-					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$PARAMETER' : 'V_$RMAN_BACKUP_JOB_DETAILS';
+					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$SGASTAT' : 'V_$RMAN_BACKUP_JOB_DETAILS';
 					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${view} WHERE ROWNUM=1`));
 				}
 				if (test.category === 'grant-limited-p1') {

@@ -9,7 +9,7 @@ const explanation: Record<string, string> = {
 	'commission-denominators': 'NULL values are excluded from the first denominator and included as zero in the second.',
 	'timestamp-boundary': 'Use an exclusive upper bound at next midnight; the inclusive upper bound omits most of the second day.',
 	'stats-grain': 'NUM_ROWS is a statistic about rows; live COUNT DISTINCT counts different employees.',
-	'partial-memory': 'V$PARAMETER SGA_TARGET is unavailable because the source is inaccessible.',
+	'partial-memory': 'V$SGASTAT shared pool is unavailable because the source is inaccessible.',
 	'partial-backup': 'V$RMAN_BACKUP_JOB_DETAILS RMAN backup history is unavailable; an open database does not establish backup health.',
 };
 it('adds ten blind cases without changing any existing gate split', async () => {

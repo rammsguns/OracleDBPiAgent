@@ -152,15 +152,15 @@
 		"target": "p1-19c-prod",
 		"category": "partial-grants",
 		"split": "challenge",
-		"question": "On p1, report instance name and major database version, then the configured SGA_TARGET value in bytes. Give every part the account can verify and explicitly identify any unavailable source and value; do not infer configured targets from currently allocated memory.",
+		"question": "On p1, report instance name and major database version, then the current shared pool allocation in bytes from V$SGASTAT. Give every part the account can verify and explicitly identify any unavailable source and value; do not infer the shared pool allocation from total SGA or configured targets.",
 		"groundTruth": {
 			"sql": "SELECT instance_name FROM v$instance UNION ALL SELECT REGEXP_SUBSTR(version,'^[0-9]+') FROM v$instance",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
-				"SGA_TARGET",
-				"V\\$PARAMETER",
+				"shared pool",
+				"V\\$SGASTAT",
 				"(unavailable|inaccessible|cannot|denied|lack|missing)"
 			],
 			"requiredTools": [],
