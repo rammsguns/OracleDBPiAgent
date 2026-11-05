@@ -2953,6 +2953,68 @@ Release gate (single side, as in phase 15):
 The coordinator commits the version bump. The push of `main` and tag `v1.2.0`
 waits for the owner.
 
+### Phase 21 results (2026-11-05): released 1.2.0
+
+Merges on master:
+- WP-21A fcfdbe4 (re-review APPROVE after the Linuxbrew and Windows Node
+  path fix);
+- WP-21B 53ee3ca;
+- WP-21C dc1ced1;
+- WP-21D cdc8127 (from the WP-21C review: the CLI catch had masked the WP-21A
+  key-file guidance).
+
+Antigravity approved every WP. The version bump is caaff4a.
+
+Release gate: master fcfdbe4, single side; WP-21C and WP-21D do not touch the
+eval path. Archive: `eval-archive/phase21/gate-release`.
+
+| Split | Result |
+|---|---|
+| dev ×2 | 28/28, 28/28 |
+| challenge ×2 (includes p16/p18/p19/p20) | 46/48, 45/48 |
+| holdout ×3 | 57/69, with 3 legitimate skips: the existing 12 cases scored 36/36, the new phase 21 cases 21/33 |
+| regression | 21/21 |
+| MVP | 39/39 |
+| refusals | all pass |
+
+The 12 missed runs on the new blind holdout were a first measurement, not
+regressions. They were left unedited for the release.
+- Case defects (6), where the answer was correct:
+  - `hard-p21-history-signature` ×3: the truth row needs `N`, the answer says
+    "No";
+  - `hard-p21-products-stats` ×3: YES/YES appears in a vertical attribute
+    table that `rowCells` does not read.
+- Agent gaps (4):
+  - `hard-p21-alert-levels` ×2: "alert messages" was not linked to the alert
+    log;
+  - `hard-p21-problem-identity` ×2: the agent claimed ADR problem keys are
+    only visible in adrci and missed V$DIAG_PROBLEM.
+- One miss each (2): trigger-state and price-plan-operations.
+
+Package smoke, from `npm pack` with a global install into a temporary prefix:
+- 1.2.0, and all 19 `--help` pages exit 0;
+- `init`; `ask` with the placeholder prints the PIAGENT_LLM_API_KEY_FILE
+  guidance and exits 1;
+- `doctor`; `ask` (107 rows); `targets`;
+- `report`, `report history` and `report schedule` (warning shown for the
+  bundled Node);
+- `plsql list` and `plsql doc`; `triage`; `alertlog`; `sql`; `security`;
+- `drift` with the parameters scope (exit 3) and the security scope
+  (exit 1, incomplete: d1 lacks most security grants, as documented);
+- `web` (page, sql, security and alertlog modules return 200).
+
+Tests on caaff4a:
+- typecheck clean;
+- 1311 unit tests;
+- 52 browser tests;
+- 55/55 integration tests, including Strata end to end.
+
+Follow-ups (phase 22 candidates):
+- Fix the two holdout case defects with a replay.
+- Agent hints for alert-log and ADR problem discovery.
+- The `PIAGENT_HOME must be private (mode 0700)` error is masked by the
+  generic CLI catch; make it a SafeConfigError.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
