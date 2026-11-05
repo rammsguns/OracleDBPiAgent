@@ -1667,3 +1667,58 @@ Revision verification: all six truths revalidated live; typecheck clean;
 The unchanged NIGHTLY_PURGE_JOB triage test still fails because `issue.codes`
 does not contain ORA-02292; the alert SQL independently finds that error on
 4 November. No database, triage, or alert-reader code was changed.
+
+### WP-18F: p18 scorer follow-up (2026-11-04)
+
+Only the existing `hard-p18-*` rowCells path changes. Oracle code cells
+accept a leading ORA-/TNS- code followed by a colon or whitespace after
+Markdown emphasis/backtick cleanup. Single-row truth can consume positive
+labelled lines/bullets across an answer; table rows remain separate, and
+multi-row truth never pools labelled lines. Leading values are extracted without
+borrowing identifiers from explanations. Negated labelled lines are excluded.
+
+Minimal gate-18 table/bullet excerpts are embedded in
+`tests/unit/phase18f-scorer.test.ts`. Tests reject wrong codes, code suffixes,
+wrong incidents, codes in different table rows, negated constraints and
+unpaired multi-row values, and verify unchanged historical-case behavior.
+
+Offline replay used the pre-change scorer copied from this branch before editing,
+and the new scorer, against every JSON archive under
+`/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive`.
+No database or LLM calls were made; archives were read only. Truth rows were
+recovered from stored `fresh ground truth row:` checks; scalar ranges and
+allCells values were recovered from their stored checks, with current case
+definitions supplying expectations/SQL labels. There were 332 record-bearing
+archives and 8,059 answer records compared. Nine execution-error records have
+no answer and retain their failure. For 113 retired-case answer records whose
+definitions are absent, replay used a synthetic case with their ID and stored
+row truth (where present); original unrelated checks remain unchanged. This
+checks the affected matching path but does not recreate retired case metadata.
+All old/new check comparisons had **zero non-p18 changes**.
+
+Every changed record is listed below (all false → true); there were no other
+check or pass changes. Paths are relative to the archive root.
+
+| Archive | Record (zero based) | Case | Justification |
+|---|---:|---|---|
+| `phase18/gate-18/2026-11-05T05-31-15-964Z-17908d06-ed9e-4a0d-b361-f333fe5c485a.json` | 0 | `hard-p18-d1-critical-incident` | The same table row contains ORA-00800 followed by its message and incident 225332. |
+| `phase18/gate-18/2026-11-05T05-31-15-964Z-17908d06-ed9e-4a0d-b361-f333fe5c485a.json` | 1 | `hard-p18-p1-failed-job` | Positive labelled job and violated-constraint lines state SHOPAPP.NIGHTLY_PURGE_JOB and SHOPAPP.SYS_C007669. |
+| `phase18/gate-18/2026-11-05T05-35-41-370Z-10ee6228-401d-4ebc-b2f0-42eefe08b79b.json` | 1 | `hard-p18-p1-failed-job` | Positive labelled job and violated-constraint lines state SHOPAPP.NIGHTLY_PURGE_JOB and SHOPAPP.SYS_C007669. |
+| `phase18/gate-18/2026-11-05T05-38-29-856Z-321cfa91-cc8c-4d62-b85d-ad9deaafab37.json` | 0 | `hard-p18-d1-critical-incident` | Positive labelled Error and Incident created lines state ORA-00800 and 225332. |
+| `phase18/gate-18/2026-11-05T05-38-29-856Z-321cfa91-cc8c-4d62-b85d-ad9deaafab37.json` | 1 | `hard-p18-p1-failed-job` | Positive labelled job and violated-constraint lines state SHOPAPP.NIGHTLY_PURGE_JOB and SHOPAPP.SYS_C007669. |
+
+Gate-18 p18 counts (old → new):
+
+| Archive timestamp (2026-11-05 UTC) | Old | Rescored |
+|---|---:|---:|
+| 05-31-15-964Z | 3/6 | 5/6 |
+| 05-33-39-257Z | 3/6 | 3/6 |
+| 05-35-41-370Z | 2/6 | 3/6 |
+| 05-38-29-856Z | 4/6 | 6/6 |
+| Total | 12/24 | 17/24 |
+
+Validation: `npm run typecheck` passed; `npm test` passed
+(74 files, 1,117 tests). This worktree lacked installed dependencies; validation
+used a local ignored node_modules symlink to the existing WP-18D installation.
+No dependencies, contracts, product code, or case definitions changed.
+Integration tests were unnecessary: no DB/LLM code changed.

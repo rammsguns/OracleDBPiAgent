@@ -89,7 +89,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	// Dictionary constraint types may be explained after an identifier.
 	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+-\s+type\s+[PRUCV]$/i, '$1');
 	const same = (actual: string, expected: unknown, label = '') => {
-		let text = evidence(actual);
+		let text = evidence(preserveQualified ? actual.replace(/__([^_]+)__/g, '$1') : actual);
 		const value = String(expected);
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
@@ -106,6 +106,9 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// DML SQL in an operation column states its operation explicitly. This
 		// does not split plan operations such as INDEX UNIQUE SCAN.
 		if (/^operation$/i.test(label)) text = /^(INSERT)\s+INTO\b|^(UPDATE)\s+[A-Za-z_][\w$.]*\s+SET\b|^(DELETE)\s+FROM\b/i.exec(text)?.slice(1).find(Boolean) ?? text;
+		if (preserveQualified && /^(?:ORA|TNS)-\d{5}$/i.test(value)
+			&& text.toLowerCase().startsWith(value.toLowerCase())
+			&& /^[:\s]/.test(text.slice(value.length))) return true;
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
@@ -155,6 +158,19 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		for (const line of lines) {
 			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!.replace(/^([^=:]+):\s*/, '$1='));
 		}
+	}
+	// A single p18 truth record may be presented as separate labelled facts.
+	// Pool only positive labelled lines, never table rows or unlabelled mentions.
+	if (preserveQualified && singleRow) {
+		const facts = lines.filter(line => !line.includes('|') && !/\b(?:not|no|never|except|without)\b/i.test(line))
+			.flatMap(line => {
+				const match = /^(?:[-•]\s+)?[A-Za-z][^:=]*:\s*(.+)$/.exec(line);
+				if (!match) return [];
+				// Keep the leading value; an explanation after it is not another fact.
+				const value = /^(?:ORA|TNS)-\d{5}(?=[:\s]|$)|^[A-Za-z_][\w$#]*(?:\.[A-Za-z_][\w$#]*)*|^[-+]?\d+(?:\.\d+)?/i.exec(match[1]!);
+				return value ? [value[0]] : [];
+			});
+		if (facts.length) candidates.push(facts.join(' | '));
 	}
 	const routineColumn = labels.find(label => /^(?:subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
 	const roleColumn = labels.findIndex(label => /^role$/i.test(label));
