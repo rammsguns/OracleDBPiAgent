@@ -5,7 +5,10 @@ const normalizeHyphens = (text: string) => text.replace(/[\u2010-\u2015\u2212]/g
 // workload) may change while the agent runs, so a scalar count may be anywhere between.
 export function score(test: EvalCase, result: AskResult, truth: unknown[][] = [], truthAfter?: unknown[][]) {
 	const checks: { check: string; pass: boolean }[] = [];
-	const answer = normalizeHyphens(result.answer);
+	// Keep historical splits byte-for-byte in behavior; p18 accepts ordinary short Oracle codes.
+	const normalizeCodes = (text: string) => normalizeHyphens(text).replace(/"([A-Za-z_][\w$#]*)"/g, '$1').replace(/\b(ORA|TNS)-(\d{1,5})(?![\w])/gi,
+		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
+	const answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : normalizeHyphens(result.answer);
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(answer) });
 	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(answer) });
 	// A required tool may list alternatives ("run_query|top_sql") when either can produce the evidence.
@@ -31,7 +34,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql)) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-')) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -73,7 +76,7 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[]): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => normalizeHyphens(text).replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
@@ -225,7 +228,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			}
 			const available = fields.flatMap(field => {
 				const value = evidence(field);
-				return /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(value) ? value.split('.') : [value];
+				return /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(value) && !(preserveQualified && row.some(expected => String(expected).toLowerCase() === value.toLowerCase())) ? value.split('.') : [value];
 			});
 			return row.every((value, column) => { const index = available.findIndex(field => same(field, value, labels[column])); if (index < 0) return false; available.splice(index, 1); return true; });
 		}

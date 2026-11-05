@@ -1,0 +1,76 @@
+{
+	"validatedAt": "2026-11-05T05:03:41.209Z",
+	"caseCount": 6,
+	"records": [
+		{
+			"id": "hard-p18-d1-critical-incident",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code, REGEXP_SUBSTR(MESSAGE_TEXT,'incident=([0-9]+)',1,1,'i',1) AS incident_id FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND MESSAGE_LEVEL=1 ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA-00800",
+					"225332"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-incident-count",
+			"target": "d1-19c-lab",
+			"sql": "SELECT p.PROBLEM_KEY AS problem_key, COUNT(*) AS incident_count FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') GROUP BY p.PROBLEM_KEY ORDER BY p.PROBLEM_KEY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA 800",
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-frequent-code",
+			"target": "d1-19c-lab",
+			"sql": "SELECT code FROM (SELECT code, DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS frequency_rank FROM (SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)')) WHERE code <> 'ORA-00000' GROUP BY code) WHERE frequency_rank=1 ORDER BY code",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA-00031"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-failed-job",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT REPLACE(REGEXP_SUBSTR(MESSAGE_TEXT,'job ([^[:space:]]+)',1,1,'i',1),'\"','') AS job_name, REGEXP_SUBSTR(MESSAGE_TEXT,'constraint [(]([^)]*)[)]',1,1,'i',1) AS constraint_name FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-05 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND INSTR(MESSAGE_TEXT,'ORA-12012')>0 AND INSTR(MESSAGE_TEXT,'ORA-02292')>0 ORDER BY job_name, constraint_name",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"SHOPAPP.NIGHTLY_PURGE_JOB",
+					"SHOPAPP.SYS_C007669"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-incident-count",
+			"target": "p1-19c-prod",
+			"sql": "SELECT p.PROBLEM_KEY AS problem_key, COUNT(*) AS incident_count FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') GROUP BY p.PROBLEM_KEY ORDER BY p.PROBLEM_KEY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA 800",
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-frequent-code",
+			"target": "p1-19c-prod",
+			"sql": "SELECT code FROM (SELECT code, DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS frequency_rank FROM (SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)')) WHERE code <> 'ORA-00000' GROUP BY code) WHERE frequency_rank=1 ORDER BY code",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA-00313"
+				]
+			]
+		}
+	]
+}
