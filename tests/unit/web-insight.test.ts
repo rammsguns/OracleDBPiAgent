@@ -48,7 +48,7 @@ it('shares lock across insight routes and releases after failures', async () => 
 	const pending = new Promise<void>(r => { release = r; }), start = new Promise<void>(r => { started = r; });
 	const f = await fixture({ plsqlList: async () => { started(); await pending; throw new Error('private DSN'); } });
 	const first = f.call(); await start;
-	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); } finally { release(); }
+	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); } finally { release(); }
 	const failed = await first; expect(failed.status).toBe(500); expect(failed.text).not.toContain('DSN'); expect((await f.call()).status).toBe(500);
 });
 it('accepts dollar and hash identifiers and forwards doc selection', async () => {
@@ -91,4 +91,11 @@ it('validates SQL requests before sessions and returns candidate picks or insigh
 	const result = await f.call('/api/sql?sqlId=0123456789abc');
 	expect(result.status).toBe(200); expect(JSON.parse(result.text).markdown).toContain('# SQL insight');
 	expect(f.closeAll).toHaveBeenCalledTimes(2);
+});
+it('SQL errors stay private, output is bounded and sessions and lock recover', async () => {
+	const { sqlFixture } = await import('../browser/sql-fixture.js');
+	let mode = 'fail';
+	const f = await fixture({ readSqlInsight: async () => { if (mode === 'fail') throw new Error('private database address'); return { ...sqlFixture, text: 'x'.repeat(1048576) }; } });
+	for (let i = 0; i < 2; i++) { const response = await f.call('/api/sql?sqlId=0123456789abc'); expect(response.status).toBe(500); expect(response.text).not.toContain('private'); }
+	mode = 'cap'; expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(413); expect(f.closeAll).toHaveBeenCalledTimes(3);
 });

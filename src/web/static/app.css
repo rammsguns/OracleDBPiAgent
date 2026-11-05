@@ -160,3 +160,9 @@ td:nth-child(2) { max-width: 24rem; }
 .sql-candidate { display: block; width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; margin: .5rem 0; }
 @media (min-width: 801px) { main:has(#sql-tab[aria-selected="true"]), main:has(#triage-panel:not([hidden]) .sql-evidence) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
 @media (prefers-color-scheme: dark) { .sql-chip.warning, .sql-chip.unavailable { color: #ffd080; } .sql-chip.ok, .sql-chip.best { color: #b8dce7; } }
+/* Keep short badges and plan branches intact; wide evidence scrolls locally. */
+.sql-table table { min-width: 38rem; }
+.sql-table .sql-chip { white-space: nowrap; }
+.sql-plan-tree > ul { width: max-content; min-width: 100%; }
+.sql-plan-tree li > span { white-space: nowrap; }
+.sql-table td { white-space: nowrap; }

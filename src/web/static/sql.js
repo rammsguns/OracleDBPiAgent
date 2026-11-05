@@ -1,11 +1,12 @@
 import { setupPanel, execute } from './panel.js';
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); if (cls) n.className = cls; return n; };
+const metric = value => typeof value === 'number' && !Number.isInteger(value) ? Number(value.toFixed(3)) : value;
 function chip(text, kind = '') { return el('span', text, 'sql-chip ' + kind); }
 function grid(parent, columns, rows) {
-	const box = el('div', undefined, 'table-scroll'), table = el('table'), head = el('tr');
+	const box = el('div', undefined, 'table-scroll sql-table'), table = el('table'), head = el('tr');
 	for (const c of columns) { const th = el('th', c); th.scope = 'col'; head.append(th); } table.append(head);
-	for (const values of rows) { const tr = el('tr'); for (const value of values) { const td = el('td'); td.append(value instanceof Node ? value : document.createTextNode(String(value ?? '—'))); tr.append(td); } table.append(tr); }
-	box.append(table); parent.append(box); if (!rows.length) parent.append(el('p', 'No rows returned.'));
+	for (const values of rows) { const tr = el('tr'); for (const value of values) { const td = el('td'); td.append(value instanceof Node ? value : document.createTextNode(String(metric(value) ?? '—'))); tr.append(td); } table.append(tr); }
+	box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'SQL evidence table'); box.append(table); parent.append(box); if (!rows.length) parent.append(el('p', 'No rows returned.'));
 }
 export function renderSqlInsight(content, result) {
 	if (!result) return;
@@ -24,7 +25,7 @@ export function renderSqlInsight(content, result) {
 	root.append(el('h4', 'Plans'));
 	for (const plan of result.plans || []) {
 		root.append(el('h5', `Plan ${plan.planHashValue} · ${plan.source}`));
-		const tree = el('div', undefined, 'sql-plan-tree');
+		const tree = el('div', undefined, 'sql-plan-tree'); tree.tabIndex = 0; tree.setAttribute('role', 'region'); tree.setAttribute('aria-label', 'Plan tree ' + plan.planHashValue);
 		// Follow parent IDs, not row order or numeric ID distance. Guard malformed cycles.
 		function branch(line, seen = new Set()) {
 			const item = el('li'); item.append(el('span', `${line.id} · ${line.operation} ${line.options || ''} ${[line.owner, line.name].filter(Boolean).join('.')}`));
@@ -40,7 +41,7 @@ export function renderSqlInsight(content, result) {
 	root.append(el('h4', 'Plan changes'));
 	const times = (result.planChanges || []).map(p => p.elapsedPerExec).filter(v => v !== null);
 	grid(root, ['Plan hash', 'Executions', 'Elapsed / exec (µs)', 'First load UTC', 'Last active UTC'], (result.planChanges || []).map(p => {
-		const time = el('span', p.elapsedPerExec ?? '—');
+		const time = el('span', metric(p.elapsedPerExec) ?? '—');
 		if (times.length > 1 && Math.min(...times) !== Math.max(...times)) { if (p.elapsedPerExec === Math.min(...times)) time.append(chip('Best', 'best')); if (p.elapsedPerExec === Math.max(...times)) time.append(chip('Worst', 'warning')); }
 		return [p.planHashValue, p.execs, time, p.firstLoad, p.lastActive];
 	}));

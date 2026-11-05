@@ -22,3 +22,14 @@ test('triage supports optional SQL evidence and old results', async ({ page }) =
 		await page.locator('#triage-run').click(); await expect(page.locator('#triage-status')).toContainText('Loaded.'); await expect(page.locator('#triage-content .sql-evidence')).toHaveCount(present ? 1 : 0);
 	}
 });
+test('SQL empty search, unavailable sections, cache miss and failure clear stale exports', async ({ page }) => {
+	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#sql-tab').click(); await page.locator('#sql-query').fill('0123456789abc');
+	await page.locator('#sql-run').click(); await expect(page.locator('#sql-export')).toBeEnabled();
+	await page.route('**/api/sql?*', route => route.fulfill({ status: 500, json: { message: 'Request failed' } }));
+	await page.locator('#sql-run').click(); await expect(page.locator('#sql-status')).toContainText('Request failed'); await expect(page.locator('#sql-export')).toBeDisabled();
+	await expect(page.locator('#sql-run')).toBeEnabled(); await expect(page.locator('.sql-evidence')).toHaveCount(0);
+	await page.route('**/api/sql?*', route => route.fulfill({ json: { result: { ...sqlFixture, text: '', children: [], plans: [], planChanges: [] }, markdown: 'empty' } }));
+	await page.locator('#sql-run').click(); await expect(page.locator('#sql-content')).toContainText('SQL not in cursor cache.');
+	await page.route('**/api/sql?*', route => route.fulfill({ json: { candidates: [], truncated: false } }));
+	await page.locator('#sql-mode').selectOption('text'); await page.locator('#sql-query').fill('missing'); await page.locator('#sql-run').click(); await expect(page.locator('#sql-content')).toContainText('No cached SQL matched.'); await expect(page.locator('#sql-export')).toBeDisabled();
+});
