@@ -39,6 +39,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 				const v = await connection.execute("SELECT version_full FROM product_component_version WHERE product LIKE 'Oracle%Database%'", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const version = String(v.rows?.[0]?.[0] ?? "unknown"); gate19c(target.name, version);
 				await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = "${target.defaultSchema}"`);
+				await connection.execute("ALTER SESSION SET TIME_ZONE = '+00:00'");
 				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const r = id.rows[0];
 				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5] };
@@ -60,7 +61,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 							const fetched = await resultSet.getRows(maxRows + 1);
 							const rows: unknown[][] = [];
 							for (const row of fetched) { const values = []; for (const value of row) values.push(await previewValue(value)); rows.push(values); }
-							return { columns: result.metaData.map((c: any) => c.name), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
+							return { columns: result.metaData.map((c: any) => c.name), columnTypes: result.metaData.map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
 						} finally { try { await resultSet?.close(); } finally { try { await connection.rollback(); } finally { busy = false; } } }
 					},
 					async close() { if (!closed) { closed = true; sessions.delete(session); await connection.close(); } },

@@ -9,7 +9,7 @@ beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mo
 function connection(version='19.9.1.0.0') {
 	const rs = {getRows:vi.fn().mockResolvedValue([[1],[2],[3]]),close:vi.fn()};
 	const c = {callTimeout:0,execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
-	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR']]});
+	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR']]});
 	mocks.connect.mockResolvedValue(c); return {c,rs};
 }
 it('sets schema and timeout, fetches one extra row and rolls back',async()=>{
@@ -39,4 +39,21 @@ it('preserves the explicit endpoint override for the gate integration test', asy
 	const {c} = connection('26.0');
 	await expect(createSessionProvider({...config, targets:[target]}, [target]).get(target.name)).rejects.toThrow('only Oracle');
 	expect(c.close).toHaveBeenCalledOnce();
+});
+
+it('sets UTC once on each new session before any tool query', async () => {
+	const provider = createSessionProvider(config);
+	for (let i = 0; i < 2; i++) {
+		const { c } = connection();
+		const session = await provider.get();
+		await session.query('SELECT 1 FROM dual');
+		await session.query('SELECT 2 FROM dual');
+		const statements = c.execute.mock.calls.map(call => call[0]);
+		const utc = "ALTER SESSION SET TIME_ZONE = '+00:00'";
+		expect(statements.filter(sql => sql === utc)).toHaveLength(1);
+		expect(statements.indexOf(utc)).toBe(2);
+		expect(statements.indexOf(utc)).toBeLessThan(statements.indexOf('SELECT 1 FROM dual'));
+		expect(statements.indexOf(utc)).toBeLessThan(statements.indexOf('SET TRANSACTION READ ONLY'));
+	}
+	await provider.closeAll();
 });
