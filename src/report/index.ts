@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { UnsupportedVersionError } from '../contracts.js';
 import type { ToolContext } from '../contracts.js';
 import { classifySql } from '../oracle/sqlPolicy.js';
+import { readReportSecurity, securitySection } from './security.js';
 import { reportQueries } from './queries.js';
 export interface ReportSection {
 	name: string;
@@ -13,7 +14,7 @@ export interface ReportSection {
 }
 export interface DatabaseReport { target: string; generatedAt: string; sections: ReportSection[] }
 export interface ReportOptions { target?: string; owner?: string; sections?: string[] }
-export const sectionNames = reportQueries.map(q => q.name);
+export const sectionNames = [...reportQueries.map(q => q.name), 'security'];
 const groups: Record<string, string[]> = { backups: ['backups', 'archive_switches'], scheduler_jobs: ['scheduler_jobs', 'scheduler_failures'], index_health: ['index_health', 'index_partitions', 'index_subpartitions'] };
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
@@ -68,9 +69,16 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 		}
 		report.sections.push(section);
 	}
+	if (selected?.has('security')) {
+		try { report.sections.push(securitySection(await readReportSecurity(ctx, target, 'report:security'))); }
+		catch (error) {
+			if (error instanceof UnsupportedVersionError) throw error;
+			report.sections.push({ name: 'security', status: 'unavailable', source: 'readSecurityPosture', columns: [], rows: [], note: `not available: ${safeReason(error, 'security metadata')}` });
+		}
+	}
 	return report;
 }
 const cell = (value: unknown): string => String(value === null || value === undefined ? 'NULL' : value instanceof Date ? value.toISOString() : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, ' ');
 export function renderMarkdown(report: DatabaseReport): string {
-	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...report.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, s.note, ...(s.status === 'ok' ? s.rows.length ? [`| ${s.columns.map(cell).join(' | ')} |`, `| ${s.columns.map(() => '---').join(' | ')} |`, ...s.rows.map(r => `| ${r.map(cell).join(' | ')} |`)] : ['No matching rows.'] : [])].filter(Boolean).join('\n\n'))].join('\n\n') + '\n';
+	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...report.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, s.note, ...((s.status === 'ok' || s.name === 'security' && s.rows.length > 0) ? s.rows.length ? [`| ${s.columns.map(cell).join(' | ')} |`, `| ${s.columns.map(() => '---').join(' | ')} |`, ...s.rows.map(r => `| ${r.map(cell).join(' | ')} |`)] : ['No matching rows.'] : [])].filter(Boolean).join('\n\n'))].join('\n\n') + '\n';
 }

@@ -1,3 +1,4 @@
+import { readReportSecurity } from '../report/security.js';
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError, type ToolContext } from '../contracts.js';
 import { classifySql } from '../oracle/sqlPolicy.js';
@@ -10,10 +11,11 @@ export interface DriftSection {
 	different: { key: string; left: unknown[]; right: unknown[] }[];
 }
 export interface DriftResult extends DriftOptions { generatedAt: string; complete: boolean; hasDrift: boolean; sections: DriftSection[] }
-export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects'; owner?: string } {
+export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects' | 'security'; owner?: string } {
+	if (scope === 'security') return { kind: 'security' };
 	if (scope === 'parameters') return { kind: 'parameters' };
 	const match = /^(schema|objects):([A-Za-z][A-Za-z0-9_$#]{0,127})$/.exec(scope);
-	if (!match) throw new Error('Scope must be parameters, schema:OWNER or objects:OWNER');
+	if (!match) throw new Error('Scope must be parameters, security, schema:OWNER or objects:OWNER');
 	return { kind: match[1] as 'schema' | 'objects', owner: match[2]!.toUpperCase() };
 }
 /** Collapse whitespace outside quoted SQL literals/identifiers only. Never erase literal differences. */
@@ -46,6 +48,7 @@ export function compareEntries(left: DriftEntry[], right: DriftEntry[]): Pick<Dr
 export async function compareTargets(ctx: ToolContext, options: DriftOptions): Promise<DriftResult> {
 	const scope = parseScope(options.scope);
 	for (const target of [options.left, options.right]) if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned drift target');
+	if (scope.kind === 'security') return compareSecurity(ctx, options);
 	const definitions = scope.kind === 'parameters' ? [parameterQuery] : scope.kind === 'schema' ? schemaQueries : objectQueries;
 	const result: DriftResult = { ...options, scope: scope.owner ? `${scope.kind}:${scope.owner}` : scope.kind, generatedAt: new Date().toISOString(), complete: true, hasDrift: false, sections: [] };
 	for (const definition of definitions) {
@@ -82,4 +85,38 @@ export function renderDriftMarkdown(result: DriftResult): string {
 	return [`# Drift: ${cell(result.left)} → ${cell(result.right)}`, `Scope: ${cell(result.scope)}. ${result.complete ? 'Complete' : 'Incomplete'} comparison.`, ...result.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, ...s.notes, ...(s.status === 'unavailable' ? ['Unavailable.'] : [
 		...(['onlyLeft', 'onlyRight', 'different'] as const).map(group => `### ${group}\n\n${s[group].length ? s[group].map(e => `- ${cell(JSON.stringify(e))}`).join('\n') : 'None.'}`),
 	])].join('\n\n'))].join('\n\n') + '\n';
+}
+
+async function compareSecurity(ctx: ToolContext, options: DriftOptions): Promise<DriftResult> {
+	const result: DriftResult = { ...options, generatedAt: new Date().toISOString(), complete: true, hasDrift: false, sections: [] };
+	const ids = ['powerful-privileges', 'public-grants'];
+	const sides = [];
+	for (const target of [options.left, options.right]) {
+		try { sides.push(await readReportSecurity(ctx, target, 'drift:security', ids)); }
+		catch (error) { if (error instanceof UnsupportedVersionError) throw error; sides.push(null); }
+	}
+	for (const id of ids) {
+		const section: DriftSection = { name: id, source: 'readSecurityPosture', status: 'ok', notes: [], onlyLeft: [], onlyRight: [], different: [] };
+		const entries = sides.map((side, i) => {
+			const check = side?.checks.find(c => c.id === id);
+			if (!check || check.status !== 'ok') {
+				section.status = 'unavailable';
+				section.notes.push(`${[options.left, options.right][i]}: security evidence unavailable or partial; comparison withheld`, ...(check?.notes ?? []), ...(check?.evidence.filter(e => e.status === 'unavailable').map(e => `Unavailable: ${e.view}`) ?? []));
+			}
+			if (check?.status === 'ok') section.notes.push(`${[options.left, options.right][i]}: ${check.findings.length} privilege findings; ${new Set(check.findings.map(f => f.subject)).size} distinct subjects.`);
+			return [...new Set(check?.findings.map(f => JSON.stringify([f.subject, f.detail])) ?? [])].sort().map(key => ({ key, values: [] }));
+		});
+		if (section.status === 'ok') {
+			Object.assign(section, compareEntries(entries[0]!, entries[1]!));
+			const counts = sides.map((side, i) => [
+				{ key: 'finding-count', values: [entries[i]!.length] },
+				{ key: 'subject-count', values: [new Set(side!.checks.find(c => c.id === id)!.findings.map(f => f.subject)).size] },
+			]);
+			const countChanges = compareEntries(counts[0]!, counts[1]!);
+			section.different.push(...countChanges.different);
+		} else result.complete = false;
+		if (section.onlyLeft.length || section.onlyRight.length || section.different.length) result.hasDrift = true;
+		result.sections.push(section);
+	}
+	return result;
 }

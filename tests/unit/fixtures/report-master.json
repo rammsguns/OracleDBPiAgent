@@ -1,0 +1,205 @@
+{
+	"report": {
+		"target": "lab",
+		"generatedAt": "2026-11-05T00:00:00.000Z",
+		"sections": [
+			{
+				"name": "identity",
+				"status": "ok",
+				"source": "PRODUCT_COMPONENT_VERSION, SYS_CONTEXT",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": ""
+			},
+			{
+				"name": "tablespaces",
+				"status": "ok",
+				"source": "DBA_DATA_FILES, DBA_FREE_SPACE",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Permanent/undo allocated datafiles; bytes, not MB. Temporary files excluded."
+			},
+			{
+				"name": "waits",
+				"status": "ok",
+				"source": "V$SYSTEM_EVENT",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Cumulative since instance startup; microseconds, not interval rates."
+			},
+			{
+				"name": "top_sql",
+				"status": "ok",
+				"source": "V$SQLSTATS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Cached cumulative statistics; elapsed and CPU time in microseconds."
+			},
+			{
+				"name": "optimizer_stats",
+				"status": "ok",
+				"source": "DBA_TAB_STATISTICS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Table-level estimates; stale, locked or never analyzed only. Owner: SH."
+			},
+			{
+				"name": "index_health",
+				"status": "ok",
+				"source": "ALL_INDEXES",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Only indexes visible to this login. Owner: SH."
+			},
+			{
+				"name": "index_partitions",
+				"status": "ok",
+				"source": "ALL_IND_PARTITIONS, ALL_INDEXES",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Only visible partitions; subpartitions reported separately. Owner: SH."
+			},
+			{
+				"name": "index_subpartitions",
+				"status": "ok",
+				"source": "ALL_IND_SUBPARTITIONS, ALL_INDEXES",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Owner: SH."
+			},
+			{
+				"name": "parameters",
+				"status": "ok",
+				"source": "V$PARAMETER",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": ""
+			},
+			{
+				"name": "scheduler_jobs",
+				"status": "ok",
+				"source": "DBA_SCHEDULER_JOBS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": ""
+			},
+			{
+				"name": "scheduler_failures",
+				"status": "ok",
+				"source": "DBA_SCHEDULER_JOB_RUN_DETAILS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": ""
+			},
+			{
+				"name": "long_operations",
+				"status": "ok",
+				"source": "V$SESSION_LONGOPS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Running plus completions updated in the last hour."
+			},
+			{
+				"name": "backups",
+				"status": "ok",
+				"source": "V$RMAN_BACKUP_JOB_DETAILS",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": ""
+			},
+			{
+				"name": "archive_switches",
+				"status": "ok",
+				"source": "V$ARCHIVED_LOG",
+				"columns": [
+					"N"
+				],
+				"rows": [
+					[
+						1
+					]
+				],
+				"note": "Last 24h; distinct thread/sequence/resetlogs; hours without switches omitted."
+			}
+		]
+	},
+	"markdown": "# Oracle 19c report: lab\n\nGenerated: 2026-11-05T00:00:00.000Z\n\n## identity\n\nSource: PRODUCT_COMPONENT_VERSION, SYS_CONTEXT\n\n| N |\n\n| --- |\n\n| 1 |\n\n## tablespaces\n\nSource: DBA_DATA_FILES, DBA_FREE_SPACE\n\nPermanent/undo allocated datafiles; bytes, not MB. Temporary files excluded.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## waits\n\nSource: V$SYSTEM_EVENT\n\nCumulative since instance startup; microseconds, not interval rates.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## top_sql\n\nSource: V$SQLSTATS\n\nCached cumulative statistics; elapsed and CPU time in microseconds.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## optimizer_stats\n\nSource: DBA_TAB_STATISTICS\n\nTable-level estimates; stale, locked or never analyzed only. Owner: SH.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## index_health\n\nSource: ALL_INDEXES\n\nOnly indexes visible to this login. Owner: SH.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## index_partitions\n\nSource: ALL_IND_PARTITIONS, ALL_INDEXES\n\nOnly visible partitions; subpartitions reported separately. Owner: SH.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## index_subpartitions\n\nSource: ALL_IND_SUBPARTITIONS, ALL_INDEXES\n\nOwner: SH.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## parameters\n\nSource: V$PARAMETER\n\n| N |\n\n| --- |\n\n| 1 |\n\n## scheduler_jobs\n\nSource: DBA_SCHEDULER_JOBS\n\n| N |\n\n| --- |\n\n| 1 |\n\n## scheduler_failures\n\nSource: DBA_SCHEDULER_JOB_RUN_DETAILS\n\n| N |\n\n| --- |\n\n| 1 |\n\n## long_operations\n\nSource: V$SESSION_LONGOPS\n\nRunning plus completions updated in the last hour.\n\n| N |\n\n| --- |\n\n| 1 |\n\n## backups\n\nSource: V$RMAN_BACKUP_JOB_DETAILS\n\n| N |\n\n| --- |\n\n| 1 |\n\n## archive_switches\n\nSource: V$ARCHIVED_LOG\n\nLast 24h; distinct thread/sequence/resetlogs; hours without switches omitted.\n\n| N |\n\n| --- |\n\n| 1 |\n"
+}
