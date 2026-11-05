@@ -2053,10 +2053,39 @@ Tests on 0c3d865:
 - 36 integration tests;
 - 27 browser tests.
 
-Open item: because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
+Open item (addressed by WP-17E): because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
 can still be listed as unverified when the owner and the name come from
 different tool results. The security-trigger case passes regardless, and the
 answer is no longer rewritten.
+
+### WP-17E: owner from tool arguments (branch `wp-17e-owner-scope`)
+Problem: the gate-17ac security-trigger answers still list `HR.SECURE_DML` and
+`HR.EMPLOYEES` as unverified. The owner appears only in the call arguments
+(`get_source {"schema":"HR","name":"SECURE_DML"}`); the result text shows
+`PROCEDURE secure_dml` and `ON employees`, so the same-result rule never matches.
+
+Owns `src/agent/grounding.ts`, the `checkFacts` call in `src/agent/index.ts`, and
+the tests.
+
+Fix:
+- `checkFacts` takes an optional fourth argument: one owner per tool result
+  (string or undefined), index-aligned with `toolResultTexts`.
+- For result i with owner O, `O.NAME` is supported when NAME appears in that
+  result's identifiers. NAME alone, or another owner, gains nothing.
+- `finishTurn` builds the owners from each toolResult's matching toolCall
+  (`toolCallId`), using the upper-cased `schema` or `owner` string argument.
+  Calls without one pass undefined.
+- Numbers and the correction trigger stay unchanged. `unsupportedNumbers` must
+  be identical for every record.
+- Tool definitions and the system prompt stay unchanged.
+
+Verification:
+- Unit tests with the gate-17ac security-trigger records as fixtures.
+- Adversarial cases: a fake owner; NAME in a different result; no schema
+  argument.
+- An offline replay over every archive (owners taken from `toolDetails[].args`
+  when it aligns with `toolResultTexts`). It reports every changed `unverified`
+  list and must show zero changes to `unsupportedNumbers`.
 
 ## MVP exit criteria
 
