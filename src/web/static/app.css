@@ -71,3 +71,19 @@ td:nth-child(2) { max-width: 24rem; }
 @media (prefers-color-scheme: dark) {
 	.graph-view .node-kind, .graph-view .node-owner { fill: #b0bdc8; }
 }
+
+#alertlog-panel, .alert-evidence { overflow-wrap: anywhere; --alert-critical: #9d2020; --alert-important: #805000; --alert-normal: #235663; }
+#alertlog-panel input { display: block; max-width: 100%; width: 20rem; font: inherit; padding: .5rem; margin-bottom: .75rem; }
+#alertlog-panel pre { white-space: pre-wrap; }
+.alert-level { font-weight: 600; }
+.alert-critical { color: var(--alert-critical); }
+.alert-important { color: var(--alert-important); }
+.alert-normal { color: var(--alert-normal); }
+.incident-badge { display: block; border: 1px solid currentColor; border-radius: .35rem; padding: .1rem .3rem; margin-top: .3rem; }
+.alert-evidence table { min-width: 740px; }
+.alert-evidence td:first-child { white-space: pre; }
+.alert-level { white-space: nowrap; }
+@media (prefers-color-scheme: dark) {
+	#alertlog-panel { background: #19282e; color: #e0edf0; padding: .5rem; color-scheme: dark; }
+	#alertlog-panel, .alert-evidence { --alert-critical: #ffaaaa; --alert-important: #ffd080; --alert-normal: #b8dce7; }
+}
