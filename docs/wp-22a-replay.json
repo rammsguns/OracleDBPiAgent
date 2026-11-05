@@ -1,0 +1,147 @@
+{
+	"files": 561,
+	"records": 12858,
+	"flips": [
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-history-signature",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"P_EMP_ID",
+					"N"
+				],
+				[
+					"P_START_DATE",
+					"N"
+				],
+				[
+					"P_END_DATE",
+					"N"
+				],
+				[
+					"P_JOB_ID",
+					"N"
+				],
+				[
+					"P_DEPARTMENT_ID",
+					"N"
+				]
+			],
+			"answer": "Here are the arguments of **HR.ADD_JOB_HISTORY** on **d1-19c-lab**, in declaration order (from `DBA_ARGUMENTS`):\n\n| # | Argument Name | Data Type | Has Default? |\n|---|---------------|-----------|--------------|\n| 1 | P_EMP_ID | NUMBER | No |\n| 2 | P_START_DATE | DATE | No |\n| 3 | P_END_DATE | DATE | No |\n| 4 | P_JOB_ID | VARCHAR2 | No |\n| 5 | P_DEPARTMENT_ID | NUMBER | No |\n\nAll five parameters are required (no defaults).",
+			"reason": "Each argument explicitly has No default, equivalent to DEFAULTED=N."
+		},
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"PRODUCTS",
+					"YES",
+					"YES"
+				]
+			],
+			"answer": "## SHOPAPP.PRODUCTS Statistics on p1-19c-prod\n\n| Attribute | Value |\n|-----------|-------|\n| **Stale?** | **YES** — `STALE_STATS = YES` (statistics are stale) |\n| **Missing?** | No — statistics exist (`LAST_ANALYZED = 2026-11-05 22:00:17`, `NUM_ROWS = 5000`) |\n| **Global statistics?** | **YES** — `GLOBAL_STATS = YES` (the table-level stats are global, not aggregated from partitions) |\n\nThe table is non-partitioned (single row with `OBJECT_TYPE = TABLE`, no partition/subpartition names), so the global stats represent the entire table.",
+			"reason": "Both statistics flags appear with their own labels in a single vertical table; the question already identifies the table."
+		},
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-history-signature",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"P_EMP_ID",
+					"N"
+				],
+				[
+					"P_START_DATE",
+					"N"
+				],
+				[
+					"P_END_DATE",
+					"N"
+				],
+				[
+					"P_JOB_ID",
+					"N"
+				],
+				[
+					"P_DEPARTMENT_ID",
+					"N"
+				]
+			],
+			"answer": "**HR.ADD_JOB_HISTORY** (target: d1-19c-lab, source: `DBA_ARGUMENTS`)\n\n| # | Argument Name | Data Type | Has Default? |\n|---|---------------|-----------|--------------|\n| 1 | P_EMP_ID | NUMBER | No |\n| 2 | P_START_DATE | DATE | No |\n| 3 | P_END_DATE | DATE | No |\n| 4 | P_JOB_ID | VARCHAR2 | No |\n| 5 | P_DEPARTMENT_ID | NUMBER | No |\n\nAll five parameters are required (DEFAULTED = `N`); none has a default value.",
+			"reason": "Each argument explicitly has No default, equivalent to DEFAULTED=N."
+		},
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"PRODUCTS",
+					"YES",
+					"YES"
+				]
+			],
+			"answer": "## SHOPAPP.PRODUCTS Statistics (target: p1-19c-prod)\n\n| Property | Value |\n|----------|-------|\n| **Last Analyzed** | 2026-11-05 22:00:17 |\n| **Stale Stats** | **YES** — statistics are stale |\n| **Global Stats** | **YES** — global statistics are gathered and used |\n| NUM_ROWS | 5,000 |\n| AVG_ROW_LEN | 38 |\n| BLOCKS | 34 |\n\n**Summary:** The table statistics exist but are marked **stale** (`STALE_STATS = YES`), meaning modifications since the last gather have exceeded Oracle's staleness threshold. They **are** global statistics (`GLOBAL_STATS = YES`).",
+			"reason": "Both statistics flags appear with their own labels in a single vertical table; the question already identifies the table."
+		},
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-history-signature",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"P_EMP_ID",
+					"N"
+				],
+				[
+					"P_START_DATE",
+					"N"
+				],
+				[
+					"P_END_DATE",
+					"N"
+				],
+				[
+					"P_JOB_ID",
+					"N"
+				],
+				[
+					"P_DEPARTMENT_ID",
+					"N"
+				]
+			],
+			"answer": "Here are the arguments of **HR.ADD_JOB_HISTORY** on **d1-19c-lab**, in declaration order:\n\n| # | Argument Name | Data Type | Mode | Has Default? |\n|---|---------------|-----------|------|--------------|\n| 1 | `P_EMP_ID` | NUMBER | IN | No |\n| 2 | `P_START_DATE` | DATE | IN | No |\n| 3 | `P_END_DATE` | DATE | IN | No |\n| 4 | `P_JOB_ID` | VARCHAR2 | IN | No |\n| 5 | `P_DEPARTMENT_ID` | NUMBER | IN | No |\n\nAll five parameters are **IN** mode and **none** has a default value (`DEFAULTED = N`).\n\n*(Source: `DBA_ARGUMENTS` on d1-19c-lab.)*",
+			"reason": "Each argument explicitly has No default, equivalent to DEFAULTED=N."
+		},
+		{
+			"file": "../eval-archive/phase21/gate-release/2026-11-05T22-48-16-872Z-b1cfd590-2e50-4d35-8b8c-650c36456173.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"PRODUCTS",
+					"YES",
+					"YES"
+				]
+			],
+			"answer": "## Result (target: `p1-19c-prod`, source: `DBA_TAB_STATISTICS`)\n\n| Attribute | Value |\n|-----------|-------|\n| **Stale?** | **YES** — `STALE_STATS = YES` |\n| **Missing?** | No — statistics exist (`LAST_ANALYZED = 2026-11-05 22:00:17`) |\n| **Global statistics?** | **YES** — `GLOBAL_STATS = YES` |\n\nThe table is non-partitioned (single row with `OBJECT_TYPE = TABLE`, no partition/subpartition names), so the global-stats flag simply confirms the stats are table-level (non-aggregated from partitions).",
+			"reason": "Both statistics flags appear with their own labels in a single vertical table; the question already identifies the table."
+		}
+	]
+}
