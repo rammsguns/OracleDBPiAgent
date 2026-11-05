@@ -328,3 +328,150 @@ each box side. Box heights follow their text. Owners appear on a muted line abov
 identifier labels; labels wrap at dots and underscores, splitting inside a token
 only when that token cannot fit. Kind tags distinguish jobs, packages, procedures,
 tables and Oracle-supplied nodes. The legend sits immediately above the diagram.
+
+### Alert Log (WP-18C)
+
+The **Alert Log** tab reads `V$DIAG_ALERT_EXT` and the joined ADR incident/problem
+list through `src/alertlog`. Choose either approved target, a relative window
+(default `24h`, maximum `30d`), optional comma-separated five-digit ORA-/TNS-
+codes, and a case-insensitive message substring. The default reader severity
+filter includes diagnostic text markers even when Oracle labels them Normal.
+No LLM is involved.
+
+The table shows first/last timestamps, textual and coloured severity, folded
+counts, incident badges, problem keys and trace names. Trace names are evidence
+text; the web server never reads those files. Text/metadata caps and partial row
+results are labelled. ADR incidents use the same time window; message/code
+filters apply only to alert entries. Missing access displays the exact SELECT
+grant request as text, without executing it. Markdown exports both tables.
+
+`GET /api/alertlog?target=d1-19c-lab&since=7d&codes=ORA-00600&text=incident`
+returns `{ entries, incidents, markdown }`, where the first two are the reader's
+`AlertResult<AlertRow>` and `AlertResult<IncidentRow>`. It shares the insight
+routes' bearer token, loopback Host/Origin checks, approved target validation,
+1 MiB response cap and single-flight lock through session cleanup. The readers
+run sequentially, with the configured row and statement-timeout limits.
+
+The Triage panel renders optional `TriageResult.alertLog` from the Phase 18 shared
+shape: status, window, grants, entries, incidents and code/job-run correlations
+with one-based entry references. Older triage responses remain supported.
+WP-18B supplies this evidence; WP-18C does not change triage collection or its
+Markdown renderer.
+
+Browser fixtures cover both colour modes at phone width, literal hostile text,
+folded metadata, filters, downloads, missing/empty/unavailable/skipped evidence,
+and failure recovery. Unit route tests cover auth, Host/Origin, input validation,
+the shared lock, cleanup and sequential reader calls without DB/LLM access.
+
+To reproduce the four live SQL-only captures:
+
+```sh
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
+PIAGENT_ALERTLOG_LIVE=1 npm run test:browser -- tests/browser/alertlog-live.spec.ts
+```
+
+The capture server stubs health and every agent path, binds loopback, and uses
+real read-only Oracle sessions. Its credential URL stays in memory. Cleanup
+resolves the actual listening PID using `ss -ltnp` and sends SIGTERM to it.
+The ordinary browser suite skips both opt-in live tests; the Strata live test
+must remain disabled for WP-18C validation.
+
+Live captures (30-day window; bounded, partial evidence):
+
+| Target | Light | Dark |
+|---|---|---|
+| d1 | [Light](img/alertlog-d1-19c-lab-light.png) | [Dark](img/alertlog-d1-19c-lab-dark.png) |
+| p1 | [Light](img/alertlog-p1-19c-prod-light.png) | [Dark](img/alertlog-p1-19c-prod-dark.png) |
+
+WP-18C validation (2026-11-04):
+
+- `npm run typecheck`: passed.
+- `npm test`: 71 files, 1,071 tests passed; no DB or LLM.
+- `npm run test:browser`: 32 passed, 2 opt-in live tests skipped.
+- `PIAGENT_SECRET_DIR=… npx vitest run tests/integration/alertlog.test.ts`:
+  2 passed (d1 and p1), no LLM tests selected.
+- The SQL-only live capture command above: 1 passed, four screenshots captured
+  and inspected; capture listener stopped by its resolved listening PID.
+- No shared-contract or `src/alertlog/` changes required. Live WP-18B triage
+  integration remains for the coordinator after that branch merges; shared
+  shape rendering is verified with fixtures here. No LLM calls were made.
+
+WP-18C visual-review follow-up:
+
+- Alert entries now give Message the remaining width after compact timestamp,
+  severity and count columns. Codes and incident badges sit with the message.
+  Alert evidence uses a wider desktop evidence pane. Timestamps omit milliseconds,
+  preserve exact ISO values in their titles, and show last time on a second line
+  only when it differs from first time.
+- Messages have a three-line preview and a native **Show full message** disclosure
+  only when the rendered preview overflows. Trace paths are replaced with basenames
+  in message text and collected in a separate collapsed
+  **Trace files (N)** list. Items show basenames with full paths in their titles.
+  Markdown exports retain the reader's complete bounded evidence.
+- Incident badges wrap inline, with at most five followed by **+N more**.
+  The ADR numeric status column is labelled **Status code**.
+- The white surround was a stylesheet issue, not a screenshot media-setting issue:
+  existing PL/SQL/Triage dark rules themed their inner panels but the root, section
+  and tab bar retained light backgrounds. The fix uses the existing dark colours
+  (`#19282e`, `#223b45`, `#e0edf0`) for the page, section and tab shell across
+  **every tab**, including PL/SQL, and the conversation. The initial alert-scoped
+  version was broadened after coordinator review.
+  [PL/SQL dark shell screenshot](img/plsql-dark-shell.png) uses the WORKLOAD
+  browser fixture at a 1280px viewport; no LLM or DB access is needed.
+- Desktop screenshots above were retaken with a **1280px viewport**, now including
+  the full page to show the shell. [390px phone capture](img/alertlog-p1-19c-prod-phone.png)
+  uses stacked alert entries and has no horizontal page scroll. The ADR table can
+  scroll within its own wrapper. [Fixture triage alert section](img/alertlog-triage-fixture.png)
+  demonstrates the shared shape and job-run correlation.
+- To reproduce the fixture screenshot, run
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser -- tests/browser/alertlog.spec.ts`.
+- Follow-up validation: typecheck passed; 1,071 unit tests passed; browser suite
+  34 passed, 2 opt-in live tests skipped. The separate Oracle-only live capture
+  test passed against both approved targets and stopped its server by listening
+  PID. Browser tests verify details toggling, preview height, basename/title paths,
+  five-badge cap, Message width, compact timestamps, Status code, dark shell colours,
+  and no page overflow at 1280px and 390px. No DB or LLM code changed and no LLM
+  calls were made; no contract changes are needed.
+
+Final visual follow-up:
+
+- Trace references preserve their basenames inline (for example,
+  `Errors in file PRODCDB_j005_704.trc:`); full paths remain in trace-list titles.
+- A ResizeObserver checks actual preview overflow, including tab activation and
+  viewport resizing. Short messages have no full-message toggle. The three-line
+  preview gains a toggle only when clipped; the separate text-cap note still
+  reports upstream reader truncation independently.
+- The dark shell now applies globally across all seven evidence tabs and the
+  conversation. A browser test checks root/body, both sections and the tab bar
+  on each tab; the PL/SQL screenshot above confirms the WORKLOAD fixture view.
+- Validation: `npm run typecheck` passed; `npm test` passed all 1,071 tests;
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser` passed 36 tests,
+  with the 2 opt-in live tests skipped. The separate Oracle-only capture test
+  passed on both targets, refreshed the five live images and stopped its server
+  by listening PID. No DB/LLM code or contracts changed; no LLM calls were made.
+
+PL/SQL graph contrast and bounds follow-up:
+
+- Node fills, outlines, owner/name labels and kind tags use graph theme tokens.
+  Light uses pale nodes with dark labels; dark uses `#223b45` nodes with
+  `#e0edf0` labels and `#b0bdc8` owner/kind text. Each of the six edge styles has
+  separate light/dark colours, retaining its distinct dash pattern and legend.
+- The viewBox already included all nodes. Clipping in the earlier desktop image
+  came from the SVG's 600px minimum width exceeding its evidence pane. Desktop
+  SVGs now fit their container, and the PL/SQL pane gets the same wider desktop
+  allocation as alert evidence. Phones retain a horizontal scroll region that
+  can be focused with the keyboard; its right edge exposes the last column.
+- [Dark graph](img/plsql-dark-shell.png) and [light graph](img/plsql-light-shell.png)
+  were retaken with the WORKLOAD browser fixture at a 1280px viewport and inspected.
+  Both show the full right-most table column.
+- Browser tests check every node rectangle against the SVG viewBox, desktop fit,
+  phone scroll reachability and lack of horizontal page overflow. They calculate
+  contrast from computed SVG colours: every label/owner/kind tag is at least
+  4.5:1 against its node fill; outlines are at least 3:1 against node fill and
+  edges/legend swatches at least 3:1 against the surrounding surface. All six
+  colour/dash styles remain distinct in both themes. These are graph-specific
+  contrast checks, not a claim of an application-wide accessibility audit.
+- Validation: `npm run typecheck` passed; `npm test` passed all 1,071 tests;
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser` passed 38 tests,
+  with 2 opt-in live tests skipped. No DB or LLM paths changed or ran; no shared
+  contract changes are needed. The screenshots use browser fixtures.
