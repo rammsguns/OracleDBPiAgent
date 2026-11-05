@@ -16,16 +16,40 @@ export async function validateP18() {
 	try {
 		for (const target of config.targets) {
 			const ctx = { config, sessions, audit: { record: async () => {} }, runId: 'p18-ground-truth' };
-			const alerts = await readAlertLog(ctx, target.name, { ...options, text: 'ORA-', level: 'all' });
 			const incidents = await readIncidents(ctx, target.name, options);
-			if (alerts.status !== 'ok' || incidents.status !== 'ok' || incidents.truncated) throw new Error(`Unavailable or capped incident evidence on ${target.name}`);
-			const alert: AlertRow | undefined = alerts.rows[0];
-			const incident: IncidentRow | undefined = incidents.rows[0];
-			if (!alert?.codes.length || !incident?.problemKey) throw new Error(`Missing challenge evidence on ${target.name}`);
+			if (incidents.status !== 'ok' || incidents.truncated) throw new Error(`Unavailable or capped incident evidence on ${target.name}`);
 			for (const test of cases.filter(test => test.target === target.name)) {
 				const rows = await groundTruth(target, test.groundTruth!.sql);
-				const expected = test.id.endsWith('latest-code') ? [[alert.codes[0]]] : test.id.endsWith('incident-count') ? [[incidents.rows.length]] : [[incident.incidentId, incident.problemKey]];
-				if (JSON.stringify(rows.map(row => row.map(String))) !== JSON.stringify(expected.map(row => row.map(String)))) throw new Error(`API/SQL truth mismatch: ${test.id}: ${JSON.stringify({rows, expected})}`);
+				if (!rows.length || rows.length >= 100 || rows.some(row => row.some(cell => cell == null || cell === ''))) throw new Error(`Missing or capped challenge truth: ${test.id}`);
+				if (test.id.endsWith('incident-count')) {
+					const counts = new Map<string, number>();
+					for (const incident of incidents.rows as IncidentRow[]) counts.set(incident.problemKey, (counts.get(incident.problemKey) ?? 0) + 1);
+					const expected = [...counts].sort(([a], [b]) => a.localeCompare(b));
+					if (JSON.stringify(rows) !== JSON.stringify(expected)) throw new Error(`API/count mismatch: ${test.id}`);
+				} else if (test.id.endsWith('critical-incident')) {
+					const alerts = await readAlertLog(ctx, target.name, { ...options, level: 1, limit: 1 });
+					const alert: AlertRow | undefined = alerts.rows[0];
+					if (alerts.status !== 'ok' || rows[0]![0] !== alert?.codes[0] || String(rows[0]![1]) !== alert?.incidentId) throw new Error(`API/critical alert mismatch: ${test.id}`);
+				} else if (test.id.endsWith('failed-job')) {
+					const alerts = await readAlertLog(ctx, target.name, { from: '2026-11-04T00:00:00Z', to: '2026-11-05T00:00:00Z', codes: ['ORA-12012'], level: 'all', limit: 100 });
+					if (alerts.status !== 'ok' || alerts.truncated) throw new Error('Unavailable or capped job alert evidence');
+					for (const row of rows) if (!alerts.rows.some(alert => alert.messageText.replace(/"/g, '').includes(String(row[0])) && alert.messageText.includes(String(row[1])))) throw new Error('API/job evidence mismatch');
+				} else {
+					// Independent raw-message scan: API folding merges repeated messages and is
+					// deliberately unsuitable for whole-window frequency counts.
+					const counts = new Map<string, number>();
+					for (let offset = 0; ; offset += 99) {
+						if (offset > 100000) throw new Error('Frequency scan safety cap reached');
+						const messages = await groundTruth(target, `SELECT MESSAGE_TEXT FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)') ORDER BY ORIGINATING_TIMESTAMP, RECORD_ID OFFSET ${offset} ROWS FETCH NEXT 99 ROWS ONLY`);
+						for (const [text] of messages) {
+							const digits = /ORA-(\d{1,5})(?!\d)/i.exec(String(text))?.[1];
+							if (digits && Number(digits)) { const code = `ORA-${digits.padStart(5, '0')}`; counts.set(code, (counts.get(code) ?? 0) + 1); }
+						}
+						if (messages.length < 99) break;
+					}
+					const max = Math.max(...counts.values()), expected = [...counts].filter(([, n]) => n === max).map(([code]) => [code]).sort();
+					if (JSON.stringify(rows) !== JSON.stringify(expected)) throw new Error(`Frequency mismatch: ${test.id}`);
+				}
 				records.push({ id: test.id, target: target.name, sql: test.groundTruth!.sql, mode: test.groundTruth!.mode, rows });
 			}
 		}

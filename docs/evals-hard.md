@@ -1592,20 +1592,48 @@ Integration and live LLM gates remain with the coordinator.
 
 ### Phase 18: alert-log challenge (`p18`, WP-18D)
 
-`evals/cases-hard/phase18-alertlog.json` adds six `hard-p18-` challenge cases,
-three per approved target: newest ORA code, incident row count, and newest
-incident id paired with its ADR problem key. They require the existing
-`run_query` tool and reuse `rowCells`; product code, tools, prompts, and scorer
-behavior are unchanged. Dev (28), holdout (12), regression (21), and MVP cases
-are unchanged; the complete hard suite now contains 99 cases.
+`evals/cases-hard/phase18-alertlog.json` has six operator-worded challenge
+questions, three per approved target. All require the existing `run_query`
+tool and reuse `rowCells` runtime ground truth. No product, prompt, tool, or
+contract changes are needed. Dev (28), holdout (12), regression (21), and MVP
+cases are unchanged; the complete hard suite contains 99 cases.
 
-All questions explicitly use UTC `[2026-10-06T00:00:00Z,
-2026-11-04T00:00:00Z)`. SQL ground truth runs afresh on every eval; new alert
-entries after the exclusive end cannot move the answer. ADR purging can change
-historical truth: rerun validation before a future gate, and review the window
-if its evidence disappears. Latest-row queries break ties by RECORD_ID or
-INCIDENT_ID. The alert question includes all message levels and normalizes
-one-to-five-digit codes to five digits, including ORA-0 → ORA-00000.
+| Case suffix | Question and live observed truth |
+|---|---|
+| d1-critical-incident | Latest critical (level 1) alert: ORA-00800, incident 225332. |
+| d1-incident-count | Incidents by problem key: ORA 800 → 6. |
+| d1-frequent-code | Most frequent primary error: ORA-00031. |
+| p1-failed-job | Failed scheduler job SHOPAPP.NIGHTLY_PURGE_JOB violated SHOPAPP.SYS_C007669. |
+| p1-incident-count | Incidents by problem key: ORA 800 → 6. |
+| p1-frequent-code | Most frequent primary error: ORA-00313. |
+
+Five cases retain the fixed UTC window `[2026-10-06T00:00:00Z,
+2026-11-04T00:00:00Z)`. The failed-job question uses the fixed UTC day
+`[2026-11-04T00:00:00Z, 2026-11-05T00:00:00Z)` because that failure happened
+on 4 November, after the other window ended. All truth is recomputed with
+read-only SQL on each run. New entries after the exclusive ends cannot move
+the answers. ADR purging can remove historical evidence: revalidate before
+future gates and review windows if prerequisites disappear.
+
+Questions ask for operational facts without prescribing SQL, joins, padding,
+or internal tie-break columns. The critical query breaks timestamp ties by
+RECORD_ID. Frequency questions define a primary error as the first ORA code
+in a message and ignore success code ORA-0. SQL groups normalized codes and
+uses DENSE_RANK over message counts, returning **all** tied winners sorted by
+code; the question explicitly requests all ties. No ORA-0 artifact is an
+expected answer. The six-case limit leaves a separate redo-member question
+out; p1's frequency case nevertheless exercises the observed ORA-00313 error.
+
+Scorer normalization is restricted to `hard-p18-` IDs: ORA-609 and ORA-00609
+match, Unicode code dashes match, and quoted Oracle identifiers match their
+unquoted names. P18 structured cells retain complete schema-qualified names,
+so a correct job/constraint pair is accepted in a table. Historical splits
+retain their existing scorer behavior. Tests cover wrong codes and numeric
+prefixes, missing tied winners, wrong counts, wrong owners/constraints, crossed
+mappings, missing facts and missing tool evidence. Existing single-record
+rowCells limitations remain: facts on one prose line can pool across sentences,
+and ambiguous two-column headings may be interpreted vertically. Suspicious
+gate answers still need manual inspection.
 
 No-LLM validation:
 
@@ -1613,34 +1641,29 @@ No-LLM validation:
 PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-p18.ts
 ```
 
-This first runs hard-suite safety/shape checks, then compares the independent
-SELECT-only runtime ground-truth reader with `readAlertLog` and `readIncidents`
-(including their joined V$DIAG_PROBLEM data). Missing evidence, missing grants,
-API/SQL disagreements, and capped incident lists fail closed. Alert folding is
-not used to derive counts. The checked-in `evals/p18-ground-truth-validation.json`
-is an observation, never an input to runtime scoring. Observed d1/p1 counts
-were both 6; newest incident/key pairs were 225332/ORA 800 and 84366/ORA 800;
-newest codes were ORA-00000 and ORA-00609.
+This runs hard-suite SQL safety and shape checks, computes the independent
+SELECT-only runtime truths, and cross-checks critical/job evidence with
+`readAlertLog` and grouped incident counts with `readIncidents` (including its
+V$DIAG_PROBLEM join). Frequency truth is independently verified by a paginated
+raw-message scan and JavaScript counts, because API folding cannot count the
+whole window. Pages contain 99 rows, below the independent reader's 100-row
+cap, with a scan safety bound. Missing grants, empty/null truth, capped evidence,
+and disagreements fail closed. `evals/p18-ground-truth-validation.json` records
+observations only; runtime scoring never reads that file.
 
-The coordinator's `p18` group is these six IDs, following the p16 prefix
-convention. For the existing runner, select them explicitly:
+The coordinator's `p18` group follows the p16 prefix convention. Existing runner
+selection for the coordinator's measurement:
 
 ```sh
-npm run eval -- --suite evals/cases-hard --split challenge --repeat 4 hard-p18-d1-latest-code hard-p18-d1-incident-count hard-p18-d1-incident-problem hard-p18-p1-latest-code hard-p18-p1-incident-count hard-p18-p1-incident-problem
+npm run eval -- --suite evals/cases-hard --split challenge --repeat 4 hard-p18-d1-critical-incident hard-p18-d1-incident-count hard-p18-d1-frequent-code hard-p18-p1-failed-job hard-p18-p1-incident-count hard-p18-p1-frequent-code
 ```
 
-That command is for the coordinator; WP-18D did **not** execute it or make LLM
-calls. Thirteen DB-free scorer tests cover correct prose/table answers, Unicode
-ORA dashes, wrong codes/counts/keys, missing facts, missing run_query evidence,
-and crossed incident mappings in labeled tables. Existing rowCells limitations
-remain: single-record prose on one line can pool facts from separate sentences,
-and unrecognized two-column table headings can be interpreted vertically. Use
-`incident_id` / `problem_key` headings for unambiguous mapping diagnostics;
-review suspicious gate answers manually. No global scorer change is made here.
+WP-18D did not execute that command or make LLM calls. The p18 gate remains the
+coordinator's responsibility.
 
-Verification: typecheck clean; 1,082 unit tests passed; all six truths validated
-live. DB integration (excluding `wp-c.integration.test.ts`, which contains the
-Strata e2e) passed 34/35 tests, including the new p18 validation and the existing
-alertlog tests on both targets. The unrelated live NIGHTLY_PURGE_JOB triage test
-failed because its returned issue codes did not contain ORA-02292. No triage or
-database changes were made to address that live-data failure.
+Revision verification: all six truths revalidated live; typecheck clean;
+1,087 unit tests passed (18 p18 tests). DB integration excluding the LLM-bearing
+`wp-c.integration.test.ts` passed 34/35, including p18 and both alertlog targets.
+The unchanged NIGHTLY_PURGE_JOB triage test still fails because `issue.codes`
+does not contain ORA-02292; the alert SQL independently finds that error on
+4 November. No database, triage, or alert-reader code was changed.
