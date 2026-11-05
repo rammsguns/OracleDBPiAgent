@@ -46,12 +46,12 @@ export async function readSqlInsight(session: OracleSession, options: { sqlId: s
 			section.status = 'unavailable'; section.attempts.push({ view, code }); return undefined;
 		}
 	}
-	const cursors = await read('children', 'V$SQL', `SELECT CHILD_NUMBER, PLAN_HASH_VALUE, EXECUTIONS, ELAPSED_TIME, CPU_TIME, BUFFER_GETS, DISK_READS, ROWS_PROCESSED, FIRST_LOAD_TIME, TO_CHAR(LAST_ACTIVE_TIME, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), SQL_TEXT, TO_CHAR(EXACT_MATCHING_SIGNATURE) FROM V$SQL WHERE ${filter} ORDER BY CHILD_NUMBER`);
+	const cursors = await read('children', 'V$SQL', `SELECT CHILD_NUMBER, PLAN_HASH_VALUE, EXECUTIONS, ELAPSED_TIME, CPU_TIME, BUFFER_GETS, DISK_READS, ROWS_PROCESSED, TO_CHAR(SYS_EXTRACT_UTC(FROM_TZ(TO_TIMESTAMP(TRIM(FIRST_LOAD_TIME), 'YYYY-MM-DD/HH24:MI:SS'), TO_CHAR(SYSTIMESTAMP, 'TZH:TZM'))), 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), TO_CHAR(LAST_ACTIVE_TIME, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), SQL_TEXT, TO_CHAR(EXACT_MATCHING_SIGNATURE) FROM V$SQL WHERE ${filter} ORDER BY CHILD_NUMBER`);
 	if (!cursors) result.status = 'unavailable';
 	for (const r of cursors?.rows ?? []) {
 		const execs = num(r[2]);
 		result.text ||= str(r[10]);
-		result.children.push({ child: num(r[0]), planHashValue: num(r[1]), execs, elapsed: num(r[3]), cpu: num(r[4]), bufferGets: num(r[5]), diskReads: num(r[6]), rowsProcessed: num(r[7]), elapsedPerExec: ratio(num(r[3]), execs), cpuPerExec: ratio(num(r[4]), execs), bufferGetsPerExec: ratio(num(r[5]), execs), diskReadsPerExec: ratio(num(r[6]), execs), rowsPerExec: ratio(num(r[7]), execs), firstLoad: str(r[8]).replace(/^(\d{4}-\d\d-\d\d)[ /]/, '$1T') + (r[8] ? 'Z' : ''), lastActive: str(r[9]) });
+		result.children.push({ child: num(r[0]), planHashValue: num(r[1]), execs, elapsed: num(r[3]), cpu: num(r[4]), bufferGets: num(r[5]), diskReads: num(r[6]), rowsProcessed: num(r[7]), elapsedPerExec: ratio(num(r[3]), execs), cpuPerExec: ratio(num(r[4]), execs), bufferGetsPerExec: ratio(num(r[5]), execs), diskReadsPerExec: ratio(num(r[6]), execs), rowsPerExec: ratio(num(r[7]), execs), firstLoad: str(r[8]), lastActive: str(r[9]) });
 	}
 	const hashes = [...new Set(result.children.map(r => r.planHashValue))];
 	result.sections.plans = { status: 'skipped', view: 'DBMS_XPLAN.DISPLAY_CURSOR / V$SQL_PLAN', truncated: hashes.length > (options.maxPlans ?? 5), attempts: [] };
@@ -89,7 +89,7 @@ export async function readSqlInsight(session: OracleSession, options: { sqlId: s
 	}
 	for (const key of ['tables', 'indexes']) {
 		const sections = Object.entries(result.sections).filter(([k]) => k.startsWith(key + ':')).map(([, v]) => v);
-		result.sections[key] = { status: !sections.length ? 'skipped' : sections.some(s => s.status === 'unavailable') ? 'unavailable' : 'ok', view: sections.map(s => s.view).join(', '), truncated: sections.some(s => s.truncated), attempts: sections.flatMap(s => s.attempts) };
+		result.sections[key] = { status: !sections.length ? 'skipped' : sections.some(s => s.status === 'unavailable') ? 'unavailable' : 'ok', view: [...new Set(sections.map(s => s.view))].join(', '), truncated: sections.some(s => s.truncated), attempts: sections.flatMap(s => s.attempts) };
 	}
 	const records = (data?: QueryResult) => data?.rows.map(r => Object.fromEntries(data.columns.map((c, i) => [c, r[i] instanceof Date ? str(r[i]) : r[i]]))) ?? [];
 	const signature = str(cursors?.rows[0]?.[11]);
@@ -138,10 +138,15 @@ export function renderSqlInsightMarkdown(result: SqlInsight): string {
 		lines.push('', '## ' + name, '');
 		const rows = result[name];
 		if (!rows.length) { lines.push('No rows returned.'); continue; }
-		const columns = Object.keys(rows[0]!);
+		const columns = [...new Set(rows.flatMap(row => Object.keys(row)))];
 		lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |');
 		for (const row of rows) lines.push('| ' + columns.map(c => escape((row as unknown as Record<string, unknown>)[c])).join(' | ') + ' |');
 	}
-	for (const plan of result.plans) lines.push('', `## Plan ${plan.planHashValue} (${plan.source})`, '', ...(plan.text ?? plan.lines.map(l => JSON.stringify(l))).map(escape));
+	for (const plan of result.plans) {
+		const text = (plan.text ?? plan.lines.map(l => JSON.stringify(l))).join('\n');
+		// Longer than every embedded backtick run, including an attempted closing fence.
+		const fence = '`'.repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map(m => m[0].length + 1)));
+		lines.push('', `## Plan ${plan.planHashValue} (${plan.source})`, '', fence, text, fence);
+	}
 	return lines.join('\n') + '\n';
 }

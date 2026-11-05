@@ -26,8 +26,19 @@ maxPlans defaults to 5 (1–20). Cursor-cache eviction and caps mean these are
 bounded observations, not historical workload measurements. The children and
 planChanges metrics are cumulative, execution-weighted across observed children;
 elapsed and CPU are microseconds. Zero executions yield null ratios.
-All times are UTC. FIRST_LOAD_TIME is normalized from Oracle's cache string,
-and DATE statistics/last-active times are formatted by the UTC database session.
+FIRST_LOAD_TIME is converted in SQL from its server-local VARCHAR2 using
+TO_TIMESTAMP, FROM_TZ with the current SYSTIMESTAMP offset, and SYS_EXTRACT_UTC.
+TRIM makes blank values SQL NULL; absent times remain empty in the output.
+DST caveat: FIRST_LOAD_TIME stores neither a zone nor its historical offset.
+Using the server's current offset can be off by an hour for cursors loaded
+before a daylight-saving transition (or by the offset change if the server
+time zone changed). These UTC values are therefore estimates across such
+changes. DATE statistics/last-active times are formatted by the UTC session.
+
+Markdown plans preserve whitespace, pipes and other characters in fenced code
+blocks, including V$SQL_PLAN fallback rows. Fence length exceeds any embedded
+backtick run. Tables include the union of keys across all rows so each child's
+mismatch flags remain visible; summary view names are de-duplicated.
 
 Plans use DISPLAY_CURSOR with TYPICAL, falling back to V$SQL_PLAN for empty,
 diagnostic-only or failed display output. Structured plan rows are also fetched
@@ -45,7 +56,7 @@ Findings contain Check evidence rows for execution-time plan instability,
 stale/missing statistics, large full scans on nested-loop inner branches, and
 high child counts. A finding is a diagnostic lead, not proof of causality.
 
-## Live smoke, 2026-11-05
+## Live smoke, 2026-11-05 (repeated after review fixes)
 
 Both approved accounts ran the integration SELECT probe:
 
@@ -56,14 +67,21 @@ SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS
 The CLI then found it by SQL text, without a fixed SQL_ID:
 
 ```sh
-PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- sql --target d1-19c-lab --text 'SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS' --json
-PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- sql --target p1-19c-prod --text 'SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS' --json
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- sql --target d1-19c-lab --text 'SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS' --markdown
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- sql --target p1-19c-prod --text 'SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS' --markdown
 ```
 
 | Target | Status | Children | Plan hash observed | Plan source | Tables / indexes |
 |---|---|---|---|---|---|
 | d1-19c-lab | ok | 1 | 3166300339 | display_cursor | 11 / 16 |
 | p1-19c-prod | ok | 1 | 4081256306 | display_cursor | 11 / 16 |
+
+The repeated Markdown smokes preserved the aligned plan header and its raw
+pipes inside triple-backtick fences on both targets. Table/index summaries
+named DBA_TAB_STATISTICS and DBA_IND_STATISTICS once each. SQL-converted
+first-load values observed were 2026-11-05T15:00:27Z (d1) and
+2026-11-05T15:00:29Z (p1). Both hosts currently use UTC; a historical DST
+transition was not induced live.
 
 Both reported ok for children, plans, plan changes, statistics, baselines,
 profiles and capture metadata. Mismatch reads were skipped because only one
@@ -74,9 +92,10 @@ and clearly skip when approved databases or credential configuration are down.
 ## Validation
 
 - npm run typecheck: clean.
-- npm test: 1,150 passing unit tests.
-- PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration:
-  46 passing tests, including both SQL insight target tests.
+- npm test: 1,154 passing unit tests.
+- PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/sqlperf.test.ts:
+  2 passing tests, one per approved target. The full integration suite was
+  intentionally not run for this review revision to avoid shared LLM use.
 - npm run test:browser: 38 passing, 2 opt-in live tests skipped.
 
 No grants, database changes, dependencies, shared contracts or model changes
