@@ -22,6 +22,7 @@ export async function groundTruth(target: TargetConfig, sql: string, setupSql?: 
 	try {
 		const gate = await connection.execute("SELECT version FROM product_component_version WHERE product LIKE 'Oracle Database%'");
 		if (!String(gate.rows?.[0]?.[0]).startsWith('19.')) throw new Error('Ground truth refuses non-19c');
+		await connection.execute("ALTER SESSION SET TIME_ZONE = '+00:00'");
 		// Session-only setting, as product sessions use; setup is a read-only SELECT.
 		if (setupSql) await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = "${target.defaultSchema}"`);
 		await connection.execute('SET TRANSACTION READ ONLY');

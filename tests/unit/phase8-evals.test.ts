@@ -28,7 +28,7 @@ it('requires dev and fresh holdout in all categories, ignoring regression in the
 
 it('retains old case counts in dev and regression', async () => {
 	// Keep the pre-Phase-8 population separate from both later additions.
-	const cases = (await loadHardCases()).filter(test => !test.id.startsWith('hard-p8-') && test.split !== 'challenge');
+	const cases = (await loadHardCases()).filter(test => !test.id.startsWith('hard-p8-') && !test.id.startsWith('hard-p21-') && test.split !== 'challenge');
 	expect(cases).toHaveLength(49);
 	expect(cases.filter(test => test.split === 'regression')).toHaveLength(21);
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(0);

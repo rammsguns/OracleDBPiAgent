@@ -1,0 +1,211 @@
+[
+	{
+		"id": "hard-p21-history-signature",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, give HR.ADD_JOB_HISTORY argument names and whether each has a default, in declaration order.",
+		"groundTruth": {
+			"sql": "SELECT argument_name AS argument_name, defaulted AS defaulted FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-trigger-state",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, list HR employee-table triggers with their enabled status and firing granularity.",
+		"groundTruth": {
+			"sql": "SELECT trigger_name AS trigger_name,status AS status,trigger_type AS trigger_type FROM dba_triggers WHERE owner='HR' AND table_name='EMPLOYEES' ORDER BY trigger_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-package-validity",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, report the status of the specification and body of SHOPAPP.WORKLOAD separately.",
+		"groundTruth": {
+			"sql": "SELECT object_type AS object_type,status AS status FROM dba_objects WHERE owner='SHOPAPP' AND object_name='WORKLOAD' AND object_type IN ('PACKAGE','PACKAGE BODY') ORDER BY object_type",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-incident-range",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, for ADR incidents created from 6 October through 3 November 2026 UTC, give the smallest and largest incident IDs and total count.",
+		"groundTruth": {
+			"sql": "SELECT MIN(incident_id) AS first_id,MAX(incident_id) AS last_id,COUNT(*) AS incident_count FROM v$diag_incident WHERE create_time>=TO_TIMESTAMP_TZ('2026-10-06 +00:00','YYYY-MM-DD TZH:TZM') AND create_time<TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM')",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-alert-levels",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, count alert messages by severity level for 4 November 2026 UTC.",
+		"groundTruth": {
+			"sql": "SELECT message_level AS message_level,COUNT(*) AS message_count FROM v$diag_alert_ext WHERE originating_timestamp>=TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM') AND originating_timestamp<TO_TIMESTAMP_TZ('2026-11-05 +00:00','YYYY-MM-DD TZH:TZM') GROUP BY message_level ORDER BY message_level",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-problem-identity",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, list ADR problem IDs with their problem keys, ordered by ID.",
+		"groundTruth": {
+			"sql": "SELECT problem_id AS problem_id,problem_key AS problem_key FROM v$diag_problem ORDER BY problem_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-products-indexes",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, list the SHOPAPP.PRODUCTS indexes, their uniqueness and validity status.",
+		"groundTruth": {
+			"sql": "SELECT index_name AS index_name,uniqueness AS uniqueness,status AS status FROM all_indexes WHERE table_owner='SHOPAPP' AND table_name='PRODUCTS' ORDER BY index_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-products-stats",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, report whether SHOPAPP.PRODUCTS table statistics are stale or missing, and whether they are global statistics.",
+		"groundTruth": {
+			"sql": "SELECT table_name AS table_name,NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-price-plan-operations",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, use existing cached evidence for the SHOPAPP SELECT reading PRICE from PRODUCTS by PRODUCT_ID. List its distinct plan operation and option pairs, using NONE for missing options. Do not execute the application statement.",
+		"groundTruth": {
+			"sql": "SELECT DISTINCT p.operation AS operation,NVL(p.options,'NONE') AS options FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY operation,options",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-profile-lock",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, give the DEFAULT profile password lock time and password grace time settings.",
+		"groundTruth": {
+			"sql": "SELECT resource_name AS resource_name,limit AS configured_limit FROM dba_profiles WHERE profile='DEFAULT' AND resource_name IN ('PASSWORD_LOCK_TIME','PASSWORD_GRACE_TIME') ORDER BY resource_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p21-public-directory",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, list explicit directory-object grants to PUBLIC, with directory name and privilege. Inspect metadata only.",
+		"groundTruth": {
+			"sql": "SELECT table_name AS directory_name,privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND type='DIRECTORY' ORDER BY table_name,privilege",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-audit-outcomes",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, list enabled unified audit policy names and their success and failure capture flags. Report configuration only, without reading event records.",
+		"groundTruth": {
+			"sql": "SELECT policy_name AS policy_name,success AS success,failure AS failure FROM audit_unified_enabled_policies ORDER BY policy_name,success,failure",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	}
+]

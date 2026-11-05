@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-05T19:58:21.287Z",
-	"caseCount": 109,
+	"validatedAt": "2026-11-05T20:54:44.500Z",
+	"caseCount": 121,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -1529,6 +1529,205 @@
 			]
 		},
 		{
+			"id": "hard-p21-history-signature",
+			"target": "d1-19c-lab",
+			"sql": "SELECT argument_name AS argument_name, defaulted AS defaulted FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
+			"mode": "rowCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"P_EMP_ID",
+					"N"
+				],
+				[
+					"P_START_DATE",
+					"N"
+				],
+				[
+					"P_END_DATE",
+					"N"
+				],
+				[
+					"P_JOB_ID",
+					"N"
+				],
+				[
+					"P_DEPARTMENT_ID",
+					"N"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-trigger-state",
+			"target": "d1-19c-lab",
+			"sql": "SELECT trigger_name AS trigger_name,status AS status,trigger_type AS trigger_type FROM dba_triggers WHERE owner='HR' AND table_name='EMPLOYEES' ORDER BY trigger_name",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"SECURE_EMPLOYEES",
+					"DISABLED",
+					"BEFORE STATEMENT"
+				],
+				[
+					"UPDATE_JOB_HISTORY",
+					"ENABLED",
+					"AFTER EACH ROW"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-package-validity",
+			"target": "p1-19c-prod",
+			"sql": "SELECT object_type AS object_type,status AS status FROM dba_objects WHERE owner='SHOPAPP' AND object_name='WORKLOAD' AND object_type IN ('PACKAGE','PACKAGE BODY') ORDER BY object_type",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"PACKAGE",
+					"VALID"
+				],
+				[
+					"PACKAGE BODY",
+					"VALID"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-incident-range",
+			"target": "d1-19c-lab",
+			"sql": "SELECT MIN(incident_id) AS first_id,MAX(incident_id) AS last_id,COUNT(*) AS incident_count FROM v$diag_incident WHERE create_time>=TO_TIMESTAMP_TZ('2026-10-06 +00:00','YYYY-MM-DD TZH:TZM') AND create_time<TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM')",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					122927,
+					225332,
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p21-alert-levels",
+			"target": "p1-19c-prod",
+			"sql": "SELECT message_level AS message_level,COUNT(*) AS message_count FROM v$diag_alert_ext WHERE originating_timestamp>=TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM') AND originating_timestamp<TO_TIMESTAMP_TZ('2026-11-05 +00:00','YYYY-MM-DD TZH:TZM') GROUP BY message_level ORDER BY message_level",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					1,
+					1
+				],
+				[
+					16,
+					1082
+				]
+			]
+		},
+		{
+			"id": "hard-p21-problem-identity",
+			"target": "d1-19c-lab",
+			"sql": "SELECT problem_id AS problem_id,problem_key AS problem_key FROM v$diag_problem ORDER BY problem_id",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					1,
+					"ORA 800"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-products-indexes",
+			"target": "p1-19c-prod",
+			"sql": "SELECT index_name AS index_name,uniqueness AS uniqueness,status AS status FROM all_indexes WHERE table_owner='SHOPAPP' AND table_name='PRODUCTS' ORDER BY index_name",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"SYS_C007655",
+					"UNIQUE",
+					"VALID"
+				],
+				[
+					"SYS_C007656",
+					"UNIQUE",
+					"VALID"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-products-stats",
+			"target": "p1-19c-prod",
+			"sql": "SELECT table_name AS table_name,NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"PRODUCTS",
+					"YES",
+					"YES"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-price-plan-operations",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT p.operation AS operation,NVL(p.options,'NONE') AS options FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY operation,options",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"INDEX",
+					"UNIQUE SCAN"
+				],
+				[
+					"SELECT STATEMENT",
+					"NONE"
+				],
+				[
+					"TABLE ACCESS",
+					"BY INDEX ROWID"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-profile-lock",
+			"target": "p1-19c-prod",
+			"sql": "SELECT resource_name AS resource_name,limit AS configured_limit FROM dba_profiles WHERE profile='DEFAULT' AND resource_name IN ('PASSWORD_LOCK_TIME','PASSWORD_GRACE_TIME') ORDER BY resource_name",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"PASSWORD_GRACE_TIME",
+					"7"
+				],
+				[
+					"PASSWORD_LOCK_TIME",
+					"1"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-audit-outcomes",
+			"target": "p1-19c-prod",
+			"sql": "SELECT policy_name AS policy_name,success AS success,failure AS failure FROM audit_unified_enabled_policies ORDER BY policy_name,success,failure",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"ORA_LOGON_FAILURES",
+					"NO",
+					"YES"
+				],
+				[
+					"ORA_SECURECONFIG",
+					"YES",
+					"YES"
+				]
+			]
+		},
+		{
 			"id": "hard-grant-p1-parameters",
 			"target": "p1-19c-prod",
 			"sql": "SELECT UPPER(name), value FROM v$parameter WHERE name IN ('sga_target','pga_aggregate_target') ORDER BY name",
@@ -1929,6 +2128,12 @@
 					"TIME_ID"
 				]
 			]
+		}
+	],
+	"skipped": [
+		{
+			"id": "hard-p21-public-directory",
+			"reason": "Empty truth permitted by skipWhenTruthEmpty"
 		}
 	]
 }
