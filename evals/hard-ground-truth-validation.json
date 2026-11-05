@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-05T20:54:44.500Z",
-	"caseCount": 121,
+	"validatedAt": "2026-11-05T23:37:35.507Z",
+	"caseCount": 123,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -1356,7 +1356,7 @@
 			"rows": [
 				[
 					2134003100,
-					1
+					2
 				]
 			]
 		},
@@ -1371,13 +1371,13 @@
 					"SHOPAPP",
 					"PRODUCTS",
 					"YES",
-					"2026-11-04T22:00:07Z"
+					"2026-11-05T22:00:17Z"
 				],
 				[
 					"SHOPAPP",
 					"SYS_C007655",
 					"YES",
-					"2026-11-04T22:00:07Z"
+					"2026-11-05T22:00:17Z"
 				]
 			]
 		},
@@ -1659,12 +1659,11 @@
 		{
 			"id": "hard-p21-products-stats",
 			"target": "p1-19c-prod",
-			"sql": "SELECT table_name AS table_name,NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
+			"sql": "SELECT NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
 			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
-					"PRODUCTS",
 					"YES",
 					"YES"
 				]
@@ -1724,6 +1723,37 @@
 					"ORA_SECURECONFIG",
 					"YES",
 					"YES"
+				]
+			]
+		},
+		{
+			"id": "hard-p21-alert-levels-d1",
+			"target": "d1-19c-lab",
+			"sql": "SELECT message_level AS message_level,COUNT(*) AS message_count FROM v$diag_alert_ext WHERE originating_timestamp>=TO_TIMESTAMP_TZ('2026-10-06 +00:00','YYYY-MM-DD TZH:TZM') AND originating_timestamp<TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM') GROUP BY message_level ORDER BY message_level",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					1,
+					6
+				],
+				[
+					16,
+					6376
+				]
+			]
+		},
+		{
+			"id": "hard-p21-problem-last-incident-p1",
+			"target": "p1-19c-prod",
+			"sql": "SELECT problem_id AS problem_id,problem_key AS problem_key,last_incident AS last_incident FROM v$diag_problem ORDER BY problem_id",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					1,
+					"ORA 800",
+					86767
 				]
 			]
 		},

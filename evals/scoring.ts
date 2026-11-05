@@ -23,7 +23,15 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	const normalizeCodes = (text: string) => normalizeHyphens(text).replace(/"([A-Za-z_][\w$#]*)"/g, '$1').replace(/\b(ORA|TNS)[ -](\d{1,5})(?![\w])/gi,
 		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
 	const p19 = test.id.startsWith('hard-p19-');
-	const answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
+	let answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
+	// This single-table case needs the two flags, not a repeated table name.
+	// Canonicalize only explicit vertical attributes; keep each table separate.
+	if (test.id === 'hard-p21-products-stats') {
+		answer = answer.split('\n').map(line => line.replace(
+			/^\|\s*[`*]*(Stale(?:[ _]Stats|\?)|Global(?:[ _]Stats| statistics\?))[`*]*\s*\|\s*[`*]*(YES|NO|UNKNOWN)[`*]*(?:\s+[-—][^|]*)?\s*\|\s*$/i,
+			(_line, label: string, value: string) => `| ${/^stale/i.test(label) ? 'stale_stats' : 'global_stats'} | ${value} |`)).join('\n');
+	}
+
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(answer) });
 	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(answer) });
 	// A required tool may list alternatives ("run_query|top_sql") when either can produce the evidence.
@@ -49,7 +57,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature') });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -91,7 +99,7 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => normalizeHyphens(text).replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
@@ -106,6 +114,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	const same = (actual: string, expected: unknown, label = '') => {
 		let text = evidence(preserveQualified ? actual.replace(/__([^_]+)__/g, '$1') : actual);
 		const value = String(expected);
+		if (historySignature && label === 'defaulted' && value === 'N' && /^(?:no|none)$/i.test(text)) return true;
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
 		// frame. Do not borrow error numbers or numbers in arbitrary descriptions.

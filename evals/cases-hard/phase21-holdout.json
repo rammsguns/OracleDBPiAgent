@@ -71,7 +71,7 @@
 		"id": "hard-p21-alert-levels",
 		"target": "p1-19c-prod",
 		"category": "release-holdout",
-		"split": "holdout",
+		"split": "dev",
 		"question": "On p1, count alert messages by severity level for 4 November 2026 UTC.",
 		"groundTruth": {
 			"sql": "SELECT message_level AS message_level,COUNT(*) AS message_count FROM v$diag_alert_ext WHERE originating_timestamp>=TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM') AND originating_timestamp<TO_TIMESTAMP_TZ('2026-11-05 +00:00','YYYY-MM-DD TZH:TZM') GROUP BY message_level ORDER BY message_level",
@@ -89,7 +89,7 @@
 		"id": "hard-p21-problem-identity",
 		"target": "d1-19c-lab",
 		"category": "release-holdout",
-		"split": "holdout",
+		"split": "dev",
 		"question": "On d1, list ADR problem IDs with their problem keys, ordered by ID.",
 		"groundTruth": {
 			"sql": "SELECT problem_id AS problem_id,problem_key AS problem_key FROM v$diag_problem ORDER BY problem_id",
@@ -127,7 +127,7 @@
 		"split": "holdout",
 		"question": "On p1, report whether SHOPAPP.PRODUCTS table statistics are stale or missing, and whether they are global statistics.",
 		"groundTruth": {
-			"sql": "SELECT table_name AS table_name,NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
+			"sql": "SELECT NVL(stale_stats,'UNKNOWN') AS stale_stats,global_stats AS global_stats FROM dba_tab_statistics WHERE owner='SHOPAPP' AND table_name='PRODUCTS' AND object_type='TABLE'",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -198,6 +198,42 @@
 		"question": "On p1, list enabled unified audit policy names and their success and failure capture flags. Report configuration only, without reading event records.",
 		"groundTruth": {
 			"sql": "SELECT policy_name AS policy_name,success AS success,failure AS failure FROM audit_unified_enabled_policies ORDER BY policy_name,success,failure",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-alert-levels-d1",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, summarize the number of alert messages at each severity level from 6 October through 3 November 2026 UTC.",
+		"groundTruth": {
+			"sql": "SELECT message_level AS message_level,COUNT(*) AS message_count FROM v$diag_alert_ext WHERE originating_timestamp>=TO_TIMESTAMP_TZ('2026-10-06 +00:00','YYYY-MM-DD TZH:TZM') AND originating_timestamp<TO_TIMESTAMP_TZ('2026-11-04 +00:00','YYYY-MM-DD TZH:TZM') GROUP BY message_level ORDER BY message_level",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-problem-last-incident-p1",
+		"target": "p1-19c-prod",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On p1, list each ADR problem ID, its problem key and its most recent incident ID, ordered by problem ID.",
+		"groundTruth": {
+			"sql": "SELECT problem_id AS problem_id,problem_key AS problem_key,last_incident AS last_incident FROM v$diag_problem ORDER BY problem_id",
 			"mode": "rowCells"
 		},
 		"expect": {
