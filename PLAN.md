@@ -2053,7 +2053,7 @@ Tests on 0c3d865:
 - 36 integration tests;
 - 27 browser tests.
 
-Open item (addressed by WP-17E): because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
+Closed by WP-17E (merged 3197a99; review APPROVE; replay: 678 unverified lists shrink, none grow, 0 number changes): because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
 can still be listed as unverified when the owner and the name come from
 different tool results. The security-trigger case passes regardless, and the
 answer is no longer rewritten.
@@ -2122,8 +2122,10 @@ Options:
   window;
 - `codes` (ORA-/TNS- codes);
 - `text` (a case-insensitive substring, bound);
-- `level` (default: errors and warnings, `MESSAGE_LEVEL <= 16` plus ORA-
-  lines);
+- `level` (default: `MESSAGE_LEVEL <= 8`, critical/severe/important, or text
+  containing ORA-, TNS-, "Errors in file", "incident=" or "deadlock"). Oracle
+  tags almost every line level 16 (normal), so `<= 16` filters nothing. `all`
+  shows everything;
 - `limit` (default 50, capped by `limits.maxRows`).
 
 Reading rules:
@@ -2134,8 +2136,9 @@ Reading rules:
   key, incident id (from "incident=N"), trace file name and message text.
 - Message text goes through the existing credential redaction, and a row's text
   is capped at 2 KB.
-- Consecutive identical messages are folded, with a count and a first/last
-  time.
+- Messages that are identical after masking digits and hex ids are folded
+  ("Resize operation completed for file# N..." ×20 is one row), with a count,
+  a first/last time and one example text. Trailing newlines are trimmed.
 
 Other reads:
 - `readIncidents` lists V$DIAG_INCIDENT joined to V$DIAG_PROBLEM: incident id,

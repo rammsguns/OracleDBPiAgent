@@ -1,4 +1,5 @@
 /** Deterministic evidence check, deliberately limited to lexical hard facts.
+ * Owners optionally scope identifiers to their index-aligned tool result.
  * Question text is an optional third argument so callers can exempt user-supplied facts.
  */
 export interface FactCheck { facts: string[]; unsupported: string[]; unsupportedNumbers: string[] }
@@ -64,7 +65,7 @@ function identifiers(text: string): string[] {
 function identifierSupported(fact: string, evidence: Set<string>): boolean {
 	return evidence.has(norm(fact)) || (fact.includes('.') && fact.split('.').every(part => evidence.has(norm(part))));
 }
-export function checkFacts(answer: string, toolResultTexts: readonly string[], question = ''): FactCheck {
+export function checkFacts(answer: string, toolResultTexts: readonly string[], question = '', toolResultOwners: readonly (string | undefined)[] = []): FactCheck {
 	const evidenceText = toolResultTexts.join('\n');
 	const evidenceByResult = toolResultTexts.map(text =>
 		new Set(identifiers(text).flatMap(id => [id, ...id.split('.')])));
@@ -106,7 +107,12 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		if (constants.has(fact.toUpperCase()) || fact.split('.').every(part => constants.has(part.toUpperCase())) || /^FM[09]+$/i.test(fact) || identifierSupported(fact, questionEvidence)) continue;
 		// Hyphenated prose (e.g. SHOPAPP-style) is not an unquoted Oracle identifier.
 		if (/^-[a-z]/i.test(answer.slice(match.index! + fact.length)) || /[a-z]-$/i.test(answer.slice(0, match.index!))) continue;
-		add(fact, evidenceByResult.some(evidence => identifierSupported(fact, evidence)));
+		add(fact, evidenceByResult.some((evidence, i) => {
+			if (identifierSupported(fact, evidence)) return true;
+			const parts = fact.split('.');
+			return parts.length === 2 && parts[0]!.toUpperCase() === toolResultOwners[i]?.toUpperCase()
+				&& evidence.has(norm(parts[1]!));
+		}));
 	}
 	// SQL IDs can begin with a digit; identifier scanning above cannot capture those.
 	for (const match of answer.matchAll(/(?<![\w])[0-9a-z]{13}(?![\w])/gi)) {
