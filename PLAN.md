@@ -2365,7 +2365,7 @@ c5bdaa4, B is 09febf7 (18G + 18H):
   - 44 integration tests pass (live targets and Strata);
   - 38 browser tests pass, 2 opt-in live tests skipped.
 
-## Phase 19: single-SQL performance drill-down (proposed 2026-11-05; needs owner approval)
+## Phase 19: single-SQL performance drill-down (approved 2026-11-05)
 
 ### Goal
 Answer "why is this SQL slow?" for one statement, using read-only evidence.
@@ -2395,6 +2395,67 @@ because they need the Diagnostics Pack license. Only cursor-cache views are used
   - `DBA_TAB_STATISTICS`, `DBA_IND_STATISTICS`, `DBA_TAB_COL_STATISTICS`.
 - Without the grants, every section degrades to `unavailable` with the missing
   view named, as alert-log reads do today.
+
+Owner on 2026-11-05: "apply the grants and start phase 19".
+`docs/grants-request-2026-11-05-sqlperf.sql` was applied on p1 as
+`/ as sysdba` (8 × "Grant succeeded"), after checking PRODCDB, 19.9.1.0.0 and
+the HARNESS_RO grantee. A read-only re-probe confirmed HARNESS_RO now reads all
+eight views. The phase 20 grants wait for phase 20.
+
+### WP-19A: SQL insight core and CLI (branch `wp-19a-sql-insight`)
+Owns:
+- `src/sqlperf/` (new);
+- the `sql` command registration in `src/cli/index.ts`;
+- the narrow `DBMS_XPLAN.DISPLAY_CURSOR` table-function allowance in
+  `src/oracle/sqlPolicy.ts`, with unit tests: exact form only, bind or literal
+  arguments, no other package;
+- tests and `docs/sqlperf.md`.
+
+API:
+- `readSqlInsight(session, { sqlId, child?, maxPlans? })` returns `SqlInsight`;
+- `renderSqlInsightMarkdown`;
+- `SqlUsageError` (CLI exit 2).
+
+Inputs and output:
+- Validate the SQL_ID as 13 base-32 characters.
+- Also accept `--text "fragment"`. It looks up `V$SQL` with a bounded
+  `LIKE` on `SQL_TEXT`, lists up to 10 candidates and never guesses when there
+  is more than one.
+
+Sections, each with its own status (`ok`, `unavailable` naming the view, or
+`skipped`):
+- cursor children (`V$SQL`): execs, elapsed, CPU, buffer gets, disk reads and
+  rows per execution; plan hash; first load and last active (UTC);
+- plans (`DISPLAY_CURSOR` 'TYPICAL', falling back to `V$SQL_PLAN` rows when
+  `DISPLAY_CURSOR` is empty or fails);
+- plan changes, one row per plan hash, with aggregated per-execution stats;
+- referenced tables and indexes from the plan objects, with `DBA_TAB_STATISTICS`
+  and `DBA_IND_STATISTICS` (stale flag, last analyzed, num rows), using the
+  `ALL_` fallback when the `DBA_` view is unavailable;
+- baselines and profiles matched by `EXACT_MATCHING_SIGNATURE` / `SQL_HANDLE`;
+- shared-cursor mismatch reasons (`Y` columns) when there are more than
+  3 children;
+- capture-only binds: name, position, datatype and `WAS_CAPTURED`.
+  `VALUE_STRING` is never selected; it may hold user data.
+
+Findings:
+- plan instability: more than one plan hash and a ratio of 2 or more between
+  the best and worst elapsed per execution;
+- stale or missing statistics;
+- `TABLE ACCESS FULL` on a table with more than 100k rows that is the inner
+  side of a `NESTED LOOPS`;
+- high child count;
+- each finding cites the evidence rows.
+
+CLI:
+- `piagent sql --target T (--sql-id ID | --text S) [--child N] [--json | --markdown]`;
+- Markdown by default, matching the alertlog style.
+
+Tests:
+- unit tests with fixtures;
+- integration tests on d1 and p1, which find a real statement by text through
+  `V$SQL`, never a hard-coded SQL_ID;
+- a live smoke on both targets in `docs/`.
 
 ### Shared shape
 `SqlInsight = { status; sqlId; target; text; children: ChildRow[];
