@@ -8,6 +8,8 @@ interface EvalCaseBase {
 	split?: 'dev' | 'holdout' | 'regression' | 'challenge';
 	/** setupSql: a plain SELECT run first with CURRENT_SCHEMA = the target's default schema, as product
 	 * sessions do, so truth that reads V$SQL does not depend on earlier cases having cached the cursor. */
+	/** Opt in to skipping cache-dependent cases when pre/post truth has no rows. */
+	skipWhenTruthEmpty?: boolean;
 	groundTruth?: { sql: string; mode: 'scalar' | 'allCells' | 'rowCells'; setupSql?: string };
 	expect: { requiredFacts: string[]; requiredTools: string[]; forbiddenClaims: string[]; mustRefuse: boolean; maxToolCalls?: number };
 }

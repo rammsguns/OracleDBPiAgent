@@ -1,0 +1,65 @@
+{
+	"roots": [
+		"/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive",
+		"evals/results"
+	],
+	"files": 398,
+	"records": 9265,
+	"unanswered": 9,
+	"p19": 8,
+	"changedChecks": 3,
+	"nonP19ChangedChecks": 0,
+	"nonP19Flips": 0,
+	"flips": [
+		{
+			"file": "evals/results/2026-11-05T15-29-17-162Z-ce4348ca-4c0d-45d0-9dce-fc2ea51f7d43.json",
+			"id": "hard-p19-plan-controls",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"reason": "P19 single-record labelled counts in separate bullets now pool",
+			"checks": [
+				"fresh ground truth row: [0,0]"
+			]
+		},
+		{
+			"file": "evals/results/2026-11-05T15-29-17-162Z-ce4348ca-4c0d-45d0-9dce-fc2ea51f7d43.json",
+			"id": "hard-p19-plan-controls",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"reason": "P19 single-record labelled counts in separate bullets now pool",
+			"checks": [
+				"fresh ground truth row: [0,0]"
+			]
+		}
+	],
+	"identity": [
+		{
+			"file": "evals/results/2026-11-05T15-29-17-162Z-ce4348ca-4c0d-45d0-9dce-fc2ea51f7d43.json",
+			"iteration": 1,
+			"truth": [
+				[
+					"f1yj0hbhj9nna",
+					0,
+					0
+				]
+			],
+			"pass": false,
+			"reason": "Wrong selected cursor; zero counts cannot compensate for missing correct cursor identity"
+		},
+		{
+			"file": "evals/results/2026-11-05T15-29-17-162Z-ce4348ca-4c0d-45d0-9dce-fc2ea51f7d43.json",
+			"iteration": 2,
+			"truth": [
+				[
+					"f1yj0hbhj9nna",
+					0,
+					0
+				]
+			],
+			"pass": true,
+			"reason": "Correct runtime-discovered cursor and labelled zero counts"
+		}
+	]
+}

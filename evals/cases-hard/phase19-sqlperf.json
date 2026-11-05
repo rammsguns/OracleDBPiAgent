@@ -16,7 +16,8 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	},
 	{
 		"id": "hard-p19-object-statistics",
@@ -35,7 +36,8 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	},
 	{
 		"id": "hard-p19-bind-metadata",
@@ -54,7 +56,8 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	},
 	{
 		"id": "hard-p19-plan-controls",
@@ -63,7 +66,7 @@
 		"split": "challenge",
 		"question": "On p1, investigate the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID, last active between 1 Oct 2026 and 1 Jan 2027 UTC (start included, end excluded). If several statement IDs match, choose the lexicographically lowest. Use existing evidence without executing the statement; if absent, report a cache miss. Across its cached children, how many distinct non-null SQL plan baseline names and SQL profile names are attached? Explain whether zero attached names proves that no matching management objects exist anywhere.",
 		"groundTruth": {
-			"sql": "SELECT COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) HAVING COUNT(*)>0",
+			"sql": "SELECT s.sql_id AS sql_id, COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.sql_id",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -73,6 +76,7 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	}
 ]
