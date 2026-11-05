@@ -22,13 +22,13 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 }
 it('requires token, approved Host/Origin, method, target and identifiers before opening sessions', async () => {
 	const f = await fixture();
-	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql']) {
+	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security']) {
 		expect((await f.call(path, undefined, { Authorization: '' })).status).toBe(401);
 		expect((await f.call(path, undefined, { Host: 'evil.test' })).status).toBe(403);
 		expect((await f.call(path, undefined, { Origin: 'null' })).status).toBe(403);
 		expect((await f.call(path, undefined, {}, 'DELETE')).status).toBe(405);
 	}
-	for (const path of ['/api/alertlog?target=FREEPDB1', '/api/alertlog?since=31d', '/api/alertlog?codes=ORA-600', '/api/alertlog?text=' + 'x'.repeat(2049), '/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
+	for (const path of ['/api/alertlog?target=FREEPDB1', '/api/alertlog?since=31d', '/api/alertlog?codes=ORA-600', '/api/alertlog?text=' + 'x'.repeat(2049), '/api/security?target=FREEPDB1', '/api/security?whoCan=HR', '/api/security?whoCan=HR.X;DROP', '/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
 	for (const issue of [{ issue: 'x', since: '31d' }, { issue: 1 }, { issue: '' }, { issue: 'x', target: 'FREEPDB1' }]) expect((await f.call('/api/triage', issue)).status).toBe(400);
 	expect(f.list).not.toHaveBeenCalled(); expect(f.triage).not.toHaveBeenCalled(); expect(f.closeAll).not.toHaveBeenCalled();
 });
@@ -48,7 +48,7 @@ it('shares lock across insight routes and releases after failures', async () => 
 	const pending = new Promise<void>(r => { release = r; }), start = new Promise<void>(r => { started = r; });
 	const f = await fixture({ plsqlList: async () => { started(); await pending; throw new Error('private DSN'); } });
 	const first = f.call(); await start;
-	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); } finally { release(); }
+	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); expect((await f.call('/api/security')).status).toBe(429); } finally { release(); }
 	const failed = await first; expect(failed.status).toBe(500); expect(failed.text).not.toContain('DSN'); expect((await f.call()).status).toBe(500);
 });
 it('accepts dollar and hash identifiers and forwards doc selection', async () => {
@@ -98,4 +98,32 @@ it('SQL errors stay private, output is bounded and sessions and lock recover', a
 	const f = await fixture({ readSqlInsight: async () => { if (mode === 'fail') throw new Error('private database address'); return { ...sqlFixture, text: 'x'.repeat(1048576) }; } });
 	for (let i = 0; i < 2; i++) { const response = await f.call('/api/sql?sqlId=0123456789abc'); expect(response.status).toBe(500); expect(response.text).not.toContain('private'); }
 	mode = 'cap'; expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(413); expect(f.closeAll).toHaveBeenCalledTimes(3);
+});
+
+
+it('security validates before connecting, returns Markdown, caps output and releases sessions on failure', async () => {
+	const { securityFixture } = await import('../browser/security-fixture.js');
+	let mode = 'ok';
+	const read = vi.fn<NonNullable<WebServerOptions['readSecurityPosture']>>(async (_session, options) => {
+		expect(options).toEqual({ whoCan: 'HR.EMPLOYEES' });
+		if (mode === 'fail') throw new Error('private database address');
+		return { ...securityFixture, target: mode === 'cap' ? 'x'.repeat(1048576) : securityFixture.target };
+	});
+	const f = await fixture({ readSecurityPosture: read });
+	expect((await f.call('/api/security?whoCan=HR.X;DROP')).status).toBe(400);
+	expect(f.closeAll).not.toHaveBeenCalled();
+	const response = await f.call('/api/security?whoCan=HR.EMPLOYEES');
+	expect(response.status).toBe(200);
+	const output = JSON.parse(response.text);
+	expect(output.markdown).toContain('# Security Posture');
+	expect(output.result.checks[0].findings[0].evidence).toMatchObject({ view: 'DBA_TAB_PRIVS', status: 'ok' });
+	expect(output.result.checks[0].evidence[0].rows).toEqual([['PUBLIC']]);
+	expect(output.result.checks[0].evidence[0]).not.toHaveProperty('binds');
+	expect(output.result.checks[0].findings[0].evidence).not.toHaveProperty('rows');
+	expect(output.result.checks[0].findings[0].evidence).not.toHaveProperty('binds');
+	expect(output.result.whoCan[0].evidence).not.toHaveProperty('sql');
+	mode = 'cap'; expect((await f.call('/api/security?whoCan=HR.EMPLOYEES')).status).toBe(413);
+	mode = 'fail';
+	for (let i = 0; i < 2; i++) { const response = await f.call('/api/security?whoCan=HR.EMPLOYEES'); expect(response.status).toBe(500); expect(response.text).not.toContain('private'); }
+	expect(f.closeAll).toHaveBeenCalledTimes(4);
 });
