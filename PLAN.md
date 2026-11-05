@@ -2594,6 +2594,32 @@ and `evals/scoring.ts` for the items below:
 4. Replay all of `eval-archive` with the new scorer. It must show zero flips
    outside p19 and list every p19 flip with a reason.
 
+### WP-19E: SQL insight polish (branch `wp-19e-sql-polish`, coordinator review of the merged 19A–19D)
+Owns:
+- `src/sqlperf/`;
+- `src/triage/sqlperf.ts` and its Markdown in `src/triage/index.ts`;
+- `src/web/static/sql.js` and its CSS;
+- tests, `docs/` and `docs/img/`.
+
+1. Candidate selection: exclude statements whose `PARSING_SCHEMA_NAME` is the
+   session user (the agent's own diagnostic queries). This applies in
+   triage's top-SQL lookup and to `--text` candidates, with a note giving the
+   number excluded. On p1, "orders query slow on SHOPAPP.ORDERS" picked a
+   HARNESS_RO diagnostic statement first.
+2. Sections: per-object statistics status lives on the object row, not as
+   `tables:OWNER.NAME` keys in `sections`. Summaries and chips show one entry
+   per section, and only non-`ok` sections are expanded.
+3. Numbers: round per-execution values for display. Show time per execution in
+   ms with 3 significant digits; keep raw microseconds in JSON.
+4. Findings: render as readable rows (finding, evidence, verify next), never
+   raw `Check` fields (`sql`, `binds`, `attempts`), in the CLI, triage and web.
+5. Presentation: consistent title-case headings; readable column labels
+   (binds: Child, Name, Position, Type, Captured); empty sections collapsed
+   into one "No baselines, profiles, binds or mismatches" line; wide tables
+   scroll inside their own box on desktop as well as on phones.
+6. Fresh screenshots (d1 and p1, light and dark, 1280 and 390) and refreshed
+   CLI and triage smokes in the docs.
+
 ## Phase 20: security and privilege review (proposed 2026-11-05; needs owner approval)
 
 ### Goal
