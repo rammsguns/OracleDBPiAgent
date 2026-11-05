@@ -1,3 +1,4 @@
+import { nameCandidates, lookupNames } from './names.js';
 import { collectRunHistory, scopeName, type RunScope } from './history.js';
 import { diagnosePredicates } from './diagnose.js';
 import { redactCredentials } from './redact.js';
@@ -21,11 +22,19 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	const hours = sinceHours(options.since), reader = new TriageReader(ctx, target.name), dictionary = new Dictionary(ctx, target.name, redactCredentials);
 	const parsed = parseIssue(options.issue ?? '');
 	const explicitObjects = [...parsed.objects], discoveredObjects: string[] = [];
-	for (const name of parsed.unqualifiedObjects) {
-		const found = await reader.read(`Owners for named object ${name}`, 'OBJECTS', 'OWNER, OBJECT_NAME, OBJECT_TYPE, STATUS', "WHERE OBJECT_NAME = :name ORDER BY OWNER, OBJECT_TYPE", { name }, 16);
-		discoveredObjects.push(...found.rows.map(r => `${identifier(asText(r[0]))}.${identifier(asText(r[1]))}`));
-		parsed.objects.push(...found.rows.map(r => `${r[0]}.${r[1]}`));
+	const candidates = nameCandidates(options.issue ?? '');
+	const matches = await lookupNames(reader, candidates);
+	for (const row of matches?.rows ?? []) {
+		if (row[1] === 'JOB') parsed.jobs.push(asText(row[3]));
+		if (row[1] === 'OBJECT') {
+			const qualified = `${identifier(asText(row[2]))}.${identifier(asText(row[3]))}`;
+			discoveredObjects.push(qualified);
+			parsed.objects.push(qualified);
+		}
 	}
+	const missingNames = candidates.filter((candidate, i) => candidate.reportMissing &&
+		!matches?.rows.some(row => Number(row[0]) === i));
+	parsed.jobs = unique(parsed.jobs);
 	parsed.objects = unique(parsed.objects);
 	const jobNames = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects.map(o => objectName(o).name)]);
 	const jobBinds: Record<string, unknown> = {};
@@ -125,6 +134,9 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		hypotheses.push({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
 	}
 	const limitations: string[] = [...runs.notes];
+	for (const candidate of missingNames) {
+		limitations.push(`not found: ${candidate.name} - check spelling, owner visibility, or whether it was dropped${matches?.status === 'unavailable' || matches?.truncated ? ' (lookup unavailable or partial)' : ''}`);
+	}
 	for (const excerpt of excerpts.filter(e => e.subprogram.includes('job_action unavailable'))) {
 		limitations.push(`${excerpt.object} has run history but no row in ${jobs.view}: the job was dropped or auto-dropped, or is no longer visible. The exact job type/action, raising condition, source text and historical dependencies cannot be verified.`);
 		if (combined.codes.includes('ORA-20001')) hypotheses.push({ rank: 0, title: 'ORA-20001 at anonymous line 1 indicates RAISE_APPLICATION_ERROR in the job’s own PLSQL_BLOCK.', evidence: [`${excerpt.object}: scheduler history reports ORA-20001 and ORA-06512 at line ${excerpt.line}.`, 'This is the anonymous job-block interpretation of the recorded stack; the dropped job_action is unavailable, so the exact call and guard cannot be inspected.'] });
@@ -135,9 +147,9 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		const evidence = [...combined.codes, ...runs.rows.slice(0, 3).map(r => `${r[0]}.${r[1]} ${r[2]} ${r[4]}`), ...excerpts.map(e => `${e.object} line ${e.line}: ${e.statement}`)].filter(e => e.trim());
 		if (evidence.length) hypotheses.push({ rank: 0, title: 'The recorded run or error is visible, but the cause is not yet established.', evidence });
 		else {
-			const searched = reader.checks.filter(c => /scheduler|Compile errors|Invalid objects|Owners for named object/i.test(c.label));
+			const searched = reader.checks.filter(c => /scheduler|Compile errors|Invalid objects|Identifier candidate lookup/i.test(c.label));
 			const views = unique(searched.flatMap(c => [c.view, ...c.attempts.map(a => `${a.view} (${a.code})`)]));
-			const names = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects]);
+			const names = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects, ...missingNames.map(c => c.name)]);
 			hypotheses.push({ rank: 0, title: `No recorded failure was found${names.length ? ' for ' + names.join(', ') : '; no job or object name was recognized'}.`, evidence: [
 				`Searched ${views.join(', ')} for ${runs.scopes.map(scopeName).join(', ') || 'no recognizable job name'}, in the requested ${options.since ?? '24h'} window and (for named jobs/objects) up to 5 latest runs without a time filter.`,
 				`Owner scope for compile errors and invalid objects: ${owners.join(', ')}. No matching run history, compiler errors or invalid objects were returned; unavailable views and caps are listed in the evidence.`,

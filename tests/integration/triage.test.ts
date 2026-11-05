@@ -55,3 +55,18 @@ it('triages older K7Q_FAILJOB failures with the default window and labels histor
 	}
 	expect(frame?.subprogram).toBe('anonymous block (job_action)'); expect(frame?.statement).toMatch(/raise_application_error\s*\(\s*-20001/i);
 }, 120000);
+
+it('reports an unknown free-text name and resolves lowercase retained job names', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
+	let missing;
+	try { missing = await live('d1-19c-lab', 'NO_SUCH_JOB_X failed'); }
+	catch (error) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved d1 listener unavailable'); return; }
+		throw error;
+	}
+	expect(renderTriageMarkdown(missing)).toContain('not found: NO_SUCH_JOB_X - check spelling, owner visibility, or whether it was dropped');
+	expect(missing.issues[0]?.hypotheses[0]?.title).not.toContain('no job or object name was recognized');
+	const lowercase = await live('d1-19c-lab', 'k7q_failjob failed');
+	expect(lowercase.issues[0]?.codes).toContain('ORA-20001');
+	expect(lowercase.issues[0]?.limitations.some(s => s.startsWith('not found: K7Q_FAILJOB'))).toBe(false);
+}, 120000);
