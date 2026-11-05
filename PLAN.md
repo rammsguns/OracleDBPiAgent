@@ -2251,7 +2251,7 @@ Tests on 48bec5e:
 - 38 browser tests, with 2 opt-in live tests skipped.
 
 Open items:
-- the WP-18G timestamp rendering (A/B gate pending);
+- the WP-18G timestamp rendering (gate-18g failed; follow-up WP-18H);
 - spaced problem keys (`ORA 800`) in labelled bullets are not matched by the
   p18 scorer (Low);
 - incident status is shown as a numeric ADR code.
@@ -2289,6 +2289,57 @@ Gate:
 - A/B alternating: p18 ×4, p16 ×4, dev 4×4, holdout ×3, regression and MVP.
 - The scorer is unchanged.
 - Merge only with no regression. The audit log also stays unchanged.
+
+Gate-18g result (2026-11-05, archive `eval-archive/phase18/gate-18g`):
+
+| Split | A (c5bdaa4) | B (+18G) | B−A pass rate, CI95 |
+|---|---|---|---|
+| p18 ×4 | 18/24 | 14/24 | −16.7 pp [−41.7, +8.3] |
+| p16 ×4 | 34/40 | 37/40 | +7.5 pp [0, +22.5] |
+| dev 4×4 | 112/112 | 112/112 | 0 |
+| holdout ×3 | 34/36 | 33/36 | −2.8 pp [−16.7, +8.3] |
+| regression | 21/21 | 21/21 | 0 |
+| MVP | 39/39 | 39/39 | 0 |
+
+Not merged. The targeted suite went down: p1-failed-job fell from 4/4 to 2/4 and
+d1-incident-count from 3/4 to 1/4. A read-only probe found the root cause.
+The agent's session time zone is the node process zone (`SESSIONTIMEZONE`
+−06:00, `DBTIMEZONE` +00:00). So the model's `TIMESTAMP '2026-11-04 00:00:00'`
+literals are read as −06:00 against the TZ-aware ADR and scheduler columns:
+- the d1 window counts 7 incidents instead of 6;
+- the p1 job failure at 04:30:56 UTC on Nov 4 falls before the window.
+
+18G prints those times as UTC, which hides the mismatch the old `GMT-0600` text
+exposed. WP-18H fixes the session side, and 18G merges together with it.
+
+### WP-18H: agent sessions in UTC (branch `wp-18h-session-utc`, based on `wp-18g-timestamps`)
+Owns `src/oracle/index.ts` (session setup), plus tests and `docs/`.
+
+Change:
+- After connect, next to the existing `CURRENT_SCHEMA` statement, run
+  `ALTER SESSION SET TIME_ZONE = '+00:00'`.
+- This is session state only and changes nothing in the database.
+- Then bare `TIMESTAMP` literals, `CURRENT_TIMESTAMP` and `LOCALTIMESTAMP`
+  are UTC, consistent with the UTC text from 18G.
+- `SYSDATE` and `SYSTIMESTAMP` are unaffected (server clock).
+
+Verify:
+- Every consumer that binds or fetches dates still gets correct instants and
+  wall clocks: alertlog CLI windows, triage alert and job windows, report,
+  web, and the 18G rendering of DATE and plain TIMESTAMP.
+- Thin-mode Date binds and fetches are converted on the client, but prove
+  it with integration tests against both targets.
+- A unit test asserts the statement runs once per session, before any tool
+  query.
+- An integration test asserts `SESSIONTIMEZONE` is `+00:00`, and that a bare
+  literal window over `V$DIAG_INCIDENT` on d1 equals the explicit-UTC window.
+
+Unchanged:
+- tool definitions and system prompt;
+- the read-only policy (session setup is not a tool query);
+- the audit log.
+
+Gate: as for 18G, with A = master and B = master + 18G + 18H.
 
 ## MVP exit criteria
 
