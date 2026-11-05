@@ -22,6 +22,7 @@ for (const colorScheme of ['light', 'dark'] as const) test(`Alert Log filters, f
 	await expect(page.locator('#alertlog-content')).toContainText('partial result');
 	await expect(page.locator('#alertlog-content')).toContainText('Inflight (1)');
 	if (process.env.PIAGENT_WP21_CAPTURE === '1') {
+		await page.setViewportSize({ width: 1280, height: 1000 });
 		await mkdir('docs/img', { recursive: true });
 		await page.screenshot({ path: `docs/img/wp-21a-alertlog-${colorScheme}.png`, fullPage: true });
 	}
