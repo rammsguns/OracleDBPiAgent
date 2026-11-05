@@ -60,7 +60,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 							const fetched = await resultSet.getRows(maxRows + 1);
 							const rows: unknown[][] = [];
 							for (const row of fetched) { const values = []; for (const value of row) values.push(await previewValue(value)); rows.push(values); }
-							return { columns: result.metaData.map((c: any) => c.name), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
+							return { columns: result.metaData.map((c: any) => c.name), columnTypes: result.metaData.map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
 						} finally { try { await resultSet?.close(); } finally { try { await connection.rollback(); } finally { busy = false; } } }
 					},
 					async close() { if (!closed) { closed = true; sessions.delete(session); await connection.close(); } },

@@ -109,6 +109,7 @@ export interface QueryOptions {
 
 export interface QueryResult {
 	columns: string[];
+	columnTypes?: string[];
 	rows: unknown[][];
 	/** True when more rows existed than maxRows. */
 	truncated: boolean;
