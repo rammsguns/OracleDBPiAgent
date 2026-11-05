@@ -4,8 +4,8 @@ import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(121);
-	expect(cases.filter(test => test.split === 'dev')).toHaveLength(28);
+	expect(cases).toHaveLength(123);
+	expect(cases.filter(test => test.split === 'dev')).toHaveLength(30);
 	// Phase 8 replaces the repeatedly observed holdout; old cases remain regression.
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(24);
 	expect(cases.filter(test => test.split === 'regression')).toHaveLength(21);

@@ -58,9 +58,10 @@ export function checkHardCases(cases: EvalCase[]): void {
 			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
 		}
 	}
-	// Phase 21 is an additional blind release holdout, not a tuning split.
+	// Phase 22 moves the two exposed ADR cases to dev; replacements remain blind.
 	for (const test of cases.filter(test => test.id.startsWith('hard-p21-'))) {
-		if (test.split !== 'holdout' || !test.groundTruth) throw new Error('Phase 21 requires holdout truth');
+		const exposed = ['hard-p21-alert-levels', 'hard-p21-problem-identity'].includes(test.id);
+		if (test.split !== (exposed ? 'dev' : 'holdout') || !test.groundTruth) throw new Error('Phase 21 requires holdout truth');
 	}
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
