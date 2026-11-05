@@ -54,7 +54,9 @@ export function generateSchedule(options: ScheduleOptions, targets: readonly { n
 }
 // Only conventional system installations are assumed stable; custom installs need review.
 export function stableNodePath(node: string): boolean {
-	return ['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node', '/bin/node'].includes(node);
+	const normalized = node.replaceAll('\\', '/');
+	if (['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node', '/bin/node', '/home/linuxbrew/.linuxbrew/bin/node'].includes(normalized)) return true;
+	return /^c:\/program files(?: \(x86\))?\/nodejs\/node\.exe$/i.test(normalized);
 }
 export function renderSchedule(schedule: ReturnType<typeof generateSchedule>): string {
 	return `${schedule.warnings.map(warning => `# WARNING: ${warning}\n`).join('')}# one-time setup (run once before enabling the timer)\n${schedule.setup}\n# ${schedule.name}.service\n${schedule.service}\n# ${schedule.name}.timer\n${schedule.timer}\n# crontab (use instead of the timer)\n${schedule.cron}`;

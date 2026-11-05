@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, readFileSync, mkdtempSync, writeFileSync, statSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { generateSchedule, renderSchedule, runSchedule } from "../../src/report/schedule.js";
+import { generateSchedule, renderSchedule, runSchedule, stableNodePath } from "../../src/report/schedule.js";
 const targets = [{ name: "d1-19c-lab" }];
 const base = { target: targets[0]!.name, every: "1h", home: "/private/piagent", out: "/private/piagent/reports", node: "/usr/bin/node", cli: "/opt/piagent/dist/cli/index.js" };
 function prepare(home: string, out = join(home, "reports")) {
@@ -180,4 +180,27 @@ it.each(['/home/user/.nvm/versions/node/v24/bin/node', '/home/user/.volta/bin/no
 	const schedule = generateSchedule({ ...base, node }, targets);
 	expect(renderSchedule(schedule)).toContain('# WARNING: Node executable may move or disappear');
 	expect(schedule.service).toContain(node);
+});
+
+it.each([
+	'/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node', '/bin/node',
+	'/home/linuxbrew/.linuxbrew/bin/node',
+	'C:/Program Files/nodejs/node.exe', 'C:/Program Files (x86)/nodejs/node.exe',
+	String.raw`C:\Program Files\nodejs\node.exe`, String.raw`C:\Program Files (x86)\nodejs\node.exe`,
+	'c:/PROGRAM FILES/NODEJS/NODE.EXE', String.raw`c:\pRoGrAm FiLeS (X86)\NodeJS\Node.EXE`,
+])('accepts stable system Node path %s', node => {
+	expect(stableNodePath(node)).toBe(true);
+});
+it.each([
+	'/home/user/.nvm/versions/node/v24/bin/node', '/home/user/.local/share/fnm/current/bin/node',
+	'/home/user/.volta/bin/node', '/home/user/.asdf/installs/nodejs/24/bin/node',
+	'/tmp/node', '/tmp/bundle/node', '/home/user/.cache/ms-playwright/driver/node',
+	'/home/user/.local/bin/node', String.raw`C:\Users\user\AppData\Local\Temp\bundle\node.exe`,
+	String.raw`C:\Users\user\.volta\bin\node.exe`,
+	'C:/Program Files/nodejs/ms-playwright/node.exe', 'C:/Program Files/nodejs/node.exe/extra',
+])('rejects version-managed, temporary or bundled Node path %s', node => {
+	expect(stableNodePath(node)).toBe(false);
+});
+it('generates Linuxbrew instructions without an unstable Node warning', () => {
+	expect(renderSchedule(generateSchedule({ ...base, node: '/home/linuxbrew/.linuxbrew/bin/node' }, targets))).not.toContain('# WARNING:');
 });

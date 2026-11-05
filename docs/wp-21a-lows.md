@@ -62,3 +62,30 @@ non-19c refusal gate is the sole permitted exception.
 Commits: `d605ffc` (ADR decoding), `9ff129b` (init placeholder), `e12270e`
 (schedule warning), `cbe57e5` (desktop screenshots), plus this validation report.
 Nothing pushed or merged.
+
+## Review follow-up: Finding 1 (Medium)
+
+Addressed `review-wp-21a:docs/review-wp-21a.md` Finding 1. Updated
+`stableNodePath` in `src/report/schedule.ts` to accept
+`/home/linuxbrew/.linuxbrew/bin/node` and the standard Windows
+`C:/Program Files/nodejs/node.exe` and
+`C:/Program Files (x86)/nodejs/node.exe` paths. Backslashes are normalized
+before matching, and Windows matching is case-insensitive and anchored to the
+complete executable path. Existing Unix system paths remain accepted.
+
+Expanded `tests/unit/report-schedule.test.ts` with explicit accepted cases for
+all system paths, Windows slash styles and mixed casing, plus rejected cases
+for nvm, fnm, volta, asdf, temporary directories, ms-playwright, bundled
+`~/.local/bin/node`, Windows temp/volta paths, and misleading suffixes.
+Linuxbrew schedule output is also checked to contain no warning.
+
+Validation after this change:
+
+- `npm run typecheck`: passed (exit 0).
+- `npm test -- --maxWorkers=2`: 87 files passed; 1,301 tests passed (37.62 s).
+- `git diff --check`: passed.
+
+Only the schedule heuristic, its unit tests, and this report changed. No DB or
+LLM code changed; no DB connections or Strata calls were made. Windows path
+classification is tested on Linux; native Windows execution was not exercised.
+No contract changes or dependencies needed. Nothing pushed or merged.
