@@ -10,10 +10,10 @@ async function live(target: string, issue: string, since = '24h') {
 it('triages live NIGHTLY_PURGE_JOB with read-only source and constraint evidence', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
 	let result;
-	try { result = await live('p1-19c-prod', 'NIGHTLY_PURGE_JOB'); }
+	try { result = await live('p1-19c-prod', 'NIGHTLY_PURGE_JOB', '7d'); }
 	catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved p1 listener unavailable'); return; } throw error; }
 	const issue = result.issues[0]!;
-	if (!issue.checks.find(c => c.label.includes('run history'))?.rows.length) { context.skip('NIGHTLY_PURGE_JOB has no failure in the 24h window'); return; }
+	if (!issue.checks.find(c => c.label.includes('run history'))?.rows.length) { context.skip('NIGHTLY_PURGE_JOB has no failure in the 7d window'); return; }
 	expect(issue.codes).toContain('ORA-02292');
 	expect(issue.excerpts.find(e => e.object === 'SHOPAPP.WORKLOAD')).toMatchObject({ line: 27, subprogram: 'NIGHTLY_PURGE' });
 	expect(issue.excerpts.find(e => e.object === 'SHOPAPP.WORKLOAD')?.statement).toMatch(/DELETE FROM orders/i);
@@ -69,4 +69,27 @@ it('reports an unknown free-text name and resolves lowercase retained job names'
 	const lowercase = await live('d1-19c-lab', 'k7q_failjob failed');
 	expect(lowercase.issues[0]?.codes).toContain('ORA-20001');
 	expect(lowercase.issues[0]?.limitations.some(s => s.startsWith('not found: K7Q_FAILJOB'))).toBe(false);
+}, 120000);
+
+it('correlates p1 purge alert evidence and d1 ORA-00800 without an LLM', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
+	let p1, d1;
+	try {
+		p1 = await live('p1-19c-prod', 'NIGHTLY_PURGE_JOB ORA-02292', '7d');
+		d1 = await live('d1-19c-lab', 'ORA-00800 errors in the alert log', '30d');
+	} catch (error) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved Oracle listener unavailable'); return; }
+		throw error;
+	}
+	expect(p1.alertLog?.status).toBe('ok');
+	const alert = p1.alertLog!;
+	const purge = alert.entries.findIndex(e => e.messageText.includes('NIGHTLY_PURGE_JOB') && e.codes.includes('ORA-02292'));
+	expect(purge).toBeGreaterThanOrEqual(0);
+	expect(alert.entries[purge]?.traceFiles.join(' ')).toContain('_j005_');
+	expect(alert.entries[purge]?.timestamp).toContain('2026-11-04T04:30:56');
+	expect(alert.correlations.some(c => c.kind === 'jobRun' && c.entryIndexes.includes(purge))).toBe(true);
+	expect(alert.checks.every(c => c.sql.includes('FETCH FIRST') && c.binds.fromTime && c.binds.toTime)).toBe(true);
+	expect(d1.alertLog?.entries.some(e => e.codes.includes('ORA-00800'))).toBe(true);
+	expect(d1.alertLog?.incidents.some(i => i.problemKey === 'ORA 800')).toBe(true);
+	expect(renderTriageMarkdown(d1)).toContain('Set Priority Failed');
 }, 120000);
