@@ -116,3 +116,17 @@ describe("agent home security", () => {
 	});
 
 });
+
+it('ask after init names the key-file setting before contacting Strata or a DB', async () => {
+	const home = join(temp(), 'home');
+	initializeHome({ PIAGENT_HOME: home });
+	vi.stubEnv('PIAGENT_HOME', home);
+	vi.stubEnv('PIAGENT_ENV_FILE', join(home, '.env'));
+	vi.stubEnv('PIAGENT_LLM_API_KEY_FILE', '/absolute/path/to/strata-api-key');
+	const llm = await import('../../src/llm/index.js');
+	const health = vi.spyOn(llm, 'checkStrataHealth');
+	const adapter = await import('../../src/agent/dbToolsAdapter.js');
+	const sessions = vi.spyOn(adapter, 'createSessions');
+	await expect(main(['node', 'piagent', 'ask', 'test'])).rejects.toThrow(/PIAGENT_LLM_API_KEY_FILE.*init placeholder/);
+	expect(health).not.toHaveBeenCalled(); expect(sessions).not.toHaveBeenCalled();
+});

@@ -51,3 +51,10 @@ export function initializeHome(env: NodeJS.ProcessEnv = process.env): boolean {
 	try { writeFileSync(join(home, ".env"), template, { flag: "wx", mode: 0o600 }); return true; }
 	catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") return false; throw new Error("Cannot initialize private environment file"); }
 }
+
+/** Detect init's path placeholder without opening a key file or contacting Strata. */
+export function assertConfiguredLlmKeyFile(file: string): void {
+	if (file === '/absolute/path/to/strata-api-key') {
+		throw new Error('Set PIAGENT_LLM_API_KEY_FILE to your private Strata API-key file; the init placeholder is still configured. Edit your private .env or export PIAGENT_LLM_API_KEY_FILE.');
+	}
+}

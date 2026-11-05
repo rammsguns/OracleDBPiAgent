@@ -49,10 +49,17 @@ export function generateSchedule(options: ScheduleOptions, targets: readonly { n
 	const timer = `[Unit]\nDescription=Schedule Oracle report for ${options.target}\n\n[Timer]\nOnCalendar=${interval.calendar}\nPersistent=true\nUnit=${name}.service\n\n[Install]\nWantedBy=timers.target\n`;
 	// Cron treats percent specially even inside shell quotes.
 	const cron = `${interval.cron} ${args.map(shellQuote).join(" ")}`.replaceAll("%", "\\%") + "\n";
-	return { name, service, timer, cron, setup: setupPaths(options.home, options.out).map(entry => entry.command).join("\n") + "\n" };
+	const warnings = stableNodePath(options.node) ? [] : ['Node executable may move or disappear (version-manager, temporary, bundled, or unrecognized path). Use a stable system Node installation and regenerate this schedule after changing Node.'];
+	return { name, service, timer, cron, warnings, setup: setupPaths(options.home, options.out).map(entry => entry.command).join("\n") + "\n" };
+}
+// Only conventional system installations are assumed stable; custom installs need review.
+export function stableNodePath(node: string): boolean {
+	const normalized = node.replaceAll('\\', '/');
+	if (['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node', '/bin/node', '/home/linuxbrew/.linuxbrew/bin/node'].includes(normalized)) return true;
+	return /^c:\/program files(?: \(x86\))?\/nodejs\/node\.exe$/i.test(normalized);
 }
 export function renderSchedule(schedule: ReturnType<typeof generateSchedule>): string {
-	return `# one-time setup (run once before enabling the timer)\n${schedule.setup}\n# ${schedule.name}.service\n${schedule.service}\n# ${schedule.name}.timer\n${schedule.timer}\n# crontab (use instead of the timer)\n${schedule.cron}`;
+	return `${schedule.warnings.map(warning => `# WARNING: ${warning}\n`).join('')}# one-time setup (run once before enabling the timer)\n${schedule.setup}\n# ${schedule.name}.service\n${schedule.service}\n# ${schedule.name}.timer\n${schedule.timer}\n# crontab (use instead of the timer)\n${schedule.cron}`;
 }
 
 export interface ScheduleRunOptions {

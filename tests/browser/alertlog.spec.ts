@@ -20,6 +20,13 @@ for (const colorScheme of ['light', 'dark'] as const) test(`Alert Log filters, f
 	await expect(page.locator('#alertlog-content')).toContainText('Incident 124');
 	await expect(page.locator('#alertlog-content')).toContainText('[metadata capped]');
 	await expect(page.locator('#alertlog-content')).toContainText('partial result');
+	await expect(page.locator('#alertlog-content')).toContainText('Inflight (1)');
+	if (process.env.PIAGENT_WP21_CAPTURE === '1') {
+		await page.setViewportSize({ width: 1280, height: 1000 });
+		await mkdir('docs/img', { recursive: true });
+		await page.screenshot({ path: `docs/img/wp-21a-alertlog-${colorScheme}.png`, fullPage: true });
+	}
+
 	await expect(page.locator('#alertlog-content img, #alertlog-content script')).toHaveCount(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	const download = page.waitForEvent('download'); await page.locator('#alertlog-export').click();
@@ -95,7 +102,7 @@ for (const width of [1280, 390]) test(`message disclosure, compact traces, cappe
 	await traces.locator('summary').click();
 	await expect(traces.locator('li')).toHaveText('example.trc');
 	await expect(traces.locator('li')).toHaveAttribute('title', '/opt/oracle/diag/example.trc');
-	await expect(content.locator('th').last()).toHaveText('Status code');
+	await expect(content.locator('th').last()).toHaveText('Status');
 	await expect(content.locator('td').first()).toHaveText('2026-11-04 11:00:00Z\n2026-11-04 12:00:00Z');
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	for (const selector of ['html', 'body', '.evidence', '[role="tablist"]']) {

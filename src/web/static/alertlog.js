@@ -92,7 +92,7 @@ export function renderAlertEvidence(content, evidence) {
 	}));
 	entries.querySelector('table').className = 'alert-entries';
 	section.append(entries);
-	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status code'], evidence.incidents.map(row => [compactTime(row.createTime), row.incidentId, row.problemKey, row.status])));
+	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status'], evidence.incidents.map(row => [compactTime(row.createTime), row.incidentId, row.problemKey, `${row.statusName || ({ 1: 'Inflight', 2: 'Ready', 3: 'Tracked', 4: 'Closed', 5: 'Data removed', 6: 'Purged', 7: 'Incomplete' })[row.status] || 'Unknown'} (${row.status ?? 'null'})`])));
 	if (evidence.correlations?.length) {
 		section.append(el('h4', 'Correlations'));
 		for (const item of evidence.correlations) section.append(el('p', `${item.kind === 'jobRun' ? 'Job run' : 'Code'}: ${item.label}${item.at ? ' · ' + item.at : ''} · Alert entries ${item.entryIndexes.map(index => index + 1).join(', ') || 'none'}`));
