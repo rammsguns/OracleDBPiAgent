@@ -1520,3 +1520,72 @@ Integration tests were not required for these offline case/scorer changes.
 No LLM calls or eval-runner invocations occurred. The temporary dependency
 symlink was removed after checks. External review and any fresh gate remain
 coordinator work; these totals describe the same archived answers.
+
+### WP-17D: single-column multi-value table cells (2026-11-04)
+
+`rowCells` now recognizes a whole table cell containing a positive list of
+identifier or numeric values separated by case-insensitive `OR`, `and`, comma
+or slash (including compact `INSERT/UPDATE/DELETE`). Markdown backticks and
+bold markers remain presentation. Each exact listed value can satisfy a
+single-column truth row. Multi-column truth and other scoring modes retain
+their existing matching rules. This does not accept prose around an event,
+partial words such as `UPDATED`, or an absent event such as DELETE when the
+cell lists INSERT/UPDATE/MERGE.
+
+Cells containing the negation words `not`, `no` or `except` supply no evidence
+for single-column truth. This check runs before slash/record splitting, so
+`not INSERT / DELETE` cannot accidentally supply DELETE. A separate positive
+cell can still supply evidence. Existing required facts and all other truth
+rows must pass independently.
+
+`tests/unit/phase17d-scorer.test.ts` covers all separators, mixed case, Markdown,
+missing/wrong events, prefixes/suffixes, negation at different list positions,
+label binding, and the multi-column/other-mode boundaries. The accompanying
+`phase17d-gate.json` replays all eight actual gate-16g security-trigger answers:
+the two complete answers now pass; the three shortened replies and the answer
+that removed error code 20205 remain failures; two existing passes stay passes.
+
+#### Complete offline comparison
+
+Baseline: master `6a5fb624bedcbef48cbeba6186e9173b4460e0e4`.
+Snapshot: `2026-11-05T00:00:13.525Z` (November 4 local time), **306 JSON files /
+7548 records**, recursively covering every archive under
+`/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive`.
+
+The committed [comparison script](phase17d-rescore.mts) follows WP-16F's
+archived-check reconstruction: expectations and truth values come from stored
+checks, scalar ranges retain their before/after bounds, and current case SQL
+supplies the column labels. Both scorers receive identical archived answers,
+tool calls, cases and truth. No current case expectations or fresh truth replace
+archived checks. This isolates the scorer change; obsolete case definitions in
+older phase16 archives are intentionally retained. The nine records without
+checks are execution errors, remain failures, and cannot be rescored.
+
+The [comparison report](phase17d-rescore.json) records the full manifest,
+per-group totals, every record/check transition and all nine unscorable errors.
+Of **7539 scored records**, exactly **two records / six checks** change, all
+FAIL → PASS. Every pre-phase16 check is unchanged. Phase16/gate-16e is unchanged;
+phase16/gate-16g changes from **473/496 to 475/496**. Across the eight PL/SQL
+security-trigger records, this is **3/8 → 5/8** (A 0/4 → 2/4, B 3/4 unchanged).
+
+Every flip is justified below. Both are `hard-p16-security-trigger`, iteration 1,
+under `phase16/gate-16g/`:
+
+| File | Gate label | Justification |
+|---|---|---|
+| `2026-11-04T21-31-08-391Z-e6285bc4-7a95-45cd-846d-a106a33aec11.json` | A p16-1 | The Trigger Definition table explicitly states `Events = INSERT OR UPDATE OR DELETE`. All other checks already passed, including BEFORE, STATEMENT, EMPLOYEES, SECURE_DML, both times, weekend restriction and 20205. Only the three event checks change. |
+| `2026-11-04T21-42-49-749Z-adef74fc-d755-4153-9d29-f46fbfde5621.json` | A p16-2 | The Trigger Definition table has the same complete positive event list. Its complete explanation preserves the routine, time/day logic and application error. All non-event checks already passed; only INSERT, UPDATE and DELETE change. |
+
+Reproduce from the repository root, without running the eval runner:
+
+```sh
+git show 6a5fb624bedcbef48cbeba6186e9173b4460e0e4:evals/scoring.ts > /tmp/wp17d-old-scoring.mts
+npx tsx docs/phase17d-rescore.mts /tmp/wp17d-old-scoring.mts /home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive /tmp/wp17d-rescore.json
+```
+
+Validation: `npm run typecheck` clean; `npm test` **65 files / 996 tests passed**.
+The worktree initially lacked local binaries; validation used the base worktree's
+already installed dependencies through a local ignored `node_modules` symlink.
+No DB code changed, no database was accessed, no LLM calls were made, and
+`evals/run.ts` was neither changed nor invoked. No contract changes are needed.
+Integration and live LLM gates remain with the coordinator.
