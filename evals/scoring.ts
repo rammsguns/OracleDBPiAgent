@@ -106,8 +106,24 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
+	// Expand only whole, positive lists in table cells for single-column truth.
+	// Do this before record splitting: a slash must not detach DELETE from
+	// a negation elsewhere in the same cell (e.g. "not INSERT / DELETE").
+	const singleColumnCell = (cell: string) => {
+		if (/\b(?:not|no|except)\b/i.test(cell)) return '';
+		const parts = cell.split(/\s+(?:or|and)\s+|\s*[,/]\s*/i);
+		const atom = /^(?:[A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*|[-+]?\d+(?:\.\d+)?)$/;
+		if (parts.length > 1 && parts.every(part => atom.test(part))
+			&& parts.some(part => part.toLowerCase() === String(row[0]).toLowerCase())) {
+			return String(row[0]);
+		}
+		return cell;
+	};
 	const hasRoutineIdentity = labels.some(label => /^(?:entry_point|subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
-	const lines = answer.split(/\r?\n/).map(clean).flatMap(line => {
+	const lines = answer.split(/\r?\n/).map(clean).map(line => {
+		if (row.length !== 1 || !line.startsWith('|') || !line.endsWith('|')) return line;
+		return '|' + line.split('|').slice(1, -1).map(clean).map(singleColumnCell).join('|') + '|';
+	}).flatMap(line => {
 		// Repeated record keys and adjacent markdown rows delimit separate records,
 		// even when a response puts them on one physical line.
 		// Routine mappings can contain parenthetical scheduler assignments. These
