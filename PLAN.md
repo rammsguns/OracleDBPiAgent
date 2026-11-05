@@ -2872,7 +2872,7 @@ Owns:
    and the full integration suite with `PIAGENT_SECRET_DIR` set. Do not call
    the LLM.
 
-## Phase 21: hardening and release 1.2.0 (proposed 2026-11-05; needs owner approval)
+## Phase 21: hardening and release 1.2.0 (approved 2026-11-05: "continue with next phase and merge and commit to github if ok")
 
 ### Goal
 Close the open Low items from phases 15–18, run a release gate on the phase
@@ -2886,8 +2886,23 @@ confirmation, as in phase 15.
 | WP-21C release notes and docs | `wp-21c-release-120` | codex | `CHANGELOG.md` 1.2.0, `README.md` and `docs/` for `sql` and `security`; install docs; grant-request index |
 | Review | `review-wp-21x` | antigravity | each WP |
 
+Ownership. WP-21A and WP-21B touch no common file and can run in parallel.
+Neither calls the LLM; the coordinator runs every Strata measurement.
+- WP-21A (product only):
+  - `src/alertlog/`;
+  - the alert parts of `src/triage/`;
+  - `src/web/static/alertlog.js`;
+  - `src/config/environment.ts`;
+  - the `ask` path in `src/cli/index.ts`;
+  - `src/report/schedule.ts`;
+  - tests and `docs/`.
+- WP-21B (evals only):
+  - `evals/` (`scoring.ts`, `ground-truth.ts`, case files, a new
+    `evals/cases-hard/phase21-holdout.json`);
+  - eval unit tests and fixtures;
+  - `docs/`.
+
 WP-21A items:
-- p18 scorer: match spaced problem keys (`ORA 800`) in labelled bullets.
 - Decode ADR incident status (numeric code to name) in alertlog, triage and
   web.
 - `ask` after `init` with the placeholder API-key file: give a clear error
@@ -2896,13 +2911,19 @@ WP-21A items:
   (phase 15 note).
 
 WP-21B items:
+- p18 scorer: match spaced problem keys (`ORA 800`) in labelled bullets.
 - `evals/ground-truth.ts` sets its session to UTC like the product (WP-18H
   review note). Replay all truth SQL to prove there are no flips.
 - Stabilize or reclassify the flaky `hard-p8-description-language`.
-- Add a fresh holdout of about 12 cases covering phases 16–20.
+- Add a fresh holdout of about 12 cases covering phases 16–20
+  (`split: holdout`, questions that never name tools or views, truth
+  validated live, `skipWhenTruthEmpty` where empty truth is legitimate). Write
+  them blind: never run the agent on them, and never tune them to answers.
 - `rowCells`: also match a labelled-bullet block in which all of a row's
   cells appear together (`hard-p20-p1-enabled-audit-policies` lists each
   policy as six bullets). Replay the archive and justify every flip.
+- Every scorer change ships with an offline replay over `eval-archive` and
+  `needlefish/evals/results`, like `docs/wp-20e-replay.ts`, listing every flip.
 
 Release gate (single side, as in phase 15):
 - hard dev ×2, challenge ×2, holdout ×3, p16/p18/p19/p20 ×2, regression and
