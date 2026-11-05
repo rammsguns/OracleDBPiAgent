@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { systemPrompt } from '../../src/agent/index.js';
 import { createDbTools } from '../../src/tools/index.js';
 import { loadConfig } from '../../src/config/index.js';
+import { ADR_GUIDANCE } from './fixtures/adr-guidance.js';
 import type { ToolContext } from '../../src/contracts.js';
 
 const serialize = (ctx: ToolContext) => JSON.stringify(createDbTools(ctx).map(({ name, description, parameters }) => ({ name, description, parameters })));
@@ -9,7 +10,7 @@ it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTa
 	const ctx = { config: loadConfig({}), pinnedTarget } as ToolContext;
 	const prompt = systemPrompt(ctx);
 	const tools = serialize(ctx);
-	expect(prompt.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
+	expect(prompt.length - ADR_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
 	const next = { ...ctx, config: loadConfig({}), runId: 'another-session' };
 	expect(systemPrompt(next)).toBe(prompt);
 	expect(serialize(next)).toBe(tools);
@@ -52,6 +53,12 @@ it('keeps every requested row and the requested output format with a small prefi
 	// Pre-WP-11B system prompt with no target descriptions or appendix.
 	const baselinePromptChars = 1095;
 	// ~40 tokens at the existing conservative estimate of 3 characters per token.
-	expect(prompt.length - baselinePromptChars).toBeGreaterThan(0);
-	expect(prompt.length - baselinePromptChars).toBeLessThanOrEqual(40 * 3);
+	expect(prompt.length - ADR_GUIDANCE.length - baselinePromptChars).toBeGreaterThan(0);
+	expect(prompt.length - ADR_GUIDANCE.length - baselinePromptChars).toBeLessThanOrEqual(40 * 3);
+});
+
+// The historical saving budgets above exclude only this explicitly bounded addition.
+it('bounds the ADR discovery prompt addition below about 60 estimated tokens', () => {
+	expect(ADR_GUIDANCE.length).toBe(166);
+	expect(Math.ceil(ADR_GUIDANCE.length / 3)).toBeLessThanOrEqual(60);
 });
