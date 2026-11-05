@@ -152,5 +152,7 @@ test('every evidence tab has the same dark shell, including PL/SQL', async ({ pa
 	if (process.env.PIAGENT_ALERTLOG_CAPTURE_FIXTURE === '1') {
 		await mkdir('docs/img', { recursive: true });
 		await page.screenshot({ path: 'docs/img/plsql-dark-shell.png', fullPage: true });
+		await page.emulateMedia({ colorScheme: 'light' });
+		await page.screenshot({ path: 'docs/img/plsql-light-shell.png', fullPage: true });
 	}
 });

@@ -145,3 +145,53 @@ test("WORKLOAD uses wide columns, compact tagged nodes and separate edge ports",
 	const diagram = await graph.boundingBox();
 	expect(legend!.y + legend!.height).toBeLessThan(diagram!.y);
 });
+
+for (const colorScheme of ['light', 'dark'] as const) test(`graph bounds and AA contrast in ${colorScheme}`, async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 1000 });
+	await page.emulateMedia({ colorScheme });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.locator('#plsql-tab').click();
+	await page.locator('#plsql-owner').fill('WORKLOAD_FIXTURE');
+	await page.locator('#plsql-run').click();
+	await expect(page.locator('#plsql-object option')).toHaveCount(1);
+	await page.locator('#plsql-doc').click();
+	const graph = page.locator('#plsql-content .graph-scroll > svg');
+	const result = await graph.evaluate(svg => {
+		const luminance = (color: string) => {
+			const rgb = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map(value => {
+				const s = value / 255; return s <= .04045 ? s / 12.92 : ((s + .055) / 1.055) ** 2.4;
+			});
+			return rgb[0]! * .2126 + rgb[1]! * .7152 + rgb[2]! * .0722;
+		};
+		const contrast = (a: string, b: string) => {
+			const l1 = luminance(a), l2 = luminance(b);
+			return (Math.max(l1, l2) + .05) / (Math.min(l1, l2) + .05);
+		};
+		const bounds = (svg as SVGSVGElement).viewBox.baseVal;
+		const nodes = [...svg.querySelectorAll('g[data-node-id]')];
+		const background = getComputedStyle(svg.closest('section')!).backgroundColor;
+		const edges = [...svg.closest('.graph-view')!.querySelectorAll('path')];
+		return {
+			contained: nodes.every(node => {
+				const rect = (node.querySelector('rect') as SVGRectElement).getBBox();
+				return rect.x >= bounds.x && rect.y >= bounds.y && rect.x + rect.width <= bounds.x + bounds.width && rect.y + rect.height <= bounds.y + bounds.height;
+			}),
+			textContrast: nodes.flatMap(node => [...node.querySelectorAll('text')].map(text => contrast(getComputedStyle(text).fill, getComputedStyle(node.querySelector('rect')!).fill))),
+			strokeContrast: nodes.map(node => contrast(getComputedStyle(node.querySelector('rect')!).stroke, getComputedStyle(node.querySelector('rect')!).fill)),
+			edgeContrast: edges.map(edge => contrast(getComputedStyle(edge).stroke, background)),
+			styles: [...new Set(edges.map(edge => getComputedStyle(edge).stroke + '/' + getComputedStyle(edge).strokeDasharray))],
+			fits: svg.getBoundingClientRect().width <= svg.parentElement!.clientWidth,
+		};
+	});
+	expect(result.contained).toBe(true);
+	expect(result.fits).toBe(true);
+	for (const ratio of result.textContrast) expect(ratio).toBeGreaterThanOrEqual(4.5);
+	for (const ratio of [...result.strokeContrast, ...result.edgeContrast]) expect(ratio).toBeGreaterThanOrEqual(3);
+	expect(result.styles).toHaveLength(6);
+	await page.setViewportSize({ width: 390, height: 844 });
+	const scroll = page.locator('#plsql-content .graph-scroll');
+	expect(await scroll.evaluate(node => getComputedStyle(node).overflowX)).toBe('auto');
+	await scroll.evaluate(node => { node.scrollLeft = node.scrollWidth; });
+	expect(await scroll.evaluate(node => node.scrollLeft + node.clientWidth >= node.scrollWidth - 1)).toBe(true);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

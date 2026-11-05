@@ -16,12 +16,12 @@ function svgEl(tag, attrs = {}, text) {
 }
 
 const edgeStyles = {
-	calls: { color: "#7853b5", dash: "2 4" },
-	contains: { color: "#64748b", dash: "" },
-	reads: { color: "#1684b3", dash: "7 4" },
-	writes: { color: "#c26516", dash: "12 3 2 3" },
-	"depends-on": { color: "#a04d78", dash: "3 3" },
-	"job runs": { color: "#25845b", dash: "10 4" },
+	calls: { color: "var(--graph-edge-calls)", dash: "2 4" },
+	contains: { color: "var(--graph-edge-contains)", dash: "" },
+	reads: { color: "var(--graph-edge-reads)", dash: "7 4" },
+	writes: { color: "var(--graph-edge-writes)", dash: "12 3 2 3" },
+	"depends-on": { color: "var(--graph-edge-depends)", dash: "3 3" },
+	"job runs": { color: "var(--graph-edge-jobs)", dash: "10 4" },
 };
 
 function edgeKind(edge, nodes) {
@@ -100,7 +100,7 @@ function drawNode(svg, node, position) {
 	const group = svgEl("g", { "data-node-id": node.id });
 	const box = svgEl("rect", {
 		x: position.x, y: position.y, width: position.width, height: position.height, rx: 6,
-		fill: "var(--graph-fill, #edf5f6)", stroke: "currentColor",
+		fill: "var(--graph-node-fill)", stroke: "var(--graph-node-stroke)",
 	});
 	group.append(svgEl("title", {}, node.title ?? node.label), box);
 	const x = position.x + 12;
@@ -126,6 +126,9 @@ export function drawGraph(graph) {
 	wrap.className = "graph-view";
 	const scroll = el("div");
 	scroll.className = "graph-scroll";
+	scroll.tabIndex = 0;
+	scroll.setAttribute("role", "region");
+	scroll.setAttribute("aria-label", "Dependency graph, scroll horizontally when needed");
 	const svg = svgEl("svg", { role: "img", "aria-label": "Evidence dependency graph", width: "100%" });
 	const context = document.createElement("canvas").getContext("2d");
 	context.font = "19px system-ui, sans-serif";

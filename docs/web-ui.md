@@ -449,3 +449,29 @@ Final visual follow-up:
   with the 2 opt-in live tests skipped. The separate Oracle-only capture test
   passed on both targets, refreshed the five live images and stopped its server
   by listening PID. No DB/LLM code or contracts changed; no LLM calls were made.
+
+PL/SQL graph contrast and bounds follow-up:
+
+- Node fills, outlines, owner/name labels and kind tags use graph theme tokens.
+  Light uses pale nodes with dark labels; dark uses `#223b45` nodes with
+  `#e0edf0` labels and `#b0bdc8` owner/kind text. Each of the six edge styles has
+  separate light/dark colours, retaining its distinct dash pattern and legend.
+- The viewBox already included all nodes. Clipping in the earlier desktop image
+  came from the SVG's 600px minimum width exceeding its evidence pane. Desktop
+  SVGs now fit their container, and the PL/SQL pane gets the same wider desktop
+  allocation as alert evidence. Phones retain a horizontal scroll region that
+  can be focused with the keyboard; its right edge exposes the last column.
+- [Dark graph](img/plsql-dark-shell.png) and [light graph](img/plsql-light-shell.png)
+  were retaken with the WORKLOAD browser fixture at a 1280px viewport and inspected.
+  Both show the full right-most table column.
+- Browser tests check every node rectangle against the SVG viewBox, desktop fit,
+  phone scroll reachability and lack of horizontal page overflow. They calculate
+  contrast from computed SVG colours: every label/owner/kind tag is at least
+  4.5:1 against its node fill; outlines are at least 3:1 against node fill and
+  edges/legend swatches at least 3:1 against the surrounding surface. All six
+  colour/dash styles remain distinct in both themes. These are graph-specific
+  contrast checks, not a claim of an application-wide accessibility audit.
+- Validation: `npm run typecheck` passed; `npm test` passed all 1,071 tests;
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser` passed 38 tests,
+  with 2 opt-in live tests skipped. No DB or LLM paths changed or ran; no shared
+  contract changes are needed. The screenshots use browser fixtures.
