@@ -38,7 +38,11 @@ export async function startFakeServer() {
 		summarize: async () => hostile + ' Invented 98,765 rows.',
 		checkHealth: async () => {},
 		health: async () => [{ name: 'Fake Strata', status: 'ok' }, { name: 'Fake Oracle', status: 'fail' }],
-		sessionFactory: async () => ({ get: async () => { throw new Error('Database access forbidden in browser tests'); }, closeAll: async () => {} }),
+		sessionFactory: async () => ({ get: async () => ({ close: async () => {}, query: async sql => {
+			const rows = sql.includes('FROM V$DIAG_ALERT_EXT') ? [[alertRow.timestamp, alertRow.level, alertRow.problemKey, alertRow.messageText]] : sql.includes('FROM V$DIAG_INCIDENT') ? [[incidentRow.incidentId, incidentRow.problemKey, incidentRow.createTime, incidentRow.status]] : undefined;
+			if (!rows) throw new Error('Unsupported browser fixture query');
+			return { rows, columns: [], elapsedMs: 0, truncated: false };
+		} }), closeAll: async () => {} }),
 		agentFactory: async ctx => {
 			await appendFile(config.auditFile, JSON.stringify({ runId: ctx.runId, kind: 'tool_call', tool: hostile, target: ctx.config.defaultTarget, sqlSha256: 'fake-hash', rows: 7, elapsedMs: 12 }) + '\n');
 			const listeners = new Set<Parameters<WebAgent['subscribe']>[0]>();

@@ -30,7 +30,7 @@ for (const colorScheme of ['light', 'dark'] as const) test(`Alert Log filters, f
 test('optional triage alert shape and correlation', async ({ page }) => {
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#triage-tab').click();
 	await page.locator('#triage-issue').fill('ORA-00600'); await page.locator('#triage-run').click();
-	await expect(page.locator('#triage-content .alert-evidence')).toContainText('Job run: NIGHTLY_PURGE_JOB');
+	await expect(page.locator('#triage-content .alert-evidence')).toContainText('Job run: Alert log within ±10 minutes of SHOPAPP.NIGHTLY_PURGE_JOB');
 	await expect(page.locator('#triage-content .alert-evidence')).toContainText('Alert entries 1');
 	if (process.env.PIAGENT_ALERTLOG_CAPTURE_FIXTURE === '1') {
 		await mkdir('docs/img', { recursive: true });

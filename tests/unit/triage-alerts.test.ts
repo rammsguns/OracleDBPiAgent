@@ -128,3 +128,33 @@ it('ranks the VKTM priority lead with folded incident evidence and unexecuted ch
 		expect(alertSuggestions(alert)).toEqual([]);
 	}
 });
+
+it.each(['alert query', 'incident query', 'session acquisition', 'session close'])('keeps triage usable after unexpected %s failure', async failure => {
+	const ctx = context();
+	const get = ctx.sessions.get.bind(ctx.sessions);
+	let first = true;
+	ctx.sessions.get = async target => {
+		const discovery = first; first = false;
+		if (discovery && failure === 'session acquisition') throw new Error('private driver details');
+		const session = await get(target), query = session.query.bind(session);
+		session.query = async (sql, binds, options) => {
+			if ((failure === 'incident query' && sql.includes('FROM V$DIAG_INCIDENT')) || (failure === 'alert query' && sql.includes('FROM V$DIAG_ALERT_EXT'))) throw new Error('private driver details');
+			return query(sql, binds, options);
+		};
+		if (discovery && failure === 'session close') session.close = async () => { throw new Error('private driver details'); };
+		return session;
+	};
+	// This issue requires only alert evidence, isolating failures to optional reads.
+	const result = await triage(ctx, { target: 'd1-19c-lab', issue: 'ORA-00600' });
+	expect(result.issues).toHaveLength(1);
+	expect(result.alertLog?.status).toBe('unavailable');
+	expect(result.alertLog?.reason).toContain('could not be read');
+	expect(renderTriageMarkdown(result)).toContain('could not be read');
+	expect(JSON.stringify(result)).not.toContain('private driver details');
+});
+
+it('renders legacy results without the optional per-issue alert evidence', async () => {
+	const result = await triage(context(), { target: 'd1-19c-lab', issue: 'ORA-00600' });
+	Reflect.deleteProperty(result.issues[0]!, 'alertLog');
+	expect(renderTriageMarkdown(result)).toContain('### Ranked hypotheses');
+});

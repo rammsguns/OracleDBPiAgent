@@ -3,10 +3,18 @@ import type { ToolContext } from '../contracts.js';
 import type { Check } from './read.js';
 import type { Hypothesis } from './index.js';
 export interface TriageAlertLog {
-	status: 'ok' | 'unavailable' | 'skipped'; grant?: string;
+	status: 'ok' | 'unavailable' | 'skipped'; grant?: string; reason?: string;
 	window: { from: string; to: string }; entries: AlertRow[]; incidents: IncidentRow[];
 	correlations: { kind: 'code' | 'jobRun'; label: string; at?: string; entryIndexes: number[] }[];
 	checks: Check[];
+}
+/** Optional alert evidence must never prevent the core triage from completing. */
+async function optionalRead<T>(target: string, view: string, window: { from: string; to: string }, read: () => Promise<AlertResult<T>>): Promise<AlertResult<T>> {
+	try { return await read(); }
+	catch {
+		// Do not expose raw driver errors, SQL, or credentials in the fallback reason.
+		return { target, view, window, status: 'unavailable', rows: [], limit: 0, truncated: false, sql: '', binds: {}, grants: [], attempts: [{ view, code: 'QUERY_FAILED' }] };
+	}
 }
 function check<T extends AlertRow | IncidentRow>(label: string, result: AlertResult<T>): Check {
 	const columns = result.view === 'V$DIAG_ALERT_EXT' ? ['timestamp', 'codes', 'messageText', 'count', 'firstTime', 'lastTime', 'incidentIds', 'problemKeys', 'traceFiles'] : ['incidentId', 'problemKey', 'createTime', 'status'];
@@ -29,17 +37,18 @@ export async function collectAlerts(ctx: ToolContext, target: string, hours: num
 		if (entryIndexes.length) result.correlations.push({ kind, label, ...(at ? { at } : {}), entryIndexes });
 	};
 	const searchable = codes.filter(c => /^(ORA|TNS)-\d{5}$/.test(c)).slice(0, 20);
-	if (searchable.length) add(`Alert log matching ${searchable.join(', ')}`, await readAlertLog(ctx, target, { ...window, codes: searchable }), 'code');
+	if (searchable.length) add(`Alert log matching ${searchable.join(', ')}`, await optionalRead(target, 'V$DIAG_ALERT_EXT', window, () => readAlertLog(ctx, target, { ...window, codes: searchable })), 'code');
 	for (const run of runs.filter(r => String(r[2]).toUpperCase() === 'FAILED' || Number(r[3]) > 0)) {
 		const time = new Date(String(run[4])).getTime(); if (!Number.isFinite(time)) continue;
 		const at = new Date(time).toISOString();
-		add(`Alert log within ±10 minutes of ${run[0]}.${run[1]} (temporal correlation only)`, await readAlertLog(ctx, target, { from: new Date(time - 600000), to: new Date(time + 600000) }), 'jobRun', at);
+		add(`Alert log within ±10 minutes of ${run[0]}.${run[1]} (temporal correlation only)`, await optionalRead(target, 'V$DIAG_ALERT_EXT', window, () => readAlertLog(ctx, target, { from: new Date(time - 600000), to: new Date(time + 600000) })), 'jobRun', at);
 	}
-	const incidents = await readIncidents(ctx, target, window);
+	const incidents = await optionalRead(target, 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM', window, () => readIncidents(ctx, target, window));
 	result.checks.push(check('ADR incidents in triage window', incidents)); result.incidents = incidents.rows;
 	incidents.grants.forEach(g => grants.add(g));
 	if (incidents.status === 'unavailable') result.status = 'unavailable';
 	if (grants.size) result.grant = [...grants].join('\n');
+	setReason(result);
 	return result;
 }
 export function alertHypotheses(alert: TriageAlertLog): Hypothesis[] {
@@ -80,13 +89,14 @@ export function mergeAlerts(alerts: TriageAlertLog[]): TriageAlertLog | undefine
 	const grants = [...new Set(alerts.flatMap(a => a.grant ? a.grant.split('\n') : []))];
 	if (grants.length) merged.grant = grants.join('\n');
 	merged.incidents = [...new Map(merged.incidents.map(i => [i.incidentId, i])).values()];
+	setReason(merged);
 	return merged;
 }
 
 /** Discover scheduler names from bounded SQL alert evidence before reading history. */
 export async function discoverAlertJobs(ctx: ToolContext, target: string, hours: number, issue: string, fallback: boolean) {
 	const to = new Date(), window = { from: new Date(to.getTime() - hours * 3600000).toISOString(), to: to.toISOString() };
-	const read = await readAlertLog(ctx, target, { ...window, codes: ['ORA-12012'] });
+	const read = await optionalRead(target, 'V$DIAG_ALERT_EXT', window, () => readAlertLog(ctx, target, { ...window, codes: ['ORA-12012'] }));
 	const words = new Set(issue.toUpperCase().match(/[A-Z]{4,}/g) ?? []);
 	const mentionsJob = /\bjobs?\b/i.test(issue);
 	const jobs: { owner: string; name: string }[] = [], entries: AlertRow[] = [];
@@ -105,13 +115,14 @@ export async function discoverAlertJobs(ctx: ToolContext, target: string, hours:
 	if (entries.length) alert.correlations.push({ kind: 'code', label: `ORA-12012 jobs discovered from alert log: ${jobs.map(j => `${j.owner}.${j.name}`).join(', ')}`, entryIndexes: entries.map((_, i) => i) });
 	const grants = new Set(read.grants);
 	if (!jobs.length && fallback) {
-		const recent = await readAlertLog(ctx, target, { ...window, limit: 10 });
+		const recent = await optionalRead(target, 'V$DIAG_ALERT_EXT', window, () => readAlertLog(ctx, target, { ...window, limit: 10 }));
 		alert.entries = recent.rows;
 		alert.checks.push(check('Recent errors in the window, not matched to the issue', recent));
 		recent.grants.forEach(g => grants.add(g));
 		if (recent.status === 'unavailable') alert.status = 'unavailable';
 	}
 	if (grants.size) alert.grant = [...grants].join('\n');
+	setReason(alert);
 	return { jobs, alert, matchedText: entries.map(e => e.messageText).join('\n') };
 }
 
@@ -125,4 +136,8 @@ export function alertSuggestions(alert: TriageAlertLog): string[] {
 		'Suggested check (not executed): inspect whether the container or OS permits real-time scheduling priority changes, including CAP_SYS_NICE in Docker.',
 		'ORA-00800 with [Set Priority Failed], [VKTM] is usually a soft, non-data error. Review the linked incidents and trace metadata; the exact OS or container configuration cause remains unverified.',
 	];
+}
+
+function setReason(alert: TriageAlertLog): void {
+	if (alert.checks.some(c => c.attempts.some(a => a.code === 'QUERY_FAILED'))) alert.reason = 'Alert evidence could not be read; some diagnostic queries failed.';
 }
