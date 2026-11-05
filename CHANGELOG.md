@@ -6,6 +6,43 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Added
 
+- `piagent sql` drills into one cached SQL statement:
+  - cursor children with per-execution timings;
+  - plans from `DBMS_XPLAN.DISPLAY_CURSOR`, falling back to `V$SQL_PLAN`;
+  - plan changes;
+  - table and index statistics with stale flags;
+  - baselines, profiles, bind metadata (never values) and cursor-sharing
+    reasons;
+  - findings: plan instability, stale statistics, large full scans on the
+    nested-loop inner side, and high child counts.
+
+  `--text` lists candidates and never guesses. The SQL policy accepts exactly
+  `SELECT … FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(a, b, c))` and nothing else
+  from the package.
+- Triage pulls SQL evidence when an issue names a SQL_ID, or reports slowness
+  on a named object. It ranks plan-regression, stale-statistics, full-scan and
+  cursor-sharing hypotheses, with verify-next SQL that is shown, never run.
+  The agent's own diagnostic statements are excluded from candidates.
+- `piagent security` gives a read-only posture review:
+  - open default-password accounts;
+  - powerful privileges through nested roles (cycle-safe);
+  - PUBLIC grants on sensitive packages;
+  - password profiles grouped by effective limit;
+  - account lifecycle, audit configuration and security parameters;
+  - `--who-can OWNER.OBJECT` privilege paths.
+
+  It never selects password hashes, `SYS.USER$` or audit trails; a
+  parser-based test guards this. Advice is prose labelled for a human DBA.
+- `report --sections security` (opt-in; the default report is unchanged),
+  security severity trends in report history, and `drift --scope security`.
+- Web SQL and Security tabs: a plan tree, plan changes, statistics badges,
+  findings by severity and a who-can graph, in light and dark modes and at
+  phone width.
+- Eval suites p19 (SQL performance) and p20 (security). Cases can opt in to
+  `skipWhenTruthEmpty`: when their cursor-cache truth is gone they are recorded
+  as skipped and excluded from pass rates. The p19 scorer pools labelled facts
+  and accepts equivalent UTC spellings.
+
 - `piagent plsql list` and `piagent plsql doc` document PL/SQL packages,
   procedures and triggers. The output covers:
   - each subprogram's signature, with spec comments;
@@ -58,6 +95,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Changed
 
+- New SELECT-only grant requests, applied with owner authorization:
+  - `docs/grants-request-2026-11-05-sqlperf.sql` (p1);
+  - `docs/grants-request-2026-11-05-security.sql` (d1 and p1).
 - Agent database sessions now run in UTC (`ALTER SESSION SET TIME_ZONE = '+00:00'`,
   session-only). Plain `TIMESTAMP` literals in agent SQL now mean UTC.
 - Tool results now show time-zone-aware timestamps as ISO UTC with `Z`.

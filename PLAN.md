@@ -2620,6 +2620,41 @@ Owns:
 6. Fresh screenshots (d1 and p1, light and dark, 1280 and 390) and refreshed
    CLI and triage smokes in the docs.
 
+### Phase 19 results (2026-11-05)
+
+Merges on master:
+- WP-19A 5a22378;
+- WP-19D 1bf0f9f;
+- WP-19B 515ee1f;
+- WP-19C 41c3ce6;
+- WP-19E 4f8907e, the polish package from the coordinator's review of 19A–19D.
+
+Antigravity approved every WP.
+
+Gate gate-19: A/B, with A = 6d0b11d (the phase 18 push) and B = b9668de
+(phase 19), because 19B changes the agent hint. Archive:
+`eval-archive/phase19/gate-19`.
+
+| Split | A | B | B − A, mean [95% CI] |
+|---|---|---|---|
+| p19 ×4 (B only, measurement) | n/a | 11/16 | n/a |
+| p18 ×4 | 20/24 | 20/24 | 0 [−12.5, +12.5] |
+| p16 ×4 | 38/40 | 35/40 | −7.5 [−17.5, +5] |
+| dev ×4 | 107/112 | 108/112 | +0.9 [0, +2.7] |
+| holdout ×3 | 33/36 | 34/36 | +2.8 [0, +8.3] |
+| regression | 21/21 | 21/21 | 0 |
+| MVP | 39/39 | 39/39 | 0 |
+
+Notes:
+- The p16 dip is one case, `hard-p16-history-arguments`: A 4/4, B 1/4. All
+  three B misses are correct answers rejected by the fact regex
+  (`**Defaults:** None` and `` `DEFAULTED = 'N'` `` do not match). This is a
+  scorer false negative, so the gate passes. With that case excluded, both
+  sides score 34/36. WP-20E fixes the regex.
+- dev misses on both sides are `hard-grant-p1-parameters`. Its premise
+  (V$PARAMETER unreadable on p1) ended when the phase 20 grants were applied.
+  WP-20E re-premises it.
+
 ## Phase 20: security and privilege review (approved 2026-11-05)
 
 ### Goal
@@ -2778,6 +2813,65 @@ Hard rules for the phase:
 Gate: single side unless the agent prompt changes, plus the full suites as in
 phase 19.
 
+### Phase 20 results (2026-11-05)
+
+Merges on master:
+- WP-20A f6f432d (forbidden-SQL scan made parser-based after review);
+- WP-20D 7fbef02, plus the 2eff14a follow-up (named truth rows);
+- WP-20B 235578d;
+- WP-20C f584de6 (graph scale and grouped profile findings after the
+  coordinator's screenshot review).
+
+Antigravity approved every WP.
+
+The chat path is unchanged, so gate-19 covers regressions. Measurement on
+f584de6, single side (archive `eval-archive/phase20/measure`): p20 ×2 = 5/6, 5/6.
+- Both misses are `hard-p20-p1-enabled-audit-policies`. The answer is correct,
+  but it uses labelled bullets, which `rowCells` does not match. WP-21B covers
+  this.
+
+Tests on f584de6:
+- typecheck clean;
+- 1260 unit tests;
+- 52 browser tests.
+- Integration: 52/55.
+  - The web-sql heading test is stale since WP-19E.
+  - The hard-truth validator fails on the V$PARAMETER premise.
+  - One p1 listener refusal came from running the integration files in
+    parallel. Each affected file passes when run alone. The coordinator set
+    integration tests to run one file at a time.
+
+### WP-20E: eval premises after the phase 20 grants (branch `wp-20e-premises`)
+Owns:
+- `evals/cases-hard/phase5-grant-limited-p1.json`;
+- `evals/cases-hard/phase11b-challenge.json` (only the case below);
+- `evals/cases-hard/phase16-*.json` (only `hard-p16-history-arguments`);
+- `evals/validate-hard.ts`;
+- `evals/hard-ground-truth-validation.json`;
+- the affected unit tests and fixtures;
+- `tests/integration/web-sql.test.ts`;
+- `docs/`.
+
+1. `hard-grant-p1-parameters` (dev): HARNESS_RO can now read V$PARAMETER on
+   p1. Make it a positive case: report SGA_TARGET and PGA_AGGREGATE_TARGET in
+   bytes, with truth SQL from V$PARAMETER and a new category (not
+   `grant-limited-p1`). Grant-limited coverage stays in the backup and
+   archive-log cases.
+2. `hard-p11b-partial-memory` (challenge, `partial-grants`): keep the
+   partial-availability idea, but replace the SGA_TARGET part with a source
+   that is still unreadable on p1. First probe it read-only through the
+   product session (catch ORA-00942 or ORA-01031). Update the validator's view
+   map to match.
+3. `hard-p16-history-arguments`: the "no defaults" fact must accept
+   `**Defaults:** None` and `` `DEFAULTED = 'N'` `` while still rejecting an
+   answer that claims a default. Replay every archived answer for this case
+   (eval-archive and evals/results), report the flips, and confirm zero
+   changes for other cases.
+4. Update `tests/integration/web-sql.test.ts` for the WP-19E title-case heading.
+5. Run `npx tsx evals/validate-hard.ts` (or the hard-evals integration test)
+   and the full integration suite with `PIAGENT_SECRET_DIR` set. Do not call
+   the LLM.
+
 ## Phase 21: hardening and release 1.2.0 (proposed 2026-11-05; needs owner approval)
 
 ### Goal
@@ -2806,6 +2900,9 @@ WP-21B items:
   review note). Replay all truth SQL to prove there are no flips.
 - Stabilize or reclassify the flaky `hard-p8-description-language`.
 - Add a fresh holdout of about 12 cases covering phases 16–20.
+- `rowCells`: also match a labelled-bullet block in which all of a row's
+  cells appear together (`hard-p20-p1-enabled-audit-policies` lists each
+  policy as six bullets). Replay the archive and justify every flip.
 
 Release gate (single side, as in phase 15):
 - hard dev ×2, challenge ×2, holdout ×3, p16/p18/p19/p20 ×2, regression and

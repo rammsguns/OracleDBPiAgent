@@ -101,6 +101,8 @@ private `.env`. See the [documentation index](docs/README.md).
 | `piagent plsql doc --target p1-19c-prod --object SHOPAPP.WORKLOAD` | Document a package, procedure or trigger: signatures, tables read and written, callers, jobs, errors, source and a Mermaid graph; `--json`, `--out`. No LLM. |
 | `piagent triage --target p1-19c-prod --issue "NIGHTLY_PURGE_JOB failed"` | Turn an issue report into read-only evidence: ranked hypotheses, debug SQL checklist, trace diagram and suggested fixes; `--issue-file`, `--since 24h`, `--json`, `--out`, optional LLM `--summarize`. With no issue, scans recent failures. See [triage](docs/triage.md). |
 | `piagent alertlog --target p1-19c-prod --since 7d` | Read the alert log and ADR incidents through SQL (no server files): errors and warnings by default, repeats folded with counts; `--code`, `--grep`, `--level all`, `--incidents`, `--json`, `--markdown`. No LLM. See [alert log](docs/alertlog.md). |
+| `piagent sql --target p1-19c-prod --sql-id 54x8br9b0szpk` | Drill into one cached statement: children and per-execution timings, plans (`DBMS_XPLAN.DISPLAY_CURSOR`), plan changes, table and index statistics, baselines, profiles, bind metadata (never values) and findings; `--text` finds candidates by SQL text and never guesses, `--child`, `--json`, `--markdown`. Cursor cache only, no AWR/ASH. No LLM. See [SQL insight](docs/sqlperf.md). |
+| `piagent security --target d1-19c-lab` | Read-only security posture: open default-password accounts, powerful privileges through nested roles, PUBLIC grants on sensitive packages, password profiles, account lifecycle, audit configuration and parameters; `--check`, `--who-can OWNER.OBJECT`, `--json`, `--markdown`. Never reads password hashes or audit trails; advice is for a human DBA. `report --sections security` and `drift --scope security` reuse it. No LLM. See [security](docs/security.md). |
 
 Manual `schedule run` defaults to `<PIAGENT_HOME>/reports`; pass `--out`
 explicitly when using a separate report directory. The generated schedule pins
@@ -141,9 +143,11 @@ health checks, with a Stop button. The Report tab runs the selected target's DBA
 checks with an optional summary and includes a saved-file History panel with
 sparklines and worsening flags. The Drift tab compares parameters, schema or object
 metadata without an LLM. The PL/SQL tab documents an object with an SVG
-dependency graph, the Alert Log tab lists folded alert-log entries and ADR
+dependency graph, the SQL tab drills into one cached statement with a plan tree,
+the Security tab shows posture findings by severity with a who-can privilege graph,
+the Alert Log tab lists folded alert-log entries and ADR
 incidents, and the Triage panel turns a pasted issue into evidence, including
-correlated alert-log entries, and a debug checklist. The UI follows the system
+correlated alert-log entries and SQL performance evidence, and a debug checklist. The UI follows the system
 light or dark theme. In chat, `/triage [--since 7d] <issue>` runs triage, then asks the
 model one grounded question. Chat and report summaries show Unverified notes
 when facts remain unsupported. Export Markdown downloads the displayed conversation,
