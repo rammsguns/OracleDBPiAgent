@@ -2725,6 +2725,51 @@ Tests:
 | WP-20D p20 evals | `wp-20d-p20-evals` | codex | about 6 cases (default-password count, a nested-role path to DBA, PUBLIC execute on `UTL_FILE`, profile limits, enabled audit policies) with fixed truth SQL |
 | Review | `review-wp-20x` | antigravity | each WP, with a focus on no secret, password hash or `SPARE4` column ever being selected |
 
+### WP-20B: report and drift integration (branch `wp-20b-security-report`)
+Owns:
+- the opt-in `security` section in `src/report/` (`--sections security` only;
+  the default 14 checks and their output stay byte-identical, checked by a
+  snapshot test);
+- `security` in report history trends (counts per severity);
+- the `drift` scope `security`, which compares per-target counts and the sets
+  of users and roles with powerful privileges and PUBLIC sensitive grants;
+- tests and docs.
+
+No new SQL: it reuses `readSecurityPosture`.
+
+### WP-20C: web Security tab (branch `wp-20c-security-web`)
+Owns:
+- `/api/security`, with the same auth, loopback, single-flight and 1 MiB rules
+  as `/api/sql`;
+- `src/web/static/security.js`;
+- browser tests and `docs/img/`.
+
+The tab:
+- findings grouped by severity, with a severity filter and status chips (only
+  non-ok sections expanded);
+- a who-can input that draws the privilege paths as a graph, reusing the
+  PL/SQL graph component, plus a list fallback;
+- Markdown export;
+- light and dark themes, and phone width with no horizontal page scroll;
+- live screenshots on d1 and p1.
+
+### WP-20D: p20 evals (branch `wp-20d-p20-evals`)
+`evals/cases-hard/phase20-security.json`, suite `p20`, 4 to 6 challenge
+cases with fixed truth SQL that never selects secrets. For example:
+- open default-password accounts on d1;
+- the role path by which a named user reaches an `ANY` privilege;
+- PUBLIC EXECUTE on UTL_FILE;
+- a profile's effective `FAILED_LOGIN_ATTEMPTS` after DEFAULT inheritance;
+- enabled unified audit policies on p1.
+
+Rules:
+- Questions must not name tools or views.
+- Use `skipWhenTruthEmpty` where truth can legitimately be empty.
+- Any scorer change is scoped to `hard-p20-`, with an archive replay showing
+  zero flips elsewhere.
+- Measure p20 ×2 locally only when told Strata is free; otherwise the
+  coordinator measures it in the gate.
+
 Hard rules for the phase:
 - Never select `PASSWORD`, `SPARE4` or any hash column.
 - Default-password checks use `DBA_USERS_WITH_DEFPWD` only.
