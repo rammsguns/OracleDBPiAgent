@@ -14,7 +14,7 @@ for (const target of ['d1-19c-lab', 'p1-19c-prod']) it(`serves live read-only SQ
 		const response = await fetch(url.origin + '/api/sql?' + new URLSearchParams({ target, sqlId: String(found.rows[0]![0]) }), { headers: { Authorization: 'Bearer ' + web.token } });
 		expect(response.status).toBe(200);
 		const body = await response.json() as any;
-		expect(body.result.target).toBe(target); expect(body.result.children.length).toBeGreaterThan(0); expect(body.result.plans.length).toBeGreaterThan(0); expect(body.markdown).toContain('# SQL insight');
+		expect(body.result.target).toBe(target); expect(body.result.children.length).toBeGreaterThan(0); expect(body.result.plans.length).toBeGreaterThan(0); expect(body.markdown).toContain('# SQL Insight');
 	} catch (error) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|ORA-01034|ORA-27101/.test(String(error))) { context.skip(`Approved database ${target} unavailable`); return; }
 		throw error;

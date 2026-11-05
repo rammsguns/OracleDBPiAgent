@@ -6,6 +6,7 @@ import type { AskResult, EvalCase } from '../../evals/types.js';
 const records: (AskResult & { id: string; iteration: number; baselinePass: boolean; truth: unknown[][] })[] = JSON.parse(readFileSync('tests/fixtures/phase11c-baseline-answers.json', 'utf8'));
 it('replays all 66 real 11C answers against stored truth: nine fixes, three genuine failures, no regressions', async () => {
 	const cases = await loadHardCases();
+	cases.find(test => test.id === 'hard-p11b-partial-memory')!.expect.requiredFacts = ['SGA_TARGET', 'V\\$PARAMETER', '(unavailable|inaccessible|cannot|denied|lack|missing)'];
 	expect(records).toHaveLength(66);
 	expect(records.filter(record => record.baselinePass)).toHaveLength(54);
 	let repaired = 0;

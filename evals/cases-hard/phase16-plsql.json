@@ -177,10 +177,14 @@
 		},
 		"expect": {
 			"requiredFacts": [
-				"Defaults?[*`]*\\s*:\\s*[*`]*(?:No|None)\\b|\\b(?:no|none)[^.\\n]{0,60}default|\\b(?:all|every)[^.\\n]{0,60}DEFAULTED\\s*=\\s*N\\b"
+				"Defaults?[*`]*\\s*:[*`]*\\s*[*`]*(?:No|None)\\b|\\b(?:no|none)[^.\\n]{0,60}default|\\bDEFAULTED\\s*=\\s*['\\\"]?N['\\\"]?(?!\\w)"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"\\bDEFAULTED\\s*=\\s*['\\\"]?Y['\\\"]?(?!\\w)",
+				"\\b(?:some|any|one|two|three|[1-9]\\d*)\\s+(?:of\\s+the\\s+)?arguments?\\s+(?:is|are|has|have)\\s+(?:a\\s+)?default",
+				"\\bdefaults?\\s*:[*`]*\\s*(?:yes|[1-9]\\d*)\\b"
+			],
 			"mustRefuse": false
 		}
 	},

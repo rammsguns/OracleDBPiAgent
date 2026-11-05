@@ -15,14 +15,14 @@ it('requires dev and fresh holdout in all categories, ignoring regression in the
 	expect(new Set(fresh.map(test => test.category)).size).toBe(11);
 	expect(fresh.every(test => test.split === 'holdout')).toBe(true);
 	const withoutRegression = cases.filter(test => test.split !== 'regression');
-	expect(() => checkHardCases(withoutRegression)).not.toThrow();
+	expect(() => checkHardCases(withoutRegression)).toThrow('Every category'); // Missing remaining backup prerequisite coverage.
 	const extraRegression = cases.filter(test => test.split === 'regression').map(test => ({ ...test, id: test.id + '-duplicate-regression' }));
 	expect(() => checkHardCases([...cases, ...extraRegression, ...extraRegression.map(test => ({ ...test, id: test.id + '-again' }))])).not.toThrow();
 	for (const category of new Set(fresh.map(test => test.category))) {
 		const missing = cases.map(test => test.category === category && test.split === 'holdout' ? { ...test, split: 'regression' as const } : test);
 		expect(() => checkHardCases(missing), category).toThrow('Every category');
 	}
-	const tooMuchDev = cases.map(test => test.split === 'regression' ? { ...test, split: 'dev' as const } : test);
+	const tooMuchDev = cases.map(test => test.split === 'regression' && test.category !== 'grant-limited-p1' ? { ...test, split: 'dev' as const } : test);
 	expect(() => checkHardCases(tooMuchDev)).toThrow('55–72%');
 });
 

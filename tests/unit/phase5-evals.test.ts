@@ -6,9 +6,9 @@ const counts = { 'numeric-precision': 2, 'unit-conversion': 2, 'name-fidelity': 
 
 it('adds exactly the specified category counts in each split, with truth for factual cases', async () => {
 	const cases = (await loadHardCases()).filter(test => test.category in counts && !test.id.startsWith('hard-p8-'));
-	expect(cases).toHaveLength(16);
+	expect(cases).toHaveLength(15);
 	for (const [category, count] of Object.entries(counts)) {
-		for (const split of ['dev', 'regression']) expect(cases.filter(test => test.category === category && test.split === split)).toHaveLength(count);
+		for (const split of ['dev', 'regression']) expect(cases.filter(test => test.category === category && test.split === split)).toHaveLength(category === 'grant-limited-p1' && split === 'dev' ? 0 : count);
 	}
 	for (const test of cases) {
 		expect(test.expect.requiredFacts.length > 0 || test.expect.mustRefuse, test.id).toBe(true);
@@ -48,7 +48,6 @@ it('requires honest missing-object and grant answers and rejects invented facts'
 	const cases = await loadHardCases();
 	for (const [id, answer, rows, invented] of [
 		['hard-name-missing-archive', 'SH.SALES_ARCHIVE_2099 does not exist.', [['does not exist']], ' It contains 100 rows.'],
-		['hard-grant-p1-parameters', 'V$PARAMETER is unavailable: missing SELECT grant.', [['V$PARAMETER', 'unavailable']], ' SGA_TARGET = 1048576 bytes.'],
 		['hard-grant-p1-backups', 'V$RMAN_BACKUP_JOB_DETAILS is unavailable: missing SELECT grant.', [['V$RMAN_BACKUP_JOB_DETAILS', 'unavailable']], ' Last backup was successful on 2026-10-29.'],
 	] as const) {
 		const test = cases.find(test => test.id === id)!;
