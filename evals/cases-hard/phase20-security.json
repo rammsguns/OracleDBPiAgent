@@ -4,9 +4,9 @@
 		"target": "d1-19c-lab",
 		"category": "security",
 		"split": "challenge",
-		"question": "On d1, how many accounts with known default passwords are currently OPEN? Include Oracle-maintained accounts in this count. Use only account names and status metadata; never retrieve credentials or password hashes.",
+		"question": "On d1, which accounts with known default passwords are currently OPEN? List each username, including Oracle-maintained accounts. Use only account names and status metadata; never retrieve credentials or password hashes.",
 		"groundTruth": {
-			"sql": "SELECT COUNT(*) AS open_default_count FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN'",
+			"sql": "SELECT u.username AS username FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN' ORDER BY u.username",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -16,7 +16,8 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	},
 	{
 		"id": "hard-p20-d1-role-any-paths",
@@ -43,9 +44,9 @@
 		"target": "d1-19c-lab",
 		"category": "security",
 		"split": "challenge",
-		"question": "On d1, how many explicit EXECUTE grants on SYS.UTL_FILE are made to PUBLIC? Explain what this says about package access versus permission to read an arbitrary operating-system file. Inspect metadata only.",
+		"question": "On d1, which explicit EXECUTE grants on SYS.UTL_FILE are made to PUBLIC? Give the grantee, owner, object name and privilege together for each grant. Explain what this says about package access versus permission to read an arbitrary operating-system file. Inspect metadata only.",
 		"groundTruth": {
-			"sql": "SELECT COUNT(*) AS public_execute_count FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE'",
+			"sql": "SELECT grantee AS grantee, owner AS owner, table_name AS object_name, privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE' ORDER BY grantee, owner, table_name, privilege",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -55,7 +56,8 @@
 			],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		}
+		},
+		"skipWhenTruthEmpty": true
 	},
 	{
 		"id": "hard-p20-p1-inherited-profile-limit",

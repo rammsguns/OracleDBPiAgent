@@ -8,8 +8,10 @@ Verified 2026-11-05T17:20:42.298Z through `evals/ground-truth.ts`, using only th
 
 ### hard-p20-d1-open-default-count (d1-19c-lab)
 
+Reverified 2026-11-05T17:42:12.503Z after review Medium finding 1.
+
 ```sql
-SELECT COUNT(*) AS open_default_count FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN'
+SELECT u.username AS username FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN' ORDER BY u.username
 ```
 
 Observed rows:
@@ -17,7 +19,19 @@ Observed rows:
 ```json
 [
   [
-    5
+    "HR"
+  ],
+  [
+    "IX"
+  ],
+  [
+    "OE"
+  ],
+  [
+    "PM"
+  ],
+  [
+    "SH"
   ]
 ]
 ```
@@ -47,8 +61,10 @@ Observed rows:
 
 ### hard-p20-d1-public-file-execute (d1-19c-lab)
 
+Reverified 2026-11-05T17:42:12.695Z after review Medium finding 1.
+
 ```sql
-SELECT COUNT(*) AS public_execute_count FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE'
+SELECT grantee AS grantee, owner AS owner, table_name AS object_name, privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE' ORDER BY grantee, owner, table_name, privilege
 ```
 
 Observed rows:
@@ -56,7 +72,10 @@ Observed rows:
 ```json
 [
   [
-    1
+    "PUBLIC",
+    "SYS",
+    "UTL_FILE",
+    "EXECUTE"
   ]
 ]
 ```
@@ -137,12 +156,11 @@ Observed rows:
 
 All cases use `rowCells`, preserving each record's association. No scorer change
 or archive replay is needed. Default-password truth reads only the dedicated
-account-name view joined to account status. Counts return a row even at zero;
-role paths, profiles and enabled-policy lists opt into `skipWhenTruthEmpty` so
+account-name view joined to account status. All six record sets opt into `skipWhenTruthEmpty` so
 empty pre/post truth is skipped by the existing runner. Missing grants remain
 errors rather than being mistaken for an empty configuration.
 
-The observed HARNESS_APP path has one role edge; truth reports the granting role and depth because SYS_CONNECT_BY_PATH is outside the existing product SQL allowlist. the recursive query also handles
+The observed HARNESS_APP path has one role edge; truth reports the granting role and depth because SYS_CONNECT_BY_PATH is outside the existing product SQL allowlist. The recursive query also handles
 nested roles with `NOCYCLE` and a ten-edge cap. No nested-role or DBA grant was
 invented to seed the case. GSM_PROF inherits PASSWORD_LIFE_TIME, while its failed
 login limit is explicit, so the inheritance case uses lifetime. The UTL_FILE
@@ -169,8 +187,27 @@ No contract changes or additional grants are needed. The hard suite grows from
 ## Validation results
 
 - `npm run typecheck`: passed (exit 0).
-- `npm test`: passed, 82 files and 1,182 tests (exit 0).
+- `npm test`: passed, 82 files and 1,183 tests (exit 0).
 - `git diff --check`: passed.
 - All six final truth queries verified live, including the revised role/depth query.
 - Integration suite not run: no product DB/LLM code changed, and it includes LLM calls.
 - LLM answer quality and p20 ×2 pass rates remain unverified until the coordinator gate.
+
+## Review follow-up: Medium finding 1
+
+Replaced both 1×1 count truths with named metadata records. The open-default
+case now requires every username; the PUBLIC grant case requires grantee,
+owner, object name and privilege in the same row. Questions request those
+names instead of a count, and no numeric count remains in either truth.
+Both cases now skip when pre/post truth is empty, matching the other record sets.
+The UTL concatenation workaround remains unchanged.
+
+Both revised queries were reverified live on d1 using the configured HARNESS_LAB
+account, the 19c gate and read-only transactions through `groundTruth`.
+The adversarial unit test rejects `1. I found 0 grants`, an incidental `5.`
+list marker and bare numeric counts for both cases; complete named tables pass,
+and omission of a required account or privilege fails. No scorer changes.
+
+Follow-up validation: `npm run typecheck` passed; `npm test` passed (82 files,
+1,183 tests); `git diff --check` passed. No LLM or integration runs. LLM
+answer quality remains for the coordinator gate. No contract changes needed.
