@@ -2114,6 +2114,15 @@ Access:
 
 Order: 18A first. 18B, 18C and 18D start after 18A merges.
 
+Order (amended 2026-11-04): 18B, 18C and 18D start from `wp-18a-alertlog`
+(aecd320) while its re-review runs. Each merges master once 18A has merged.
+
+Shared shape (18B produces it, 18C renders it). `TriageResult.alertLog` is
+optional:
+`{ status: 'ok' | 'unavailable' | 'skipped'; grant?: string; window: { from: string; to: string }; entries: AlertRow[]; incidents: IncidentRow[]; correlations: { kind: 'code' | 'jobRun'; label: string; at?: string; entryIndexes: number[] }[]; checks: Check[] }`.
+`AlertRow` and `IncidentRow` come from `src/alertlog`.
+
+
 ### WP-18A: alert-log reader and CLI
 Module `src/alertlog/` exposes `readAlertLog(ctx, target, options)`.
 
