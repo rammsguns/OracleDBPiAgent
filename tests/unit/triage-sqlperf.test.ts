@@ -12,7 +12,8 @@ function fixture(fail = '', empty = false) {
 		if (fail && sql.includes(fail)) throw Error('query failed with sensitive driver detail');
 		let rows: unknown[][] = [];
 		if (!empty) {
-			if (sql.includes('ELAPSED_PER_EXEC FROM')) rows = [['abcdfghjkmnpq', 'select from orders', 100]];
+			if (sql.includes('COUNT(DISTINCT s.SQL_ID)')) rows = [[4]];
+			else if (sql.includes('ELAPSED_PER_EXEC FROM')) rows = [['abcdfghjkmnpq', 'select from orders', 100]];
 			else if (sql.includes('FROM V$SQL WHERE')) rows = [0, 1, 2, 3].map(n => [n, n ? 200 : 100, 10, n ? 3000 : 1000, 100, 50, 2, 10, '2026-11-05T00:00:00Z', '2026-11-05T01:00:00Z', 'select from orders', '123']);
 			else if (sql.includes('FROM V$SQL_PLAN ')) rows = [[0, null, 'NESTED LOOPS', '', '', '', ''], [1, 0, 'INDEX', '', '', '', ''], [2, 0, 'TABLE ACCESS', 'FULL', 'SHOPAPP', 'ORDERS', 'TABLE']];
 			else if (sql.includes('_TAB_STATISTICS')) rows = [['YES', '2026-11-01T00:00:00Z', 200001]];
@@ -35,6 +36,8 @@ it('only collects for SQL_ID or performance language plus an object', async () =
 it.each(['slow', 'slowness', 'timeout', 'takes long'])('finds top three object statements for %s and preserves exact evidence', async word => {
 	const { ctx, query, close } = fixture();
 	const r = await collectSql(ctx, 'p1-19c-prod', `orders query ${word}`, 7, ['SHOPAPP.ORDERS']);
+	expect(r.excluded).toBe(4);
+	expect(r.candidates?.sql).toContain("s.PARSING_SCHEMA_NAME <> SYS_CONTEXT('USERENV', 'SESSION_USER')");
 	expect(r.candidates?.sql).toContain('FETCH FIRST 3 ROWS ONLY');
 	expect(r.candidates?.sql).toContain('p.CHILD_NUMBER = s.CHILD_NUMBER');
 	expect(r.candidates?.sql).toContain('s.LAST_ACTIVE_TIME >= SYSDATE - :hours / 24');
