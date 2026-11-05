@@ -1,4 +1,4 @@
-import { collectAlerts, alertHypotheses, mergeAlerts, discoverAlertJobs } from './alerts.js';
+import { collectAlerts, alertHypotheses, mergeAlerts, discoverAlertJobs, alertSuggestions } from './alerts.js';
 export type { TriageAlertLog } from './alerts.js';
 import { nameCandidates, lookupNames } from './names.js';
 import { collectRunHistory, scopeName, type RunScope } from './history.js';
@@ -137,6 +137,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	const alertLog = mergeAlerts([discovery.alert, await collectAlerts(ctx, target.name, hours, combined.codes, runs.rows)])!;
 	reader.checks.push(...alertLog.checks);
 	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
+	diagnosis.suggestions.push(...alertSuggestions(alertLog));
 	const hypotheses: Hypothesis[] = [...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
 	for (const constraint of constraints.filter(c => c.rows.length)) {
 		const row = constraint.rows[0]!;
@@ -227,7 +228,7 @@ export async function triage(ctx: ToolContext, options: TriageOptions) {
 export type TriageResult = Awaited<ReturnType<typeof triage>>;
 const safe = (v: unknown) => asText(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/`/g, 'ˋ').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 const inline = (value: string) => '`' + value.replace(/`/g, 'ˋ').replace(/\r?\n/g, ' ') + '`';
-const evidenceText = (value: string) => { const m = /^([\s\S]*?:\s*)((?:DELETE|UPDATE|SELECT|INSERT|BEGIN)\b[\s\S]*)$/i.exec(value); return m ? safe(m[1]) + inline(m[2]!) : safe(value); };
+const evidenceText = (value: string) => { const m = /^([\s\S]*?:\s*)((?:DELETE|UPDATE|SELECT|INSERT|BEGIN)\b[\s\S]*)$/i.exec(value); return m ? safe(m[1]) + inline(m[2]!) : safe(value).replace(/\bIncident (\d+)\b/g, '[Incident $1](#incident-$1)'); };
 const block = (language: string, value: string) => '```' + language + '\n' + value.replace(/`/g, 'ˋ') + '\n```';
 export function renderTriageMarkdown(result: TriageResult): string {
 	return [`# Issue triage: ${safe(result.target)}`, 'Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Credential-looking literals are redacted; ordinary business literals are preserved; graph call associations and statement ranges are heuristic.', ...(result.scan ? [`Scan cap: ${result.scan.cap}; ${result.scan.truncated ? 'partial' : 'complete within visible window'}.`, ...result.scan.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)} ${c.attempts.map(a => a.code).join(', ')} (${c.rows.length} rows)`)] : []), ...result.issues.map((issue, i) => [
@@ -263,11 +264,12 @@ function lookFor(check: Check): string {
 
 function renderTriageAlerts(alert: import('./alerts.js').TriageAlertLog): string {
 	return [`${alert.status}; ${alert.window.from} to ${alert.window.to} (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.`, ...(alert.grant ? ['Alert evidence unavailable (possibly partial). Required grants:', block('sql', alert.grant)] : []),
+		...alert.entries.flatMap(r => r.incidentIds.filter(id => /^\d+$/.test(id) && !alert.incidents.some(i => i.incidentId === id)).map(id => `<a id="incident-${id}"></a>`)),
 		['| Index | First / last | Count | Codes | Incident / problem / trace | Message |', '|---|---|---|---|---|---|',
 		...alert.entries.map((r, i) => `| ${i} | ${safe(r.firstTime)} / ${safe(r.lastTime)} | ${r.count} | ${r.codes.join(', ')} | ${safe([...r.incidentIds, ...r.problemKeys, ...r.traceFiles].join('; '))} | ${safe(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`)].join('\n'),
 		...(!alert.entries.length ? ['No matching alert entries returned within the bounded queries.'] : []),
 		...alert.correlations.map(c => `Correlation (${c.kind}): ${safe(c.label)}${c.at ? ' at ' + safe(c.at) : ''}; entry indexes ${c.entryIndexes.join(', ')}. Temporal matches are diagnostic leads.`),
-		...alert.incidents.map(i => `Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${i.status}.`),
+		...alert.incidents.map(i => `<a id="incident-${/^\d+$/.test(i.incidentId) ? i.incidentId : 'unknown'}"></a>Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${i.status}.`),
 		...(alert.checks.some(c => c.truncated) ? ['Row cap reached; alert evidence is partial and folding covers fetched rows only.'] : []),
 	].join('\n\n');
 }

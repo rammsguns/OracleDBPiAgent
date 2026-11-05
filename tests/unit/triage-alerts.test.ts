@@ -103,3 +103,28 @@ it('labels capped unmatched recent evidence and omits an empty trace diagram', a
 	expect(renderTriageMarkdown(result)).toContain('Recent errors in the window, not matched to the issue');
 	expect(renderTriageMarkdown(result)).not.toContain('### Trace diagram');
 });
+
+it('ranks the VKTM priority lead with folded incident evidence and unexecuted checks', async () => {
+	const { alertSuggestions } = await import('../../src/triage/alerts.js');
+	const alert = await collectAlerts(context(), 'd1-19c-lab', 24, ['ORA-00800'], []);
+	const row = alert.entries[0]!;
+	row.codes = ['ORA-00800']; row.messageText = 'ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration]';
+	row.incidentIds = ['12', '13'];
+	const lead = alertHypotheses(alert)[0]!;
+	expect(lead.title).toBe('The VKTM timekeeping process could not raise its OS scheduling priority');
+	expect(lead.evidence.join(' ')).toContain(row.messageText);
+	expect(lead.evidence.join(' ')).toContain('Incident 12; Incident 13');
+	expect(alertSuggestions(alert).join(' ')).toMatch(/oradism.*ownership.*setuid.*ORACLE_HOME\/bin/);
+	expect(alertSuggestions(alert).join(' ')).toContain('CAP_SYS_NICE in Docker');
+	expect(alertSuggestions(alert).join(' ')).toContain('usually a soft, non-data error');
+	const result = await triage(context(), { target: 'd1-19c-lab', issue: 'ORA-00800' });
+	result.issues[0]!.alertLog = alert; result.issues[0]!.hypotheses = [{ ...lead, rank: 1 }];
+	const markdown = renderTriageMarkdown(result);
+	expect(markdown).toContain('[Incident 12](#incident-12)');
+	expect(markdown).toContain('<a id="incident-12"></a>');
+	for (const message of ['ORA-00800: arguments: [Other Error], [VKTM]', 'ORA-00800: arguments: [Set Priority Failed], [OTHER]', 'ORA-00800: other error mentions Set Priority Failed and VKTM']) {
+		row.messageText = message;
+		expect(alertHypotheses(alert)[0]?.title).toContain('soft external error');
+		expect(alertSuggestions(alert)).toEqual([]);
+	}
+});

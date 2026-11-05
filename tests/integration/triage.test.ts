@@ -92,6 +92,9 @@ it('correlates p1 purge alert evidence and d1 ORA-00800 without an LLM', async c
 	expect(d1.alertLog?.entries.some(e => e.codes.includes('ORA-00800'))).toBe(true);
 	expect(d1.alertLog?.incidents.some(i => i.problemKey === 'ORA 800')).toBe(true);
 	expect(renderTriageMarkdown(d1)).toContain('Set Priority Failed');
+	expect(d1.issues[0]?.hypotheses[0]?.title).toBe('The VKTM timekeeping process could not raise its OS scheduling priority');
+	expect(d1.issues[0]?.suggestions.join(' ')).toContain('CAP_SYS_NICE');
+	for (const id of d1.alertLog!.entries.flatMap(e => e.incidentIds)) expect(renderTriageMarkdown(d1)).toContain(`[Incident ${id}](#incident-${id})`);
 }, 120000);
 
 it('discovers the live purge failure from natural language via the alert log', async context => {

@@ -249,13 +249,15 @@ Incident 86767: ORA 800; 2026-11-04T04:29:49.671Z; status 2.
 
 ### Live smoke: d1 ORA-00800
 
+Refreshed at approximately 2026-11-05T05:06Z, using SQL only and no LLM.
+
 ```sh
 npm run piagent -- triage --target d1-19c-lab --since 30d --issue 'ORA-00800 errors in the alert log' --json
 ```
 
 ### Alert log
 
-ok; 2026-10-06T05:02:46.555Z to 2026-11-05T05:02:46.555Z (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.
+ok; 2026-10-06T05:05:49.907Z to 2026-11-05T05:05:49.907Z (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.
 
 | Index | First / last | Count | Codes | Incident / problem / trace | Message |
 |---|---|---|---|---|---|
@@ -263,32 +265,43 @@ ok; 2026-10-06T05:02:46.555Z to 2026-11-05T05:02:46.555Z (exclusive). Job-run qu
 
 Correlation (code): Alert log matching ORA-00800; entry indexes 0. Temporal matches are diagnostic leads.
 
-Incident 245813: ORA 800; 2026-11-04T04:29:49.671Z; status 2.
+<a id="incident-245813"></a>Incident 245813: ORA 800; 2026-11-04T04:29:49.671Z; status 2.
 
-Incident 225332: ORA 800; 2026-10-22T23:21:11.147Z; status 2.
+<a id="incident-225332"></a>Incident 225332: ORA 800; 2026-10-22T23:21:11.147Z; status 2.
 
-Incident 204851: ORA 800; 2026-10-21T03:38:14.898Z; status 2.
+<a id="incident-204851"></a>Incident 204851: ORA 800; 2026-10-21T03:38:14.898Z; status 2.
 
-Incident 184370: ORA 800; 2026-10-21T03:15:07.830Z; status 2.
+<a id="incident-184370"></a>Incident 184370: ORA 800; 2026-10-21T03:15:07.830Z; status 2.
 
-Incident 163889: ORA 800; 2026-10-16T23:36:52.002Z; status 2.
+<a id="incident-163889"></a>Incident 163889: ORA 800; 2026-10-16T23:36:52.002Z; status 2.
 
-Incident 143408: ORA 800; 2026-10-13T03:31:29.243Z; status 2.
+<a id="incident-143408"></a>Incident 143408: ORA 800; 2026-10-13T03:31:29.243Z; status 2.
 
-Incident 122927: ORA 800; 2026-10-13T03:05:03.725Z; status 2.
+<a id="incident-122927"></a>Incident 122927: ORA 800; 2026-10-13T03:05:03.725Z; status 2.
 
 ### Ranked hypotheses
 
-1. The recorded run or error is visible, but the cause is not yet established.
+1. The VKTM timekeeping process could not raise its OS scheduling priority
 
-- ORA-00800
-- Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], []
+- 2026-10-13T03:05:03.725Z to 2026-11-04T04:29:49.671Z (count 7): Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], []
+- [Incident 245813](#incident-245813); [Incident 225332](#incident-225332); [Incident 204851](#incident-204851); [Incident 184370](#incident-184370); [Incident 163889](#incident-163889); [Incident 143408](#incident-143408); [Incident 122927](#incident-122927)
 - Alert code match at 2026-11-04T04:29:49.671Z: Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], []
+
+
+### Suggested fixes (not executed)
+
+Suggestions for a developer; no changes were run.
+
+- Suggested check (not executed): inspect the oradism binary ownership and setuid permission in ORACLE_HOME/bin with the DBA or OS administrator.
+
+- Suggested check (not executed): inspect whether the container or OS permits real-time scheduling priority changes, including CAP_SYS_NICE in Docker.
+
+- ORA-00800 with [Set Priority Failed], [VKTM] is usually a soft, non-data error. Review the linked incidents and trace metadata; the exact OS or container configuration cause remains unverified.
 
 
 The p1 alert independently confirms the job name, ORA-12012/ORA-02292, constraint and line 27. The ±10 minute query also returns VKTM and filesystem diagnostics; this timing does not link those errors to the FK violation. The child-record constraint hypothesis ranks first; the separately evaluated cutoff at lines 26/27 is the next, source-based hypothesis. The job is explicitly labelled discovered from alert log (ORA-12012).
 
-The d1 row folds seven ORA-00800 occurrences and preserves all seven incident ids. Its message reports Set Priority Failed for VKTM and asks for traces/OS configuration checks. This does not establish the exact host configuration cause; the generic hypothesis intentionally leaves that unresolved. There is a code correlation and no scheduler correlation.
+The d1 row folds seven ORA-00800 occurrences and preserves all seven incident ids. Its message reports Set Priority Failed for VKTM and asks for traces/OS configuration checks. The specific VKTM hypothesis explains the reported priority failure; the exact host configuration cause remains unverified. Other ORA-00800 arguments retain the generic soft-external-error hypothesis. There is a code correlation and no scheduler correlation.
 
 Natural-language discovery regression: `job failed` previously parsed FAILED as a job name via the `job X` pattern in `parse.ts`. Parsing and candidate lookup now share a common-word exclusion list. A bounded ORA-12012 window read discovers qualified scheduler jobs when the issue mentions a job or shares a word of at least four letters with the job name. Only matched alert text enters the code/frame/constraint pipeline. With no codes or recognized names and no discovered job, a separate default-severity query returns at most ten recent errors, labelled **recent errors in the window, not matched to the issue**. Its rows do not become stack-frame or constraint evidence. Both discovery queries retain exact SQL/binds and cap markers.
 

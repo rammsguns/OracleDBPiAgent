@@ -51,7 +51,12 @@ export function alertHypotheses(alert: TriageAlertLog): Hypothesis[] {
 		if (row.codes.some(c => ['ORA-00600', 'ORA-07445'].includes(c)) && (incident || row.incidentIds.length)) {
 			title = 'Internal Oracle error: open an SR with the incident id and problem key.';
 			evidence.push(`Incident ${incident?.incidentId ?? row.incidentIds.join(', ')}; problem key ${incident?.problemKey ?? row.problemKeys.join(', ')}`);
-		} else if (row.codes.includes('ORA-04031')) title = 'Shared pool memory pressure or fragmentation may explain ORA-04031.';
+		} else if (isVktmPriorityError(row)) {
+			title = 'The VKTM timekeeping process could not raise its OS scheduling priority';
+			const ids = [...new Set(row.incidentIds)];
+			evidence.push(ids.length ? ids.map(id => `Incident ${id}`).join('; ') : 'No incident id was present in the fetched alert entry.');
+		} else if (row.codes.includes('ORA-00800')) title = 'ORA-00800 reports a soft external error; inspect its arguments to establish the cause.';
+		else if (row.codes.includes('ORA-04031')) title = 'Shared pool memory pressure or fragmentation may explain ORA-04031.';
 		else if (row.codes.includes('ORA-01555')) title = 'Undo retention or overwritten undo may explain ORA-01555.';
 		else if (row.codes.some(c => ['ORA-01653', 'ORA-01654', 'ORA-01688'].includes(c))) title = 'Tablespace space exhaustion may explain the allocation failure.';
 		else if (row.codes.includes('ORA-00060')) { title = 'A deadlock was recorded; review the named trace with the DBA.'; evidence.push(`Trace: ${row.traceFiles.join(', ') || 'not present in the fetched alert text'}`); }
@@ -108,4 +113,16 @@ export async function discoverAlertJobs(ctx: ToolContext, target: string, hours:
 	}
 	if (grants.size) alert.grant = [...grants].join('\n');
 	return { jobs, alert, matchedText: entries.map(e => e.messageText).join('\n') };
+}
+
+function isVktmPriorityError(row: AlertRow): boolean {
+	return row.codes.includes('ORA-00800') && /arguments:\s*\[Set Priority Failed\]\s*,\s*\[VKTM\]/i.test(row.messageText);
+}
+export function alertSuggestions(alert: TriageAlertLog): string[] {
+	if (!alert.entries.some(isVktmPriorityError)) return [];
+	return [
+		'Suggested check (not executed): inspect the oradism binary ownership and setuid permission in ORACLE_HOME/bin with the DBA or OS administrator.',
+		'Suggested check (not executed): inspect whether the container or OS permits real-time scheduling priority changes, including CAP_SYS_NICE in Docker.',
+		'ORA-00800 with [Set Priority Failed], [VKTM] is usually a soft, non-data error. Review the linked incidents and trace metadata; the exact OS or container configuration cause remains unverified.',
+	];
 }
