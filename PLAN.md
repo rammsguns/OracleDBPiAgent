@@ -1908,7 +1908,7 @@ definitions stay byte-identical. Gate: as WP-16E, against master with WP-16E.
   default chat is unchanged.
 - Antigravity review per WP.
 
-### Phase 16 results (2026-11-04): complete, not yet pushed
+### Phase 16 results (2026-11-04): complete, pushed (be17cfe)
 All WPs are merged on local master with Antigravity review APPROVE:
 
 | WP | Merges |
@@ -2018,6 +2018,45 @@ rows INSERT, UPDATE and DELETE, under these rules:
 - Negated cells ("not DELETE") must still fail.
 
 Rescore every archive and justify each flip.
+
+### Phase 17 results (2026-11-04): complete
+
+Merges on master:
+- WP-17B: 23f1967, then the wording fix 7cb9d9c (deduplicated views, searched
+  names in not-found evidence).
+- WP-17D: 29510ba. The rescore covered 7,548 records; the only flips were 2
+  FAIL to PASS, both justified.
+- WP-17A and WP-17C: 0c3d865. Offline replay over 3,703 records changed 13, all
+  justified. Antigravity reviews approved all four WPs.
+
+Gate gate-17ac (A = master+17D, B = +17A+17C; `eval-archive/phase17/gate-17ac`):
+
+| Split | A | B | B−A (CI95) |
+|---|---|---|---|
+| p16 ×4 | 33/40 | 38/40 | +12.5pp [5, 20] |
+| hard-p16-security-trigger | 0/4 | 4/4 | |
+| dev ×4 | 112/112 | 112/112 | 0; tokens +2.2k [−2.8k, 9.0k] |
+| holdout ×3 | 35/36 | 34/36 | −2.8pp [−8.3, 0] |
+| regression | 21/21 | 21/21 | |
+| MVP | 39/39 | 39/39 | |
+
+The holdout misses were all hard-p8-description-language skipping `run_query`
+(A once, B twice). That tool choice is made before grounding or the hint runs,
+and the case has been flaky in earlier gates.
+
+Live smoke on d1: `/triage NO_SUCH_JOB_X` reports "No recorded failure was found
+for NO_SUCH_JOB_X." and lists each searched view once.
+
+Tests on 0c3d865:
+- typecheck clean;
+- 1034 unit tests;
+- 36 integration tests;
+- 27 browser tests.
+
+Open item: because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
+can still be listed as unverified when the owner and the name come from
+different tool results. The security-trigger case passes regardless, and the
+answer is no longer rewritten.
 
 ## MVP exit criteria
 

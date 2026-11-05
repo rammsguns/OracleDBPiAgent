@@ -43,8 +43,23 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   applied once at the owner's request; see
   [the grant script](docs/grants-request-2026-11-04-plsql.sql).
 
+- Triage recognizes job and object names without a `_JOB` suffix (one bounded,
+  bound-variable lookup of up to 20 tokens). When a name is not found, triage says
+  so and lists the views it searched.
+- The empty-dictionary hint also covers comma joins (`FROM all_objects o,
+  all_tables t`).
+- A grounding correction now asks the model for its complete revised answer, so
+  the explanation is no longer lost. On PL/SQL challenge questions this raised the
+  score from 33/40 to 38/40.
+
 ### Fixed
 
+- Grounding no longer flags SQL/PL/SQL keywords (`FOR EACH ROW`), or numbers that
+  differ from the evidence only by a leading minus (`20205` vs `-20205`). An
+  `OWNER.NAME` now counts as verified only when both parts appear in the same tool
+  result.
+- Challenge scoring: one-cell value lists (`INSERT OR UPDATE OR DELETE`) satisfy
+  single-column truth rows; negated cells still fail.
 - Challenge scoring: Unicode dashes in ORA codes, and child/parent rows of a
   constraint table, are now matched; wrong layouts still fail. Earlier records
   are unchanged.
