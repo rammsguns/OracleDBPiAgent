@@ -2087,6 +2087,112 @@ Verification:
   when it aligns with `toolResultTexts`). It reports every changed `unverified`
   list and must show zero changes to `unsupportedNumbers`.
 
+## Phase 18: alert-log triage (owner request 2026-11-04)
+
+The owner chose alert-log triage as phase 18. Triage and the operator gain the
+database alert log and the ADR incident/problem list, read with SQL only:
+`V$DIAG_ALERT_EXT`, `V$DIAG_INCIDENT` and `V$DIAG_PROBLEM`. The agent never
+reads server files.
+
+Access:
+- The owner approved `docs/grants-request-2026-11-04-alertlog.sql` ("Write and
+  run it"). It was applied once on 2026-11-04 as sysdba in containers
+  `oracle19c` (HARNESS_LAB) and `oracle19c-prod` (HARNESS_RO): three SELECT
+  grants on each, verified read-only afterwards.
+- Probe results:
+  - d1 has 11,097 entries, 254 ORA- lines in 30 days, 13 incidents and 1
+    problem.
+  - p1 has 4,563 entries, 38 ORA- lines and 7 incidents.
+  - A 30-day bounded query takes under 0.3 s.
+
+| WP | Branch | Owns | Gate |
+|---|---|---|---|
+| WP-18A Alert-log reader and CLI | `wp-18a-alertlog` | `src/alertlog/` (new), the `alertlog` command registration in `src/cli/index.ts`, tests, `docs/alertlog.md` | unit, integration on d1 and p1, live smoke |
+| WP-18B Triage integration | `wp-18b-triage-alert` | `src/triage/` (alert evidence, hypotheses, checklist, Markdown), tests, `docs/triage.md` | unit, integration, live triage smokes |
+| WP-18C Web | `wp-18c-web-alert` | `src/web/` (Alert Log tab, `/api/alertlog`, the alert section of the triage panel), browser tests, `docs/web-ui.md` | browser tests and live screenshots |
+| WP-18D Evals | `wp-18d-evals-alert` | `evals/` (alert-log challenge cases, suite `p18`), `docs/evals-hard.md` | p18 ×4 measured; dev, holdout, regression and MVP unchanged |
+
+Order: 18A first. 18B, 18C and 18D start after 18A merges.
+
+### WP-18A: alert-log reader and CLI
+Module `src/alertlog/` exposes `readAlertLog(ctx, target, options)`.
+
+Options:
+- `since` (the triage window syntax: 24h, 7d), or an explicit `from`/`to`
+  window;
+- `codes` (ORA-/TNS- codes);
+- `text` (a case-insensitive substring, bound);
+- `level` (default: errors and warnings, `MESSAGE_LEVEL <= 16` plus ORA-
+  lines);
+- `limit` (default 50, capped by `limits.maxRows`).
+
+Reading rules:
+- Every query has a timestamp predicate, bind variables only, `FETCH FIRST`,
+  the configured statement timeout, and read-only sessions from the existing
+  provider.
+- Rows carry the timestamp, level, the code(s) parsed from the text, problem
+  key, incident id (from "incident=N"), trace file name and message text.
+- Message text goes through the existing credential redaction, and a row's text
+  is capped at 2 KB.
+- Consecutive identical messages are folded, with a count and a first/last
+  time.
+
+Other reads:
+- `readIncidents` lists V$DIAG_INCIDENT joined to V$DIAG_PROBLEM: incident id,
+  problem key, create time, status, with a window and a limit.
+- On ORA-00942 or ORA-01031, the result has `status: 'unavailable'` and gives
+  the exact grant line. It never throws for missing access.
+
+CLI: `piagent alertlog --target T [--since 24h] [--code ORA-00600]... [--grep
+text] [--incidents] [--json|--markdown]`.
+
+Out of scope for 18A: no chat tool, no change to tool definitions or the system
+prompt, and no LLM call.
+
+### WP-18B: triage integration
+`triageIssue` adds alert evidence:
+- entries matching the issue's ORA codes within the window;
+- entries within ±10 minutes of each failed scheduler run it found;
+- incidents in the window.
+
+Each is a `Check`, with its exact SQL and binds as for the other evidence.
+
+Hypotheses (ranked like the existing ones, shown as evidence and never run):
+- ORA-00600 or ORA-07445 with an incident: an internal error. Open an SR, with
+  the incident id and problem key.
+- ORA-04031: shared pool memory.
+- ORA-01555: undo retention.
+- ORA-01653/1654/1688: tablespace full.
+- ORA-00060: deadlock, with the trace file named.
+- ORA-12850/TNS: network.
+
+Other changes:
+- The debug checklist gains a step with the alert-log SQL.
+- The trace diagram adds an alert-log node when entries correlate.
+- An unavailable alert log is reported once, with the grant line, and never
+  fails triage.
+- `--summarize` grounding sees the alert rows as evidence.
+- Chat `/triage` includes the alert evidence automatically.
+
+### WP-18C: web
+- An Alert Log tab with a target, a window and code/text filters. It shows a
+  table with folded counts, the level as text and colour, and an incident badge,
+  and exports Markdown.
+- The triage panel shows the alert section and the correlation.
+- `/api/alertlog` uses the same auth and loopback rules as the other routes.
+- Browser tests, and live screenshots in light and dark modes.
+
+### WP-18D: evals
+Four to six challenge cases (suite `p18`) about the alert log on d1 and p1. Their
+ground truth is computed at run time with the same SQL, for example:
+- the most recent ORA- code in the last 7 days;
+- the number of incidents;
+- the problem key.
+
+The agent answers through its existing `run_query` tool. The scorer reuses the
+existing check types. The gate reports p18 ×4 as a measurement, and the other
+splits must not change, because there are no product changes in 18D.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
