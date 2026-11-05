@@ -104,3 +104,51 @@ containers or Strata configuration changed. No LLM calls, full integration suite
 evals, push, merge or PR. No requested contract changes. Live observations are
 transient, not a security certification; core reachability limitations in
 security.md still apply. No live nested-role/PUBLIC/ANY fixture was created.
+
+## Coordinator Review Follow-up
+
+The coordinator found that the initial d1 desktop graph cut off its fourth route
+and scaled its node text too large. The earlier visual review missed that cutoff.
+Security now opts into an explicit 0.75 graph scale: the SVG has intrinsic width
+and height derived from its layout instead of stretching to the panel width.
+Security CSS respects those dimensions. Node labels render at 14.25 px (owner
+labels 12 px; kind labels 10.5 px), alongside the page's 16 px body and 13.6 px
+tables. Both live graphs fit vertically in their containers, including d1's final
+Direct OE → SELECT HR.EMPLOYEES route. Larger graphs still scroll within the
+bounded viewport; phone graphs may require horizontal scrolling. The shared
+PL/SQL renderer keeps its original sizing/fonts when no scale is supplied.
+
+Profile findings now aggregate in `readSecurityPosture`, keyed by profile,
+resource and effective limit. Each finding names the profile and limit once and
+lists the sorted, distinct affected open custom users. DEFAULT inheritance still
+resolves before grouping, and separate profiles/resources remain separate rows.
+For example, d1 now has one DEFAULT / PASSWORD_VERIFY_FUNCTION=NULL finding with
+10 users; p1 has one with two users. CLI Markdown, report consumers and web all
+receive these grouped findings. Raw profile/user evidence remains complete and
+unchanged, including accounts excluded from findings. Findings counts now count
+profile-limit groups rather than affected users. No contract shape changed.
+
+All eight linked images were retaken after both fixes. Reviewed the full d1 dark
+desktop capture and graph/list crops from every target/theme/width: the last path
+is visible, fonts are consistent with page scale, light/dark labels remain
+readable, and graphs no longer stretch across the desktop panel. Live capture
+assertions check the final node's bottom against its container, no vertical graph
+overflow for these live paths, rendered label size between 13 and 16 px, and no
+horizontal page overflow at all eight sizes/themes. The existing locally scrolling
+phone evidence and graph layout remains intentional.
+
+Follow-up verification (no LLM calls):
+
+- `npm run typecheck`: passed.
+- `npm test`: 85 files, 1,254 tests passed.
+- `PIAGENT_BROWSER_LIVE=0 PIAGENT_ALERTLOG_LIVE=0 PIAGENT_SQL_LIVE=0 PIAGENT_SECURITY_LIVE=0 npm run test:browser`: 52 passed, 4 opt-in live tests skipped. Includes existing PL/SQL graph layout/contrast tests and an explicit default-renderer sizing regression check.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/security.test.ts tests/integration/web-security.test.ts`: 4 passed in two files, no skips. Live core assertions verify the single DEFAULT verify-function group and affected-user count on both targets.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets PIAGENT_SECURITY_LIVE=1 npx playwright test tests/browser/security-live.spec.ts`: 1 passed, all eight images refreshed.
+
+Additional changed files: `src/security/index.ts`, `tests/unit/security.test.ts`,
+`tests/integration/security.test.ts`, and the grouping note in `docs/security.md`.
+Other follow-up edits are confined to the previously listed graph/UI/browser files,
+this report and the eight screenshots. No shared contract or dependency changes
+are required. No full integration suite, database mutations, Strata calls, push or
+merge were performed. Live evidence remains transient; no new grant fixtures
+were created.
