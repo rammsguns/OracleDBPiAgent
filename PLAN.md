@@ -2620,7 +2620,7 @@ Owns:
 6. Fresh screenshots (d1 and p1, light and dark, 1280 and 390) and refreshed
    CLI and triage smokes in the docs.
 
-## Phase 20: security and privilege review (proposed 2026-11-05; needs owner approval)
+## Phase 20: security and privilege review (approved 2026-11-05)
 
 ### Goal
 `piagent security --target T` produces a read-only posture report that a DBA
@@ -2642,6 +2642,61 @@ statement is clearly labelled "for a human DBA".
   `UNIFIED_AUDIT_TRAIL` is deliberately excluded: it holds other users'
   activity, and only policy configuration is needed.
 - Missing views degrade per check to `unavailable`.
+
+Owner on 2026-11-05: "apply the grants", then "continue with next phase".
+`docs/grants-request-2026-11-05-security.sql` was applied as `/ as sysdba`
+after checking DB name, version and grantee in each container:
+- d1 (ORCL 19.9.1, HARNESS_LAB): 3 × "Grant succeeded";
+- p1 (PRODCDB 19.9.1, HARNESS_RO): 12 × "Grant succeeded".
+
+A read-only re-probe shows every phase 20 view is readable on both targets
+except `UNIFIED_AUDIT_TRAIL`, which is deliberately not granted.
+
+### WP-20A: security core and CLI (branch `wp-20a-security`)
+Owns:
+- `src/security/` (new);
+- the `security` command registration in `src/cli/index.ts`;
+- tests and `docs/security.md`.
+
+API:
+- `readSecurityPosture(session, { checks?, whoCan? })` returns
+  `SecurityPosture = { status; target; checks: SecurityCheck[]; whoCan?: PrivilegePath[] }`.
+- `SecurityCheck = { id; title; severity: 'high'|'medium'|'low'|'info';
+  status: 'ok'|'unavailable'|'skipped'; findings: { subject; detail; evidence: Check }[];
+  advice }`.
+- `renderSecurityMarkdown`.
+- `SecurityUsageError` (CLI exit 2).
+
+Rules:
+- Oracle-maintained accounts (`ORACLE_MAINTAINED='Y'`) and roles are excluded
+  from findings unless the check is about them.
+- The default-password check reports Oracle-maintained accounts only when they
+  are OPEN.
+- The role graph is expanded in SQL (`CONNECT BY NOCYCLE`) or in TypeScript,
+  with a cycle guard and a depth cap of 10.
+- Who-can for `OWNER.OBJECT`:
+  - direct object grants;
+  - via roles, with the path listed;
+  - `PUBLIC`;
+  - the matching `ANY` system privileges (`SELECT ANY TABLE`, `EXECUTE ANY
+    PROCEDURE`, …, mapped by object type);
+  - the owner itself.
+- Advice text is prose, and any example statement is prefixed "For a human
+  DBA:". Nothing is executed.
+- Never select `PASSWORD`, `SPARE4`, `AUTHENTICATION_TYPE` hashes or anything
+  from `SYS.USER$`. A unit test scans every SQL string in `src/security/` for
+  forbidden columns and objects.
+
+CLI:
+- `piagent security --target T [--check id[,id]] [--who-can OWNER.OBJECT] [--json | --markdown]`;
+- Markdown by default, findings first and grouped by severity, matching the
+  sqlperf/alertlog style (readable column labels, no raw `Check` fields,
+  collapsed empty checks).
+
+Tests:
+- unit tests with fixtures, including role cycles and nested roles;
+- integration tests on d1 and p1;
+- live smokes in the docs.
 
 ### Checks (each a `Check` with evidence rows and severity)
 1. Accounts with default passwords that are open.
