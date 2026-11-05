@@ -1,3 +1,4 @@
+import { renderSqlInsight } from "./sql.js";
 import { setupPanel, execute } from "./panel.js";
 import { renderAlertEvidence } from "./alertlog.js";
 import { layoutGraph, columnGap } from "./graphLayout.js";
@@ -297,6 +298,7 @@ function initTriage(api, targets) {
 		const response = await api("/api/triage", { method: "POST", body: JSON.stringify(options) });
 		const result = await response.json();
 		markdown = result.markdown;
+		if (result.result.sql) renderSqlInsight(view.content, result.result.sql);
 		if (result.result.alertLog) renderAlertEvidence(view.content, result.result.alertLog);
 		for (const item of result.result.issues) renderTriageIssue(view.content, item);
 		download.disabled = false;

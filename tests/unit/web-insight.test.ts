@@ -10,7 +10,7 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 	const list = vi.fn(async () => ({ target: 'd1-19c-lab', status: 'ok', rows: [] } as any));
 	const triage = vi.fn(async () => ({ target: 'd1-19c-lab', issues: [], scan: null }));
 	const web = createWebServer({ port: 0, token: 'test', config: loadConfig({}), plsqlList: list, triage,
-		sessionFactory: async () => ({ get: vi.fn(), closeAll }), ...overrides });
+		sessionFactory: async () => ({ get: vi.fn(async () => ({ target: {}, identity: {}, close: async () => {}, query: vi.fn() } as any)), closeAll }), ...overrides });
 	const url = new URL(await web.listen()); cleanups.push(web.close);
 	const call = (path = '/api/plsql/list?owner=HR', data?: unknown, headers = {}, method = data === undefined ? 'GET' : 'POST') =>
 		new Promise<{ status: number; text: string }>((resolve, reject) => {
@@ -22,7 +22,7 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 }
 it('requires token, approved Host/Origin, method, target and identifiers before opening sessions', async () => {
 	const f = await fixture();
-	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog']) {
+	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql']) {
 		expect((await f.call(path, undefined, { Authorization: '' })).status).toBe(401);
 		expect((await f.call(path, undefined, { Host: 'evil.test' })).status).toBe(403);
 		expect((await f.call(path, undefined, { Origin: 'null' })).status).toBe(403);
@@ -77,5 +77,18 @@ it('alert failures are private and release the shared lock and sessions', async 
 		const response = await f.call('/api/alertlog');
 		expect(response.status).toBe(500); expect(response.text).not.toContain('private');
 	}
+	expect(f.closeAll).toHaveBeenCalledTimes(2);
+});
+
+it('validates SQL requests before sessions and returns candidate picks or insight', async () => {
+	const { sqlFixture } = await import('../browser/sql-fixture.js');
+	const read = vi.fn(async () => sqlFixture);
+	const f = await fixture({ readSqlInsight: read, findSqlCandidates: async () => ({ columns: [], rows: [['0123456789abc', 'SELECT x'], ['123456789abcd', 'SELECT y']], elapsedMs: 0, truncated: false }) });
+	for (const query of ['', '?sqlId=bad', '?sqlId=0123456789abc&text=x', '?text=', '?text=' + 'x'.repeat(2049), '?sqlId=0123456789abc&target=FREEPDB1']) expect((await f.call('/api/sql' + query)).status).toBe(400);
+	expect(f.closeAll).not.toHaveBeenCalled();
+	const candidates = await f.call('/api/sql?text=SELECT');
+	expect(JSON.parse(candidates.text).candidates).toHaveLength(2); expect(read).not.toHaveBeenCalled();
+	const result = await f.call('/api/sql?sqlId=0123456789abc');
+	expect(result.status).toBe(200); expect(JSON.parse(result.text).markdown).toContain('# SQL insight');
 	expect(f.closeAll).toHaveBeenCalledTimes(2);
 });
