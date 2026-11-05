@@ -109,3 +109,21 @@ it('labels every check advice for a human DBA, including skipped and unavailable
 		for (const check of result.checks) expect(check.advice, check.id).toMatch(/^For a human DBA:/);
 	}
 });
+
+it('groups profile limits across affected open users and preserves complete user/profile evidence', async () => {
+	const users = [['Z_APP', 'N', 'OPEN', 'APP_PROFILE'], ['A_APP', 'N', 'OPEN', 'APP_PROFILE'], ['EXPIRED_APP', 'N', 'OPEN & EXPIRED', 'APP_PROFILE'], ['OTHER', 'N', 'OPEN', 'DEFAULT'], ['LOCKED_APP', 'N', 'LOCKED', 'APP_PROFILE'], ['SYS', 'Y', 'OPEN', 'APP_PROFILE']];
+	const profiles = [['APP_PROFILE', 'PASSWORD_LIFE_TIME', 'DEFAULT'], ['DEFAULT', 'PASSWORD_LIFE_TIME', 'UNLIMITED'], ['APP_PROFILE', 'FAILED_LOGIN_ATTEMPTS', '10'], ['DEFAULT', 'FAILED_LOGIN_ATTEMPTS', '10'], ['APP_PROFILE', 'PASSWORD_VERIFY_FUNCTION', null], ['DEFAULT', 'PASSWORD_VERIFY_FUNCTION', 'NULL']];
+	const result = await readSecurityPosture(fixture({ users, profiles }), { checks: ['profiles'] });
+	const check = result.checks[0]!;
+	expect(check.status).toBe('ok'); expect(check.findings).toHaveLength(4);
+	for (const resource of ['PASSWORD_LIFE_TIME=UNLIMITED', 'PASSWORD_VERIFY_FUNCTION=NULL']) {
+		const grouped = check.findings.filter(f => f.detail.startsWith(resource)); expect(grouped).toHaveLength(2);
+		expect(grouped.find(f => f.subject === 'Profile APP_PROFILE')?.detail).toBe(resource + '; Affected Open Users (3): A_APP, EXPIRED_APP, Z_APP');
+		expect(grouped.find(f => f.subject === 'Profile DEFAULT')?.detail).toBe(resource + '; Affected Open Users (1): OTHER');
+	}
+	expect(check.evidence.find(e => e.view === 'DBA_USERS')?.rows).toEqual(users);
+	expect(check.evidence.find(e => e.view === 'DBA_PROFILES')?.rows).toEqual(profiles);
+	const markdown = renderSecurityMarkdown(result);
+	expect(markdown.match(/Affected Open Users \(3\): A_APP, EXPIRED_APP, Z_APP/g)).toHaveLength(2);
+	expect(markdown).not.toContain('LOCKED_APP'); expect(markdown).not.toContain('SYS');
+});

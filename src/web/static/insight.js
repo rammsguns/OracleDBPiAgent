@@ -121,25 +121,30 @@ function drawNode(svg, node, position) {
 	svg.append(group);
 }
 
-export function drawGraph(graph) {
-	const view = collapseOracleNodes(graph);
+export function drawGraph(graph, options = {}) {
+	const view = options.collapseOracle === false ? graph : collapseOracleNodes(graph);
 	const wrap = el("div");
 	wrap.className = "graph-view";
 	const scroll = el("div");
 	scroll.className = "graph-scroll";
 	scroll.tabIndex = 0;
 	scroll.setAttribute("role", "region");
-	scroll.setAttribute("aria-label", "Dependency graph, scroll horizontally when needed");
-	const svg = svgEl("svg", { role: "img", "aria-label": "Evidence dependency graph", width: "100%" });
+	scroll.setAttribute("aria-label", options.label || "Dependency graph, scroll horizontally when needed");
+	const svg = svgEl("svg", { role: "img", "aria-label": options.label || "Evidence dependency graph", width: "100%" });
 	const context = document.createElement("canvas").getContext("2d");
 	context.font = "19px system-ui, sans-serif";
 	const layout = layoutGraph(view, text => context.measureText(text).width);
 	svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+	if (options.scale !== undefined) {
+		svg.setAttribute("width", layout.width * options.scale);
+		svg.setAttribute("height", layout.height * options.scale);
+	}
 	const nodes = new Map(view.nodes.map(node => [node.id, node]));
 	for (const edge of view.edges) drawEdge(svg, edge, layout, nodes);
 	for (const node of view.nodes) drawNode(svg, node, layout.positions.get(node.id));
 	scroll.append(svg);
-	wrap.append(graphLegend(), scroll);
+	if (options.legend !== false) wrap.append(graphLegend());
+	wrap.append(scroll);
 	return wrap;
 }
 

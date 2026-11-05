@@ -1,3 +1,4 @@
+import { securityFixture } from './security-fixture.js';
 import { sqlFixture } from './sql-fixture.js';
 import { alertResult, alertRow, incidentRow } from './alertlog-fixture.js';
 import { insightFakes } from './insight-fixture.js';
@@ -16,6 +17,7 @@ export async function startFakeServer() {
 	let now = 0;
 	const stats = { aborted: 0, prompts: 0, lastQuestion: '' };
 	const web = createWebServer({ ...insightFakes, port: 0,
+		readSecurityPosture: async (_session, options) => ({ ...securityFixture, ...(options.whoCan ? {} : { whoCan: undefined }) }),
 		readSqlInsight: async (_session, options) => ({ ...sqlFixture, sqlId: options.sqlId }),
 		findSqlCandidates: async () => ({ columns: ['SQL_ID', 'SQL_TEXT'], rows: [['0123456789abc', 'SELECT one'], ['123456789abcd', 'SELECT two']], truncated: false, elapsedMs: 0 }),
 		readAlertLog: async (_ctx, target) => { await new Promise(resolve => setTimeout(resolve, 100)); return alertResult(target, [alertRow]); },
