@@ -175,3 +175,9 @@ it.each(["reports", "audit.jsonl", "alerts.log"].flatMap(name => ["missing", "sy
 		error.mockRestore(); rmSync(home, { recursive: true, force: true });
 	}
 });
+
+it.each(['/home/user/.nvm/versions/node/v24/bin/node', '/home/user/.volta/bin/node', '/tmp/bundle/node', '/opt/custom/bin/node'])('warns about potentially unstable Node path %s', node => {
+	const schedule = generateSchedule({ ...base, node }, targets);
+	expect(renderSchedule(schedule)).toContain('# WARNING: Node executable may move or disappear');
+	expect(schedule.service).toContain(node);
+});
