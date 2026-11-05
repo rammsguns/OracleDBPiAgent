@@ -113,7 +113,7 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 				agent.unverified = check.unsupported;
 				if (check.unsupportedNumbers.length && !correctionScheduled) {
 					correctionScheduled = true;
-					const text = `These numbers do not appear in this conversation's tool results: ${check.unsupportedNumbers.join(", ")}. Keep the rest of your answer, including any refusal, and only fix or remove the listed numbers; use tools only if needed.`;
+					const text = `These numbers do not appear in this conversation's tool results: ${check.unsupportedNumbers.join(", ")}. Return the complete revised answer, which will replace your previous answer. Keep the rest of your answer, including any refusal, and only fix or remove the listed numbers; use tools only if needed.`;
 					correctionMessages.add(text);
 					agent.followUp({ role: "user", content: text, timestamp: Date.now() });
 					return { action: "continue" };

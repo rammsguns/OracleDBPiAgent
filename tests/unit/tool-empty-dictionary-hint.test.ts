@@ -95,3 +95,40 @@ it('accepts leading comments without rewriting them', async () => {
 	expect(query.mock.calls[1]?.[0]).toBe(statement.replace('FROM all_arguments', 'FROM DBA_arguments'));
 	expect(result.details.sourceNote).toContain('Re-run with DBA_ARGUMENTS.');
 });
+
+for (const statement of [
+	'SELECT o.object_name FROM all_objects o, all_tables t WHERE o.object_name=t.table_name',
+	'SELECT o.object_name FROM sys.all_objects o, SYS.ALL_TABLES t WHERE o.object_name=t.table_name',
+	'SELECT * FROM all_objects o, all_tables t JOIN all_tab_columns c ON c.table_name=t.table_name',
+	'SELECT * FROM all_objects o JOIN all_tables t ON o.object_name=t.table_name, all_tab_columns c',
+	'SELECT * FROM (SELECT * FROM all_objects o, sys.all_tables t) v, all_source s',
+	'SELECT * FROM all_objects o, (SELECT * FROM all_tables t, all_tab_columns c) v, all_source s',
+	'SELECT object_name, owner, substr(object_name, 1, 2) FROM all_objects o, all_tables t',
+	'SELECT * FROM all_objects o WHERE EXISTS (SELECT 1 FROM all_tables t, all_tab_columns c)',
+]) it(`probes dictionary views in FROM lists: ${statement}`, async () => {
+	const { tools, query } = setup();
+	query.mockResolvedValueOnce(empty).mockResolvedValueOnce({ ...empty, rows: [[1]] });
+	const result = await tools.find(t => t.name === 'run_query')!.execute('1', { sql: statement });
+	expect(query.mock.calls[1]?.[0]).toBe(statement.replace(/all_/gi, 'DBA_'));
+	expect(result.details.sourceNote).toContain('Re-run with DBA_');
+});
+
+for (const statement of [
+	'SELECT owner, all_tables FROM all_objects',
+	'SELECT * FROM all_objects o, other.all_tables t',
+	'SELECT * FROM all_objects o, all_custom t',
+	'SELECT * FROM all_objects o, "ALL_TABLES" t',
+	"SELECT q'[comma, all_tables]' FROM all_objects o, all_tables t",
+	'WITH x AS (SELECT * FROM all_objects o, all_tables t) SELECT * FROM x',
+	'SELECT * FROM all_objects o JOIN dual d ON coalesce(1, all_tables)=1',
+	'SELECT * FROM all_objects o, (SELECT 1, all_tables FROM dual) t',
+	'SELECT * FROM (SELECT * FROM all_objects o), all_tables WHERE all_source=1',
+	'SELECT * FROM (SELECT * FROM all_objects o) v ORDER BY owner, all_tables',
+	'SELECT (SELECT object_name FROM all_objects), all_tables FROM dual',
+	...['WHERE', 'GROUP BY', 'ORDER BY', 'CONNECT BY', 'START WITH', 'HAVING', 'UNION SELECT', 'MINUS SELECT', 'INTERSECT SELECT', 'FETCH FIRST'].map(clause =>
+		`SELECT * FROM all_objects o ${clause} owner, all_tables`),
+]) it(`does not treat unrelated commas as view positions: ${statement}`, async () => {
+	const { tools, query } = setup();
+	await tools.find(t => t.name === 'run_query')!.execute('1', { sql: statement });
+	expect(query).toHaveBeenCalledOnce();
+});
