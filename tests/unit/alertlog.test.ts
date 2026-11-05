@@ -14,16 +14,16 @@ it('binds filters, window and caps; audits hashes without values; closes session
 	const f = fixture(); f.ctx.config.limits.maxRows = 10;
 	const r = await readAlertLog(f.ctx, 'd1-19c-lab', { since: '7d', codes: ['ora-00600', 'TNS-12514'], text: "x%' OR 1=1", limit: 90 });
 	expect(r.limit).toBe(10); expect(r.sql).toContain('FETCH FIRST :fetchLimit ROWS ONLY'); expect(r.sql).toContain('ORIGINATING_TIMESTAMP <');
-	expect(r.sql).not.toContain("x%'"); expect(r.binds).toMatchObject({ code0: '(^|[^A-Z0-9_])ORA-0*600([^0-9]|$)', code1: '(^|[^A-Z0-9_])TNS-0*12514([^0-9]|$)', text: "x%' OR 1=1", maxLevel: 16, fetchLimit: 10 });
+	expect(r.sql).not.toContain("x%'"); expect(r.binds).toMatchObject({ code0: '(^|[^A-Z0-9_])ORA-0*600([^0-9]|$)', code1: '(^|[^A-Z0-9_])TNS-0*12514([^0-9]|$)', text: "x%' OR 1=1", maxLevel: 8, fetchLimit: 10 });
 	expect(f.query.mock.calls[0]?.[2]).toEqual({ maxRows: 10, timeoutSeconds: f.ctx.config.limits.statementTimeoutSeconds });
 	expect(f.close).toHaveBeenCalledOnce();
 	for (const [event] of vi.mocked(f.ctx.audit.record).mock.calls) { expect(event.sqlSha256).toMatch(/^[a-f0-9]{64}$/); expect(event).not.toHaveProperty('binds'); expect(JSON.stringify(event)).not.toContain('1=1'); }
 });
-it('parses metadata before byte capping, redacts credentials, folds only consecutive full identical messages', async () => {
+it('parses metadata before byte capping, redacts credentials, folds matching complete messages across the result', async () => {
 	const text = 'ORA-00600 TNS-12514 incident=123 /diag/trace/test.trc password=hidden ' + '😀'.repeat(700);
 	const f = fixture([row(text, '2026-11-04T12:02:00Z'), row(text), row(text + 'different'), row('other'), row(text)]);
 	const r = await readAlertLog(f.ctx, 'd1-19c-lab');
-	expect(r.rows).toHaveLength(4); expect(r.rows[0]).toMatchObject({ count: 2, firstTime: '2026-11-04T12:00:00Z', lastTime: '2026-11-04T12:02:00Z', codes: ['ORA-00600', 'TNS-12514'], incidentId: '123', traceFile: '/diag/trace/test.trc', textTruncated: true });
+	expect(r.rows).toHaveLength(3); expect(r.rows[0]).toMatchObject({ count: 3, firstTime: '2026-11-04T12:00:00Z', lastTime: '2026-11-04T12:02:00Z', codes: ['ORA-00600', 'TNS-12514'], incidentId: '123', traceFile: '/diag/trace/test.trc', textTruncated: true });
 	expect(Buffer.byteLength(r.rows[0]!.messageText)).toBeLessThanOrEqual(2048);
 	expect(JSON.stringify(r)).not.toContain('hidden'); expect(JSON.stringify(r)).not.toContain('_identity');
 });
@@ -62,4 +62,32 @@ it('normalizes abbreviated alert-log codes and matches full code boundaries', as
 	const r = await readAlertLog(f.ctx, 'd1-19c-lab', { codes: ['ORA-00609'] });
 	expect(r.rows[0]?.codes).toEqual(['ORA-00609', 'TNS-12514', 'ORA-00600']);
 	const pattern = new RegExp(String(r.binds.code0)); expect(pattern.test('ORA-609')).toBe(true); expect(pattern.test('ORA-00609')).toBe(true); expect(pattern.test('ORA-006090')).toBe(false);
+});
+
+it('binds every default diagnostic marker and removes them for level all', async () => {
+	const f = fixture(); const r = await readAlertLog(f.ctx, 'd1-19c-lab');
+	expect(r.binds).toMatchObject({ maxLevel: 8, marker0: 'ORA-', marker1: 'TNS-', marker2: 'ERRORS IN FILE', marker3: 'INCIDENT=', marker4: 'DEADLOCK' });
+	for (let i = 0; i < 5; i++) expect(r.sql).toContain(`INSTR(UPPER(MESSAGE_TEXT), :marker${i}) > 0`);
+	const all = await readAlertLog(f.ctx, 'd1-19c-lab', { level: 'all' }); expect(all.sql).not.toContain('MESSAGE_LEVEL <='); expect(all.sql).not.toContain('INSTR');
+});
+it('folds twenty digit-varying resize messages across interleaved rows and keeps an example', async () => {
+	const rows = Array.from({ length: 20 }, (_, i) => row(`Resize operation completed for file# ${201 + i}, old size ${i}K, new size ${i + 1}K\r\n`, `2026-11-04T12:${String(59 - i).padStart(2, '0')}:00Z`));
+	rows.splice(4, 0, row('unrelated message'));
+	const result = await readAlertLog(fixture(rows).ctx, 'd1-19c-lab', { level: 'all' });
+	expect(result.rows).toHaveLength(2); expect(result.rows[0]).toMatchObject({ count: 20, firstTime: '2026-11-04T12:40:00Z', lastTime: '2026-11-04T12:59:00Z', messageText: 'Resize operation completed for file# 201, old size 0K, new size 1K' });
+	expect(renderAlertLogMarkdown(result)).not.toContain('<br>');
+});
+it('masks hex IDs, unions metadata with a cap, and preserves newest singular fields', async () => {
+	const rows = Array.from({ length: 25 }, (_, i) => row(`ORA-${String(i).padStart(5, '0')} incident=${100 + i} /trace/t${i}.trc address=0x${(100 + i).toString(16)} id=${(0xdeadbeef + i).toString(16)}`));
+	const result = await readAlertLog(fixture(rows).ctx, 'd1-19c-lab'); const group = result.rows[0]!;
+	expect(result.rows).toHaveLength(1); expect(group.count).toBe(25);
+	for (const field of ['codes', 'incidentIds', 'traceFiles'] as const) expect(group[field]).toHaveLength(20);
+	expect(group).toMatchObject({ incidentId: '100', traceFile: '/trace/t0.trc', metadataTruncated: true });
+	expect(renderAlertLogMarkdown(result)).toContain('100, 101');
+});
+it('renders single occurrences with one timestamp and titles incidents correctly', async () => {
+	const result = await readAlertLog(fixture([row('ORA-00600\nline two\r\n')]).ctx, 'd1-19c-lab');
+	expect(result.rows[0]?.messageText).toBe('ORA-00600\nline two');
+	const markdown = renderAlertLogMarkdown(result); expect(markdown).toContain('ORA-00600<br>line two |'); expect(markdown).not.toContain('2026-11-04T12:00:00Z /');
+	const incidents = await readIncidents(fixture().ctx, 'd1-19c-lab'); expect(renderAlertLogMarkdown(incidents)).toMatch(/^# ADR incidents: d1-19c-lab/);
 });

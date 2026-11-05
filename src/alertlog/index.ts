@@ -7,13 +7,15 @@ export interface WindowOptions { since?: string; from?: string | Date; to?: stri
 export interface AlertLogOptions extends WindowOptions {
 	codes?: string[];
 	text?: string;
-	/** Default includes MESSAGE_LEVEL <= 16 and all ORA- lines. A number selects a maximum level. */
+	/** Default includes MESSAGE_LEVEL <= 8 and diagnostic text markers. A number selects a maximum level. */
 	level?: 'default' | 'all' | number;
 }
 export interface AlertRow {
 	timestamp: string; firstTime: string; lastTime: string; count: number;
 	level: number | null; codes: string[]; problemKey: string; incidentId: string | null;
 	traceFile: string | null; messageText: string; textTruncated: boolean;
+	/** Bounded unions across the group; singular fields retain the newest example. */
+	incidentIds: string[]; traceFiles: string[]; problemKeys: string[]; metadataTruncated: boolean;
 }
 export interface IncidentRow { incidentId: string; problemKey: string; createTime: string; status: number | null }
 export interface AlertResult<T> {
@@ -74,27 +76,45 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 	if (level !== 'default' && level !== 'all' && (!Number.isInteger(level) || level < 1 || level > 32)) throw new Error('level must be default, all, or an integer from 1 to 32');
 	const result = await read(ctx, target, options, 'V$DIAG_ALERT_EXT', ['V$DIAG_ALERT_EXT'], time => {
 		const binds: Record<string, unknown> = {}, clauses = [`ORIGINATING_TIMESTAMP >= ${time}`, `ORIGINATING_TIMESTAMP < ${time.replace(':fromTime', ':toTime')}`];
-		if (level === 'default') { clauses.push('(MESSAGE_LEVEL <= :maxLevel OR INSTR(UPPER(MESSAGE_TEXT), :oraPrefix) > 0)'); binds.maxLevel = 16; binds.oraPrefix = 'ORA-'; }
+		if (level === 'default') {
+			binds.maxLevel = 8;
+			const markers = ['ORA-', 'TNS-', 'ERRORS IN FILE', 'INCIDENT=', 'DEADLOCK'];
+			clauses.push('(MESSAGE_LEVEL <= :maxLevel OR ' + markers.map((marker, i) => {
+				binds[`marker${i}`] = marker; return `INSTR(UPPER(MESSAGE_TEXT), :marker${i}) > 0`;
+			}).join(' OR ') + ')');
+		}
 		else if (level !== 'all') { clauses.push('MESSAGE_LEVEL <= :maxLevel'); binds.maxLevel = level; }
 		if (codes.length) clauses.push('(' + codes.map((code, i) => { const [prefix, digits] = code.split('-'); binds[`code${i}`] = `(^|[^A-Z0-9_])${prefix}-0*${Number(digits)}([^0-9]|$)`; return `REGEXP_LIKE(UPPER(MESSAGE_TEXT), :code${i})`; }).join(' OR ') + ')');
 		if (options.text) { clauses.push('INSTR(UPPER(MESSAGE_TEXT), UPPER(:text)) > 0'); binds.text = options.text; }
 		return { select: 'SELECT ORIGINATING_TIMESTAMP, MESSAGE_LEVEL, PROBLEM_KEY, MESSAGE_TEXT FROM V$DIAG_ALERT_EXT', where: clauses.join(' AND '), order: 'ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC', binds };
 	}, row => {
-		const raw = str(row[3]), redacted = redactCredentials(raw);
+		const raw = str(row[3]), redacted = redactCredentials(raw).replace(/[\r\n]+$/, '');
 		let messageText = '', bytes = 0;
 		for (const char of redacted) { const n = Buffer.byteLength(char); if (bytes + n > 2048) break; messageText += char; bytes += n; }
 		const timestamp = str(row[0]);
-		return { timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codesIn(raw), problemKey: safe(row[2]), incidentId: /\bincident\s*=\s*(\d+)/i.exec(raw)?.[1] ?? null, traceFile: safe(/[^\s'"<>]*\.trc\b/i.exec(redacted)?.[0]) || null, messageText, textTruncated: Buffer.byteLength(redacted) > 2048, _identity: raw };
+		const incidentIds = [...new Set([...raw.matchAll(/\bincident\s*=\s*(\d+)/gi)].map(m => m[1]!))];
+		const traceFiles = [...new Set([...redacted.matchAll(/[^\s'"<>]*\.trc\b/gi)].map(m => m[0]))];
+		const codes = codesIn(raw), problemKey = safe(row[2]);
+		const normalized = raw.replace(/[\r\n]+$/, '').replace(/\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{8,}\b/gi, '<hex>').replace(/\d+/g, '<n>');
+		return { timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codes.slice(0, 20), problemKey, incidentId: incidentIds[0] ?? null, traceFile: traceFiles[0] ?? null, incidentIds: incidentIds.slice(0, 20), traceFiles: traceFiles.slice(0, 20), problemKeys: problemKey ? [problemKey] : [], metadataTruncated: codes.length > 20 || incidentIds.length > 20 || traceFiles.length > 20, messageText: messageText.replace(/[\r\n]+$/, ''), textTruncated: Buffer.byteLength(redacted) > 2048, _identity: createHash('sha256').update(normalized).digest('hex') };
 	});
-	// Compare full original messages, not redacted/capped previews that may hide differences.
-	const folded: AlertRow[] = [];
-	let identity: string | undefined;
+	// Group throughout the bounded result, using complete text before preview clipping.
+	const folded: AlertRow[] = [], groups = new Map<string, AlertRow>();
 	for (const row of result.rows) {
 		const { _identity, ...clean } = row;
-		const previous = folded.at(-1);
-		const key = JSON.stringify([_identity, row.level, row.problemKey]);
-		if (previous && key === identity) { previous.count++; previous.firstTime = row.timestamp; }
-		else { folded.push(clean); identity = key; }
+		const previous = groups.get(_identity);
+		if (!previous) { folded.push(clean); groups.set(_identity, clean); continue; }
+		previous.count++;
+		if (row.timestamp < previous.firstTime) previous.firstTime = row.timestamp;
+		if (row.timestamp > previous.lastTime) previous.lastTime = row.timestamp;
+		if (row.level !== null) previous.level = previous.level === null ? row.level : Math.min(previous.level, row.level);
+		previous.textTruncated ||= row.textTruncated;
+		previous.metadataTruncated ||= row.metadataTruncated;
+		for (const field of ['codes', 'incidentIds', 'traceFiles', 'problemKeys'] as const) {
+			const union = [...new Set([...previous[field], ...row[field]])];
+			previous.metadataTruncated ||= union.length > 20;
+			previous[field] = union.slice(0, 20);
+		}
 	}
 	return { ...result, rows: folded };
 }
@@ -107,10 +127,10 @@ export function readIncidents(ctx: ToolContext, target: string, options: WindowO
 }
 const escape = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResult<IncidentRow>): string {
-	const lines = [`# Alert log: ${escape(result.target)}`, '', `${result.status}; ${escape(result.view)}; ${result.window.from} to ${result.window.to} (exclusive)`, '', ...result.grants.map(g => '`' + g + '`')];
+	const lines = [`# ${result.view === 'V$DIAG_ALERT_EXT' ? 'Alert log' : 'ADR incidents'}: ${escape(result.target)}`, '', `${result.status}; ${escape(result.view)}; ${result.window.from} to ${result.window.to} (exclusive)`, '', ...result.grants.map(g => '`' + g + '`')];
 	if (result.view === 'V$DIAG_ALERT_EXT') {
 		lines.push('| First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |', '|---|---|---|---|---|---|---|---|');
-		for (const r of result.rows as AlertRow[]) lines.push(`| ${escape(r.firstTime)} / ${escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${escape(r.problemKey)} | ${escape(r.incidentId)} | ${escape(r.traceFile)} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''} |`);
+		for (const r of result.rows as AlertRow[]) lines.push(`| ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
 	} else {
 		lines.push('| Created | Incident | Problem | Status |', '|---|---|---|---|');
 		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${r.status} |`);
