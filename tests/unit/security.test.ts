@@ -12,7 +12,7 @@ function fixture(data: Partial<Record<keyof typeof SQL, unknown[][]>> = {}, unav
 	} } as unknown as OracleSession;
 }
 it('scans every security SQL string and source for forbidden credential columns and objects', () => {
-	const forbidden = /\b(?:PASSWORD|SPARE4|AUTHENTICATION_TYPE|PASSWORD_HASH|PASSWORD_VERSIONS)\b|\b(?:SYS\s*\.\s*)?USER\$/i;
+	const forbidden = /\b(?:PASSWORD|SPARE4|AUTHENTICATION_TYPE|PASSWORD_VERSIONS|[A-Z0-9_]*HASH[A-Z0-9_]*)\b|\b(?:SYS\s*\.\s*)?USER\$/i;
 	const strings: string[] = [...Object.values(SQL)];
 	for (const file of readdirSync('src/security').filter(f => f.endsWith('.ts'))) {
 		const source = readFileSync('src/security/' + file, 'utf8');
