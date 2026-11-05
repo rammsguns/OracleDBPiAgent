@@ -23,7 +23,7 @@ it('collects exact evidence and bounds failed-run windows independently of the i
 	expect(JSON.stringify(alert)).not.toContain('hidden');
 	expect(alertHypotheses(alert)[0]?.evidence.join(' ')).toContain('Incident 12; problem key test problem');
 	const merged = mergeAlerts([alert, alert])!;
-	expect(merged.correlations[2]?.entryIndexes).toEqual([1]);
+	expect(merged.correlations[2]?.entryIndexes).toEqual([0]);
 	expect(merged.incidents).toHaveLength(1);
 });
 it('returns the shared top-level shape, Markdown evidence, checklist and stubbed summary grounding', async () => {
@@ -55,4 +55,51 @@ it('requires incident evidence for internal-error SR hypotheses', async () => {
 	const alert = await collectAlerts(context(), 'd1-19c-lab', 24, ['ORA-00600'], []);
 	alert.incidents = []; alert.entries[0]!.incidentIds = []; alert.entries[0]!.incidentId = null;
 	expect(alertHypotheses(alert)).toEqual([]);
+});
+
+it('rejects prose after job and common words as missing identifiers', async () => {
+	const { parseIssue } = await import('../../src/triage/parse.js');
+	const { nameCandidates } = await import('../../src/triage/names.js');
+	for (const word of ['FAILED', 'FAILING', 'ERROR', 'ERRORS', 'LAST', 'NIGHT', 'YESTERDAY', 'TODAY', 'RUN', 'RUNNING']) {
+		expect(parseIssue(`job ${word}`).jobs).toEqual([]);
+		expect(nameCandidates(word)).toEqual([]);
+	}
+	expect(parseIssue('nightly purge job failed last night').jobs).toEqual([]);
+});
+it('discovers job names and frames from alert text before reading history, even without retained runs', async () => {
+	const ctx = context();
+	const get = ctx.sessions.get.bind(ctx.sessions);
+	ctx.sessions.get = async target => {
+		const session = await get(target), original = session.query.bind(session);
+		session.query = async (sql, binds, options) => {
+			if (sql.includes('FROM V$DIAG_ALERT_EXT')) return { columns: [], elapsedMs: 0, truncated: false, rows: [['2026-11-04T04:30:56Z', 16, '', 'ORA-12012: error on auto execute of job "SHOPAPP"."NIGHTLY_PURGE_JOB"\nORA-02292: integrity constraint (SHOPAPP.FK_TEST) violated - child record found\nORA-06512: at "SHOPAPP.WORKLOAD", line 27']] };
+			if (sql.includes('_SOURCE')) return { columns: [], elapsedMs: 0, truncated: false, rows: [['PACKAGE BODY', 25, 'PROCEDURE nightly_purge IS'], ['PACKAGE BODY', 26, 'BEGIN'], ['PACKAGE BODY', 27, 'DELETE FROM orders;'], ['PACKAGE BODY', 28, 'END;']] };
+			if (sql.includes('_CONSTRAINTS') && binds?.name === 'FK_TEST') return { columns: [], elapsedMs: 0, truncated: false, rows: [['SHOPAPP', 'FK_TEST', 'R', 'ORDER_LINES', 'SHOPAPP', 'PK_ORDERS', 'NO ACTION', 'ENABLED']] };
+			return original(sql, binds, options);
+		};
+		return session;
+	};
+	const result = await triage(ctx, { target: 'p1-19c-prod', issue: 'nightly purge job failed last night', since: '2d' });
+	const issue = result.issues[0]!;
+	expect(issue.issue.jobs).toContain('NIGHTLY_PURGE_JOB');
+	expect(issue.codes).toContain('ORA-02292');
+	expect(issue.excerpts.find(e => e.object === 'SHOPAPP.WORKLOAD')?.line).toBe(27);
+	expect(issue.hypotheses[0]?.title).toContain('child foreign key');
+	expect(issue.checks.some(c => c.label === 'Constraint SHOPAPP.FK_TEST')).toBe(true);
+	expect(issue.limitations.join(' ')).toContain('discovered from alert log');
+	expect(result.alertLog?.correlations.some(c => c.label.includes('from alert log'))).toBe(true);
+	const markdown = renderTriageMarkdown(result);
+	expect(markdown).toMatch(/\| Index[^\n]*\n\|---[^\n]*\n\| 0/);
+	expect(markdown).not.toContain('found for FAILED');
+	const { discoverAlertJobs } = await import('../../src/triage/alerts.js');
+	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'purge failed', false)).jobs).toHaveLength(1);
+	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'unrelated outage', false)).jobs).toHaveLength(0);
+});
+it('labels capped unmatched recent evidence and omits an empty trace diagram', async () => {
+	const result = await triage(context(), { target: 'd1-19c-lab', issue: 'something went wrong' });
+	const recent = result.alertLog?.checks.find(c => c.label.startsWith('Recent errors'));
+	expect(recent?.binds.fetchLimit).toBe(11);
+	expect(result.alertLog?.correlations).toEqual([]);
+	expect(renderTriageMarkdown(result)).toContain('Recent errors in the window, not matched to the issue');
+	expect(renderTriageMarkdown(result)).not.toContain('### Trace diagram');
 });

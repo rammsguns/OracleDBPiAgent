@@ -21,8 +21,8 @@ it('triages live NIGHTLY_PURGE_JOB with read-only source and constraint evidence
 	expect(constraint?.rows[0]?.slice(0, 3)).toEqual(['SHOPAPP', 'SYS_C007669', 'R']);
 	expect(issue.checks.find(c => c.label === 'Columns for SHOPAPP.SYS_C007669')?.rows[0]?.[3]).toBe('ORDER_ID');
 	expect(issue.checks.some(c => c.label.startsWith('All visible child foreign keys') && c.rows.length)).toBe(true);
-	expect(issue.hypotheses[0]?.title).toMatch(/Cutoff evaluated twice/);
-	expect(issue.hypotheses[0]?.evidence.join(' ')).toMatch(/line 26[\s\S]*line 27/);
+	expect(issue.hypotheses[0]?.title).toMatch(/child foreign key/);
+	expect(issue.hypotheses.find(h => h.title.includes('Cutoff evaluated twice'))?.evidence.join(' ')).toMatch(/line 26[\s\S]*line 27/);
 	expect(issue.excerpts[0]?.statement).toContain("INTERVAL '7' DAY");
 	const count = issue.checks.find(c => c.label.startsWith('Current child references'));
 	expect(count).toBeDefined();
@@ -92,4 +92,18 @@ it('correlates p1 purge alert evidence and d1 ORA-00800 without an LLM', async c
 	expect(d1.alertLog?.entries.some(e => e.codes.includes('ORA-00800'))).toBe(true);
 	expect(d1.alertLog?.incidents.some(i => i.problemKey === 'ORA 800')).toBe(true);
 	expect(renderTriageMarkdown(d1)).toContain('Set Priority Failed');
+}, 120000);
+
+it('discovers the live purge failure from natural language via the alert log', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
+	let result;
+	try { result = await live('p1-19c-prod', 'nightly purge job failed last night', '2d'); }
+	catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved p1 listener unavailable'); return; } throw error; }
+	const issue = result.issues[0]!;
+	expect(issue.issue.jobs).toContain('NIGHTLY_PURGE_JOB');
+	expect(issue.codes).toEqual(expect.arrayContaining(['ORA-12012', 'ORA-02292']));
+	expect(issue.excerpts.find(e => e.object === 'SHOPAPP.WORKLOAD')?.line).toBe(27);
+	expect(issue.hypotheses[0]?.title).toContain('child foreign key');
+	expect(issue.limitations.join(' ')).toContain('SHOPAPP.NIGHTLY_PURGE_JOB: discovered from alert log');
+	expect(renderTriageMarkdown(result)).not.toContain('found for FAILED');
 }, 120000);

@@ -64,12 +64,48 @@ export function mergeAlerts(alerts: TriageAlertLog[]): TriageAlertLog | undefine
 	if (!alerts.length) return undefined;
 	const merged: TriageAlertLog = { status: alerts.some(a => a.status === 'unavailable') ? 'unavailable' : 'ok', window: alerts[0]!.window, entries: [], incidents: [], correlations: [], checks: [] };
 	for (const alert of alerts) {
-		const offset = merged.entries.length;
-		merged.entries.push(...alert.entries); merged.incidents.push(...alert.incidents); merged.checks.push(...alert.checks);
-		merged.correlations.push(...alert.correlations.map(c => ({ ...c, entryIndexes: c.entryIndexes.map(i => i + offset) })));
+		const indexes = alert.entries.map(row => {
+			let index = merged.entries.findIndex(e => JSON.stringify(e) === JSON.stringify(row));
+			if (index < 0) { index = merged.entries.length; merged.entries.push(row); }
+			return index;
+		});
+		merged.incidents.push(...alert.incidents); merged.checks.push(...alert.checks);
+		merged.correlations.push(...alert.correlations.map(c => ({ ...c, entryIndexes: c.entryIndexes.map(i => indexes[i]!) })));
 	}
 	const grants = [...new Set(alerts.flatMap(a => a.grant ? a.grant.split('\n') : []))];
 	if (grants.length) merged.grant = grants.join('\n');
 	merged.incidents = [...new Map(merged.incidents.map(i => [i.incidentId, i])).values()];
 	return merged;
+}
+
+/** Discover scheduler names from bounded SQL alert evidence before reading history. */
+export async function discoverAlertJobs(ctx: ToolContext, target: string, hours: number, issue: string, fallback: boolean) {
+	const to = new Date(), window = { from: new Date(to.getTime() - hours * 3600000).toISOString(), to: to.toISOString() };
+	const read = await readAlertLog(ctx, target, { ...window, codes: ['ORA-12012'] });
+	const words = new Set(issue.toUpperCase().match(/[A-Z]{4,}/g) ?? []);
+	const mentionsJob = /\bjobs?\b/i.test(issue);
+	const jobs: { owner: string; name: string }[] = [], entries: AlertRow[] = [];
+	for (const row of read.rows) {
+		const matches = [...row.messageText.matchAll(/ORA-12012:[\s\S]*?auto execute of job\s+"([A-Z][\w$#]{0,127})"\s*\.\s*"([A-Z][\w$#]{0,127})"/gi)];
+		let matched = false;
+		for (const m of matches) {
+			const owner = m[1]!.toUpperCase(), name = m[2]!.toUpperCase();
+			if (!mentionsJob && !name.split(/[_$#0-9]+/).some(w => w.length >= 4 && words.has(w))) continue;
+			if (!jobs.some(j => j.owner === owner && j.name === name)) jobs.push({ owner, name });
+			matched = true;
+		}
+		if (matched) entries.push(row);
+	}
+	const alert: TriageAlertLog = { status: read.status, window, entries, incidents: [], correlations: [], checks: [check('Alert log ORA-12012 job discovery in window', read)] };
+	if (entries.length) alert.correlations.push({ kind: 'code', label: `ORA-12012 jobs discovered from alert log: ${jobs.map(j => `${j.owner}.${j.name}`).join(', ')}`, entryIndexes: entries.map((_, i) => i) });
+	const grants = new Set(read.grants);
+	if (!jobs.length && fallback) {
+		const recent = await readAlertLog(ctx, target, { ...window, limit: 10 });
+		alert.entries = recent.rows;
+		alert.checks.push(check('Recent errors in the window, not matched to the issue', recent));
+		recent.grants.forEach(g => grants.add(g));
+		if (recent.status === 'unavailable') alert.status = 'unavailable';
+	}
+	if (grants.size) alert.grant = [...grants].join('\n');
+	return { jobs, alert, matchedText: entries.map(e => e.messageText).join('\n') };
 }

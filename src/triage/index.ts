@@ -1,4 +1,4 @@
-import { collectAlerts, alertHypotheses, mergeAlerts } from './alerts.js';
+import { collectAlerts, alertHypotheses, mergeAlerts, discoverAlertJobs } from './alerts.js';
 export type { TriageAlertLog } from './alerts.js';
 import { nameCandidates, lookupNames } from './names.js';
 import { collectRunHistory, scopeName, type RunScope } from './history.js';
@@ -34,6 +34,11 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 			parsed.objects.push(qualified);
 		}
 	}
+	const discovery = await discoverAlertJobs(ctx, target.name, hours, options.issue ?? '', !parsed.codes.length && !parsed.jobs.length && !parsed.objects.length && !matches?.rows.length);
+	for (const job of discovery.jobs) {
+		parsed.jobs.push(job.name);
+		discoveredObjects.push(`${job.owner}.${job.name}`);
+	}
 	const missingNames = candidates.filter((candidate, i) => candidate.reportMissing &&
 		!matches?.rows.some(row => Number(row[0]) === i));
 	parsed.jobs = unique(parsed.jobs);
@@ -62,11 +67,11 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	}
 	const scopes: RunScope[] = jobs.rows.map(r => ({ owner: asText(r[0]), name: asText(r[1]) }));
 	for (const name of jobNames.filter(name => !jobs.rows.some(r => r[1] === name) && !implicatedObjects.has(name))) {
-		const qualified = parsed.objects.map(objectName).find(o => o.name === name);
+		const qualified = [...parsed.objects, ...discoveredObjects].map(objectName).find(o => o.name === name);
 		scopes.push({ name, ...(qualified ? { owner: qualified.owner } : {}) });
 	}
 	const runs = await collectRunHistory(reader, scopes, hours, options.since ?? '24h');
-	const combined = parseIssue([options.issue ?? '', ...runs.rows.map(r => `${Number(r[3]) ? `ORA-${String(r[3]).padStart(5, '0')}` : ''} ${asText(r[5])}`)].join('\n'));
+	const combined = parseIssue([options.issue ?? '', discovery.matchedText, ...runs.rows.map(r => `${Number(r[3]) ? `ORA-${String(r[3]).padStart(5, '0')}` : ''} ${asText(r[5])}`)].join('\n'));
 	const owners = unique([...[...explicitObjects, ...discoveredObjects].map(o => objectName(o).owner), ...combined.frames.flatMap(f => f.owner ? [f.owner] : []), ...jobs.rows.map(r => asText(r[0])), ...runs.rows.map(r => asText(r[0]))]);
 	if (!owners.length) owners.push(target.defaultSchema);
 	const excerpts: Excerpt[] = [];
@@ -102,7 +107,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	}
 	const constraints: Check[] = [];
 	if (combined.codes.some(c => ['ORA-00001', 'ORA-02291', 'ORA-02292'].includes(c))) {
-		for (const match of [options.issue ?? '', ...runs.rows.map(r => asText(r[5]))].join('\n').toUpperCase().matchAll(/\(([A-Z][A-Z0-9_$#]*)\.([A-Z][A-Z0-9_$#]*)\)/g)) {
+		for (const match of [options.issue ?? '', discovery.matchedText, ...runs.rows.map(r => asText(r[5]))].join('\n').toUpperCase().matchAll(/\(([A-Z][A-Z0-9_$#]*)\.([A-Z][A-Z0-9_$#]*)\)/g)) {
 			const owner = identifier(match[1]!), name = identifier(match[2]!);
 			if (constraints.some(c => c.binds.owner === owner && c.binds.name === name)) continue;
 			const constraint = await reader.read(`Constraint ${owner}.${name}`, 'CONSTRAINTS', 'OWNER, CONSTRAINT_NAME, CONSTRAINT_TYPE, TABLE_NAME, R_OWNER, R_CONSTRAINT_NAME, DELETE_RULE, STATUS', 'WHERE OWNER = :owner AND CONSTRAINT_NAME = :name', { owner, name });
@@ -129,15 +134,15 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		validateLogTables([log]);
 		await reader.query(`Configured log ${log.table}`, [{ view: log.table, sql: `SELECT ${unique([log.timestampColumn, ...log.columns]).join(', ')} FROM ${log.table} WHERE ${log.timestampColumn} >= SYSTIMESTAMP - NUMTODSINTERVAL(:hours, 'HOUR') ORDER BY ${log.timestampColumn} DESC` }], { hours }, 50);
 	}
-	const alertLog = await collectAlerts(ctx, target.name, hours, combined.codes, runs.rows);
+	const alertLog = mergeAlerts([discovery.alert, await collectAlerts(ctx, target.name, hours, combined.codes, runs.rows)])!;
 	reader.checks.push(...alertLog.checks);
 	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
 	const hypotheses: Hypothesis[] = [...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
 	for (const constraint of constraints.filter(c => c.rows.length)) {
 		const row = constraint.rows[0]!;
-		hypotheses.push({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
+		hypotheses.unshift({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
 	}
-	const limitations: string[] = [...runs.notes];
+	const limitations: string[] = [...runs.notes, ...discovery.jobs.map(j => `${j.owner}.${j.name}: discovered from alert log (ORA-12012).`), ...(discovery.alert.checks.some(c => c.label.startsWith('Recent errors')) ? ['Recent errors in the window, not matched to the issue; no causal association is established.'] : [])];
 	for (const candidate of missingNames) {
 		limitations.push(`not found: ${candidate.name} - check spelling, owner visibility, or whether it was dropped${matches?.status === 'unavailable' || matches?.truncated ? ' (lookup unavailable or partial)' : ''}`);
 	}
@@ -233,7 +238,7 @@ export function renderTriageMarkdown(result: TriageResult): string {
 		'### Evidence', ...issue.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)}${c.truncated ? '; row cap reached (partial)' : ''}${c.attempts.map(a => `; ${a.view} ${a.code}`).join('')}\n\n${c.rows.length ? '| ' + c.columns.map(safe).join(' | ') + ' |\n| ' + c.columns.map(() => '---').join(' | ') + ' |\n' + c.rows.map(r => '| ' + r.map(safe).join(' | ') + ' |').join('\n') : c.label.startsWith('Source around') ? 'See the redacted frame excerpt above; source was collected through the bounded dictionary reader.' : 'No rows returned; absence is limited to visible evidence.'}`),
 		'### Local error guide', ...issue.guide.map(g => `${g.code}: ${g.meaning}. Typical causes: ${g.causes} Read-only checks: ${g.checks}`),
 		'### Numbered debug checklist', ...issue.checks.map((c, n) => `${n + 1}. ${safe(c.label)}. ${lookFor(c)}\n\n${block('sql', displaySql(c))}`),
-		'### Trace diagram', block('mermaid', issue.mermaid),
+		...(issue.graph.nodes.length ? ['### Trace diagram', block('mermaid', issue.mermaid)] : []),
 	].join('\n\n'))].join('\n\n') + '\n';
 }
 function lookFor(check: Check): string {
@@ -258,8 +263,8 @@ function lookFor(check: Check): string {
 
 function renderTriageAlerts(alert: import('./alerts.js').TriageAlertLog): string {
 	return [`${alert.status}; ${alert.window.from} to ${alert.window.to} (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.`, ...(alert.grant ? ['Alert evidence unavailable (possibly partial). Required grants:', block('sql', alert.grant)] : []),
-		'| Index | First / last | Count | Codes | Incident / problem / trace | Message |', '|---|---|---|---|---|---|',
-		...alert.entries.map((r, i) => `| ${i} | ${safe(r.firstTime)} / ${safe(r.lastTime)} | ${r.count} | ${r.codes.join(', ')} | ${safe([...r.incidentIds, ...r.problemKeys, ...r.traceFiles].join('; '))} | ${safe(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`),
+		['| Index | First / last | Count | Codes | Incident / problem / trace | Message |', '|---|---|---|---|---|---|',
+		...alert.entries.map((r, i) => `| ${i} | ${safe(r.firstTime)} / ${safe(r.lastTime)} | ${r.count} | ${r.codes.join(', ')} | ${safe([...r.incidentIds, ...r.problemKeys, ...r.traceFiles].join('; '))} | ${safe(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`)].join('\n'),
 		...(!alert.entries.length ? ['No matching alert entries returned within the bounded queries.'] : []),
 		...alert.correlations.map(c => `Correlation (${c.kind}): ${safe(c.label)}${c.at ? ' at ' + safe(c.at) : ''}; entry indexes ${c.entryIndexes.join(', ')}. Temporal matches are diagnostic leads.`),
 		...alert.incidents.map(i => `Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${i.status}.`),
