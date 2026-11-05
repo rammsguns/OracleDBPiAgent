@@ -2925,6 +2925,24 @@ WP-21B items:
 - Every scorer change ships with an offline replay over `eval-archive` and
   `needlefish/evals/results`, like `docs/wp-20e-replay.ts`, listing every flip.
 
+### WP-21D: CLI messages (branch `wp-21d-cli-messages`, from the WP-21C review)
+Owns:
+- `src/cli/index.ts` (the drift description and the top-level catch);
+- `src/config/environment.ts`;
+- tests;
+- `docs/install.md` and `README.md`, only where they describe these
+  messages.
+
+1. The top-level `main().catch` turns every error into a generic message, so
+   the WP-21A key-file guidance never reaches the user. Add a safe-message
+   error class: config errors whose text is fixed and never contains paths,
+   secrets or values. Print `error.message` for that class only; every other
+   error keeps the generic text. `assertConfiguredLlmKeyFile` throws it. Unit
+   test both paths, and check end to end that `piagent ask` with the init
+   placeholder prints the guidance and exits 1 without contacting Strata.
+2. The `drift` description lists every scope, including `security`.
+3. Remove the install-doc caveat that says the message is masked.
+
 Release gate (single side, as in phase 15):
 - hard dev ×2, challenge ×2, holdout ×3, p16/p18/p19/p20 ×2, regression and
   MVP;
