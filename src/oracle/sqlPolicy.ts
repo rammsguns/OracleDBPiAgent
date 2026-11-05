@@ -87,7 +87,7 @@ function checkFunctionCalls(clean: string): void {
 				if (tokens[j] === ')' && tokens[j + 1]?.toUpperCase() === 'AS' && tokens[j + 2] === '(') continue;
 			}
 		}
-		throw new StatementRejectedError(`Function ${name} is not allowed`);
+		throw new StatementRejectedError(`Function ${name} is not allowed${/^DBMS_XPLAN\./i.test(name.replaceAll('"', '')) ? ". Allowed form: SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('<sql_id>', <child>, 'TYPICAL'))" : ''}`);
 	}
 }
 
@@ -126,7 +126,7 @@ export function classifySql(sql: string): string {
 	if (/\bDBMS_XPLAN\b/i.test(callClean)) {
 		const arg = String.raw`(?:literal|:[A-Za-z_][A-Za-z0-9_]*|[0-9]+|NULL)`;
 		const exact = new RegExp(String.raw`^\s*SELECT\s+(?:\*|PLAN_TABLE_OUTPUT)\s+FROM\s+TABLE\s*\(\s*DBMS_XPLAN\s*\.\s*DISPLAY_CURSOR\s*\(\s*${arg}\s*,\s*${arg}\s*,\s*${arg}\s*\)\s*\)\s*;?\s*$`, 'i');
-		if (!exact.test(callClean)) reject("DISPLAY_CURSOR requires the exact SELECT FROM TABLE form with scalar bind or literal arguments");
+		if (!exact.test(callClean)) reject("DISPLAY_CURSOR requires the exact allowed form: SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('<sql_id>', <child>, 'TYPICAL')) (scalar bind or literal arguments)");
 	}
 	if (/\b(DBMS_\w+|UTL_\w+)\b/i.test(clean) && !/\bDBMS_XPLAN\s*\.\s*DISPLAY_CURSOR\b/i.test(clean)) reject("Package calls are forbidden");
 	if (/\bDBMS_XPLAN\s*\.\s*(?!DISPLAY_CURSOR\b)\w+/i.test(clean)) reject("Only DISPLAY_CURSOR is allowed from DBMS_XPLAN");

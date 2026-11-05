@@ -1,3 +1,5 @@
+import { collectSql, sqlHypotheses, type TriageSql } from './sqlperf.js';
+import { renderSqlInsightMarkdown } from '../sqlperf/index.js';
 import { collectAlerts, alertHypotheses, mergeAlerts, discoverAlertJobs, alertSuggestions } from './alerts.js';
 export type { TriageAlertLog } from './alerts.js';
 import { nameCandidates, lookupNames } from './names.js';
@@ -15,7 +17,7 @@ import { TriageReader, displaySql, type Check } from './read.js';
 export { parseIssue, sinceHours } from './parse.js';
 export interface TriageOptions { target: string; issue?: string; since?: string }
 export interface Excerpt { object: string; line: number; subprogram: string; statement: string; source: SourceRow[]; status: string; view: string; truncated: boolean; attempts: { view: string; code: string }[] }
-export interface Hypothesis { rank: number; title: string; evidence: string[] }
+export interface Hypothesis { rank: number; title: string; evidence: string[]; verifyNext?: { sql: string; binds: Record<string, unknown> } }
 const asText = (v: unknown) => v == null ? '' : String(v);
 const unique = <T>(items: T[]) => [...new Set(items)];
 export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
@@ -136,9 +138,11 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	}
 	const alertLog = mergeAlerts([discovery.alert, await collectAlerts(ctx, target.name, hours, combined.codes, runs.rows)])!;
 	reader.checks.push(...alertLog.checks);
+	const sql = await collectSql(ctx, target.name, options.issue ?? '', hours, parsed.objects);
+	reader.checks.push(...sql.checks);
 	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
 	diagnosis.suggestions.push(...alertSuggestions(alertLog));
-	const hypotheses: Hypothesis[] = [...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
+	const hypotheses: Hypothesis[] = [...sqlHypotheses(sql), ...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
 	for (const constraint of constraints.filter(c => c.rows.length)) {
 		const row = constraint.rows[0]!;
 		hypotheses.unshift({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
@@ -195,7 +199,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		for (const job of runs.rows.filter(r => correlation.kind === 'jobRun' && correlation.label.includes(`${r[0]}.${r[1]} `))) edge(node(`job:${job[0]}.${job[1]}`, 'job', `${job[0]}.${job[1]}`), alert);
 	}
 	graph.edges = [...new Map(graph.edges.map(e => [JSON.stringify(e), e])).values()];
-	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
+	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, sql, checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
 }
 async function columns(reader: TriageReader, owner: string, name: string) {
 	const existing = reader.checks.find(c => c.label === `Columns for ${owner}.${name}`); if (existing) return existing;
@@ -234,7 +238,8 @@ export function renderTriageMarkdown(result: TriageResult): string {
 	return [`# Issue triage: ${safe(result.target)}`, 'Read-only evidence. Hypotheses are ranked diagnostic leads, not proof. Credential-looking literals are redacted; ordinary business literals are preserved; graph call associations and statement ranges are heuristic.', ...(result.scan ? [`Scan cap: ${result.scan.cap}; ${result.scan.truncated ? 'partial' : 'complete within visible window'}.`, ...result.scan.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)} ${c.attempts.map(a => a.code).join(', ')} (${c.rows.length} rows)`)] : []), ...result.issues.map((issue, i) => [
 		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ') || 'none'}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
 		...(issue.alertLog ? ['### Alert log', renderTriageAlerts(issue.alertLog)] : []),
-		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.filter(e => e.trim()).map(e => '- ' + evidenceText(e)).join('\n')}`),
+		...(issue.sql ? renderTriageSql(issue.sql) : []),
+		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.filter(e => e.trim()).map(e => '- ' + evidenceText(e)).join('\n')}${h.verifyNext ? '\n\nVerify next (not executed):\n\n' + block('sql', h.verifyNext.sql) + '\nBinds: ' + safe(JSON.stringify(h.verifyNext.binds)) : ''}`),
 		'### Limitations', ...(issue.limitations.length ? issue.limitations.map(safe) : ['No additional limitations identified; view failures and caps are reported below.']), '### Concurrency review', ...(issue.concurrency.length ? issue.concurrency.map(safe) : ['No supported concurrent child-insert path identified from the available source and job evidence.']), '### Suggested fixes (not executed)', 'Suggestions for a developer; no changes were run.', ...(issue.suggestions.length ? issue.suggestions.map(s => '- ' + safe(s)) : ['Inspect the unavailable source and raising condition before choosing a remediation; preserve exception/backtrace logging without credentials.']), '### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${inline(e.statement)}\n\n${e.source.length ? block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n')) : 'Source unavailable; historical job_action and raising condition cannot be inspected.'}`),
 		'### Evidence', ...issue.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)}${c.truncated ? '; row cap reached (partial)' : ''}${c.attempts.map(a => `; ${a.view} ${a.code}`).join('')}\n\n${c.rows.length ? '| ' + c.columns.map(safe).join(' | ') + ' |\n| ' + c.columns.map(() => '---').join(' | ') + ' |\n' + c.rows.map(r => '| ' + r.map(safe).join(' | ') + ' |').join('\n') : c.label.startsWith('Source around') ? 'See the redacted frame excerpt above; source was collected through the bounded dictionary reader.' : 'No rows returned; absence is limited to visible evidence.'}`),
 		'### Local error guide', ...issue.guide.map(g => `${g.code}: ${g.meaning}. Typical causes: ${g.causes} Read-only checks: ${g.checks}`),
@@ -243,6 +248,7 @@ export function renderTriageMarkdown(result: TriageResult): string {
 	].join('\n\n'))].join('\n\n') + '\n';
 }
 function lookFor(check: Check): string {
+	if (/^(SQL insight:|Top SQL referencing)/.test(check.label)) return 'Compare cursor-cache plans, cumulative per-execution metrics and object statistics; cached timing differences are diagnostic leads, not proof of causation. SQL binds: ' + JSON.stringify(check.binds);
 	if (check.view.includes('V$DIAG')) return 'Compare codes, incident metadata and timestamps; a ±10 minute match alone does not establish causation. SQL binds: ' + JSON.stringify(check.binds);
 	if (check.label.startsWith('Current child')) return 'Look for a nonzero CHILD_ROWS count: children currently reference parents eligible for the parent operation; zero does not disprove a past boundary race.';
 	if (check.label.startsWith('Latest scheduler runs')) return 'These are the latest retained runs without a time filter, capped at 5; check OUTSIDE_WINDOW and the last-run timestamp before treating an old failure as current.';
@@ -272,4 +278,11 @@ function renderTriageAlerts(alert: import('./alerts.js').TriageAlertLog): string
 		...alert.incidents.map(i => `<a id="incident-${/^\d+$/.test(i.incidentId) ? i.incidentId : 'unknown'}"></a>Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${i.status}.`),
 		...(alert.checks.some(c => c.truncated) ? ['Row cap reached; alert evidence is partial and folding covers fetched rows only.'] : []),
 	].join('\n\n');
+}
+
+function renderTriageSql(sql: TriageSql): string[] {
+	if (sql.status === 'skipped' && !sql.reason) return [];
+	return ['### SQL performance', safe(sql.status + (sql.reason ? ': ' + sql.reason : '')),
+		...(sql.insight ? [renderSqlInsightMarkdown(sql.insight)] : []),
+	];
 }
