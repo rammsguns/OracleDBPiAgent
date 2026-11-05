@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
-import { forbiddenSecuritySql, scanSecuritySource } from './security-sql-scan.js';
+import { readdirSync, readFileSync } from 'node:fs';
+import { SQL } from '../../src/security/sql.js';
+import { forbiddenSecuritySql, scanSecuritySource, securitySourceStrings } from './security-sql-scan.js';
 
 it.each([
 	'SELECT PASSWORD FROM DBA_USERS',
@@ -71,4 +73,14 @@ it('accepts profile resource literals, prose, comments and regular expressions w
 });
 it('fails closed on source parse errors', () => {
 	expect(() => scanSecuritySource('const x = `unfinished')).toThrow('Cannot scan');
+});
+
+it('discovers real SQL strings in the security sources rather than passing vacuously', () => {
+	const strings = readdirSync('src/security', { recursive: true, encoding: 'utf8' })
+		.filter(file => /\.[cm]?tsx?$/.test(file))
+		.flatMap(file => securitySourceStrings(readFileSync('src/security/' + file, 'utf8'), file));
+	const sql = strings.filter(text => /\bSELECT\b[\s\S]*\bFROM\b/i.test(text));
+	expect(sql.length).toBeGreaterThan(0);
+	// Verifies the parser visits all of today's SQL catalog, not just some literals.
+	for (const statement of Object.values(SQL)) expect(sql).toContain(statement);
 });

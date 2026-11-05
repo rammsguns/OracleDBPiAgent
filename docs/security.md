@@ -407,3 +407,21 @@ Validation after these changes:
 
 Only the security integration file ran. No LLM calls, new dependencies,
 shared contract changes, database writes or permission changes were needed.
+
+### Parser dependency follow-up
+
+The SQL gate now uses only the declared `typescript` devDependency. TypeScript
+7.0.2 no longer exports the legacy `ts.createSourceFile` API, so a small local
+`createSourceFile` adapter obtains a compiler SourceFile through TypeScript's
+native API in an isolated virtual project. The walker uses TypeScript node
+kinds/guards for string literals, templates, constants and `+` expressions.
+The adapter rejects parse errors and missing projects/source files, disposes
+compiler resources, and never executes inspected code. No rolldown import or
+package changes remain.
+
+All existing bypass tests still pass. A new non-vacuity test asserts that the
+source walk discovers a non-zero number of real SQL strings and contains every
+statement in the current SQL catalog.
+
+Validation: `npm run typecheck` passed; `npm test` passed (84 files, 1,249 tests).
+This follow-up changes test infrastructure only; no DB or LLM calls were made.
