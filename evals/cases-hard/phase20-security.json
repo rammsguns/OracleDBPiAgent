@@ -1,0 +1,120 @@
+[
+	{
+		"id": "hard-p20-d1-open-default-count",
+		"target": "d1-19c-lab",
+		"category": "security",
+		"split": "challenge",
+		"question": "On d1, how many accounts with known default passwords are currently OPEN? Include Oracle-maintained accounts in this count. Use only account names and status metadata; never retrieve credentials or password hashes.",
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) AS open_default_count FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p20-d1-role-any-paths",
+		"target": "d1-19c-lab",
+		"category": "security",
+		"split": "challenge",
+		"question": "On d1, which ANY system privileges does HARNESS_APP inherit through roles? Expand nested roles, guard against cycles and stop at ten role edges. For each privilege, report the role holding the system grant and its depth from HARNESS_APP (a directly granted role has depth 1), together in one row. Exclude direct user grants; describe configured grants rather than whether roles are enabled in a particular session.",
+		"groundTruth": {
+			"sql": "SELECT DISTINCT r.granted_role AS granting_role, r.role_depth AS role_depth, p.privilege AS privilege FROM (SELECT granted_role, LEVEL AS role_depth FROM dba_role_privs START WITH grantee='HARNESS_APP' CONNECT BY NOCYCLE PRIOR granted_role=grantee AND LEVEL<=10) r JOIN dba_sys_privs p ON p.grantee=r.granted_role WHERE INSTR(' ' || p.privilege || ' ',' ANY ')>0 ORDER BY granting_role, role_depth, privilege",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p20-d1-public-file-execute",
+		"target": "d1-19c-lab",
+		"category": "security",
+		"split": "challenge",
+		"question": "On d1, how many explicit EXECUTE grants on SYS.UTL_FILE are made to PUBLIC? Explain what this says about package access versus permission to read an arbitrary operating-system file. Inspect metadata only.",
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) AS public_execute_count FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p20-p1-inherited-profile-limit",
+		"target": "p1-19c-prod",
+		"category": "security",
+		"split": "challenge",
+		"question": "On p1, resolve the effective PASSWORD_LIFE_TIME for GSM_PROF, following DEFAULT inheritance. Give the profile name, stored limit, and effective limit together in one row. Do not treat the word DEFAULT as unlimited.",
+		"groundTruth": {
+			"sql": "SELECT p.profile AS profile, p.limit AS stored_limit, CASE WHEN p.limit='DEFAULT' THEN d.limit ELSE p.limit END AS effective_limit FROM dba_profiles p JOIN dba_profiles d ON d.profile='DEFAULT' AND d.resource_name=p.resource_name AND d.resource_type=p.resource_type WHERE p.profile='GSM_PROF' AND p.resource_name='PASSWORD_LIFE_TIME'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p20-p1-default-profile",
+		"target": "p1-19c-prod",
+		"category": "security",
+		"split": "challenge",
+		"question": "On p1, inspect the DEFAULT profile. Give one row per setting for FAILED_LOGIN_ATTEMPTS, PASSWORD_LIFE_TIME, and PASSWORD_VERIFY_FUNCTION, with the configured limit or function name. Explain the security implication of a missing verify function without disclosing any credentials.",
+		"groundTruth": {
+			"sql": "SELECT resource_name AS resource_name, limit AS configured_limit FROM dba_profiles WHERE profile='DEFAULT' AND resource_type='PASSWORD' AND resource_name IN ('FAILED_LOGIN_ATTEMPTS','PASSWORD_LIFE_TIME','PASSWORD_VERIFY_FUNCTION') ORDER BY resource_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p20-p1-enabled-audit-policies",
+		"target": "p1-19c-prod",
+		"category": "security",
+		"split": "challenge",
+		"question": "On p1, list every enabled unified audit policy, its enablement mode, entity name and type, and whether successes and failures are audited. Put all six attributes together for each policy. Distinguish enabled configuration from proof that any particular event was recorded; do not read audit activity records.",
+		"groundTruth": {
+			"sql": "SELECT policy_name AS policy_name, enabled_option AS enabled_option, entity_name AS entity_name, entity_type AS entity_type, success AS success, failure AS failure FROM audit_unified_enabled_policies ORDER BY policy_name, entity_name, entity_type, enabled_option, success, failure",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	}
+]
