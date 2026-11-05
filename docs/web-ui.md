@@ -395,3 +395,37 @@ WP-18C validation (2026-11-04):
 - No shared-contract or `src/alertlog/` changes required. Live WP-18B triage
   integration remains for the coordinator after that branch merges; shared
   shape rendering is verified with fixtures here. No LLM calls were made.
+
+WP-18C visual-review follow-up:
+
+- Alert entries now give Message the remaining width after compact timestamp,
+  severity and count columns. Codes and incident badges sit with the message.
+  Alert evidence uses a wider desktop evidence pane. Timestamps omit milliseconds,
+  preserve exact ISO values in their titles, and show last time on a second line
+  only when it differs from first time.
+- Messages have a three-line preview and a native **Show full message** disclosure.
+  Trace paths are removed from message text and collected in a separate collapsed
+  **Trace files (N)** list. Items show basenames with full paths in their titles.
+  Markdown exports retain the reader's complete bounded evidence.
+- Incident badges wrap inline, with at most five followed by **+N more**.
+  The ADR numeric status column is labelled **Status code**.
+- The white surround was a stylesheet issue, not a screenshot media-setting issue:
+  existing PL/SQL/Triage dark rules themed their inner panels but the root, section
+  and tab bar retained light backgrounds. The fix uses the existing dark colours
+  (`#19282e`, `#223b45`, `#e0edf0`) for the page, section and tab shell only while
+  Alert Log or a Triage panel containing alert evidence is visible. Other tab views
+  keep their prior styling.
+- Desktop screenshots above were retaken with a **1280px viewport**, now including
+  the full page to show the shell. [390px phone capture](img/alertlog-p1-19c-prod-phone.png)
+  uses stacked alert entries and has no horizontal page scroll. The ADR table can
+  scroll within its own wrapper. [Fixture triage alert section](img/alertlog-triage-fixture.png)
+  demonstrates the shared shape and job-run correlation.
+- To reproduce the fixture screenshot, run
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser -- tests/browser/alertlog.spec.ts`.
+- Follow-up validation: typecheck passed; 1,071 unit tests passed; browser suite
+  34 passed, 2 opt-in live tests skipped. The separate Oracle-only live capture
+  test passed against both approved targets and stopped its server by listening
+  PID. Browser tests verify details toggling, preview height, basename/title paths,
+  five-badge cap, Message width, compact timestamps, Status code, dark shell colours,
+  and no page overflow at 1280px and 390px. No DB or LLM code changed and no LLM
+  calls were made; no contract changes are needed.

@@ -32,17 +32,56 @@ function level(value) {
 	const label = ({ 1: 'Critical', 2: 'Severe', 8: 'Important', 16: 'Normal', 32: 'Debug' })[value] || 'Unknown';
 	return el('span', `${label} (${value ?? 'unknown'})`, 'alert-level ' + (value !== null && value <= 2 ? 'alert-critical' : value !== null && value <= 8 ? 'alert-important' : 'alert-normal'));
 }
+function compactTime(value) {
+	const date = new Date(value);
+	return Number.isNaN(date.getTime()) ? value : date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, 'Z');
+}
+function messageCell(row) {
+	const cell = el('div', undefined, 'alert-message');
+	const traces = [...new Set((row.traceFiles || [row.traceFile]).filter(Boolean))];
+	// Extract trace paths from the message too; keep each path in its own disclosure.
+	for (const match of row.messageText.matchAll(/[^\s'"<>]*\.trc\b/gi)) {
+		if (!traces.includes(match[0])) traces.push(match[0]);
+	}
+	let text = row.messageText;
+	for (const path of traces) text = text.replaceAll(path, '');
+	text = text.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+	cell.append(el('div', text || '(Trace file reference)', 'alert-message-preview'));
+	const full = el('details', undefined, 'alert-full-message');
+	full.append(el('summary', 'Show full message'), el('div', text, 'alert-message-text'));
+	cell.append(full);
+	if (row.codes.length) cell.append(el('div', row.codes.join(', '), 'alert-codes'));
+	const ids = [...new Set(row.incidentIds || (row.incidentId ? [row.incidentId] : []))];
+	const badges = el('div', undefined, 'incident-badges');
+	for (const id of ids.slice(0, 5)) badges.append(el('span', `Incident ${id}`, 'incident-badge'));
+	if (ids.length > 5) badges.append(el('span', `+${ids.length - 5} more`, 'incident-more'));
+	cell.append(badges);
+	for (const key of (row.problemKeys || [row.problemKey]).filter(Boolean)) cell.append(el('div', key));
+	if (traces.length) {
+		const details = el('details', undefined, 'alert-traces');
+		details.append(el('summary', `Trace files (${traces.length})`));
+		const list = el('ul');
+		for (const path of traces) {
+			const item = el('li', path.split(/[\\/]/).pop()); item.title = path; list.append(item);
+		}
+		details.append(list); cell.append(details);
+	}
+	for (const note of [row.textTruncated ? '[text capped]' : '', row.metadataTruncated ? '[metadata capped]' : ''].filter(Boolean)) cell.append(el('small', note));
+	return cell;
+}
 export function renderAlertEvidence(content, evidence) {
 	const section = el('div', undefined, 'alert-evidence');
 	section.append(el('h3', 'Alert log evidence'), el('p', `${evidence.status} · ${evidence.window.from} to ${evidence.window.to} (exclusive)`));
 	if (evidence.grant) section.append(el('pre', evidence.grant));
-	section.append(grid('Alert entries', ['First / last time', 'Level', 'Count', 'Codes / incidents', 'Message'], evidence.entries.map(row => {
-		const metadata = el('div', row.codes.join(', '));
-		for (const id of row.incidentIds || (row.incidentId ? [row.incidentId] : [])) metadata.append(el('span', `Incident ${id}`, 'incident-badge'));
-		const message = [row.messageText, ...(row.problemKeys || [row.problemKey]).filter(Boolean), ...(row.traceFiles || [row.traceFile]).filter(Boolean), row.textTruncated ? '[text capped]' : '', row.metadataTruncated ? '[metadata capped]' : ''].filter(Boolean).join('\n');
-		return [row.count > 1 ? row.firstTime + '\n' + row.lastTime : row.timestamp, level(row.level), `×${row.count}`, metadata, message];
-	})));
-	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status'], evidence.incidents.map(row => [row.createTime, row.incidentId, row.problemKey, row.status])));
+	const entries = grid('Alert entries', ['First / last time', 'Level', 'Count', 'Message'], evidence.entries.map(row => {
+		const first = row.firstTime || row.timestamp, last = row.lastTime || row.timestamp;
+		const time = el('span', compactTime(first) + (first !== last ? '\n' + compactTime(last) : ''));
+		time.title = first + (first !== last ? ' / ' + last : '');
+		return [time, level(row.level), `×${row.count}`, messageCell(row)];
+	}));
+	entries.querySelector('table').className = 'alert-entries';
+	section.append(entries);
+	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status code'], evidence.incidents.map(row => [compactTime(row.createTime), row.incidentId, row.problemKey, row.status])));
 	if (evidence.correlations?.length) {
 		section.append(el('h4', 'Correlations'));
 		for (const item of evidence.correlations) section.append(el('p', `${item.kind === 'jobRun' ? 'Job run' : 'Code'}: ${item.label}${item.at ? ' · ' + item.at : ''} · Alert entries ${item.entryIndexes.map(index => index + 1).join(', ') || 'none'}`));

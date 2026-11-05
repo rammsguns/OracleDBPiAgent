@@ -79,11 +79,53 @@ td:nth-child(2) { max-width: 24rem; }
 .alert-critical { color: var(--alert-critical); }
 .alert-important { color: var(--alert-important); }
 .alert-normal { color: var(--alert-normal); }
-.incident-badge { display: block; border: 1px solid currentColor; border-radius: .35rem; padding: .1rem .3rem; margin-top: .3rem; }
-.alert-evidence table { min-width: 740px; }
+.incident-badge { border: 1px solid currentColor; border-radius: .35rem; padding: .1rem .3rem; margin-top: .3rem; }
+.alert-evidence table { min-width: 620px; }
+.alert-entries { table-layout: fixed; }
+.alert-entries th:first-child { width: 10rem; }
+.alert-entries th:nth-child(2) { width: 6rem; }
+.alert-entries th:nth-child(3) { width: 3.5rem; }
 .alert-evidence td:first-child { white-space: pre; }
 .alert-level { white-space: nowrap; }
 @media (prefers-color-scheme: dark) {
 	#alertlog-panel { background: #19282e; color: #e0edf0; padding: .5rem; color-scheme: dark; }
 	#alertlog-panel, .alert-evidence { --alert-critical: #ffaaaa; --alert-important: #ffd080; --alert-normal: #b8dce7; }
+}
+
+.incident-badges { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; }
+.incident-badge, .incident-more { white-space: nowrap; }
+.alert-message-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; }
+.alert-message-text { white-space: pre-wrap; }
+.alert-message:has(.alert-full-message[open]) .alert-message-preview { display: none; }
+.alert-message details { margin: .35rem 0; }
+.alert-message summary { cursor: pointer; }
+.alert-message small { display: block; }
+.alert-traces ul { padding-left: 1.2rem; }
+/* Alert evidence needs room alongside the conversation, including at 1280px. */
+@media (min-width: 801px) {
+	main:has(#alertlog-tab[aria-selected="true"]), main:has(#triage-panel:not([hidden]) .alert-evidence) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); }
+}
+/* Other tabs also only themed their inner panels. Scope the shell fix to alert views. */
+@media (prefers-color-scheme: dark) {
+	:root:has(#alertlog-tab[aria-selected="true"]), :root:has(#triage-panel:not([hidden]) .alert-evidence) {
+		color-scheme: dark; color: #e0edf0; background: #19282e;
+		--alert-surface: #19282e; --alert-fill: #223b45; --alert-text: #e0edf0;
+	}
+	body:has(#alertlog-tab[aria-selected="true"]), body:has(#triage-panel:not([hidden]) .alert-evidence) {
+		background: var(--alert-surface); color: var(--alert-text);
+	}
+	body:has(#alertlog-tab[aria-selected="true"]) section, body:has(#triage-panel:not([hidden]) .alert-evidence) section { background: var(--alert-surface); }
+	body:has(#alertlog-tab[aria-selected="true"]) [role="tablist"], body:has(#triage-panel:not([hidden]) .alert-evidence) [role="tablist"] { background: var(--alert-surface); }
+	body:has(#alertlog-tab[aria-selected="true"]) button, body:has(#triage-panel:not([hidden]) .alert-evidence) button { background: var(--alert-fill); color: var(--alert-text); }
+	body:has(#alertlog-tab[aria-selected="true"]) button[aria-selected="true"], body:has(#triage-panel:not([hidden]) .alert-evidence) button[aria-selected="true"] { background: #185b67; }
+	.alert-message small { color: #b0bdc8; }
+}
+@media (max-width: 800px) {
+	.alert-entries { display: block; min-width: 0 !important; }
+	.alert-entries caption { display: block; }
+	.alert-entries tr:first-of-type { display: none; }
+	.alert-entries tr:not(:first-of-type) { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .5fr); border-bottom: 1px solid #d4dfe3; }
+	.alert-entries td { display: block; border: 0; padding: .4rem; }
+	.alert-entries td:first-child { white-space: pre-wrap; font-size: .75rem; }
+	.alert-entries td:last-child { grid-column: 1 / -1; }
 }

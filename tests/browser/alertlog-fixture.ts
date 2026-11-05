@@ -2,8 +2,8 @@ import type { AlertRow, IncidentRow, AlertResult } from '../../src/alertlog/inde
 export const alertRow: AlertRow = {
 	timestamp: '2026-11-04T12:00:00Z', firstTime: '2026-11-04T11:00:00Z', lastTime: '2026-11-04T12:00:00Z', count: 3,
 	level: 1, codes: ['ORA-00600'], problemKey: 'ORA 600 [example]', incidentId: '123', traceFile: 'example.trc',
-	messageText: '<img src=x onerror=alert(1)> ORA-00600 incident=123', textTruncated: true,
-	incidentIds: ['123', '124'], traceFiles: ['example.trc'], problemKeys: ['ORA 600 [example]'], metadataTruncated: true,
+	messageText: '<img src=x onerror=alert(1)> ORA-00600 incident=123\nErrors in file /opt/oracle/diag/example.trc\n' + 'Diagnostic context for the internal error. '.repeat(20) + '\nFinal diagnostic line', textTruncated: true,
+	incidentIds: ['123', '124', '125', '126', '127', '128', '129'], traceFiles: ['/opt/oracle/diag/example.trc'], problemKeys: ['ORA 600 [example]'], metadataTruncated: true,
 };
 export const incidentRow: IncidentRow = { incidentId: '123', problemKey: 'ORA 600 [example]', createTime: alertRow.timestamp, status: 1 };
 export function alertResult<T>(target: string, rows: T[]): AlertResult<T> {

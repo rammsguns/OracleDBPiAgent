@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 test.afterEach(async ({ page, request }) => { await page.close(); await request.get(process.env.PIAGENT_BROWSER_CONTROL! + '/expire'); });
@@ -31,6 +32,11 @@ test('optional triage alert shape and correlation', async ({ page }) => {
 	await page.locator('#triage-issue').fill('ORA-00600'); await page.locator('#triage-run').click();
 	await expect(page.locator('#triage-content .alert-evidence')).toContainText('Job run: NIGHTLY_PURGE_JOB');
 	await expect(page.locator('#triage-content .alert-evidence')).toContainText('Alert entries 1');
+	if (process.env.PIAGENT_ALERTLOG_CAPTURE_FIXTURE === '1') {
+		await mkdir('docs/img', { recursive: true });
+		await page.setViewportSize({ width: 1280, height: 1000 });
+		await page.locator('#triage-content .alert-evidence').screenshot({ path: 'docs/img/alertlog-triage-fixture.png' });
+	}
 });
 test('unavailable, empty, skipped and failed requests recover without stale export', async ({ page }) => {
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#alertlog-tab').click();
@@ -60,5 +66,43 @@ test('triage remains usable without alert evidence, and renders unavailable gran
 		await expect(page.locator('#triage-status')).toContainText('Loaded.');
 		await expect(page.locator('#triage-content .alert-evidence')).toHaveCount(status === 'absent' ? 0 : 1);
 		if (status === 'unavailable') await expect(page.locator('.alert-evidence pre')).toHaveText('GRANT SELECT ON SYS.V_$DIAG_ALERT_EXT TO HARNESS_RO;');
+	}
+});
+
+for (const width of [1280, 390]) test(`message disclosure, compact traces, capped badges and dark shell at ${width}px`, async ({ page }) => {
+	await page.setViewportSize({ width, height: 900 });
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#alertlog-tab').click();
+	await page.locator('#alertlog-run').click();
+	const content = page.locator('#alertlog-content');
+	await expect(content.locator('.incident-badge')).toHaveCount(5);
+	await expect(content.locator('.incident-more')).toHaveText('+2 more');
+	const full = content.locator('.alert-full-message');
+	await expect(full).not.toHaveAttribute('open', '');
+	await expect(full.locator('.alert-message-text')).not.toBeVisible();
+	await expect(content.locator('.alert-message-preview')).toBeVisible();
+	const previewHeight = await content.locator('.alert-message-preview').evaluate(node => ({ height: node.getBoundingClientRect().height, line: parseFloat(getComputedStyle(node).lineHeight) }));
+	expect(previewHeight.height).toBeLessThanOrEqual(previewHeight.line * 3 + 1);
+	await full.locator('summary').click();
+	await expect(full.locator('.alert-message-text')).toBeVisible();
+	await expect(full.locator('.alert-message-text')).toContainText('Final diagnostic line');
+	await expect(full.locator('.alert-message-text')).not.toContainText('/opt/oracle/diag/');
+	await full.locator('summary').click();
+	await expect(full.locator('.alert-message-text')).not.toBeVisible();
+	const traces = content.locator('.alert-traces');
+	await expect(traces.locator('summary')).toHaveText('Trace files (1)');
+	await expect(traces.locator('li')).not.toBeVisible();
+	await traces.locator('summary').click();
+	await expect(traces.locator('li')).toHaveText('example.trc');
+	await expect(traces.locator('li')).toHaveAttribute('title', '/opt/oracle/diag/example.trc');
+	await expect(content.locator('th').last()).toHaveText('Status code');
+	await expect(content.locator('td').first()).toHaveText('2026-11-04 11:00:00Z\n2026-11-04 12:00:00Z');
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	for (const selector of ['html', 'body', '.evidence', '[role="tablist"]']) {
+		expect(await page.locator(selector).evaluate(node => getComputedStyle(node).backgroundColor)).toBe('rgb(25, 40, 46)');
+	}
+	if (width === 1280) {
+		const columns = await content.locator('.alert-entries tr').nth(1).locator('td').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().width));
+		expect(columns[3]).toBeGreaterThan(columns[0]! + columns[1]! + columns[2]!);
 	}
 });

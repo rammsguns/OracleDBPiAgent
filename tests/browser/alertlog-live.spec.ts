@@ -17,7 +17,7 @@ test('live read-only Alert Log captures on both approved targets, light and dark
 				if (match) { port = match[1]; clearTimeout(timer); resolve(match[0]); }
 			});
 		});
-		await page.setViewportSize({ width: 1800, height: 1200 });
+		await page.setViewportSize({ width: 1280, height: 1200 });
 		await page.goto(url); await page.locator('#alertlog-tab').click();
 		await mkdir('docs/img', { recursive: true });
 		for (const target of ['d1-19c-lab', 'p1-19c-prod']) {
@@ -29,9 +29,13 @@ test('live read-only Alert Log captures on both approved targets, light and dark
 			expect(await page.locator('#alertlog-content table').first().locator('tr').count()).toBeGreaterThan(1);
 			for (const colorScheme of ['light', 'dark'] as const) {
 				await page.emulateMedia({ colorScheme });
-				await page.locator('.evidence').screenshot({ path: `docs/img/alertlog-${target}-${colorScheme}.png` });
+				await page.screenshot({ path: `docs/img/alertlog-${target}-${colorScheme}.png`, fullPage: true });
 			}
 		}
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.emulateMedia({ colorScheme: 'light' });
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+		await page.screenshot({ path: 'docs/img/alertlog-p1-19c-prod-phone.png', fullPage: true });
 	} finally {
 		await page.close();
 		// Resolve and kill the actual listener, rather than a launcher or shell PID.
