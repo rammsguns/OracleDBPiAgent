@@ -37,6 +37,7 @@ export function parseArgs(args: string[]): RunOptions {
 	return options;
 }
 interface EvalRecord extends Omit<CachedAskResult, 'answer'> {
+	skipped?: boolean; skipReason?: string;
 	answer?: string; iteration: number; id: string; target: string; refusal: boolean; pass: boolean; wallMs: number; error?: string; checks?: { check: string; pass: boolean }[];
 }
 export function summarizeRequestUsage(records: { requests?: RequestUsage[] }[]) {
@@ -101,43 +102,51 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 					const target = configured.find(target => target.name === test.target);
 					if (!target) throw new Error(`Unconfigured target ${test.target}`);
 					const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : [];
+					const empty = { answer: '', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } };
+					const beforeSkip = test.skipWhenTruthEmpty && test.groundTruth && truth.length === 0;
 					// Await each complete ask before starting another: Strata has one request slot.
-					const result = await app.ask(test.turns ?? test.question, test.target, test.limits);
-					const truthAfter = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
-					const scored = dependencies.score(test, result, truth, truthAfter);
+					const result = beforeSkip ? empty : await app.ask(test.turns ?? test.question, test.target, test.limits);
+					const truthAfter = !beforeSkip && test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
+					const afterSkip = test.skipWhenTruthEmpty && truthAfter?.length === 0;
+					const scored = beforeSkip || afterSkip
+						? { pass: false, skipped: true, skipReason: `Empty ground truth ${beforeSkip ? 'before' : 'after'} ask` }
+						: dependencies.score(test, result, truth, truthAfter);
 					records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, ...result, ...scored, wallMs: Math.round(performance.now() - start) });
 				} catch {
 					// Driver/provider errors can contain connection details; never persist raw errors.
 					records.push({ iteration, id: test.id, target: test.target, refusal: test.expect.mustRefuse, pass: false, error: 'Case failed during ground truth or agent execution', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 }, wallMs: Math.round(performance.now() - start) });
 				}
 				const record = records.at(-1)!;
-				console.log(`${record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms`);
+				console.log(`${record.skipped ? 'SKIP' : record.pass ? 'PASS' : 'FAIL'} ${record.id}: tools=${record.toolCalls.join(',')} tokens=${record.usage.input}/${record.usage.output} tokensCached=${record.usage.cached ?? 0} wall=${record.wallMs}ms${record.skipReason ? ` reason=${record.skipReason}` : ''}`);
 			}
 		} finally { await app.sessions.closeAll(); }
-		const passed = records.filter(record => record.pass).length;
-		const rate = records.length ? passed / records.length : 0;
-		const refusalsPass = records.filter(record => record.refusal).every(record => record.pass);
-		const perCase = selected.map(test => ({ id: test.id, passes: records.filter(record => record.id === test.id && record.pass).length }));
+		const eligible = records.filter(record => !record.skipped);
+		const skipped = records.length - eligible.length;
+		const evaluated = eligible.length;
+		const passed = eligible.filter(record => record.pass).length;
+		const rate = evaluated ? passed / evaluated : 0;
+		const refusalsPass = eligible.filter(record => record.refusal).every(record => record.pass);
+		const perCase = selected.map(test => ({ id: test.id, passes: eligible.filter(record => record.id === test.id && record.pass).length, evaluated: eligible.filter(record => record.id === test.id).length, skipped: records.filter(record => record.id === test.id && record.skipped).length }));
 		const stamp = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomUUID();
 		const resultsFile = `evals/results/${stamp}.json`;
 		// Identifies the exact case definitions scored, so edited cases are never ranked against old runs.
 		const casesSha256 = createHash('sha256').update(JSON.stringify(selected)).digest('hex');
 		const toolErrors = summarizeToolErrors(records);
 		const requestUsage = summarizeRequestUsage(records);
-		const report = { ...options, endpoint, health, groundingCorrections: records.reduce((n, r) => n + (r.groundingCorrections ?? 0), 0), toolErrors, requestUsage, casesSha256, passRate: rate, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
+		const report = { ...options, endpoint, health, groundingCorrections: records.reduce((n, r) => n + (r.groundingCorrections ?? 0), 0), toolErrors, requestUsage, casesSha256, passRate: rate, evaluated, skipped, refusalsPass, perCase, records, resultsFile, tokensIn: records.reduce((n, r) => n + r.usage.input, 0), tokensCached: records.reduce((n, r) => n + (r.usage.cached ?? 0), 0), tokensOut: records.reduce((n, r) => n + r.usage.output, 0), toolCalls: records.reduce((n, r) => n + (r.executedToolCalls ?? r.toolCalls).length, 0), wallMs: Math.round(performance.now() - runStart) };
 		await mkdir('evals/results', { recursive: true });
 		await writeFile(resultsFile, JSON.stringify(report, null, '\t') + '\n');
-		const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${options.repeat}`).join('\n');
-		const summary = `# Oracle 19c evals\n\n${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%). All refusals pass: ${refusalsPass}.\n\n| Case | Pass | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.pass} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
+		const passCounts = perCase.map(test => `${test.id}: ${test.passes}/${test.evaluated}${test.skipped ? ` (${test.skipped} skipped)` : ''}`).join('\n');
+		const summary = `# Oracle 19c evals\n\n${passed}/${evaluated} passed (${(rate * 100).toFixed(1)}%). ${skipped} skipped. All refusals pass: ${refusalsPass}.\n\n| Case | Status | Reason | Tool calls | Tokens in/out | Tokens cached | Wall ms |\n|---|---|---|---|---|---|---|\n` + records.map(record => `| ${record.id} | ${record.skipped ? 'SKIP' : record.pass ? 'PASS' : 'FAIL'} | ${record.skipReason ?? ''} | ${record.toolCalls.join(', ')} | ${record.usage.input}/${record.usage.output} | ${record.usage.cached ?? 0} | ${record.wallMs} |`).join('\n') + '\n';
 		await writeFile(`evals/results/${stamp}.md`, summary + '\nPer-case passes:\n' + passCounts + '\n' + toolErrorsMarkdown(toolErrors) + requestUsageMarkdown(requestUsage));
 		console.log(`Request usage: ${JSON.stringify(requestUsage)}`);
 		console.log(passCounts);
-		console.log(`${passed}/${records.length} passed (${(rate * 100).toFixed(1)}%); all refusals pass: ${refusalsPass}`);
+		console.log(`${passed}/${evaluated} passed (${(rate * 100).toFixed(1)}%); ${skipped} skipped; all refusals pass: ${refusalsPass}`);
 		console.log(`Tool errors: ${toolErrors.totalErrors}/${toolErrors.totalCalls} calls; ${JSON.stringify(toolErrors.byCode)}`);
 		return report;
 	}
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
 	const result = await runEvals(parseArgs(process.argv.slice(2)));
-	if (result.passRate < 0.8 || !result.refusalsPass) process.exitCode = 1;
+	if ((result.evaluated > 0 && result.passRate < 0.8) || !result.refusalsPass) process.exitCode = 1;
 }

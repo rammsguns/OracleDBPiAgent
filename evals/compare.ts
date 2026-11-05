@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export interface RecordRow {
+	skipped?: boolean; skipReason?: string;
 	id: string; target: string; iteration: number; pass: boolean; error?: string; refusal?: boolean;
 	usage: { input: number; output: number };
 	toolDetails?: { isError: boolean | null }[];
@@ -10,10 +11,11 @@ export interface RecordRow {
 export interface Report { endpoint?: "primary" | "secondary"; casesSha256?: string; records: RecordRow[] }
 export function endpointWarnings(a: Report[], b: Report[]): string[] {
 	// Count case observations, so repeats and partial suites retain their weight.
-	const count = (reports: Report[], endpoint: string) => reports.filter(r => (r.endpoint ?? 'primary') === endpoint).reduce((n, r) => n + r.records.length, 0);
+	const count = (reports: Report[], endpoint: string) => reports.filter(r => (r.endpoint ?? 'primary') === endpoint).reduce((n, r) => n + r.records.filter(row => !row.skipped).length, 0);
 	return ['primary', 'secondary'].some(endpoint => count(a, endpoint) !== count(b, endpoint))
 		? ['Unequal endpoint use between sides: server differences may confound the comparison.'] : [];
 }
+const skipCounts = (a: Report[], b: Report[]) => ({ a: a.flatMap(r => r.records).filter(r => r.skipped).length, b: b.flatMap(r => r.records).filter(r => r.skipped).length });
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 /** Percentile bootstrap of paired differences; fixed PRNG makes reports reproducible. */
 export function interval(xs: number[], samples = 10000): [number, number] | null {
@@ -50,7 +52,8 @@ export function compare(a: Report[], b: Report[]) {
 	if ([...aa, ...bb].some(block => block.size !== keys.length || keys.some(key => !block.has(key)))) throw new Error('Case/target sets differ');
 	const summarize = (xs: number[]) => ({ mean: mean(xs), ci95: interval(xs) });
 	const cases = keys.map(key => {
-		const pairs = aa.map((block, i) => [block.get(key)!, bb[i]!.get(key)!] as const);
+		const pairs = aa.map((block, i) => [block.get(key)!, bb[i]!.get(key)!] as const).filter(([x, y]) => !x.skipped && !y.skipped);
+		if (!pairs.length) return null;
 		const tokens = (r: RecordRow) => r.usage.input + r.usage.output;
 		const errors = (r: RecordRow) => r.toolDetails?.some(d => d.isError === null) || !r.toolDetails ? null : r.toolDetails.filter(d => d.isError).length;
 		return { case: key, pairs: pairs.length, aTokens: mean(pairs.map(([r]) => tokens(r))), bTokens: mean(pairs.map(([, r]) => tokens(r))),
@@ -59,18 +62,23 @@ export function compare(a: Report[], b: Report[]) {
 			tokens: summarize(pairs.map(([x, y]) => tokens(y) - tokens(x))),
 			passRate: summarize(pairs.map(([x, y]) => Number(y.pass) - Number(x.pass))),
 			toolErrors: pairs.some(([x, y]) => errors(x) === null || errors(y) === null) ? null : summarize(pairs.map(([x, y]) => errors(y)! - errors(x)!)) };
-	});
+	}).filter((item): item is NonNullable<typeof item> => item !== null);
 	// Resample whole paired runs for suite totals, preserving within-run case covariance.
 	const total = (field: 'tokens' | 'passRate' | 'toolErrors') => {
 		if (field === 'toolErrors' && cases.some(c => c.toolErrors === null)) return null;
-		return summarize(aa.map((block, i) => keys.reduce((sum, key) => {
-			const x = block.get(key)!, y = bb[i]!.get(key)!;
-			if (field === 'tokens') return sum + y.usage.input + y.usage.output - x.usage.input - x.usage.output;
-			if (field === 'passRate') return sum + (Number(y.pass) - Number(x.pass)) / keys.length;
-			return sum + y.toolDetails!.filter(d => d.isError).length - x.toolDetails!.filter(d => d.isError).length;
-		}, 0)));
+		const values = aa.flatMap((block, i) => {
+			const eligible = keys.filter(key => !block.get(key)!.skipped && !bb[i]!.get(key)!.skipped);
+			if (!eligible.length) return [];
+			return [eligible.reduce((sum, key) => {
+				const x = block.get(key)!, y = bb[i]!.get(key)!;
+				if (field === 'tokens') return sum + y.usage.input + y.usage.output - x.usage.input - x.usage.output;
+				if (field === 'passRate') return sum + (Number(y.pass) - Number(x.pass)) / eligible.length;
+				return sum + y.toolDetails!.filter(d => d.isError).length - x.toolDetails!.filter(d => d.isError).length;
+			}, 0)];
+		});
+		return values.length ? summarize(values) : null;
 	};
-	return { direction: 'B minus A; tokens = uncached input + output', pairedBlocks: aa.length,
+	return { direction: 'B minus A; tokens = uncached input + output', pairedBlocks: aa.length, skipped: skipCounts(a, b),
 		warnings: [...endpointWarnings(a, b),...([...aa, ...bb].some(block => [...block.values()].some(r => r.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),
 			...(aa.length < 4 ? ['Fewer than four pairs: intervals are exploratory, not an acceptance gate.'] : []),
 			...([...a, ...b].some(r => !r.casesSha256) ? ['Missing case hash: manually verify identical questions and scoring.'] : [])],
@@ -86,7 +94,7 @@ export function comparePerCase(a: Report[], b: Report[], { seed = 8129, samples 
 	const collect = (reports: Report[]) => {
 		blocks(reports); // Reuse record and duplicate-within-iteration validation.
 		const groups = new Map<string, { target: string; tokens: number[] }>();
-		for (const r of reports.flatMap(report => report.records)) {
+		for (const r of reports.flatMap(report => report.records).filter(r => !r.skipped)) {
 			const group = groups.get(r.id) ?? { target: r.target, tokens: [] };
 			if (group.target !== r.target) throw new Error('Case id has multiple targets');
 			group.tokens.push(r.usage.input + r.usage.output); groups.set(r.id, group);
@@ -130,7 +138,7 @@ export function comparePerCase(a: Report[], b: Report[], { seed = 8129, samples 
 	const runsPerSide = insufficient || budget <= 0 ? null : Math.max(2, Math.ceil(within / budget));
 	return { mode: 'per-case', direction: 'B / A; percent change in geometric mean of case mean-token ratios', seed, samples,
 		percentChange: pct(mean(cases.map(c => c.logRatio))), ci95: [draws[Math.floor(samples * .025)]!, draws[Math.ceil(samples * .975) - 1]!],
-		skipped, planning: { targetHalfWidthPercent: 3, runsPerSide, betweenLogVariance: between, denoisedBetweenLogVariance: trueBetween, meanWithinRelativeVariance: within,
+		skipped, skippedObservations: skipCounts(a, b), planning: { targetHalfWidthPercent: 3, runsPerSide, betweenLogVariance: between, denoisedBetweenLogVariance: trueBetween, meanWithinRelativeVariance: within,
 			reason: insufficient ? 'Within-case variance unknown with fewer than two runs on either side' : budget <= 0 ? 'No finite runs-only estimate under the de-noised between-case variance model' : 'Method-of-moments delta-method approximation; runs per arm per case' },
 		warnings: [...endpointWarnings(a, b),...(insufficient ? ['Single-run cases have no estimable within-case variance; bootstrap conditions on those observations.'] : []),
 			...([...a, ...b].some(r => r.records.some(row => row.error)) ? ['Execution failures present: zero recorded tokens are not a saving.'] : []),

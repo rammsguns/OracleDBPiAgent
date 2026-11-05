@@ -1,6 +1,20 @@
 import type { AskResult, EvalCase } from './types.js';
 const normalizeHyphens = (text: string) => text.replace(/[\u2010-\u2015\u2212]/g, '-');
 
+/** Normalize only explicitly UTC-labelled p19 timestamps; never infer a timezone. */
+function p19UtcTimestamps(answer: string): string {
+	const marksUtc = (line: string) => /\bUTC\b(?![+-]\d)/i.test(line) && !/\b(?:not|non)[ -]?UTC\b/i.test(line);
+	const allUtc = answer.split('\n').some(line => /\ball (?:times|timestamps) (?:are |in )?UTC\b/i.test(line) && !/\bnot\b/i.test(line));
+	let utcTable = false;
+	return answer.split('\n').map(line => {
+		if (!line.trim().startsWith('|')) utcTable = false;
+		if (line.trim().startsWith('|') && marksUtc(line)) utcTable = true;
+		const marked = allUtc || utcTable || marksUtc(line);
+		return line.replace(/\b(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(Z|[+]00:00)?(?![\d.+-])/g,
+			(original, date: string, time: string, zone: string | undefined) => zone || marked ? `${date}T${time}Z` : original);
+	}).join('\n');
+}
+
 // truthAfter is the same ground truth re-read after the ask: live data (p1's SHOPAPP
 // workload) may change while the agent runs, so a scalar count may be anywhere between.
 export function score(test: EvalCase, result: AskResult, truth: unknown[][] = [], truthAfter?: unknown[][]) {
@@ -8,7 +22,8 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	// Keep historical splits byte-for-byte in behavior; p18 accepts ordinary short Oracle codes.
 	const normalizeCodes = (text: string) => normalizeHyphens(text).replace(/"([A-Za-z_][\w$#]*)"/g, '$1').replace(/\b(ORA|TNS)-(\d{1,5})(?![\w])/gi,
 		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
-	const answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : normalizeHyphens(result.answer);
+	const p19 = test.id.startsWith('hard-p19-');
+	const answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(answer) });
 	for (const pattern of test.expect.forbiddenClaims) checks.push({ check: `forbidden: ${pattern}`, pass: !new RegExp(pattern, 'i').test(answer) });
 	// A required tool may list alternatives ("run_query|top_sql") when either can produce the evidence.
@@ -34,7 +49,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-')) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -76,7 +91,7 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => normalizeHyphens(text).replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
@@ -159,9 +174,10 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!.replace(/^([^=:]+):\s*/, '$1='));
 		}
 	}
-	// A single p18 truth record may be presented as separate labelled facts.
+	// A single p18 or p19 truth record may be presented as separate labelled facts.
 	// Pool only positive labelled lines, never table rows or unlabelled mentions.
-	if (preserveQualified && singleRow) {
+	const pooledFacts: string[] = [];
+	if ((preserveQualified || p19) && singleRow) {
 		const facts = lines.filter(line => !line.includes('|') && !/\b(?:not|no|never|except|without)\b/i.test(line))
 			.flatMap(line => {
 				const match = /^(?:[-•]\s+)?[A-Za-z][^:=]*:\s*(.+)$/.exec(line);
@@ -170,7 +186,8 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 				const value = /^(?:ORA|TNS)-\d{5}(?=[:\s]|$)|^[A-Za-z_][\w$#]*(?:\.[A-Za-z_][\w$#]*)*|^[-+]?\d+(?:\.\d+)?/i.exec(match[1]!);
 				return value ? [value[0]] : [];
 			});
-		if (facts.length) candidates.push(facts.join(' | '));
+		if (p19) pooledFacts.push(...facts);
+		else if (facts.length) candidates.push(facts.join(' | '));
 	}
 	const routineColumn = labels.find(label => /^(?:subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
 	const roleColumn = labels.findIndex(label => /^role$/i.test(label));
@@ -222,6 +239,17 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (singleRow && !block.every(cells => cells.length === 2) && !/^(?:attribute|field|property)?$/i.test(block[0]?.[0] ?? '')) continue;
 		for (let col = 1; col < (block[0]?.length ?? 0); col++) candidates.push(block.slice(1).map(cells => `${cells[0]}=${(cells[col] ?? '').replace(/\s+\([^)]*\)\s*$/, '')}`).join(' / '));
 	}
+	if (p19 && singleRow && pooledFacts.length) {
+		// Cursor identity can be in a named table or an inline labelled fact while
+		// its counts are separate bullets. Accept only one unambiguous labelled ID.
+		const ids = new Set<string>();
+		for (const line of [...lines, ...candidates]) {
+			for (const match of line.matchAll(/\bsql_id\s*[=:]\s*['"]?([0-9abcdfghjkmnpqrstuvwxyz]{13})(?![\w])/gi)) ids.add(match[1]!.toLowerCase());
+		}
+		if (ids.size === 1) pooledFacts.push(`sql_id=${[...ids][0]}`);
+		candidates.push(pooledFacts.join(' | '));
+	}
+
 	return candidates.some(line => {
 		// Named values must agree with their own truth column, even when the
 		// unordered multiset of values would otherwise match a swapped record.
