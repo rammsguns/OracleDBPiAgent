@@ -22,7 +22,7 @@ it('triages slow SHOPAPP orders and a SQL_ID discovered by text on p1 without an
 		expect(direct.issues[0]!.sql.insight?.sqlId).toBe(sql.insight.sqlId);
 		expect(direct.issues[0]!.sql.insight?.children.length).toBeGreaterThan(0);
 		expect(direct.issues[0]!.sql.checks.every(c => c.sql.length > 0)).toBe(true);
-		expect(renderTriageMarkdown(direct)).toContain('### SQL performance');
+		expect(renderTriageMarkdown(direct)).toContain('### SQL Performance');
 		const legacy = structuredClone(direct);
 		delete (legacy.issues[0] as { sql?: unknown }).sql;
 		expect(() => renderTriageMarkdown(legacy)).not.toThrow();

@@ -166,3 +166,8 @@ td:nth-child(2) { max-width: 24rem; }
 .sql-plan-tree > ul { width: max-content; min-width: 100%; }
 .sql-plan-tree li > span { white-space: nowrap; }
 .sql-table td { white-space: nowrap; }
+
+.sql-table { max-width: 100%; min-width: 0; overflow-x: auto; }
+.sql-evidence > p { overflow-wrap: anywhere; }
+.sql-evidence .sql-table td { white-space: nowrap; }
+.sql-evidence .sql-findings td { min-width: 12rem; max-width: 32rem; white-space: normal; overflow-wrap: anywhere; }

@@ -1,11 +1,12 @@
 import type { OracleSession, ToolContext } from '../contracts.js';
-import { readSqlInsight, validateSqlOptions, type SqlInsight } from '../sqlperf/index.js';
+import { findingPresentation, readSqlInsight, validateSqlOptions, type SqlInsight } from '../sqlperf/index.js';
 import { TriageReader, type Check } from './read.js';
 import type { Hypothesis } from './index.js';
 
 export interface TriageSql {
 	status: 'ok' | 'unavailable' | 'skipped';
 	reason?: string;
+	excluded?: number;
 	candidates: Check | null;
 	insight?: SqlInsight;
 	checks: Check[];
@@ -31,7 +32,9 @@ export async function collectSql(ctx: ToolContext, target: string, issue: string
 				binds[`owner${i}`] = owner; binds[`name${i}`] = name;
 				return `(p.OBJECT_OWNER = :owner${i} AND p.OBJECT_NAME = :name${i})`;
 			});
-			result.candidates = await reader.query('Top SQL referencing issue objects (cursor-cache cumulative time per execution)', [{ view: 'V$SQL / V$SQL_PLAN', sql: `SELECT s.SQL_ID, MIN(s.SQL_TEXT) SQL_TEXT, SUM(s.ELAPSED_TIME) / SUM(s.EXECUTIONS) ELAPSED_PER_EXEC FROM V$SQL s WHERE s.EXECUTIONS > 0 AND s.LAST_ACTIVE_TIME >= SYSDATE - :hours / 24 AND s.LAST_ACTIVE_TIME <= SYSDATE AND EXISTS (SELECT 1 FROM V$SQL_PLAN p WHERE p.SQL_ID = s.SQL_ID AND p.CHILD_NUMBER = s.CHILD_NUMBER AND (${predicates.join(' OR ')})) GROUP BY s.SQL_ID ORDER BY ELAPSED_PER_EXEC DESC, s.SQL_ID FETCH FIRST 3 ROWS ONLY` }], binds, 3);
+			const excluded = await reader.query('Excluded session-user diagnostic SQL', [{ view: 'V$SQL / V$SQL_PLAN', sql: `SELECT COUNT(DISTINCT s.SQL_ID) FROM V$SQL s WHERE s.PARSING_SCHEMA_NAME = SYS_CONTEXT('USERENV', 'SESSION_USER') AND s.EXECUTIONS > 0 AND s.LAST_ACTIVE_TIME >= SYSDATE - :hours / 24 AND s.LAST_ACTIVE_TIME <= SYSDATE AND EXISTS (SELECT 1 FROM V$SQL_PLAN p WHERE p.SQL_ID = s.SQL_ID AND p.CHILD_NUMBER = s.CHILD_NUMBER AND (${predicates.join(' OR ')}))` }], binds, 1);
+			result.excluded = Number(excluded.rows[0]?.[0] ?? 0);
+			result.candidates = await reader.query('Top SQL referencing issue objects (cursor-cache cumulative time per execution)', [{ view: 'V$SQL / V$SQL_PLAN', sql: `SELECT s.SQL_ID, MIN(s.SQL_TEXT) SQL_TEXT, SUM(s.ELAPSED_TIME) / SUM(s.EXECUTIONS) ELAPSED_PER_EXEC FROM V$SQL s WHERE s.PARSING_SCHEMA_NAME <> SYS_CONTEXT('USERENV', 'SESSION_USER') AND s.EXECUTIONS > 0 AND s.LAST_ACTIVE_TIME >= SYSDATE - :hours / 24 AND s.LAST_ACTIVE_TIME <= SYSDATE AND EXISTS (SELECT 1 FROM V$SQL_PLAN p WHERE p.SQL_ID = s.SQL_ID AND p.CHILD_NUMBER = s.CHILD_NUMBER AND (${predicates.join(' OR ')})) GROUP BY s.SQL_ID ORDER BY ELAPSED_PER_EXEC DESC, s.SQL_ID FETCH FIRST 3 ROWS ONLY` }], binds, 3);
 			if (result.candidates.status === 'unavailable') { result.status = 'unavailable'; return result; }
 			sqlId = result.candidates.rows[0]?.[0] as string | undefined;
 			if (!sqlId) { result.reason = 'SQL not in cursor cache'; return result; }
@@ -71,6 +74,6 @@ export async function collectSql(ctx: ToolContext, target: string, issue: string
 export function sqlHypotheses(sql: TriageSql): Hypothesis[] {
 	return (sql.insight?.findings ?? []).map((f, i) => ({ rank: 0, verifyNext: sql.verifyNext[i],
 		title: /instability/i.test(f.label) ? 'Possible plan regression: cached plans differ in elapsed time per execution.' : /child/i.test(f.label) ? 'Cursor sharing: high child-cursor count.' : f.label,
-		evidence: [f.view + ': ' + f.columns.join(' | '), ...f.rows.map(r => r.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')).join(' | '))],
+		evidence: [findingPresentation(f, sql.insight!.sqlId).evidence],
 	}));
 }

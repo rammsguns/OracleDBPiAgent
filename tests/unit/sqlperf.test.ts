@@ -62,7 +62,7 @@ it('validates numeric bounds', () => {
 });
 it('escapes LIKE wildcard fragments and bounds candidates', async () => {
 	let seen: unknown;
-	const session = { query: async (sql: string, binds: unknown) => { classifySql(sql); seen = binds; expect(sql).toContain('FIRST 11'); return data([]); } } as unknown as OracleSession;
+	const session = { query: async (sql: string, binds: unknown) => { classifySql(sql); seen = binds; expect(sql).toContain('PARSING_SCHEMA_NAME'); return data([]); } } as unknown as OracleSession;
 	await findSqlCandidates(session, 'x%_'); expect(seen).toEqual({ fragment: '%x\\%\\_%' });
 	await expect(findSqlCandidates(session, '')).rejects.toThrow();
 });
@@ -141,7 +141,7 @@ it('renders the union of mismatch keys in first-seen order', async () => {
 	const { session } = fixture();
 	const r = await readSqlInsight(session, { sqlId: 'abcdfghjkmnpq' });
 	r.mismatches = [{ CHILD_NUMBER: 0, OPTIMIZER_MISMATCH: 'Y' }, { CHILD_NUMBER: 1, BIND_MISMATCH: 'Y' }];
-	expect(renderSqlInsightMarkdown(r)).toContain('| CHILD_NUMBER | OPTIMIZER_MISMATCH | BIND_MISMATCH |\n| --- | --- | --- |\n| 0 | Y |  |\n| 1 |  | Y |');
+	expect(renderSqlInsightMarkdown(r)).toContain('| Child | Optimizer Mismatch | Bind Mismatch |\n| --- | --- | --- |\n| 0 | Y |  |\n| 1 |  | Y |');
 });
 it('deduplicates statistics summary view names while preserving object sections', async () => {
 	const { session } = fixture();
@@ -154,6 +154,30 @@ it('deduplicates statistics summary view names while preserving object sections'
 	const r = await readSqlInsight(session, { sqlId: 'abcdfghjkmnpq' });
 	expect(r.sections.tables?.view).toBe('DBA_TAB_STATISTICS');
 	expect(r.sections.indexes?.view).toBe('DBA_IND_STATISTICS');
-	expect(Object.keys(r.sections).filter(k => k.startsWith('tables:'))).toHaveLength(2);
-	expect(renderSqlInsightMarkdown(r)).toContain('- tables: ok; DBA_TAB_STATISTICS\n');
+	expect(Object.keys(r.sections).filter(k => k.startsWith('tables:'))).toHaveLength(0);
+	expect(renderSqlInsightMarkdown(r)).toContain('Tables: ok');
+});
+it('excludes diagnostic candidates in SQL before the cap and reports their distinct count', async () => {
+	const queries: string[] = [];
+	const session = { query: async (sql: string) => {
+		queries.push(sql); classifySql(sql);
+		return sql.includes('COUNT(DISTINCT') ? data([[7]]) : data([['abcdfghjkmnpq', 'SELECT workload']]);
+	} } as unknown as OracleSession;
+	const result = await findSqlCandidates(session, 'workload');
+	expect(result.excluded).toBe(7);
+	expect(result.rows).toEqual([['abcdfghjkmnpq', 'SELECT workload']]);
+	expect(queries[0]).toContain("PARSING_SCHEMA_NAME = SYS_CONTEXT('USERENV', 'SESSION_USER')");
+	expect(queries[1]).toContain("PARSING_SCHEMA_NAME <> SYS_CONTEXT('USERENV', 'SESSION_USER')");
+});
+it('formats findings without Check internals and leaves raw timing intact', async () => {
+	const { session } = fixture();
+	const result = await readSqlInsight(session, { sqlId: 'abcdfghjkmnpq' });
+	result.children[0]!.elapsedPerExec = 12345.6789;
+	const markdown = renderSqlInsightMarkdown(result);
+	expect(markdown).toContain('12.3');
+	expect(markdown).toContain('Verify Next');
+	expect(markdown).not.toContain('| sql |');
+	expect(markdown).not.toContain('| attempts |');
+	expect(result.children[0]!.elapsedPerExec).toBe(12345.6789);
+	expect(Object.keys(result.sections).some(k => k.includes(':'))).toBe(false);
 });

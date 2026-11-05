@@ -7,9 +7,8 @@ for (const target of ['d1-19c-lab', 'p1-19c-prod']) it(`reads live single-SQL ev
 	const sessions = createSessionProvider(loadConfig());
 	try {
 		const session = await sessions.get(target);
-		await session.query('SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS');
-		const candidates = await findSqlCandidates(session, 'SELECT /* piagent_sqlperf_live_probe */ COUNT(*) FROM ALL_OBJECTS');
-		const row = candidates.rows.find(r => String(r[1]).startsWith('SELECT /* piagent_sqlperf_live_probe */'));
+		const candidates = await findSqlCandidates(session, target.startsWith('d1') ? 'SALES' : 'ORDERS');
+		const row = candidates.rows[0];
 		expect(row).toBeDefined();
 		const result = await readSqlInsight(session, { sqlId: String(row![0]) });
 		expect(result.status).toBe('ok');
