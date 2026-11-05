@@ -2365,6 +2365,170 @@ c5bdaa4, B is 09febf7 (18G + 18H):
   - 44 integration tests pass (live targets and Strata);
   - 38 browser tests pass, 2 opt-in live tests skipped.
 
+## Phase 19: single-SQL performance drill-down (proposed 2026-11-05; needs owner approval)
+
+### Goal
+Answer "why is this SQL slow?" for one statement, using read-only evidence.
+`report` already lists top SQL, wait events and optimizer statistics. What is
+missing is the follow-up on one SQL_ID:
+- its plan or plans;
+- whether the plan changed;
+- where the time goes;
+- whether the tables it reads have stale statistics.
+
+AWR and ASH (`DBA_HIST_*`, `V$ACTIVE_SESSION_HISTORY`) stay out of scope
+because they need the Diagnostics Pack license. Only cursor-cache views are used.
+
+### Access (probed read-only on 2026-11-05)
+- **d1 (HARNESS_LAB):** reads everything needed through SELECT_CATALOG_ROLE:
+  - `V$SQL`, `V$SQL_PLAN`, `V$SQL_PLAN_STATISTICS_ALL`, `V$SQL_BIND_CAPTURE`,
+    `V$SQL_SHARED_CURSOR`;
+  - `DBA_SQL_PLAN_BASELINES`, `DBA_SQL_PROFILES`;
+  - `DBA_TAB_STATISTICS`, `DBA_IND_STATISTICS`, `DBA_TAB_COL_STATISTICS`;
+  - `DBMS_XPLAN.DISPLAY_CURSOR`.
+- **p1 (HARNESS_RO):** reads only `V$SQL`, `V$SQL_PLAN`, `V$SQLSTATS` and
+  `DISPLAY_CURSOR`.
+- **Owner decision:** a grant request
+  `docs/grants-request-<date>-sqlperf.sql` (SELECT only, for HARNESS_RO) on:
+  - `V_$SQL_PLAN_STATISTICS_ALL`, `V_$SQL_SHARED_CURSOR`, `V_$SQL_BIND_CAPTURE`;
+  - `DBA_SQL_PLAN_BASELINES`, `DBA_SQL_PROFILES`;
+  - `DBA_TAB_STATISTICS`, `DBA_IND_STATISTICS`, `DBA_TAB_COL_STATISTICS`.
+- Without the grants, every section degrades to `unavailable` with the missing
+  view named, as alert-log reads do today.
+
+### Shared shape
+`SqlInsight = { status; sqlId; target; text; children: ChildRow[];
+plans: { planHashValue; lines: PlanLine[]; source: 'display_cursor'|'v$sql_plan' }[];
+planChanges: { planHashValue; firstLoad; lastActive; execs; elapsedPerExec }[];
+tables: { owner; name; stale: boolean|null; lastAnalyzed; numRows }[];
+baselines; profiles; binds?; findings: Check[] }`.
+
+Finding examples:
+- several plan hash values with more than 2× difference in elapsed time per
+  execution;
+- stale or missing statistics on a referenced table;
+- a full scan of a large table inside a nested loop;
+- high child-cursor count with the `V$SQL_SHARED_CURSOR` reasons.
+
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-19A SQL insight core and CLI | `wp-19a-sql-insight` | codex | new `src/sqlperf/`; `piagent sql --target T --sql-id ID [--json --markdown]` |
+| WP-19B triage and agent hint | `wp-19b-sql-triage` | codex | `src/triage/` (an issue naming a SQL_ID, or "slow" plus an object, pulls SqlInsight); the `run_query` hint only, no new chat tool (phase-W lesson) |
+| WP-19C web SQL tab | `wp-19c-sql-web` | codex | `src/web/static/` SQL tab: plan tree, plan-change table, stale-stats badges, dark mode |
+| WP-19D p19 evals | `wp-19d-p19-evals` | codex | `evals/cases-hard/phase19-sqlperf.json`: about 6 cases with fixed truth SQL, avoiding volatile cursor-cache facts (plan hash of a pinned lab statement, child count reasons, stale flag) |
+| Review | `review-wp-19x` | antigravity | each WP before merge |
+
+Notes:
+- Order: 19A, then 19B and 19C in parallel, then 19D.
+- Plan text from `DISPLAY_CURSOR` is read with `SELECT … FROM
+  TABLE(DBMS_XPLAN.DISPLAY_CURSOR(:id, :child, 'TYPICAL'))`. This is a
+  read-only table function. The SQL policy must accept exactly this form,
+  with a unit test.
+- Cursor-cache facts age out, so evals must use a lab statement the case
+  itself identifies by SQL text through `V$SQL`, not a hard-coded SQL_ID.
+
+Gate:
+- Single side for 19A and 19C (no chat change).
+- A/B like gate-18h for 19B, because it touches the agent hint.
+- Merge with no regression on p16, p18, dev, holdout, regression and MVP.
+
+## Phase 20: security and privilege review (proposed 2026-11-05; needs owner approval)
+
+### Goal
+`piagent security --target T` produces a read-only posture report that a DBA
+can act on, plus a triage path for "who can drop/read X?".
+
+It reports findings only. It never generates or runs GRANT, REVOKE, ALTER USER
+or AUDIT statements. Remediation text is advice in prose, and every suggested
+statement is clearly labelled "for a human DBA".
+
+### Access (probed read-only on 2026-11-05)
+- **d1:** has `DBA_SYS_PRIVS`, `DBA_ROLE_PRIVS`, `DBA_TAB_PRIVS`,
+  `DBA_PROFILES`, `DBA_USERS`, `DBA_ROLES`, `PROXY_USERS`, `V$PWFILE_USERS`
+  and `V$PARAMETER`. It lacks `DBA_USERS_WITH_DEFPWD` and the
+  `AUDIT_UNIFIED_*` views.
+- **p1:** has only `DBA_USERS`.
+- **Owner decision:** a grant request for SELECT on the views above, plus
+  `DBA_USERS_WITH_DEFPWD`, `AUDIT_UNIFIED_ENABLED_POLICIES`,
+  `AUDIT_UNIFIED_POLICIES` and `DBA_STMT_AUDIT_OPTS`, for both accounts.
+  `UNIFIED_AUDIT_TRAIL` is deliberately excluded: it holds other users'
+  activity, and only policy configuration is needed.
+- Missing views degrade per check to `unavailable`.
+
+### Checks (each a `Check` with evidence rows and severity)
+1. Accounts with default passwords that are open.
+2. Non-Oracle-maintained users holding `DBA`, `SYSDBA`/`SYSOPER` (password
+   file), or `ANY` system privileges, directly or through nested roles.
+   Role-graph expansion is cycle-safe.
+3. Grants to `PUBLIC` on sensitive packages (`UTL_FILE`, `UTL_HTTP`,
+   `UTL_TCP`, `UTL_SMTP`, `DBMS_SQL`, `DBMS_JAVA`, …) and on non-Oracle tables.
+4. Profiles: unlimited `FAILED_LOGIN_ATTEMPTS`, `PASSWORD_LIFE_TIME`, missing
+   verify function; which open users use them.
+5. Open accounts with expired or never-used passwords, and locked accounts
+   that still own objects (informational).
+6. Audit configuration: enabled unified policies, and whether logons and
+   privilege use are covered.
+7. Parameters: `remote_login_passwordfile`, `sec_case_sensitive_logon`,
+   `audit_trail`, `O7_DICTIONARY_ACCESSIBILITY` (absent in 19c, so N/A).
+8. A "Who can …" query: the effective privilege paths on one object
+   (direct, role, `ANY`, `PUBLIC`), shown as a path list, and in the web UI
+   as a graph that reuses the PL/SQL graph component.
+
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-20A security core and CLI | `wp-20a-security` | codex | new `src/security/`; `piagent security --target T [--check id] [--who-can OWNER.OBJECT] [--json --markdown]` |
+| WP-20B report and drift integration | `wp-20b-security-report` | codex | an optional `security` section in `report` (off by default, so the 14 fixed checks stay unchanged), and privilege counts in `drift` scope `security` |
+| WP-20C web Security tab | `wp-20c-security-web` | codex | `src/web/static/` tab with findings, severity filter and the who-can graph |
+| WP-20D p20 evals | `wp-20d-p20-evals` | codex | about 6 cases (default-password count, a nested-role path to DBA, PUBLIC execute on `UTL_FILE`, profile limits, enabled audit policies) with fixed truth SQL |
+| Review | `review-wp-20x` | antigravity | each WP, with a focus on no secret, password hash or `SPARE4` column ever being selected |
+
+Hard rules for the phase:
+- Never select `PASSWORD`, `SPARE4` or any hash column.
+- Default-password checks use `DBA_USERS_WITH_DEFPWD` only.
+- Output names accounts but never credentials.
+
+Gate: single side unless the agent prompt changes, plus the full suites as in
+phase 19.
+
+## Phase 21: hardening and release 1.2.0 (proposed 2026-11-05; needs owner approval)
+
+### Goal
+Close the open Low items from phases 15–18, run a release gate on the phase
+19–20 features, and ship 1.2.0. Pushing the tag needs the owner's
+confirmation, as in phase 15.
+
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-21A open Low items | `wp-21a-lows` | codex | see the list below |
+| WP-21B eval hygiene | `wp-21b-eval-hygiene` | codex | see the list below |
+| WP-21C release notes and docs | `wp-21c-release-120` | codex | `CHANGELOG.md` 1.2.0, `README.md` and `docs/` for `sql` and `security`; install docs; grant-request index |
+| Review | `review-wp-21x` | antigravity | each WP |
+
+WP-21A items:
+- p18 scorer: match spaced problem keys (`ORA 800`) in labelled bullets.
+- Decode ADR incident status (numeric code to name) in alertlog, triage and
+  web.
+- `ask` after `init` with the placeholder API-key file: give a clear error
+  naming `PIAGENT_LLM_API_KEY_FILE` (phase 15 note).
+- `report schedule`: warn when `process.execPath` is not a stable Node path
+  (phase 15 note).
+
+WP-21B items:
+- `evals/ground-truth.ts` sets its session to UTC like the product (WP-18H
+  review note). Replay all truth SQL to prove there are no flips.
+- Stabilize or reclassify the flaky `hard-p8-description-language`.
+- Add a fresh holdout of about 12 cases covering phases 16–20.
+
+Release gate (single side, as in phase 15):
+- hard dev ×2, challenge ×2, holdout ×3, p16/p18/p19/p20 ×2, regression and
+  MVP;
+- every refusal passes;
+- `npm pack` plus a global install smoke of every command;
+- version 1.2.0.
+
+The coordinator commits the version bump. The push of `main` and tag `v1.2.0`
+waits for the owner.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
