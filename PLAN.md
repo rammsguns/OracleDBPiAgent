@@ -2122,8 +2122,10 @@ Options:
   window;
 - `codes` (ORA-/TNS- codes);
 - `text` (a case-insensitive substring, bound);
-- `level` (default: errors and warnings, `MESSAGE_LEVEL <= 16` plus ORA-
-  lines);
+- `level` (default: `MESSAGE_LEVEL <= 8`, critical/severe/important, or text
+  containing ORA-, TNS-, "Errors in file", "incident=" or "deadlock"). Oracle
+  tags almost every line level 16 (normal), so `<= 16` filters nothing. `all`
+  shows everything;
 - `limit` (default 50, capped by `limits.maxRows`).
 
 Reading rules:
@@ -2134,8 +2136,9 @@ Reading rules:
   key, incident id (from "incident=N"), trace file name and message text.
 - Message text goes through the existing credential redaction, and a row's text
   is capped at 2 KB.
-- Consecutive identical messages are folded, with a count and a first/last
-  time.
+- Messages that are identical after masking digits and hex ids are folded
+  ("Resize operation completed for file# N..." ×20 is one row), with a count,
+  a first/last time and one example text. Trailing newlines are trimmed.
 
 Other reads:
 - `readIncidents` lists V$DIAG_INCIDENT joined to V$DIAG_PROBLEM: incident id,
