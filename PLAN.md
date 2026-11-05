@@ -2574,6 +2574,26 @@ Rules:
 - Run p19 ×2 locally as a measurement and report per-case results.
 - No product changes.
 
+WP-19D follow-up (coordinator, 2026-11-05, after the first measurement: raw 5/8,
+6/8 on manual review). Same branch and worker. It now also owns the eval runner
+and `evals/scoring.ts` for the items below:
+1. `hard-p19-plan-controls` truth also returns the discovered statement's
+   SQL_ID, computed at run time. Its old truth `[[0, 0]]` could be matched on
+   the wrong cursor.
+2. An opt-in `skipWhenTruthEmpty` case flag:
+   - when truth is empty before the ask, record `skipped` with a reason and
+     make no LLM call;
+   - when truth is empty after the ask, also record `skipped`;
+   - skips are excluded from pass-rate denominators and `compare.ts`, and
+     counted separately in the summary;
+   - set the flag on all p19 cases.
+3. The scorer extends the WP-18F labelled single-record pooling to p19 cases
+   only, and accepts equivalent UTC timestamp spellings
+   (`2026-11-04 22:00:07`, `2026-11-04T22:00:07Z`) only when the answer marks
+   the time as UTC.
+4. Replay all of `eval-archive` with the new scorer. It must show zero flips
+   outside p19 and list every p19 flip with a reason.
+
 ## Phase 20: security and privilege review (proposed 2026-11-05; needs owner approval)
 
 ### Goal
