@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ config: vi.fn(), sessions: vi.fn(), read: vi.f
 vi.mock('../../src/config/index.js', () => ({ loadConfig: mocks.config }));
 vi.mock('../../src/oracle/index.js', () => ({ createSessionProvider: mocks.sessions }));
 vi.mock('../../src/audit/index.js', () => ({ JsonlAuditSink: class {} }));
-vi.mock('../../src/alertlog/index.js', () => ({ readAlertLog: mocks.read, readIncidents: mocks.incidents, renderAlertLogMarkdown: () => '# Alert log\n' }));
+vi.mock('../../src/alertlog/index.js', async original => ({ ...await original<typeof import('../../src/alertlog/index.js')>(), readAlertLog: mocks.read, readIncidents: mocks.incidents, renderAlertLogMarkdown: () => '# Alert log\n' }));
 import { runAlertLog } from '../../src/alertlog/cli.js';
 afterEach(() => { vi.restoreAllMocks(); });
 function setup() {

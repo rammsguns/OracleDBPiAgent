@@ -78,10 +78,11 @@ it('folds twenty digit-varying resize messages across interleaved rows and keeps
 	expect(renderAlertLogMarkdown(result)).not.toContain('<br>');
 });
 it('masks hex IDs, unions metadata with a cap, and preserves newest singular fields', async () => {
-	const rows = Array.from({ length: 25 }, (_, i) => row(`ORA-${String(i).padStart(5, '0')} incident=${100 + i} /trace/t${i}.trc address=0x${(100 + i).toString(16)} id=${(0xdeadbeef + i).toString(16)}`));
+	const rows = Array.from({ length: 25 }, (_, i) => row(`ORA-00600 ospid=${200 + i} incident=${100 + i} /trace/t${i}.trc address=0x${(100 + i).toString(16)} id=${(0xdeadbeef + i).toString(16)}`));
 	const result = await readAlertLog(fixture(rows).ctx, 'd1-19c-lab'); const group = result.rows[0]!;
 	expect(result.rows).toHaveLength(1); expect(group.count).toBe(25);
-	for (const field of ['codes', 'incidentIds', 'traceFiles'] as const) expect(group[field]).toHaveLength(20);
+	expect(group.codes).toEqual(['ORA-00600']);
+	for (const field of ['incidentIds', 'traceFiles'] as const) expect(group[field]).toHaveLength(20);
 	expect(group).toMatchObject({ incidentId: '100', traceFile: '/trace/t0.trc', metadataTruncated: true });
 	expect(renderAlertLogMarkdown(result)).toContain('100, 101');
 });
@@ -90,4 +91,24 @@ it('renders single occurrences with one timestamp and titles incidents correctly
 	expect(result.rows[0]?.messageText).toBe('ORA-00600\nline two');
 	const markdown = renderAlertLogMarkdown(result); expect(markdown).toContain('ORA-00600<br>line two |'); expect(markdown).not.toContain('2026-11-04T12:00:00Z /');
 	const incidents = await readIncidents(fixture().ctx, 'd1-19c-lab'); expect(renderAlertLogMarkdown(incidents)).toMatch(/^# ADR incidents: d1-19c-lab/);
+});
+
+it('never folds distinct error codes, including abbreviated ORA codes and TNS/PLS', async () => {
+	for (const [a, b] of [['ORA-00600', 'ORA-07445'], ['ORA-609', 'ORA-600'], ['TNS-12537', 'TNS-00507'], ['PLS-00302', 'PLS-00306']]) {
+		const result = await readAlertLog(fixture([row(`ospid=12 ${a}`), row(`ospid=34 ${b}`)]).ctx, 'd1-19c-lab');
+		expect(result.rows).toHaveLength(2); expect(result.rows.map(r => r.count)).toEqual([1, 1]);
+	}
+});
+it('keeps code positions intact as well as the sorted code set', async () => {
+	const result = await readAlertLog(fixture([row('ORA-00600 then ORA-07445 pid=12'), row('ORA-07445 then ORA-00600 pid=34')]).ctx, 'd1-19c-lab');
+	expect(result.rows).toHaveLength(2);
+});
+it('separates equal message templates at distinct levels, including null', async () => {
+	const rows = [1, 16, null, 1].map(level => ['2026-11-04T12:00:00Z', level, 'key', 'ORA-00600 pid=12']);
+	const result = await readAlertLog(fixture(rows).ctx, 'd1-19c-lab', { level: 'all' });
+	expect(result.rows.map(r => [r.level, r.count])).toEqual([[1, 2], [16, 1], [null, 1]]);
+});
+it('folds repeated abbreviated codes while retaining incident and trace unions', async () => {
+	const result = await readAlertLog(fixture([row('ORA-609 ospid=12 incident=123 /trace/t12.trc'), row('ORA-609 ospid=34 incident=456 /trace/t34.trc')]).ctx, 'd1-19c-lab');
+	expect(result.rows).toHaveLength(1); expect(result.rows[0]).toMatchObject({ count: 2, codes: ['ORA-00609'], incidentIds: ['123', '456'], traceFiles: ['/trace/t12.trc', '/trace/t34.trc'] });
 });

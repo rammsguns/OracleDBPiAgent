@@ -2,10 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
 import { JsonlAuditSink } from '../audit/index.js';
-import { readAlertLog, readIncidents, renderAlertLogMarkdown, type AlertLogOptions } from './index.js';
+import { AlertlogUsageError, readAlertLog, readIncidents, renderAlertLogMarkdown, type AlertLogOptions } from './index.js';
 export async function runAlertLog(options: { target: string; since?: string; from?: string; to?: string; code?: string[]; grep?: string; level?: string; limit?: string; incidents?: boolean; json?: boolean; markdown?: boolean }): Promise<void> {
-	if (options.json && options.markdown) throw new Error('Choose --json or --markdown');
-	if (options.incidents && (options.code?.length || options.grep !== undefined || options.level !== undefined)) throw new Error('Incident mode accepts window and limit options only');
+	if (options.json && options.markdown) throw new AlertlogUsageError('Choose --json or --markdown');
+	if (options.incidents && (options.code?.length || options.grep !== undefined || options.level !== undefined)) throw new AlertlogUsageError('Incident mode accepts window and limit options only');
 	const config = loadConfig(), sessions = createSessionProvider(config);
 	try {
 		const ctx = { config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() };

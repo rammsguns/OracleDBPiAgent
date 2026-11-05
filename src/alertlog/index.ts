@@ -3,6 +3,10 @@ import type { ToolContext } from '../contracts.js';
 import { sinceHours } from '../triage/parse.js';
 import { redactCredentials } from '../triage/redact.js';
 
+export class AlertlogUsageError extends Error {
+	constructor(message: string) { super(message); this.name = 'AlertlogUsageError'; }
+}
+
 export interface WindowOptions { since?: string; from?: string | Date; to?: string | Date; limit?: number }
 export interface AlertLogOptions extends WindowOptions {
 	codes?: string[];
@@ -26,27 +30,31 @@ export interface AlertResult<T> {
 }
 const str = (v: unknown): string => v == null ? '' : v instanceof Date ? v.toISOString() : String(v);
 const safe = (v: unknown): string => redactCredentials(str(v));
-const codesIn = (text: string): string[] => [...new Set([...text.toUpperCase().matchAll(/\b(ORA|TNS)-(\d{1,5})\b/g)].map(m => `${m[1]}-${m[2]!.padStart(5, '0')}`))];
+const codesIn = (text: string): string[] => [...new Set([...text.toUpperCase().matchAll(/\b(ORA|TNS|PLS)-(\d{1,5})\b/g)].map(m => `${m[1]}-${m[2]!.padStart(5, '0')}`))];
+function durationHours(since?: string): number {
+	try { return sinceHours(since); }
+	catch (error) { throw new AlertlogUsageError((error as Error).message); }
+}
 function windowOptions(options: WindowOptions) {
-	if (options.since !== undefined && (options.from !== undefined || options.to !== undefined)) throw new Error('Choose since or from/to');
-	if ((options.from === undefined) !== (options.to === undefined)) throw new Error('Explicit window requires both from and to');
+	if (options.since !== undefined && (options.from !== undefined || options.to !== undefined)) throw new AlertlogUsageError('Choose since or from/to');
+	if ((options.from === undefined) !== (options.to === undefined)) throw new AlertlogUsageError('Explicit window requires both from and to');
 	const to = options.to === undefined ? new Date() : date(options.to);
-	const from = options.from === undefined ? new Date(to.getTime() - sinceHours(options.since) * 3600000) : date(options.from);
-	if (from >= to || to.getTime() - from.getTime() > 30 * 86400000) throw new Error('Window must be positive and at most 30d');
+	const from = options.from === undefined ? new Date(to.getTime() - durationHours(options.since) * 3600000) : date(options.from);
+	if (from >= to || to.getTime() - from.getTime() > 30 * 86400000) throw new AlertlogUsageError('Window must be positive and at most 30d');
 	return { from: from.toISOString(), to: to.toISOString() };
 }
 function date(value: string | Date): Date {
 	// Require an explicit zone so operator and database time zones cannot silently disagree.
-	if (typeof value === 'string' && !/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/i.test(value)) throw new Error('Window timestamps require ISO date/time with a timezone');
+	if (typeof value === 'string' && !/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/i.test(value)) throw new AlertlogUsageError('Window timestamps require ISO date/time with a timezone');
 	const result = new Date(value);
-	if (!Number.isFinite(result.getTime())) throw new Error('Invalid window timestamp');
+	if (!Number.isFinite(result.getTime())) throw new AlertlogUsageError('Invalid window timestamp');
 	return result;
 }
 async function read<T>(ctx: ToolContext, target: string, options: WindowOptions, view: string, views: string[], build: (time: string) => { select: string; where: string; order: string; binds: Record<string, unknown> }, map: (row: unknown[]) => T): Promise<AlertResult<T>> {
 	const configured = ctx.config.targets.find(t => t.name === target);
-	if (!configured || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned alert-log target');
+	if (!configured || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new AlertlogUsageError('Unknown or unpinned alert-log target');
 	const requested = options.limit ?? 50;
-	if (!Number.isInteger(requested) || requested < 1) throw new Error('limit must be a positive integer');
+	if (!Number.isInteger(requested) || requested < 1) throw new AlertlogUsageError('limit must be a positive integer');
 	const limit = Math.min(requested, ctx.config.limits.maxRows), window = windowOptions(options);
 	const time = `TO_TIMESTAMP_TZ(:fromTime, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM')`;
 	const query = build(time);
@@ -70,10 +78,10 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 }
 export async function readAlertLog(ctx: ToolContext, target: string, options: AlertLogOptions = {}): Promise<AlertResult<AlertRow>> {
 	const codes = [...new Set((options.codes ?? []).map(c => c.toUpperCase()))];
-	if (codes.length > 20 || codes.some(c => !/^(ORA|TNS)-\d{5}$/.test(c))) throw new Error('codes must contain at most 20 ORA-/TNS- codes with five digits');
-	if (options.text !== undefined && (typeof options.text !== 'string' || options.text.length > 2048)) throw new Error('text must be at most 2048 characters');
+	if (codes.length > 20 || codes.some(c => !/^(ORA|TNS)-\d{5}$/.test(c))) throw new AlertlogUsageError('codes must contain at most 20 ORA-/TNS- codes with five digits');
+	if (options.text !== undefined && (typeof options.text !== 'string' || options.text.length > 2048)) throw new AlertlogUsageError('text must be at most 2048 characters');
 	const level = options.level ?? 'default';
-	if (level !== 'default' && level !== 'all' && (!Number.isInteger(level) || level < 1 || level > 32)) throw new Error('level must be default, all, or an integer from 1 to 32');
+	if (level !== 'default' && level !== 'all' && (!Number.isInteger(level) || level < 1 || level > 32)) throw new AlertlogUsageError('level must be default, all, or an integer from 1 to 32');
 	const result = await read(ctx, target, options, 'V$DIAG_ALERT_EXT', ['V$DIAG_ALERT_EXT'], time => {
 		const binds: Record<string, unknown> = {}, clauses = [`ORIGINATING_TIMESTAMP >= ${time}`, `ORIGINATING_TIMESTAMP < ${time.replace(':fromTime', ':toTime')}`];
 		if (level === 'default') {
@@ -95,8 +103,9 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 		const incidentIds = [...new Set([...raw.matchAll(/\bincident\s*=\s*(\d+)/gi)].map(m => m[1]!))];
 		const traceFiles = [...new Set([...redacted.matchAll(/[^\s'"<>]*\.trc\b/gi)].map(m => m[0]))];
 		const codes = codesIn(raw), problemKey = safe(row[2]);
-		const normalized = raw.replace(/[\r\n]+$/, '').replace(/\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{8,}\b/gi, '<hex>').replace(/\d+/g, '<n>');
-		return { timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codes.slice(0, 20), problemKey, incidentId: incidentIds[0] ?? null, traceFile: traceFiles[0] ?? null, incidentIds: incidentIds.slice(0, 20), traceFiles: traceFiles.slice(0, 20), problemKeys: problemKey ? [problemKey] : [], metadataTruncated: codes.length > 20 || incidentIds.length > 20 || traceFiles.length > 20, messageText: messageText.replace(/[\r\n]+$/, ''), textTruncated: Buffer.byteLength(redacted) > 2048, _identity: createHash('sha256').update(normalized).digest('hex') };
+		const normalized = raw.replace(/[\r\n]+$/, '').replace(/\b(?:ORA|TNS|PLS)-\d+\b|\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{8,}\b|\d+/gi,
+			token => /^(?:ORA|TNS|PLS)-/i.test(token) ? token.toUpperCase() : /^(?:0x|.*[a-f])/i.test(token) ? '<hex>' : '<n>');
+		return { timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codes.slice(0, 20), problemKey, incidentId: incidentIds[0] ?? null, traceFile: traceFiles[0] ?? null, incidentIds: incidentIds.slice(0, 20), traceFiles: traceFiles.slice(0, 20), problemKeys: problemKey ? [problemKey] : [], metadataTruncated: codes.length > 20 || incidentIds.length > 20 || traceFiles.length > 20, messageText: messageText.replace(/[\r\n]+$/, ''), textTruncated: Buffer.byteLength(redacted) > 2048, _identity: createHash('sha256').update(JSON.stringify([normalized, [...codes].sort(), row[1] == null ? null : Number(row[1])])).digest('hex') };
 	});
 	// Group throughout the bounded result, using complete text before preview clipping.
 	const folded: AlertRow[] = [], groups = new Map<string, AlertRow>();
@@ -107,7 +116,6 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 		previous.count++;
 		if (row.timestamp < previous.firstTime) previous.firstTime = row.timestamp;
 		if (row.timestamp > previous.lastTime) previous.lastTime = row.timestamp;
-		if (row.level !== null) previous.level = previous.level === null ? row.level : Math.min(previous.level, row.level);
 		previous.textTruncated ||= row.textTruncated;
 		previous.metadataTruncated ||= row.metadataTruncated;
 		for (const field of ['codes', 'incidentIds', 'traceFiles', 'problemKeys'] as const) {

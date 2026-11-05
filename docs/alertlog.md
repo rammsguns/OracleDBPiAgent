@@ -34,6 +34,11 @@ Options:
   limit options; message-only filters are rejected.
 - `--json` or `--markdown`: mutually exclusive. Markdown is also the default.
 
+Invalid option values raise the exported `AlertlogUsageError`. The alertlog
+action prints the specific validation message to stderr and exits with code 2.
+Database/runtime errors retain the existing failure handling. For example,
+`--since 31d` prints `--since must be a positive duration (m/h/d), at most 30d`.
+
 ## Reusable API
 
 Import `readAlertLog(ctx, target, options)`, `readIncidents(ctx, target, options)`
@@ -49,14 +54,17 @@ existing triage redactor before text is capped to 2,048 UTF-8 bytes. Trailing
 newlines are removed; internal newlines remain. Trace names are extracted from
 redacted text.
 
-Messages matching after masking digit sequences, `0x` hex IDs and bare hex IDs
+Messages matching after masking non-error digit sequences, `0x` hex IDs and bare hex IDs
 (at least eight hex characters including a letter) fold throughout the fetched
-result, even when other messages intervene. The complete text determines the
+result, even when other messages intervene. ORA-/TNS-/PLS- code digits (including
+abbreviated forms such as ORA-609) are preserved. The complete sorted parsed
+code set and exact level are also part of the identity: different codes or
+levels never fold together. The complete text determines the
 group before preview clipping. Each group retains its newest example text and
 singular `incidentId`, `traceFile`, and `problemKey` fields. Additive `incidentIds`,
 `traceFiles`, and `problemKeys` arrays preserve unions across the group, as does
 `codes`. Each union is capped at 20 distinct values; `metadataTruncated` signals
-omissions. The group's numeric level is the lowest (most severe) member level.
+omissions. Each group retains its original level.
 `firstTime` and `lastTime` bound the group; counts cover only the bounded fetched
 result, not the entire window. Markdown shows a single timestamp for count 1,
 and both bounds for repeated messages. It displays the union metadata and marks
@@ -87,25 +95,24 @@ alerts and joined incidents from both approved targets and exercise code/text
 filters; they clearly skip when credentials are unset or the database is down.
 Missing grants are tested with stubs, without changing live grants.
 
-Commands used:
+Commands used for the Antigravity fixes:
 
 ```sh
 npm run typecheck
 npm test
-PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- -t '^(?!.*answers one end-to-end ask)'
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/alertlog.test.ts
 ```
 
-Results after the coordinator fixes: typecheck clean; 1,057 unit tests passed
-(70 files); 37 integration tests passed and one LLM test was skipped (13 files).
-The live captures below cover both targets with no LLM calls.
+Results: typecheck clean; 1,069 unit tests passed (71 files); both alertlog
+integration tests passed on d1 and p1. No LLM calls were made.
 
-The integration name filter skips the pre-existing Strata end-to-end test to
-honor the task's no-LLM instruction. All database integration tests still run,
-including the existing 19c refusal gate's explicitly permitted non-19c connection.
+The alertlog integration tests cover both approved targets, without an LLM.
+Unit tests include real CLI subprocess checks for specific validation messages
+and exit code 2; these fail validation before connecting to any database.
 
 ## Live CLI output (credential-redacted)
 
-Captured from both approved targets after the coordinator fixes. Each target
+Captured from both approved targets after the Antigravity fixes. Each target
 shows the default filter/window, the default filter over 30 days, and ADR
 incidents over 30 days. UTC bounds are emitted by the host clock. Trace paths
 are SQL evidence; no server files were opened. Text passes through credential
@@ -118,7 +125,7 @@ piagent alertlog --target d1-19c-lab --limit 10 --markdown
 ```text
 # Alert log: d1-19c-lab
 
-ok; V$DIAG_ALERT_EXT; 2026-11-04T04:08:50.980Z to 2026-11-05T04:08:50.980Z (exclusive)
+ok; V$DIAG_ALERT_EXT; 2026-11-04T04:21:57.948Z to 2026-11-05T04:21:57.948Z (exclusive)
 
 | First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |
 |---|---|---|---|---|---|---|---|
@@ -136,7 +143,7 @@ piagent alertlog --target d1-19c-lab --since 30d --limit 10 --markdown
 ```text
 # Alert log: d1-19c-lab
 
-ok; V$DIAG_ALERT_EXT; 2026-10-06T04:08:53.490Z to 2026-11-05T04:08:53.490Z (exclusive)
+ok; V$DIAG_ALERT_EXT; 2026-10-06T04:22:00.498Z to 2026-11-05T04:22:00.498Z (exclusive)
 
 | First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |
 |---|---|---|---|---|---|---|---|
@@ -145,7 +152,8 @@ ok; V$DIAG_ALERT_EXT; 2026-10-06T04:08:53.490Z to 2026-11-05T04:08:53.490Z (excl
 | 2026-11-04T05:32:36.101Z | 16 | TNS-12537 | 1 |  |  |  | TNS-12537: TNS:connection closed |
 | 2026-11-04T04:29:49.671Z | 1 | ORA-00800 | 1 | ORA 800 | 245813 | /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc | Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], [] |
 | 2026-11-04T04:29:44.158Z | 16 | ORA-27167, ORA-27300, ORA-27301, ORA-27302, ORA-27303 | 1 |  |  | /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_ora_20.trc | Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_ora_20.trc:<br>ORA-27167: Attempt to determine if Oracle binary image is stored on remote server failed<br>ORA-27300: OS system dependent operation:parse_df failed with status: 2<br>ORA-27301: OS failure message: No such file or directory<br>ORA-27302: failure occurred at: parse failed<br>ORA-27303: additional information: Filesystem     1K-blocks      Used Available Use% Mounted on<br>overlay        951012720 359290188 543339984  40% / |
-| 2026-10-25T02:41:50.777Z / 2026-10-25T02:45:50.676Z | 16 | ORA-00000, ORA-00031 | 5 |  |  |  |   Result = ORA-0 |
+| 2026-10-25T02:41:50.777Z / 2026-10-25T02:45:50.676Z | 16 | ORA-00000 | 2 |  |  |  |   Result = ORA-0 |
+| 2026-10-25T02:45:48.847Z / 2026-10-25T02:45:50.413Z | 16 | ORA-00031 | 3 |  |  |  |   Result = ORA-31 |
 Row cap reached; partial result (folding covers only fetched rows).
 ```
 
@@ -156,7 +164,7 @@ piagent alertlog --target d1-19c-lab --since 30d --incidents --limit 3 --markdow
 ```text
 # ADR incidents: d1-19c-lab
 
-ok; V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM; 2026-10-06T04:08:56.029Z to 2026-11-05T04:08:56.029Z (exclusive)
+ok; V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM; 2026-10-06T04:22:03.048Z to 2026-11-05T04:22:03.048Z (exclusive)
 
 | Created | Incident | Problem | Status |
 |---|---|---|---|
@@ -173,7 +181,7 @@ piagent alertlog --target p1-19c-prod --limit 10 --markdown
 ```text
 # Alert log: p1-19c-prod
 
-ok; V$DIAG_ALERT_EXT; 2026-11-04T04:08:58.275Z to 2026-11-05T04:08:58.275Z (exclusive)
+ok; V$DIAG_ALERT_EXT; 2026-11-04T04:22:05.044Z to 2026-11-05T04:22:05.044Z (exclusive)
 
 | First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |
 |---|---|---|---|---|---|---|---|
@@ -192,7 +200,7 @@ piagent alertlog --target p1-19c-prod --since 30d --limit 10 --markdown
 ```text
 # Alert log: p1-19c-prod
 
-ok; V$DIAG_ALERT_EXT; 2026-10-06T04:09:00.369Z to 2026-11-05T04:09:00.369Z (exclusive)
+ok; V$DIAG_ALERT_EXT; 2026-10-06T04:22:07.174Z to 2026-11-05T04:22:07.174Z (exclusive)
 
 | First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |
 |---|---|---|---|---|---|---|---|
@@ -212,7 +220,7 @@ piagent alertlog --target p1-19c-prod --since 30d --incidents --limit 3 --markdo
 ```text
 # ADR incidents: p1-19c-prod
 
-ok; V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM; 2026-10-06T04:09:02.390Z to 2026-11-05T04:09:02.390Z (exclusive)
+ok; V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM; 2026-10-06T04:22:09.161Z to 2026-11-05T04:22:09.161Z (exclusive)
 
 | Created | Incident | Problem | Status |
 |---|---|---|---|
