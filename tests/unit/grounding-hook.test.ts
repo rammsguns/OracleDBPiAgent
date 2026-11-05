@@ -27,7 +27,7 @@ it('corrects unsupported numbers once using the exact follow-up, keeping identif
 	const { agent, audit, contexts } = await fixture(['TOOL', '`PROMO`: 3,331,394.74', '`PROMOTIONS`: 3,313,394.74']);
 	await agent.prompt('What is the table total?');
 	expect(contexts).toHaveLength(3);
-	expect(contexts[2].messages.at(-1).content).toContain("These numbers do not appear in this conversation's tool results: 3,331,394.74. Keep the rest of your answer, including any refusal, and only fix or remove the listed numbers; use tools only if needed.");
+	expect(contexts[2].messages.at(-1).content).toContain("These numbers do not appear in this conversation's tool results: 3,331,394.74. Return the complete revised answer, which will replace your previous answer. Keep the rest of your answer, including any refusal, and only fix or remove the listed numbers; use tools only if needed.");
 	expect(contexts[2].messages.at(-1).content).not.toContain('PROMO');
 	expect(agent.unverified).toEqual([]);
 	expect(audit.filter(e => e.kind === 'run_end')).toMatchObject([{ unverifiedCount: 0 }]);

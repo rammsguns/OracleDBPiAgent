@@ -6,6 +6,8 @@ interface Numeric { text: string; value: number; precision: number; coefficient:
 const numberPattern = /(?<![\w$#.])(?:[-+]?[$€£]\s*)?[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?(?:\s*(?:[KMGT]i?B|[KMGT]|bytes|%))?(?![\w]|\.\d|,\d)/gi;
 const identifierPattern = /(?<![\w])(?:[A-Za-z_$#][\w$#]*)(?:\.[A-Za-z_$#][\w$#]*)*/g;
 const constants = new Set(('SQL SQL_ID ID DBA DB DML DDL PL SQL SELECT FROM WHERE JOIN ON AS AND OR NOT NULL WITH BY GROUP ORDER HAVING DESC ASC UNION ALL DISTINCT CASE WHEN THEN ELSE END IN IS LIKE EXISTS COUNT SUM AVG MIN MAX ROUND OVER PARTITION ROWS FETCH FIRST ONLY OFFSET LIMIT INSERT UPDATE DELETE MERGE DROP CREATE ALTER TABLE VIEW INDEX COMMIT ROLLBACK EXPLAIN PLAN FOR NEXTVAL SYS SYSTEM DBMS_ UTL_ KB MB GB TB KIB MIB GIB TIB CPU SGA PGA IO IOPS TEMP UNDO RMAN ASH AWR ORA JSON CSV UTC GMT TRUE FALSE N A OK PK FK UK Y N READ CTAS LIST_TARGETS DB_OVERVIEW LIST_SCHEMAS LIST_OBJECTS DESCRIBE_OBJECT GET_SOURCE RUN_QUERY EXPLAIN_PLAN TOP_SQL SESSION_ACTIVITY WAIT_EVENTS TABLESPACE_USAGE ROW_NUMBER DENSE_RANK RANK TO_CHAR TO_DATE TRUNC NVL NULLIF COALESCE PRIMARY KEY NO ACTION DBWR LGWR OLTP TX TM AE FIRST_ROWS FM DBA_ R C P U V O V$SQL V$SQLSTATS V$SQL_PLAN V$SQL_PLAN_MONITOR V$SESSION V$LOCK V$ACTIVE_SESSION_HISTORY DBA_HIST_ACTIVE_SESS_HISTORY ALL_CONSTRAINTS ALL_CONS_COLUMNS ALL_INDEXES ALL_IND_COLUMNS ALL_TAB_COLUMNS ALL_TABLES ALL_OBJECTS ALL_USERS ALL_SYNONYMS EXECUTIONS ELAPSED_TIME BUFFER_GETS CPU_TIME BLOCKING_SESSION R_OWNER R_CONSTRAINT_NAME').split(' '));
+// Language keywords and built-in syntax are not evidence-dependent identifiers.
+for (const keyword of 'EACH ROW BEFORE AFTER INSTEAD OF TRIGGER PROCEDURE FUNCTION PACKAGE BODY BEGIN DECLARE EXCEPTION RETURN RETURNS IF ELSIF LOOP WHILE EXIT CONTINUE BETWEEN SYSDATE RAISE RAISE_APPLICATION_ERROR'.split(' ')) constants.add(keyword);
 const norm = (text: string) => text.toLowerCase().replace(/["'`]/g, '').replace(/,/g, '');
 function numbers(text: string): Numeric[] {
 	return [...text.matchAll(numberPattern)].flatMap(match => {
@@ -64,7 +66,8 @@ function identifierSupported(fact: string, evidence: Set<string>): boolean {
 }
 export function checkFacts(answer: string, toolResultTexts: readonly string[], question = ''): FactCheck {
 	const evidenceText = toolResultTexts.join('\n');
-	const evidence = new Set(identifiers(evidenceText).flatMap(id => [id, ...id.split('.')]));
+	const evidenceByResult = toolResultTexts.map(text =>
+		new Set(identifiers(text).flatMap(id => [id, ...id.split('.')])));
 	const questionEvidence = new Set(identifiers(question).flatMap(id => [id, ...id.split('.')]));
 	const values = numbers(evidenceText);
 	// Oracle wait tables label time in microseconds in the header, not in each cell.
@@ -103,7 +106,7 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		if (constants.has(fact.toUpperCase()) || fact.split('.').every(part => constants.has(part.toUpperCase())) || /^FM[09]+$/i.test(fact) || identifierSupported(fact, questionEvidence)) continue;
 		// Hyphenated prose (e.g. SHOPAPP-style) is not an unquoted Oracle identifier.
 		if (/^-[a-z]/i.test(answer.slice(match.index! + fact.length)) || /[a-z]-$/i.test(answer.slice(0, match.index!))) continue;
-		add(fact, identifierSupported(fact, evidence));
+		add(fact, evidenceByResult.some(evidence => identifierSupported(fact, evidence)));
 	}
 	// SQL IDs can begin with a digit; identifier scanning above cannot capture those.
 	for (const match of answer.matchAll(/(?<![\w])[0-9a-z]{13}(?![\w])/gi)) {
@@ -123,6 +126,10 @@ export function checkFacts(answer: string, toolResultTexts: readonly string[], q
 		// Avoid treating digits inside quoted identifiers or SQL_IDs as quantities.
 		if (quoted.some(q => shown.start >= q.index! && shown.end <= q.index! + q[0].length)) continue;
 		const supported = values.some(value => {
+			// Error codes are often cited without their source's leading minus sign.
+			// Require an exact magnitude and the same unit; do not round across signs.
+			if (value.unit === shown.unit && value.coefficient === -shown.coefficient
+				&& value.exponent === shown.exponent) return true;
 			if (shown.unit === '%' || value.unit === '%') return shown.unit === '%' && (!value.unit || value.unit === '%') && exactRounded(value, shown);
 			return scales(shown.unit).some(scale => scales(value.unit).some(source => exactRounded(value, shown, source, scale)));
 		}) || ((shown.unit === '%' || !shown.unit) && ratioSupported(shown, ratioValues, shown.unit === '%' ? 100 : 1))
