@@ -28,6 +28,9 @@ revision they checked; use the status page and current code for today's behavior
 
 ## Reports, grounding and web UI
 
+- [sqlperf.md](sqlperf.md) — Cached SQL insight, plans, statistics and findings; CLI and web.
+- [security.md](security.md) — Posture checks, privilege paths, reports, drift and web.
+- [alertlog.md](alertlog.md) — Alert-log and ADR evidence, filters and decoded incident status.
 - [report.md](report.md) — Read-only DBA report sections, CLI options, summary grounding and live verification.
 - [triage.md](triage.md) — Issue evidence, constraint resolution, debug SQL, traces and exports.
 - [triage-nightly-purge.md](triage-nightly-purge.md) and [triage-k7q-failjob.md](triage-k7q-failjob.md) — Generated read-only triage examples.
@@ -38,6 +41,7 @@ revision they checked; use the status page and current code for today's behavior
 
 ## Compatibility and grants
 
+- [grants.md](grants.md) — Complete grant-request index, target/grantee scope and deliberate exclusions.
 - [compatibility-19c.md](compatibility-19c.md) — Oracle 19c access, fallbacks, SQL policy and source limits.
 - [grants-request-2026-10-26.sql](grants-request-2026-10-26.sql) — Historical SELECT-grant script applied with owner authorization; not an agent setup step.
 

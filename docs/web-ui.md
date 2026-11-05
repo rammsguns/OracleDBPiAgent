@@ -475,3 +475,25 @@ PL/SQL graph contrast and bounds follow-up:
   `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser` passed 38 tests,
   with 2 opt-in live tests skipped. No DB or LLM paths changed or ran; no shared
   contract changes are needed. The screenshots use browser fixtures.
+
+## SQL and Security tabs (1.2.0)
+
+The evidence tab bar now includes Tool trace, Audit, Report, Drift, PL/SQL, SQL,
+Security, Alert Log and Triage. Chat remains alongside the evidence panels.
+
+The **SQL** tab reads one cached statement by SQL ID or text fragment. Text searches
+list candidates for explicit selection, even when only one matches. The CLI
+opens a single untruncated match automatically.
+It shows child metrics, plan trees and changes, table/index statistics, optional
+controls and metadata, findings and per-section availability. Bind values are
+never displayed. Markdown export preserves the evidence. See [SQL insight](sqlperf.md).
+
+The **Security** tab groups posture findings by severity, provides a severity
+filter, and shows availability notes. Supply `OWNER.OBJECT` to draw who-can
+privilege paths, with a list fallback. Markdown export includes the report.
+A status of `ok` describes available evidence, not a clean security assessment.
+See [security](security.md) for reachability limits and deliberately excluded data.
+
+Both tabs use deterministic read-only database evidence without an LLM. They
+support light/dark themes and contain wide content inside scrolling regions.
+The Alert Log tab now shows decoded ADR status names alongside raw codes.

@@ -16,7 +16,7 @@ Or install a packed tarball from the prepared clone:
 ```bash
 npm pack
 # Replace the filename below with the one printed by npm pack.
-npm install -g ./oracledb-pi-agent-1.1.0.tgz
+npm install -g ./oracledb-pi-agent-1.2.0.tgz
 ```
 
 The prepare script compiles the CLI and web assets. Run `piagent` from any
@@ -115,3 +115,26 @@ alert and succeeds; other failures remain failures. See the
 
 See the [full command list](../README.md#commands), [drift guide](drift.md) and
 [web UI](web-ui.md) for the new metadata comparison and saved-history views.
+
+## Upgrade to 1.2.0
+
+Rebuild and reinstall the updated clone, or install its prepared tarball as above.
+The coordinator sets the package version for the release; `piagent --version`
+reports the installed package, so a pre-release checkout may still report 1.1.0.
+Existing private configuration and saved reports stay in place. `init` never
+replaces an existing `.env`. No npm registry release is required for this workflow.
+
+SQL insight and security need no LLM: see [SQL insight](sqlperf.md),
+[security](security.md) and the [grant-request index](grants.md). No grant script
+is an install step. New security report sections are opt-in.
+
+Before using ask/chat, replace init's `/absolute/path/to/strata-api-key` with the
+existing private key-file path in `PIAGENT_LLM_API_KEY_FILE`. The placeholder is
+rejected before any service contact. The current top-level CLI catch still prints
+its generic failure message; check this setting first after a fresh init.
+
+Generated schedules pin the current Node and CLI executables. A warning now flags
+Node paths outside recognized system locations, including temporary, bundled and
+version-manager paths. Review the warning, use a stable Node installation and
+regenerate the schedule after changing Node or the installed CLI. This heuristic
+does not test that an executable will remain available to the service account.

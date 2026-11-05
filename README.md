@@ -96,12 +96,12 @@ private `.env`. See the [documentation index](docs/README.md).
 | `piagent report history --target d1-19c-lab --last 10 --json` | Saved-file trends; last 1–30 (default 30), optional JSON. No DB/LLM. |
 | `piagent report schedule --target d1-19c-lab --every 1h` | Print setup, systemd service/timer and alternative cron line; optional `--out`. No installation or DB/LLM. |
 | `piagent report schedule run --target d1-19c-lab` | Run the scheduled read-only report; optional absolute `--home` and `--out`. |
-| `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`; optional JSON and `--out`. No LLM. |
+| `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`, `security`; optional JSON and `--out`. No LLM. |
 | `piagent plsql list --target p1-19c-prod --owner SHOPAPP` | List PL/SQL objects with status, line count and last DDL time; optional `--json`. No LLM. See [PL/SQL docs](docs/plsql.md). |
 | `piagent plsql doc --target p1-19c-prod --object SHOPAPP.WORKLOAD` | Document a package, procedure or trigger: signatures, tables read and written, callers, jobs, errors, source and a Mermaid graph; `--json`, `--out`. No LLM. |
 | `piagent triage --target p1-19c-prod --issue "NIGHTLY_PURGE_JOB failed"` | Turn an issue report into read-only evidence: ranked hypotheses, debug SQL checklist, trace diagram and suggested fixes; `--issue-file`, `--since 24h`, `--json`, `--out`, optional LLM `--summarize`. With no issue, scans recent failures. See [triage](docs/triage.md). |
 | `piagent alertlog --target p1-19c-prod --since 7d` | Read the alert log and ADR incidents through SQL (no server files): errors and warnings by default, repeats folded with counts; `--code`, `--grep`, `--level all`, `--incidents`, `--json`, `--markdown`. No LLM. See [alert log](docs/alertlog.md). |
-| `piagent sql --target p1-19c-prod --sql-id 54x8br9b0szpk` | Drill into one cached statement: children and per-execution timings, plans (`DBMS_XPLAN.DISPLAY_CURSOR`), plan changes, table and index statistics, baselines, profiles, bind metadata (never values) and findings; `--text` finds candidates by SQL text and never guesses, `--child`, `--json`, `--markdown`. Cursor cache only, no AWR/ASH. No LLM. See [SQL insight](docs/sqlperf.md). |
+| `piagent sql --target p1-19c-prod --sql-id 54x8br9b0szpk` | Drill into one cached statement: children and per-execution timings, plans (`DBMS_XPLAN.DISPLAY_CURSOR`), plan changes, table and index statistics, baselines, profiles, bind metadata (never values) and findings; `--text` opens a unique match or lists candidates for explicit selection, `--child`, `--json`, `--markdown`. Cursor cache only, no AWR/ASH. No LLM. See [SQL insight](docs/sqlperf.md). |
 | `piagent security --target d1-19c-lab` | Read-only security posture: open default-password accounts, powerful privileges through nested roles, PUBLIC grants on sensitive packages, password profiles, account lifecycle, audit configuration and parameters; `--check`, `--who-can OWNER.OBJECT`, `--json`, `--markdown`. Never reads password hashes or audit trails; advice is for a human DBA. `report --sections security` and `drift --scope security` reuse it. No LLM. See [security](docs/security.md). |
 
 Manual `schedule run` defaults to `<PIAGENT_HOME>/reports`; pass `--out`
@@ -114,9 +114,9 @@ and one writer per output directory. Exit 3 from a report diff records a local
 alert and the schedule runner succeeds. See [reports and scheduling](docs/report.md).
 Drift exits 0 for complete equality, 3 for observed differences, or 1 for incomplete
 results without observed differences/failure. Inspect `complete` even on exit 3;
-p1 parameter visibility can be unavailable. See [drift](docs/drift.md).
+missing grants can make individual scopes unavailable. See [drift](docs/drift.md).
 
-`report` requires `--target` and runs 14 bounded read-only DBA checks without the
+`report` requires `--target` and by default runs 14 bounded read-only DBA checks without the
 LLM. Markdown is the default (`--md`); `--json` emits one report object.
 `--sections identity,tablespaces,top_sql` selects checks; `--owner HR` selects the
 schema for statistics/index checks. Missing grants become section notes.
@@ -141,12 +141,13 @@ Open the printed `http://127.0.0.1:N/#token=...` URL and keep it private.
 The page shows a target picker, streamed chat, tool-call trace, session audit and
 health checks, with a Stop button. The Report tab runs the selected target's DBA
 checks with an optional summary and includes a saved-file History panel with
-sparklines and worsening flags. The Drift tab compares parameters, schema or object
-metadata without an LLM. The PL/SQL tab documents an object with an SVG
+sparklines and worsening flags. The CLI selects security reports with
+`report --sections security`. The Drift tab compares parameters, schema or object
+metadata without an LLM; the CLI also supports `drift --scope security`. The PL/SQL tab documents an object with an SVG
 dependency graph, the SQL tab drills into one cached statement with a plan tree,
 the Security tab shows posture findings by severity with a who-can privilege graph,
 the Alert Log tab lists folded alert-log entries and ADR
-incidents, and the Triage panel turns a pasted issue into evidence, including
+incidents with decoded status names, and the Triage panel turns a pasted issue into evidence, including
 correlated alert-log entries and SQL performance evidence, and a debug checklist. The UI follows the system
 light or dark theme. In chat, `/triage [--since 7d] <issue>` runs triage, then asks the
 model one grounded question. Chat and report summaries show Unverified notes
@@ -154,6 +155,14 @@ when facts remain unsupported. Export Markdown downloads the displayed conversat
 grounding notes and trace; trace arguments omit SQL, binds and connection fields.
 The token stays in browser memory; reopen the original URL after reloading. The build copies the page into `dist/web/static/`.
 See [web UI details](docs/web-ui.md) for the API and controls.
+
+## Grants
+
+Setup creates no accounts and applies no grants. The [grant-request index](docs/grants.md)
+records every historical request by date, target, grantee and enabled feature.
+Missing access produces availability notes rather than proof of an empty result.
+Security reads policy configuration, never `UNIFIED_AUDIT_TRAIL` or `SYS.USER$`.
+Grant scripts are historical DBA material and must never run as application setup.
 
 ## Tools
 

@@ -1,5 +1,10 @@
 # Single-SQL Performance Insight
 
+Access prerequisites: [grant-request index](grants.md). In the web **SQL** tab,
+choose a target and SQL ID or text fragment, then inspect findings, child metrics,
+the plan tree, statistics and status chips; export Markdown for handoff.
+No LLM is involved.
+
 Current presentation and refreshed live smokes: [WP-19E](wp-19e-sql-polish.md).
 Text candidates now exclude the session user’s diagnostic statements and report
 the excluded count. Raw JSON timing remains in microseconds; displayed per-execution
@@ -14,11 +19,13 @@ piagent sql --target p1-19c-prod --text 'statement fragment' --json
 piagent sql --target p1-19c-prod --sql-id <id> --child 0 --markdown
 ```
 
-Markdown is the default. Choose exactly one selector and one output format.
+Markdown is the default; `--markdown` makes it explicit, and `--json` selects JSON.
+Choose exactly one selector (`--sql-id` or `--text`); output flags are mutually exclusive.
+`--child` is a nonnegative cursor child number, and `--target` is required.
 Invalid options raise SqlUsageError and exit 2. Text lookup escapes LIKE wildcards,
 uses binds, and lists at most 10 distinct SQL_ID candidates (an eleventh sentinel
-detects truncation). Multiple matches require the operator to choose an ID;
-the CLI never picks one. No match produces an empty candidate response.
+detects truncation). A single untruncated match opens its insight automatically. Multiple matches or
+a truncated search require the operator to choose an ID with `--sql-id`. No match produces an empty candidate response.
 
 The public API is exported from src/sqlperf/index.ts:
 readSqlInsight(session, { sqlId, child?, maxPlans? }), findSqlCandidates,
@@ -39,7 +46,10 @@ DST caveat: FIRST_LOAD_TIME stores neither a zone nor its historical offset.
 Using the server's current offset can be off by an hour for cursors loaded
 before a daylight-saving transition (or by the offset change if the server
 time zone changed). These UTC values are therefore estimates across such
-changes. DATE statistics/last-active times are formatted by the UTC session.
+changes. DATE statistics/last-active times preserve their stored clock time, although the
+current SQL formatter appends a literal `Z`. DATE carries no time zone: this label
+does not prove conversion to UTC. Interpret these values with the database clock
+convention; the UTC session does not convert the stored DATE value.
 
 Markdown plans preserve whitespace, pipes and other characters in fenced code
 blocks, including V$SQL_PLAN fallback rows. Fence length exceeds any embedded
