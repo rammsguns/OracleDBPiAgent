@@ -121,6 +121,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
 		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
 	});
+	program.command("sql").description("Read-only single-SQL cursor-cache insight; no LLM").requiredOption("--target <target>").option("--sql-id <id>").option("--text <fragment>").option("--child <number>").option("--json").option("--markdown").action(async options => {
+		const { runSql } = await import("../sqlperf/cli.js");
+		const { SqlUsageError } = await import("../sqlperf/index.js");
+		try { await runSql(options); }
+		catch (error) {
+			if (!(error instanceof SqlUsageError)) throw error;
+			console.error(error.message); process.exitCode = 2;
+		}
+	});
 	program.command("alertlog").description("Read-only Oracle alert log and ADR incidents; no LLM").requiredOption("--target <target>").option("--since <duration>", "Recent window, default 24h, at most 30d").option("--from <timestamp>").option("--to <timestamp>").option("--code <code>", "ORA-/TNS- code (repeatable)", (value: string, previous: string[]) => [...previous, value], [] as string[]).option("--grep <text>").option("--level <level>", "default, all, or maximum numeric level").option("--limit <rows>").option("--incidents").option("--json").option("--markdown").action(async options => {
 		const { runAlertLog } = await import("../alertlog/cli.js");
 		const { AlertlogUsageError } = await import("../alertlog/index.js");

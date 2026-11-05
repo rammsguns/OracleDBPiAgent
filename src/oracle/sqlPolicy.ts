@@ -122,6 +122,12 @@ export function classifySql(sql: string): string {
 	if (/\bFOR\s+UPDATE\b/i.test(clean)) reject("FOR UPDATE is forbidden");
 	if (/(?<![\w$#])(INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|BEGIN|DECLARE|CALL|EXECUTE|LOCK|COMMIT|ROLLBACK|INTO)(?![\w$#])/i.test(clean)) reject("Write or procedural token is forbidden");
 	checkFunctionCalls(callClean);
+	// Package allowance is a whole-statement grammar, never a general function allowance.
+	if (/\bDBMS_XPLAN\b/i.test(callClean)) {
+		const arg = String.raw`(?:literal|:[A-Za-z_][A-Za-z0-9_]*|[0-9]+|NULL)`;
+		const exact = new RegExp(String.raw`^\s*SELECT\s+(?:\*|PLAN_TABLE_OUTPUT)\s+FROM\s+TABLE\s*\(\s*DBMS_XPLAN\s*\.\s*DISPLAY_CURSOR\s*\(\s*${arg}\s*,\s*${arg}\s*,\s*${arg}\s*\)\s*\)\s*;?\s*$`, 'i');
+		if (!exact.test(callClean)) reject("DISPLAY_CURSOR requires the exact SELECT FROM TABLE form with scalar bind or literal arguments");
+	}
 	if (/\b(DBMS_\w+|UTL_\w+)\b/i.test(clean) && !/\bDBMS_XPLAN\s*\.\s*DISPLAY_CURSOR\b/i.test(clean)) reject("Package calls are forbidden");
 	if (/\bDBMS_XPLAN\s*\.\s*(?!DISPLAY_CURSOR\b)\w+/i.test(clean)) reject("Only DISPLAY_CURSOR is allowed from DBMS_XPLAN");
 	// Even when DISPLAY_CURSOR is present, no other DBMS/UTL package may piggyback.
