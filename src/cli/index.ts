@@ -2,7 +2,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
-import { loadEnvironment, initializeHome } from "../config/environment.js";
+import { loadEnvironment, initializeHome, assertConfiguredLlmKeyFile } from "../config/environment.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
@@ -182,6 +182,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			config.defaultTarget = options.target;
 			pinnedTarget = options.target;
 		}
+		assertConfiguredLlmKeyFile(config.llm.apiKeyFile);
 		await checkStrataHealth(config.llm);
 		const sessions = await createSessions(config);
 		const ctx = { config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID(), pinnedTarget };
