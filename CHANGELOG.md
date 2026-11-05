@@ -31,6 +31,30 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   issue, choose a window, export Markdown). Chat `/triage [--since 7d] <issue>` in
   CLI and web chat. See [web UI](docs/web-ui.md).
 - Ten PL/SQL challenge eval cases. See [hard evals](docs/evals-hard.md).
+- `piagent alertlog` reads the database alert log and ADR incidents with
+  bounded, read-only SQL (`V$DIAG_ALERT_EXT`, `V$DIAG_INCIDENT`,
+  `V$DIAG_PROBLEM`); the agent never reads server files.
+  - By default it shows errors and warnings.
+  - Repeated messages fold together with counts, while different error codes
+    and levels stay separate.
+  - Credentials are redacted.
+  - When access is missing, it shows the exact grant line.
+
+  See [alert log](docs/alertlog.md).
+- Triage uses the alert log:
+  - it discovers failed jobs from ORA-12012 entries, so "nightly purge job
+    failed last night" finds `SHOPAPP.NIGHTLY_PURGE_JOB`, its constraint and the
+    failing line;
+  - it reads ORA-06512 frames and ORA-02292 constraints from alert text;
+  - it lists entries within ±10 minutes of failed runs, labelled as leads;
+  - it lists incidents in the window;
+  - it adds code-specific hypotheses, including VKTM ORA-00800;
+  - its debug checklist includes the alert-log SQL.
+
+  Alert-log failures never stop triage.
+- Web Alert Log tab, and an alert section in the Triage panel. The web UI uses a
+  dark theme across all tabs when the system prefers it.
+- Six alert-log challenge eval cases (`p18`).
 
 ### Changed
 
@@ -39,6 +63,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   grant. The result names the view that answered; tool definitions are unchanged.
   On PL/SQL challenge questions this raised the score from 17/40 to 32/40, and hard
   dev used fewer tokens. See [tool fallback](docs/wp-16e-tool-fallback.md).
+- `HARNESS_LAB` (d1) and `HARNESS_RO` (p1) gained SELECT on `V$DIAG_ALERT_EXT`,
+  `V$DIAG_INCIDENT` and `V$DIAG_PROBLEM`, applied once at the owner's request; see
+  [the grant script](docs/grants-request-2026-11-04-alertlog.sql).
 - p1 `HARNESS_RO` gained SELECT on six DBA_ PL/SQL dictionary views. This was
   applied once at the owner's request; see
   [the grant script](docs/grants-request-2026-11-04-plsql.sql).
@@ -54,6 +81,8 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Fixed
 
+- PL/SQL dependency graph labels are readable in dark mode, and the graph
+  no longer clips its right-most nodes.
 - Grounding no longer flags SQL/PL/SQL keywords (`FOR EACH ROW`), or numbers that
   differ from the evidence only by a leading minus (`20205` vs `-20205`). An
   `OWNER.NAME` now counts as verified when both parts appear in the same tool

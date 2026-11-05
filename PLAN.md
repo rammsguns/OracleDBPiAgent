@@ -2205,6 +2205,57 @@ The agent answers through its existing `run_query` tool. The scorer reuses the
 existing check types. The gate reports p18 ×4 as a measurement, and the other
 splits must not change, because there are no product changes in 18D.
 
+### Phase 18 results (2026-11-05)
+
+Merges on master:
+- WP-18A f1d2ac6 (re-review APPROVE after three fixes);
+- WP-18D f603db8;
+- WP-18B e4cfe5a;
+- WP-18C fb65104;
+- WP-18E 7885328, the integration fix: the renderer handles missing per-issue
+  alert evidence, and optional alert reads never fail triage;
+- WP-18F 3e5d113, the p18 scorer: 8,059 answers replayed, zero non-p18 flips,
+  five justified p18 flips.
+
+Antigravity approved every WP.
+
+Gate gate-18: master 48bec5e, single side, because chat tools and the prompt are
+unchanged. Archive: `eval-archive/phase18/gate-18`.
+
+| Split | Result |
+|---|---|
+| p18 ×4 | 12/24 raw, 17/24 with the WP-18F scorer (measurement) |
+| p16 | 10/10 |
+| dev | 28/28 |
+| holdout | 11/12 (the known flaky hard-p8-description-language skipped run_query) |
+| regression | 21/21 |
+| MVP | 39/39 |
+
+The remaining p18 misses are mostly the time-zone trap:
+- The agent compares UTC questions with session-local `TIMESTAMP` literals.
+- Tool results printed dates in JavaScript local format.
+
+WP-18G addresses the second point.
+
+Live smokes:
+- On p1, triage for "nightly purge job failed last night" finds:
+  - `SHOPAPP.NIGHTLY_PURGE_JOB` from ORA-12012;
+  - child-record constraint `SYS_C007669` as the top hypothesis;
+  - the excerpt at `WORKLOAD` line 27.
+- On d1, ORA-00800 ranks the VKTM priority hypothesis first, with its incidents.
+
+Tests on 48bec5e:
+- typecheck clean;
+- 1117 unit tests;
+- 41 integration tests;
+- 38 browser tests, with 2 opt-in live tests skipped.
+
+Open items:
+- the WP-18G timestamp rendering (A/B gate pending);
+- spaced problem keys (`ORA 800`) in labelled bullets are not matched by the
+  p18 scorer (Low);
+- incident status is shown as a numeric ADR code.
+
 ### WP-18G: timestamps in tool results (branch `wp-18g-timestamps`)
 In gate-18, tool results rendered Oracle date values with JavaScript
 `String(Date)`. For example, an alert time showed as `Tue Nov 03 2026 22:30:56
