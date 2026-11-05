@@ -174,10 +174,21 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 	}));
 }
 
+// Oracle DATE/plain TIMESTAMP are fetched as client-local Dates. Local getters
+// preserve their stored wall clock; only timezone-aware types identify an instant.
+function renderCell(value: unknown, columnType?: string): string {
+	if (value == null) return "NULL";
+	if (!(value instanceof Date)) return String(value).replace(/\s+/g, " ");
+	if (columnType === "TIMESTAMP WITH TIME ZONE" || columnType === "TIMESTAMP WITH LOCAL TIME ZONE") return value.toISOString();
+	const pad = (n: number, width = 2) => String(n).padStart(width, "0");
+	const wall = `${pad(value.getFullYear(), 4)}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+	return columnType === "TIMESTAMP" ? `${wall}.${pad(value.getMilliseconds(), 3)}` : wall;
+}
+
 // Keep the tagged query intact: folding in JS avoids LISTAGG's
 // VARCHAR2 limit, including for long identifier lists on Oracle 19c.
 function describeSections(result: QueryResult) {
-	const cell = (value: unknown) => value == null ? "NULL" : String(value).replace(/\s+/g, " ");
+	const cell = (value: unknown, index: number) => renderCell(value, result.columnTypes?.[index]);
 	const sectionsOutput: { header: string; entries: { text: string; rows: unknown[][] }[]; omitted: number }[] = [];
 	const rows = result.rows;
 	const sections = [
@@ -193,15 +204,15 @@ function describeSections(result: QueryResult) {
 		const section = { header: header!, entries: [] as { text: string; rows: unknown[][] }[], omitted: 0 };
 		sectionsOutput.push(section);
 		for (const row of parents) {
-			const values = kind === "COLUMN" ? [row[4], row[1], row[2], row[3]] : [row[1], row[2], row[3]];
+			const values = (kind === "COLUMN" ? [4, 1, 2, 3] : [1, 2, 3]).map(index => cell(row[index], index));
 			if (kind === "CONSTRAINT" || kind === "INDEX") {
-				values.push(children.filter(child => child[1] === row[1]).sort((a, b) => Number(a[4]) - Number(b[4])).map(child => `${cell(child[4])}:${cell(child[2])}`).join(","));
+				values.push(children.filter(child => child[1] === row[1]).sort((a, b) => Number(a[4]) - Number(b[4])).map(child => `${cell(child[4], 4)}:${cell(child[2], 2)}`).join(","));
 			}
-			section.entries.push({ text: values.map(cell).join("|"), rows: [row, ...children.filter(child => child[1] === row[1])] });
+			section.entries.push({ text: values.join("|"), rows: [row, ...children.filter(child => child[1] === row[1])] });
 		}
 		// Retain even orphan column rows (possible with unusual dictionary visibility).
 		for (const child of children.filter(child => !parents.some(parent => parent[1] === child[1]))) {
-			section.entries.push({ text: `${kind}_COLUMN|${cell(child[1])}|${cell(child[4])}:${cell(child[2])}`, rows: [child] });
+			section.entries.push({ text: `${kind}_COLUMN|${cell(child[1], 1)}|${cell(child[4], 4)}:${cell(child[2], 2)}`, rows: [child] });
 		}
 	}
 	return sectionsOutput;
@@ -266,8 +277,8 @@ export function boundedResult(result: unknown, cap: number, renderTable?: (resul
 			] : []),
 			details.columns.join(" | "),
 		];
-		const rowLines = details.rows.map((row: unknown[]) => row.map(value =>
-			value == null ? "NULL" : String(value).replace(/\s+/g, " ")
+		const rowLines = details.rows.map((row: unknown[]) => row.map((value, index) =>
+			renderCell(value, details.columnTypes?.[index])
 		).join(" | "));
 		const footerLines = [
 			...(details.truncated ? ["[truncated]"] : []),
