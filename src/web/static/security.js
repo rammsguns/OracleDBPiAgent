@@ -32,7 +32,7 @@ function paths(content, result) {
 	// Large graphs remain bounded; the complete list is always available.
 	const shown = result.whoCan.slice(0, 60);
 	if (shown.length !== result.whoCan.length) content.append(el('p', `Graph shows ${shown.length} of ${result.whoCan.length} paths; the list below includes all paths.`));
-	content.append(drawGraph(privilegeGraph(shown), { collapseOracle: false, legend: false, label: 'Privilege paths, left to right; scroll horizontally when needed' }));
+	content.append(drawGraph(privilegeGraph(shown), { collapseOracle: false, legend: false, scale: 0.75, label: 'Privilege paths, left to right; scroll horizontally when needed' }));
 	const list = el('ol', undefined, 'security-paths');
 	for (const p of result.whoCan) { const item = el('li'); item.append(el('strong', p.privilege + ' · ' + title(p.source)), el('p', p.path.join(' → '))); list.append(item); }
 	content.append(el('h5', 'Privilege Path List'), list);

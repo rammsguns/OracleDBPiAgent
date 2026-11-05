@@ -51,3 +51,25 @@ test('wide findings scroll locally and large graphs have a complete list fallbac
 	await box.evaluate(n => { n.scrollLeft = n.scrollWidth; }); expect(await box.evaluate(n => n.scrollLeft)).toBeGreaterThan(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+
+test('four Security paths fit vertically at page-scale fonts while PL/SQL sizing keeps its defaults', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.route('**/api/security?*', route => route.fulfill({ json: { result: { ...securityFixture, whoCan: Array.from({ length: 4 }, () => securityFixture.whoCan![1]) }, markdown: 'fixture' } }));
+	await page.locator('#security-tab').click(); await page.locator('#security-run').click();
+	await expect(page.locator('#security-status')).toContainText('Loaded.');
+	const bounds = await page.locator('#security-content .graph-scroll').evaluate(box => {
+		const svg = box.querySelector('svg')!, text = svg.querySelector<SVGTextElement>('.node-label')!;
+		return { height: box.clientHeight, full: box.scrollHeight, last: svg.querySelector('g:last-child')!.getBoundingClientRect().bottom, bottom: box.getBoundingClientRect().bottom, font: parseFloat(getComputedStyle(text).fontSize) * text.getScreenCTM()!.a };
+	});
+	expect(bounds.full).toBeLessThanOrEqual(bounds.height + 1); expect(bounds.last).toBeLessThanOrEqual(bounds.bottom);
+	expect(bounds.font).toBeGreaterThanOrEqual(13); expect(bounds.font).toBeLessThanOrEqual(16);
+	// The optional scale is confined to Security; default shared renderer behavior is unchanged.
+	const defaults = await page.evaluate(async () => {
+		const { drawGraph } = await import('/insight.js');
+		const svg = drawGraph({ nodes: [{ id: 'p', label: 'APP.PROC', kind: 'subprogram' }], edges: [] }).querySelector('.graph-scroll svg');
+		return { width: svg.getAttribute('width'), height: svg.getAttribute('height'), font: svg.querySelector('.node-label').getAttribute('font-size') };
+	});
+	expect(defaults).toEqual({ width: '100%', height: null, font: '19' });
+});

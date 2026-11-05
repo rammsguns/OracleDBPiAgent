@@ -135,6 +135,10 @@ export function drawGraph(graph, options = {}) {
 	context.font = "19px system-ui, sans-serif";
 	const layout = layoutGraph(view, text => context.measureText(text).width);
 	svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+	if (options.scale !== undefined) {
+		svg.setAttribute("width", layout.width * options.scale);
+		svg.setAttribute("height", layout.height * options.scale);
+	}
 	const nodes = new Map(view.nodes.map(node => [node.id, node]));
 	for (const edge of view.edges) drawEdge(svg, edge, layout, nodes);
 	for (const node of view.nodes) drawNode(svg, node, layout.positions.get(node.id));

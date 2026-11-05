@@ -29,6 +29,17 @@ test('live read-only Security captures on both approved targets, light and dark'
 			for (const width of [1280, 390]) for (const colorScheme of ['light', 'dark'] as const) {
 				await page.setViewportSize({ width, height: width === 1280 ? 1000 : 844 });
 				await page.emulateMedia({ colorScheme });
+				const geometry = await page.locator('#security-content .graph-scroll').evaluate(box => {
+					const svg = box.querySelector('svg')!;
+					const last = svg.querySelector('g:last-child')!.getBoundingClientRect();
+					const bounds = box.getBoundingClientRect();
+					const label = svg.querySelector<SVGTextElement>('.node-label')!;
+					return { bottom: last.bottom, containerBottom: bounds.bottom, visibleHeight: box.clientHeight, fullHeight: box.scrollHeight, labelSize: parseFloat(getComputedStyle(label).fontSize) * label.getScreenCTM()!.a };
+				});
+				expect(geometry.bottom).toBeLessThanOrEqual(geometry.containerBottom);
+				expect(geometry.fullHeight).toBeLessThanOrEqual(geometry.visibleHeight + 1);
+				expect(geometry.labelSize).toBeGreaterThanOrEqual(13);
+				expect(geometry.labelSize).toBeLessThanOrEqual(16);
 				expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 				await page.screenshot({ path: `docs/img/security-${target}-${colorScheme}-${width}.png`, fullPage: true });
 			}

@@ -186,7 +186,7 @@ td:nth-child(2) { max-width: 24rem; }
 .security-paths { padding-left: 1.4rem; }
 .security-paths p { margin: .25rem 0 .75rem; }
 #security-content .graph-scroll { max-height: 36rem; }
-#security-content .graph-scroll svg { min-width: 700px; }
+#security-content .graph-scroll svg { width: auto; min-width: 0; height: auto; }
 @media (min-width: 801px) { main:has(#security-tab[aria-selected="true"]) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
 .security-table td:nth-child(2) { min-width: 16rem; }
 .security-table td:last-child { white-space: nowrap; }
