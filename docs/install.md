@@ -37,7 +37,11 @@ approved accounts and credential file names.
 
 Set `PIAGENT_HOME` to choose another private home. Existing homes must be real
 directories owned by the current user with no group/other permissions; they are
-never chmodded. Read-only commands such as `--version` do not create the home.
+never chmodded. A permission failure prints `PIAGENT_HOME must be private (mode 0700)`
+and exits 1; remove group/other permissions on your private home before retrying.
+Fixed configuration validation messages are shown directly. Unexpected errors
+(including filesystem and JSON errors that may contain private input) retain the
+generic failure message. Read-only commands such as `--version` do not create the home.
 On startup the CLI loads
 `PIAGENT_ENV_FILE`, or `$PIAGENT_HOME/.env` (default `~/.piagent/.env`). Missing
 default files are allowed; a missing explicit `PIAGENT_ENV_FILE` is an error.

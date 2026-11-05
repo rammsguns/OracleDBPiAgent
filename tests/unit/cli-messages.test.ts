@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handleCliError } from "../../src/cli/index.js";
@@ -31,10 +31,11 @@ it.each([new Error("sensitive path or value"), { message: "sensitive path or val
 	expect(process.exitCode).toBe(1);
 });
 
-it("ask with init's isolated placeholder exits before any network attempt", () => {
+it.each(["placeholder", "home permissions"])("%s exits before any network attempt", scenario => {
 	const root = mkdtempSync(join(tmpdir(), "piagent-cli-message-")); dirs.push(root);
 	const home = join(root, "home");
 	initializeHome({ PIAGENT_HOME: home });
+	if (scenario === "home permissions") chmodSync(home, 0o755);
 	const guard = join(root, "no-network.mjs");
 	writeFileSync(guard, `
 import net from 'node:net';
@@ -49,13 +50,13 @@ http.request = http.get = https.request = https.get = deny;
 globalThis.fetch = deny;
 syncBuiltinESMExports();
 `);
-	const child = spawnSync(process.execPath, ["--import", "tsx", "--import", guard, "src/cli/index.ts", "ask", "test"], {
+	const child = spawnSync(process.execPath, ["--import", "tsx", "--import", guard, "src/cli/index.ts", ...(scenario === "placeholder" ? ["ask", "test"] : ["init"])], {
 		env: { PATH: process.env.PATH, HOME: root, PIAGENT_HOME: home }, encoding: "utf8", timeout: 15000,
 	});
 	expect(child.error).toBeUndefined();
 	expect(child.status).toBe(1);
 	expect(child.stdout).toBe("");
-	expect(child.stderr.trim()).toBe(new SafeConfigError().message);
+	expect(child.stderr.trim()).toBe(scenario === "placeholder" ? new SafeConfigError().message : "PIAGENT_HOME must be private (mode 0700)");
 });
 
 it("drift help lists every supported scope without network access", () => {

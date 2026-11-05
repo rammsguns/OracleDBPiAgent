@@ -1,3 +1,4 @@
+import { SafeConfigError } from "./safeErrors.js";
 import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
@@ -13,12 +14,12 @@ export function ensureAgentHome(env: NodeJS.ProcessEnv = process.env): string {
 			mkdirSync(home, { recursive: true, mode: 0o700 });
 			stat = lstatSync(home);
 		}
-		if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("PIAGENT_HOME must be a real directory, not a symlink");
-		if (typeof process.getuid === "function" && stat.uid !== process.getuid()) throw new Error("PIAGENT_HOME must be owned by the current user");
-		if ((stat.mode & 0o077) !== 0) throw new Error("PIAGENT_HOME must be private (mode 0700)");
+		if (!stat.isDirectory() || stat.isSymbolicLink()) throw new SafeConfigError("PIAGENT_HOME must be a real directory, not a symlink");
+		if (typeof process.getuid === "function" && stat.uid !== process.getuid()) throw new SafeConfigError("PIAGENT_HOME must be owned by the current user");
+		if ((stat.mode & 0o077) !== 0) throw new SafeConfigError("PIAGENT_HOME must be private (mode 0700)");
 	} catch (error) {
-		if (error instanceof Error && error.message.startsWith("PIAGENT_HOME ")) throw error;
-		throw new Error("Cannot create or inspect PIAGENT_HOME private directory");
+		if (error instanceof SafeConfigError) throw error;
+		throw new SafeConfigError("Cannot create or inspect PIAGENT_HOME private directory");
 	}
 	return home;
 }
@@ -29,14 +30,14 @@ export function loadEnvironment(env: NodeJS.ProcessEnv = process.env): void {
 	try { fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK); }
 	catch (error) {
 		if ((error as NodeJS.ErrnoException).code === "ENOENT" && !isExplicit) return;
-		throw new Error("Cannot open private environment file");
+		throw new SafeConfigError("Cannot open private environment file");
 	}
 	try {
 		const stat = fstatSync(fd);
-		if (!stat.isFile() || (stat.mode & 0o077) !== 0) throw new Error("Environment file must be a private regular file (0600)");
+		if (!stat.isFile() || (stat.mode & 0o077) !== 0) throw new SafeConfigError("Environment file must be a private regular file (0600)");
 		let parsed: ReturnType<typeof parseEnv>;
 		try { parsed = parseEnv(readFileSync(fd, "utf8")); }
-		catch { throw new Error("Cannot parse environment file"); }
+		catch { throw new SafeConfigError("Cannot parse environment file"); }
 		for (const [key, value] of Object.entries(parsed)) if (env[key] === undefined) env[key] = value;
 	} finally { closeSync(fd); }
 }
@@ -49,16 +50,10 @@ export function initializeHome(env: NodeJS.ProcessEnv = process.env): boolean {
 		.replace(/^PIAGENT_AUDIT_FILE=.*$/m, "# PIAGENT_AUDIT_FILE=/absolute/path/to/audit.jsonl")
 		.replace(/^# Copy to.*$/m, "# Private piagent settings. Edit paths below; never put credentials here.");
 	try { writeFileSync(join(home, ".env"), template, { flag: "wx", mode: 0o600 }); return true; }
-	catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") return false; throw new Error("Cannot initialize private environment file"); }
+	catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") return false; throw new SafeConfigError("Cannot initialize private environment file"); }
 }
 
-/** Only fixed, reviewed configuration guidance may cross the CLI error boundary. */
-export class SafeConfigError extends Error {
-	constructor() {
-		super("Set PIAGENT_LLM_API_KEY_FILE to your private Strata API-key file; the init placeholder is still configured. Edit your private .env or export PIAGENT_LLM_API_KEY_FILE.");
-		this.name = "SafeConfigError";
-	}
-}
+export { SafeConfigError } from "./safeErrors.js";
 
 /** Detect init's path placeholder without opening a key file or contacting Strata. */
 export function assertConfiguredLlmKeyFile(file: string): void {

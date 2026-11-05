@@ -76,15 +76,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
 	program.command("web").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
 		const port = Number(options.port);
-		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid port");
+		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new SafeConfigError("Invalid port");
 		const { createWebServer } = await import("../web/server.js");
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
 	});
 	program.command("report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
-		if (!options.target) throw new Error("Report requires --target");
-		if (options.json && options.md) throw new Error("Choose --json or --md");
-		if (options.diffOnly && options.summarize) throw new Error("--diff-only cannot summarize");
+		if (!options.target) throw new SafeConfigError("Report requires --target");
+		if (options.json && options.md) throw new SafeConfigError("Choose --json or --md");
+		if (options.diffOnly && options.summarize) throw new SafeConfigError("--diff-only cannot summarize");
 		const config = loadConfig();
 		const { generateReport, renderMarkdown } = await import("../report/index.js");
 		const { loadLatestReport, saveReport, validateReportTarget } = await import("../report/history.js");
@@ -160,7 +160,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		await runDrift(options);
 	});
 	const schedule = program.commands.find(command => command.name() === "report")!.command("schedule").enablePositionalOptions().option("--target <target>").option("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
-		if (!options.target || !options.every) throw new Error("Schedule requires --target and --every");
+		if (!options.target || !options.every) throw new SafeConfigError("Schedule requires --target and --every");
 		const { generateSchedule, renderSchedule } = await import("../report/schedule.js");
 		const { agentHome } = await import("../config/paths.js");
 		console.log(renderSchedule(generateSchedule({ target: options.target, every: options.every, home: agentHome(), out: options.out ? (await import("node:path")).resolve(options.out) : reportDirectory(), node: process.execPath, cli: join(PACKAGE_ROOT, "dist/cli/index.js") }, loadConfig().targets)));
@@ -178,7 +178,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const config = loadConfig();
 		let pinnedTarget: string | undefined;
 		if (options.target) {
-			if (!config.targets.some(t => t.name === options.target)) throw new Error("Unknown target");
+			if (!config.targets.some(t => t.name === options.target)) throw new SafeConfigError("Unknown target");
 			config.defaultTarget = options.target;
 			pinnedTarget = options.target;
 		}
