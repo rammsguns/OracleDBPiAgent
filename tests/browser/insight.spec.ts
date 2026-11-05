@@ -24,7 +24,7 @@ test('triage hypotheses, fixes, SQL, evidence, trace and Markdown download', asy
 	await expect(page.locator('#triage-content')).toContainText('Foreign key child rows');
 	await expect(page.locator('#triage-content')).toContainText('Review retention policy');
 	await expect(page.locator('#triage-content pre')).toContainText('SELECT * FROM DBA_CONSTRAINTS');
-	await expect(page.locator('#triage-content td')).toHaveText(evil);
+	await expect(page.locator('#triage-content > .table-scroll td')).toHaveText(evil);
 	await expect(page.locator('#triage-content .graph-scroll > svg')).toHaveCount(1);
 	const download = page.waitForEvent('download'); await page.locator('#triage-export').click(); const file = await download; expect(file.suggestedFilename()).toBe('triage.md');
 	const stream = await file.createReadStream(); const chunks = []; for await (const chunk of stream!) chunks.push(chunk); expect(Buffer.concat(chunks).toString()).toContain('Foreign key child rows');

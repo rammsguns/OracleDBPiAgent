@@ -328,3 +328,70 @@ each box side. Box heights follow their text. Owners appear on a muted line abov
 identifier labels; labels wrap at dots and underscores, splitting inside a token
 only when that token cannot fit. Kind tags distinguish jobs, packages, procedures,
 tables and Oracle-supplied nodes. The legend sits immediately above the diagram.
+
+### Alert Log (WP-18C)
+
+The **Alert Log** tab reads `V$DIAG_ALERT_EXT` and the joined ADR incident/problem
+list through `src/alertlog`. Choose either approved target, a relative window
+(default `24h`, maximum `30d`), optional comma-separated five-digit ORA-/TNS-
+codes, and a case-insensitive message substring. The default reader severity
+filter includes diagnostic text markers even when Oracle labels them Normal.
+No LLM is involved.
+
+The table shows first/last timestamps, textual and coloured severity, folded
+counts, incident badges, problem keys and trace names. Trace names are evidence
+text; the web server never reads those files. Text/metadata caps and partial row
+results are labelled. ADR incidents use the same time window; message/code
+filters apply only to alert entries. Missing access displays the exact SELECT
+grant request as text, without executing it. Markdown exports both tables.
+
+`GET /api/alertlog?target=d1-19c-lab&since=7d&codes=ORA-00600&text=incident`
+returns `{ entries, incidents, markdown }`, where the first two are the reader's
+`AlertResult<AlertRow>` and `AlertResult<IncidentRow>`. It shares the insight
+routes' bearer token, loopback Host/Origin checks, approved target validation,
+1 MiB response cap and single-flight lock through session cleanup. The readers
+run sequentially, with the configured row and statement-timeout limits.
+
+The Triage panel renders optional `TriageResult.alertLog` from the Phase 18 shared
+shape: status, window, grants, entries, incidents and code/job-run correlations
+with one-based entry references. Older triage responses remain supported.
+WP-18B supplies this evidence; WP-18C does not change triage collection or its
+Markdown renderer.
+
+Browser fixtures cover both colour modes at phone width, literal hostile text,
+folded metadata, filters, downloads, missing/empty/unavailable/skipped evidence,
+and failure recovery. Unit route tests cover auth, Host/Origin, input validation,
+the shared lock, cleanup and sequential reader calls without DB/LLM access.
+
+To reproduce the four live SQL-only captures:
+
+```sh
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
+PIAGENT_ALERTLOG_LIVE=1 npm run test:browser -- tests/browser/alertlog-live.spec.ts
+```
+
+The capture server stubs health and every agent path, binds loopback, and uses
+real read-only Oracle sessions. Its credential URL stays in memory. Cleanup
+resolves the actual listening PID using `ss -ltnp` and sends SIGTERM to it.
+The ordinary browser suite skips both opt-in live tests; the Strata live test
+must remain disabled for WP-18C validation.
+
+Live captures (30-day window; bounded, partial evidence):
+
+| Target | Light | Dark |
+|---|---|---|
+| d1 | [Light](img/alertlog-d1-19c-lab-light.png) | [Dark](img/alertlog-d1-19c-lab-dark.png) |
+| p1 | [Light](img/alertlog-p1-19c-prod-light.png) | [Dark](img/alertlog-p1-19c-prod-dark.png) |
+
+WP-18C validation (2026-11-04):
+
+- `npm run typecheck`: passed.
+- `npm test`: 71 files, 1,071 tests passed; no DB or LLM.
+- `npm run test:browser`: 32 passed, 2 opt-in live tests skipped.
+- `PIAGENT_SECRET_DIR=… npx vitest run tests/integration/alertlog.test.ts`:
+  2 passed (d1 and p1), no LLM tests selected.
+- The SQL-only live capture command above: 1 passed, four screenshots captured
+  and inspected; capture listener stopped by its resolved listening PID.
+- No shared-contract or `src/alertlog/` changes required. Live WP-18B triage
+  integration remains for the coordinator after that branch merges; shared
+  shape rendering is verified with fixtures here. No LLM calls were made.

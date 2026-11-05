@@ -1,3 +1,4 @@
+import { alertResult, alertRow, incidentRow } from '../browser/alertlog-fixture.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import { request } from 'node:http';
 import { loadConfig } from '../../src/config/index.js';
@@ -21,13 +22,13 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 }
 it('requires token, approved Host/Origin, method, target and identifiers before opening sessions', async () => {
 	const f = await fixture();
-	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage']) {
+	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog']) {
 		expect((await f.call(path, undefined, { Authorization: '' })).status).toBe(401);
 		expect((await f.call(path, undefined, { Host: 'evil.test' })).status).toBe(403);
 		expect((await f.call(path, undefined, { Origin: 'null' })).status).toBe(403);
 		expect((await f.call(path, undefined, {}, 'DELETE')).status).toBe(405);
 	}
-	for (const path of ['/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
+	for (const path of ['/api/alertlog?target=FREEPDB1', '/api/alertlog?since=31d', '/api/alertlog?codes=ORA-600', '/api/alertlog?text=' + 'x'.repeat(2049), '/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
 	for (const issue of [{ issue: 'x', since: '31d' }, { issue: 1 }, { issue: '' }, { issue: 'x', target: 'FREEPDB1' }]) expect((await f.call('/api/triage', issue)).status).toBe(400);
 	expect(f.list).not.toHaveBeenCalled(); expect(f.triage).not.toHaveBeenCalled(); expect(f.closeAll).not.toHaveBeenCalled();
 });
@@ -47,7 +48,7 @@ it('shares lock across insight routes and releases after failures', async () => 
 	const pending = new Promise<void>(r => { release = r; }), start = new Promise<void>(r => { started = r; });
 	const f = await fixture({ plsqlList: async () => { started(); await pending; throw new Error('private DSN'); } });
 	const first = f.call(); await start;
-	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); } finally { release(); }
+	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); } finally { release(); }
 	const failed = await first; expect(failed.status).toBe(500); expect(failed.text).not.toContain('DSN'); expect((await f.call()).status).toBe(500);
 });
 it('accepts dollar and hash identifiers and forwards doc selection', async () => {
@@ -55,4 +56,26 @@ it('accepts dollar and hash identifiers and forwards doc selection', async () =>
 	const f = await fixture({ plsqlDoc: doc });
 	expect((await f.call('/api/plsql/doc?object=HR.P%24%23')).status).toBe(200);
 	expect(doc.mock.calls[0]).toEqual([expect.objectContaining({ pinnedTarget: 'd1-19c-lab' }), 'd1-19c-lab', 'HR.P$#']);
+});
+
+it('reads both alert APIs sequentially with a common window and closes sessions', async () => {
+	const order: string[] = [];
+	const readAlerts = vi.fn<NonNullable<WebServerOptions["readAlertLog"]>>(async (_ctx, target) => { order.push('alerts'); return alertResult(target, [alertRow]); });
+	const readIncidentRows = vi.fn<NonNullable<WebServerOptions["readIncidents"]>>(async (_ctx, target) => { order.push('incidents'); return { ...alertResult(target, [incidentRow]), view: 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM' }; });
+	const f = await fixture({ readAlertLog: readAlerts, readIncidents: readIncidentRows });
+	const response = await f.call('/api/alertlog?target=p1-19c-prod&since=7d&codes=ora-00600,TNS-12541&text=needle');
+	expect(response.status).toBe(200);
+	expect(order).toEqual(['alerts', 'incidents']);
+	expect(readAlerts.mock.calls[0]).toEqual([expect.objectContaining({ pinnedTarget: 'p1-19c-prod' }), 'p1-19c-prod', { since: '7d', codes: ['ORA-00600', 'TNS-12541'], text: 'needle' }]);
+	expect(readIncidentRows.mock.calls[0]?.[2]).toEqual(alertResult('', []).window);
+	expect(JSON.parse(response.text).markdown).toContain('ADR incidents');
+	expect(f.closeAll).toHaveBeenCalledOnce();
+});
+it('alert failures are private and release the shared lock and sessions', async () => {
+	const f = await fixture({ readAlertLog: async () => { throw new Error('private database address'); } });
+	for (let i = 0; i < 2; i++) {
+		const response = await f.call('/api/alertlog');
+		expect(response.status).toBe(500); expect(response.text).not.toContain('private');
+	}
+	expect(f.closeAll).toHaveBeenCalledTimes(2);
 });
