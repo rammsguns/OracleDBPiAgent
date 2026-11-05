@@ -1589,3 +1589,58 @@ already installed dependencies through a local ignored `node_modules` symlink.
 No DB code changed, no database was accessed, no LLM calls were made, and
 `evals/run.ts` was neither changed nor invoked. No contract changes are needed.
 Integration and live LLM gates remain with the coordinator.
+
+### Phase 18: alert-log challenge (`p18`, WP-18D)
+
+`evals/cases-hard/phase18-alertlog.json` adds six `hard-p18-` challenge cases,
+three per approved target: newest ORA code, incident row count, and newest
+incident id paired with its ADR problem key. They require the existing
+`run_query` tool and reuse `rowCells`; product code, tools, prompts, and scorer
+behavior are unchanged. Dev (28), holdout (12), regression (21), and MVP cases
+are unchanged; the complete hard suite now contains 99 cases.
+
+All questions explicitly use UTC `[2026-10-06T00:00:00Z,
+2026-11-04T00:00:00Z)`. SQL ground truth runs afresh on every eval; new alert
+entries after the exclusive end cannot move the answer. ADR purging can change
+historical truth: rerun validation before a future gate, and review the window
+if its evidence disappears. Latest-row queries break ties by RECORD_ID or
+INCIDENT_ID. The alert question includes all message levels and normalizes
+one-to-five-digit codes to five digits, including ORA-0 → ORA-00000.
+
+No-LLM validation:
+
+```sh
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-p18.ts
+```
+
+This first runs hard-suite safety/shape checks, then compares the independent
+SELECT-only runtime ground-truth reader with `readAlertLog` and `readIncidents`
+(including their joined V$DIAG_PROBLEM data). Missing evidence, missing grants,
+API/SQL disagreements, and capped incident lists fail closed. Alert folding is
+not used to derive counts. The checked-in `evals/p18-ground-truth-validation.json`
+is an observation, never an input to runtime scoring. Observed d1/p1 counts
+were both 6; newest incident/key pairs were 225332/ORA 800 and 84366/ORA 800;
+newest codes were ORA-00000 and ORA-00609.
+
+The coordinator's `p18` group is these six IDs, following the p16 prefix
+convention. For the existing runner, select them explicitly:
+
+```sh
+npm run eval -- --suite evals/cases-hard --split challenge --repeat 4 hard-p18-d1-latest-code hard-p18-d1-incident-count hard-p18-d1-incident-problem hard-p18-p1-latest-code hard-p18-p1-incident-count hard-p18-p1-incident-problem
+```
+
+That command is for the coordinator; WP-18D did **not** execute it or make LLM
+calls. Thirteen DB-free scorer tests cover correct prose/table answers, Unicode
+ORA dashes, wrong codes/counts/keys, missing facts, missing run_query evidence,
+and crossed incident mappings in labeled tables. Existing rowCells limitations
+remain: single-record prose on one line can pool facts from separate sentences,
+and unrecognized two-column table headings can be interpreted vertically. Use
+`incident_id` / `problem_key` headings for unambiguous mapping diagnostics;
+review suspicious gate answers manually. No global scorer change is made here.
+
+Verification: typecheck clean; 1,082 unit tests passed; all six truths validated
+live. DB integration (excluding `wp-c.integration.test.ts`, which contains the
+Strata e2e) passed 34/35 tests, including the new p18 validation and the existing
+alertlog tests on both targets. The unrelated live NIGHTLY_PURGE_JOB triage test
+failed because its returned issue codes did not contain ORA-02292. No triage or
+database changes were made to address that live-data failure.

@@ -1,0 +1,74 @@
+{
+	"validatedAt": "2026-11-05T04:57:35.847Z",
+	"caseCount": 6,
+	"records": [
+		{
+			"id": "hard-p18-d1-latest-code",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)') ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA-00000"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-incident-count",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) AS incident_count FROM V$DIAG_INCIDENT WHERE CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM')",
+			"mode": "rowCells",
+			"rows": [
+				[
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-incident-problem",
+			"target": "d1-19c-lab",
+			"sql": "SELECT i.INCIDENT_ID AS incident_id, p.PROBLEM_KEY AS problem_key FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY i.CREATE_TIME DESC, i.INCIDENT_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					225332,
+					"ORA 800"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-latest-code",
+			"target": "p1-19c-prod",
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)') ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					"ORA-00609"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-incident-count",
+			"target": "p1-19c-prod",
+			"sql": "SELECT COUNT(*) AS incident_count FROM V$DIAG_INCIDENT WHERE CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM')",
+			"mode": "rowCells",
+			"rows": [
+				[
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-incident-problem",
+			"target": "p1-19c-prod",
+			"sql": "SELECT i.INCIDENT_ID AS incident_id, p.PROBLEM_KEY AS problem_key FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY i.CREATE_TIME DESC, i.INCIDENT_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rows": [
+				[
+					84366,
+					"ORA 800"
+				]
+			]
+		}
+	]
+}
