@@ -109,7 +109,14 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 				}
 				const toolTexts = context.messages.filter(m => m.role === "toolResult").map(m => m.content.filter(c => c.type === "text").map(c => c.text).join("\n"));
 				const questions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text)).join("\n");
-				const check = checkFacts(answer, toolTexts, questions);
+				const toolCalls = new Map(context.messages.flatMap(m => m.role === "assistant"
+					? m.content.filter(c => c.type === "toolCall").map(c => [c.id, c.arguments] as const) : []));
+				const owners = context.messages.filter(m => m.role === "toolResult").map(m => {
+					const args = toolCalls.get(m.toolCallId);
+					const owner = typeof args?.schema === "string" ? args.schema : args?.owner;
+					return typeof owner === "string" ? owner.toUpperCase() : undefined;
+				});
+				const check = checkFacts(answer, toolTexts, questions, owners);
 				agent.unverified = check.unsupported;
 				if (check.unsupportedNumbers.length && !correctionScheduled) {
 					correctionScheduled = true;

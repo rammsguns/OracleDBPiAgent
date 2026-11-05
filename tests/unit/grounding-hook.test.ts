@@ -1,9 +1,10 @@
 import { expect, it } from 'vitest';
+import { Type } from 'typebox';
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream';
 import { createOracleAgent } from '../../src/agent/index.js';
 import { loadConfig } from '../../src/config/index.js';
 
-async function fixture(replies: string[], enabled = true, maxCalls = 20) {
+async function fixture(replies: string[], enabled = true, maxCalls = 20, toolCalls?: { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }[]) {
 	const config = loadConfig({ PIAGENT_GROUNDING_CHECK: enabled ? '1' : '0', PIAGENT_MAX_TOOL_CALLS: String(maxCalls) });
 	config.targets[0]!.description = 'PROMOTIONS 3313394.74';
 	const audit: any[] = [], contexts: any[] = [];
@@ -13,7 +14,7 @@ async function fixture(replies: string[], enabled = true, maxCalls = 20) {
 			contexts.push(structuredClone(context));
 			const next = replies.shift();
 			if (next === undefined) throw Error('Unexpected additional request');
-			const content = next === 'TOOL' ? [{ type: 'toolCall' as const, id: String(contexts.length), name: 'list_targets', arguments: {} }] : [{ type: 'text' as const, text: next }];
+			const content = next === 'TOOL' ? toolCalls ?? [{ type: 'toolCall' as const, id: String(contexts.length), name: 'list_targets', arguments: {} }] : [{ type: 'text' as const, text: next }];
 			const message = { role: 'assistant' as const, api: 'openai-completions' as const, provider: 'strata', model: 'test', content, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: next === 'TOOL' ? 'toolUse' as const : 'stop' as const, timestamp: Date.now() };
 			const stream = createAssistantMessageEventStream();
 			stream.push({ type: 'done', reason: message.stopReason, message }); stream.end(message);
@@ -114,3 +115,21 @@ it('never exempts a fact merely because a previous correction instruction named 
 	expect(contexts).toHaveLength(6);
 	expect(agent.unverified).toEqual(['99,999']);
 });
+
+for (const key of ['schema', 'owner']) {
+	it(`matches result owners by toolCallId using ${key}, including missing owners`, async () => {
+		const { agent, contexts } = await fixture(['TOOL', 'HR.SECURE_DML HR.EMPLOYEES FAKE.SECURE_DML OE.EMPLOYEES HR.UNKNOWN 99999', 'HR.SECURE_DML HR.EMPLOYEES FAKE.SECURE_DML OE.EMPLOYEES HR.UNKNOWN'], true, 20, [
+			{ type: 'toolCall', id: 'source', name: 'fixture_source', arguments: { [key]: 'hr' } },
+			{ type: 'toolCall', id: 'other', name: 'fixture_source', arguments: {} },
+		]);
+		agent.state.tools = [{
+			name: 'fixture_source', label: 'fixture', description: 'Unit test evidence',
+			parameters: Type.Object({ schema: Type.Optional(Type.String()), owner: Type.Optional(Type.String()) }),
+			execute: async id => ({ content: [{ type: 'text', text: id === 'source' ? 'PROCEDURE secure_dml; ON employees' : 'unknown' }], details: {} }),
+		}];
+		await agent.prompt('Explain the source.');
+		expect(agent.unverified).toEqual(['FAKE.SECURE_DML', 'OE.EMPLOYEES', 'HR.UNKNOWN']);
+		expect(contexts).toHaveLength(3);
+		expect(contexts[2].messages.at(-1).content).toContain('99999');
+	});
+}
