@@ -195,3 +195,100 @@ The existing NIGHTLY_PURGE_JOB and K7Q_FAILJOB integration assertions passed.
 Live CLI smokes confirmed the missing-name message for `NO_SUCH_JOB_X failed`
 and ORA-20001 historical evidence for `k7q_failjob failed`. No LLM calls or evals
 were run. No shared contract changes are required.
+
+## Phase 18B alert-log integration and live smokes
+
+Triage now returns the Phase 18 shared `TriageResult.alertLog` shape (also on each issue). It uses only the public alertlog reader API. Code matches use the requested triage window; failed scheduler runs get separate ±10 minute queries, including historical fallback runs. Incidents use the triage window. Each read contributes its exact SQL, binds, access status and cap marker to the evidence and numbered checklist. Correlation indexes refer to the returned entries, starting at zero. A temporal correlation is a diagnostic lead, not causal proof.
+
+Alert evidence is included in Markdown used by summary grounding and chat /triage. Missing grants are deduplicated into one alert access notice. All new hypotheses are suggestions supported by fetched rows; no remediation is executed.
+
+These live CLI smokes ran at approximately 2026-11-05T05:00Z. The host UTC date had advanced past November 4; the wider windows below retain the requested failures. Both used HARNESS read-only accounts and PIAGENT_SECRET_DIR, with no LLM calls or server file reads. Trace paths below are metadata from SQL, never files opened by the agent. Output excerpts are rendered from the actual CLI JSON (unrelated sections omitted).
+
+### Live smoke: p1 nightly purge
+
+```sh
+npm run piagent -- triage --target p1-19c-prod --since 7d --issue 'NIGHTLY_PURGE_JOB nightly purge failure ORA-02292' --json
+```
+
+### Alert log
+
+ok; 2026-10-29T04:59:10.753Z to 2026-11-05T04:59:10.753Z (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.
+
+| Index | First / last | Count | Codes | Incident / problem / trace | Message |
+
+|---|---|---|---|---|---|
+
+| 0 | 2026-11-04T04:30:56.298Z / 2026-11-04T04:30:56.298Z | 1 | ORA-12012, ORA-02292, ORA-06512 | /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_j005_704.trc | Errors in file /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_j005_704.trc:<br>ORA-12012: error on auto execute of job "SHOPAPP"."NIGHTLY_PURGE_JOB"<br>ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found<br>ORA-06512: at "SHOPAPP.WORKLOAD", line 27<br>ORA-06512: at line 1 |
+
+| 1 | 2026-11-04T04:29:49.671Z / 2026-11-04T04:29:49.671Z | 1 | ORA-00800 | 86767; ORA 800; /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_vktm_87.trc | Errors in file /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_vktm_87.trc  (incident=86767):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], [] |
+
+| 2 | 2026-11-04T04:29:44.395Z / 2026-11-04T04:29:44.395Z | 1 | ORA-27167, ORA-27300, ORA-27301, ORA-27302, ORA-27303 | /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_ora_21.trc | Errors in file /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_ora_21.trc:<br>ORA-27167: Attempt to determine if Oracle binary image is stored on remote server failed<br>ORA-27300: OS system dependent operation:parse_df failed with status: 2<br>ORA-27301: OS failure message: No such file or directory<br>ORA-27302: failure occurred at: parse failed<br>ORA-27303: additional information: Filesystem     1K-blocks      Used Available Use% Mounted on<br>overlay        951012720 359290200 543339972  40% / |
+
+Correlation (code): Alert log matching ORA-02292, ORA-06512; entry indexes 0. Temporal matches are diagnostic leads.
+
+Correlation (jobRun): Alert log within ±10 minutes of SHOPAPP.NIGHTLY_PURGE_JOB (temporal correlation only) at 2026-11-04T04:30:02.953Z; entry indexes 0, 1, 2. Temporal matches are diagnostic leads.
+
+Incident 86767: ORA 800; 2026-11-04T04:29:49.671Z; status 2.
+
+### Ranked hypotheses
+
+1. Cutoff evaluated twice / predicate mismatch: rows crossing the boundary between statements keep child rows.
+
+- SHOPAPP.WORKLOAD.NIGHTLY_PURGE, line 26: `DELETE FROM order_lines WHERE order_id IN (SELECT order_id FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY);`
+- SHOPAPP.WORKLOAD.NIGHTLY_PURGE, line 27: `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
+- Both statements evaluate a time-relative cutoff separately; the later statement can include parents that crossed the boundary.
+- This is a source-based hypothesis; current aggregates cannot reconstruct the failing transaction.
+- Current matching child row count: 0 (a new read-only snapshot, not proof of the historical cause).
+- Alert code match at 2026-11-04T04:30:56.298Z: Errors in file /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_j005_704.trc:<br>ORA-12012: error on auto execute of job "SHOPAPP"."NIGHTLY_PURGE_JOB"<br>ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found<br>ORA-06512: at "SHOPAPP.WORKLOAD", line 27<br>ORA-06512: at line 1
+
+2. A child foreign key still references the parent rows being deleted.
+
+- SHOPAPP.SYS_C007669: table SHOPAPP.ORDER_LINES, type R.
+- SHOPAPP.WORKLOAD line 27 inside NIGHTLY_PURGE: `DELETE FROM orders WHERE ordered_at < SYSTIMESTAMP - INTERVAL '7' DAY;`
+- SHOPAPP.NIGHTLY_PURGE_JOB line 1 inside anonymous block (job_action): `BEGIN shopapp.workload.nightly_purge; END;`
+- Alert code match at 2026-11-04T04:30:56.298Z: Errors in file /opt/oracle/diag/rdbms/prodcdb/PRODCDB/trace/PRODCDB_j005_704.trc:<br>ORA-12012: error on auto execute of job "SHOPAPP"."NIGHTLY_PURGE_JOB"<br>ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found<br>ORA-06512: at "SHOPAPP.WORKLOAD", line 27<br>ORA-06512: at line 1
+
+
+### Live smoke: d1 ORA-00800
+
+```sh
+npm run piagent -- triage --target d1-19c-lab --since 30d --issue 'ORA-00800 errors in the alert log' --json
+```
+
+### Alert log
+
+ok; 2026-10-06T04:58:15.007Z to 2026-11-05T04:58:15.007Z (exclusive). Job-run queries use their own ±10 minute windows, including historical runs.
+
+| Index | First / last | Count | Codes | Incident / problem / trace | Message |
+
+|---|---|---|---|---|---|
+
+| 0 | 2026-10-13T03:05:03.725Z / 2026-11-04T04:29:49.671Z | 7 | ORA-00800 | 245813; 225332; 204851; 184370; 163889; 143408; 122927; ORA 800; /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc; /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_58.trc; /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_57.trc; /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_87.trc | Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], [] |
+
+Correlation (code): Alert log matching ORA-00800; entry indexes 0. Temporal matches are diagnostic leads.
+
+Incident 245813: ORA 800; 2026-11-04T04:29:49.671Z; status 2.
+
+Incident 225332: ORA 800; 2026-10-22T23:21:11.147Z; status 2.
+
+Incident 204851: ORA 800; 2026-10-21T03:38:14.898Z; status 2.
+
+Incident 184370: ORA 800; 2026-10-21T03:15:07.830Z; status 2.
+
+Incident 163889: ORA 800; 2026-10-16T23:36:52.002Z; status 2.
+
+Incident 143408: ORA 800; 2026-10-13T03:31:29.243Z; status 2.
+
+Incident 122927: ORA 800; 2026-10-13T03:05:03.725Z; status 2.
+
+### Ranked hypotheses
+
+1. The recorded run or error is visible, but the cause is not yet established.
+
+- ORA-00800
+- Errors in file /opt/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_vktm_86.trc  (incident=245813):<br>ORA-00800: soft external error, arguments: [Set Priority Failed], [VKTM], [Check traces and OS configuration], [Check Oracle document and MOS notes], []
+
+
+The p1 alert independently confirms the job name, ORA-12012/ORA-02292, constraint and line 27. The ±10 minute query also returns VKTM and filesystem diagnostics; this timing does not link those errors to the FK violation. The leading purge hypothesis remains the separately evaluated cutoff at lines 26/27.
+
+The d1 row folds seven ORA-00800 occurrences and preserves all seven incident ids. Its message reports Set Priority Failed for VKTM and asks for traces/OS configuration checks. This does not establish the exact host configuration cause; the generic hypothesis intentionally leaves that unresolved. There is a code correlation and no scheduler correlation.
