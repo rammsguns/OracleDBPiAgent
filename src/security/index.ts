@@ -76,7 +76,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 	}
 	for (const id of CHECK_IDS) {
 		if (options.checks && !options.checks.includes(id) && !(id === 'who-can' && options.whoCan)) continue;
-		const c: SecurityCheck = { id, title: '', severity: 'info', status: 'ok', findings: [], advice: '', evidence: [], notes: [] };
+		const c: SecurityCheck = { id, title: '', severity: 'info', status: 'ok', findings: [], advice: 'For a human DBA: review available evidence before planning changes.', evidence: [], notes: [] };
 		result.checks.push(c);
 		async function use(key: keyof typeof SQL, binds?: Record<string, unknown>): Promise<Check> {
 			const e = await read(key, binds); c.evidence.push(e);
@@ -86,12 +86,12 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 		}
 		function add(subject: unknown, detail: string, evidence: Check) { c.findings.push({ subject: s(subject), detail, evidence }); }
 		if (id === 'default-passwords') {
-			Object.assign(c, { title: 'Open Accounts with Default Passwords', severity: 'high', advice: 'Have a DBA rotate default credentials and review whether these accounts need to remain open.' });
+			Object.assign(c, { title: 'Open Accounts with Default Passwords', severity: 'high', advice: 'For a human DBA: rotate default credentials and review whether these accounts need to remain open.' });
 			const e = await use('defaults'); for (const r of e.rows) add(r[0], `${r[1]}; default credential listed by DBA_USERS_WITH_DEFPWD`, e);
 		} else if (id === 'powerful-privileges' || id === 'who-can') {
 			c.title = id === 'who-can' ? 'Who Can Access ' + (options.whoCan?.toUpperCase() ?? 'an Object') : 'Powerful Privileges';
 			c.severity = id === 'who-can' ? 'info' : 'high';
-			c.advice = 'Review privilege paths with the account owner and retain only privileges required for their duties.';
+			c.advice = 'For a human DBA: review privilege paths with the account owner and retain only privileges required for their duties.';
 			if (id === 'who-can' && !options.whoCan) { c.status = 'skipped'; c.notes.push('Supply --who-can OWNER.OBJECT.'); continue; }
 			const users = await use('users'), roles = await use('roles'), grants = await use('roleGrants'), sys = await use('systemGrants');
 			c.notes.push('Role reachability includes grants regardless of default/enabled role state; roles may require activation. Expansion stops at ten role edges.');
@@ -124,10 +124,10 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 				for (const p of result.whoCan) add(p.subject, `${p.privilege}: ${p.path.join(' → ')} (${p.source})`, p.evidence);
 			}
 		} else if (id === 'public-grants') {
-			Object.assign(c, { title: 'PUBLIC Grants', severity: 'medium', advice: 'Review PUBLIC access to network, file and dynamic SQL packages and application data; prefer narrowly scoped access where practical.' });
+			Object.assign(c, { title: 'PUBLIC Grants', severity: 'medium', advice: 'For a human DBA: review PUBLIC access to network, file and dynamic SQL packages and application data; prefer narrowly scoped access where practical.' });
 			const e = await use('public'); for (const r of e.rows) add(`${r[0]}.${r[1]}`, `PUBLIC ${r[2]} (${r[3] ?? 'package'})`, e);
 		} else if (id === 'profiles') {
-			Object.assign(c, { title: 'Password Profiles for Open Users', severity: 'medium', advice: 'Review effective profile limits, password verification and application authentication requirements with a DBA.' });
+			Object.assign(c, { title: 'Password Profiles for Open Users', severity: 'medium', advice: 'For a human DBA: review effective profile limits, password verification and application authentication requirements with a DBA.' });
 			const profiles = await use('profiles'), users = await use('users');
 			for (const u of users.rows.filter(r => r[1] === 'N' && s(r[2]).startsWith('OPEN'))) for (const resource of ['FAILED_LOGIN_ATTEMPTS', 'PASSWORD_LIFE_TIME', 'PASSWORD_VERIFY_FUNCTION']) {
 				let value = profiles.rows.find(r => r[0] === u[3] && r[1] === resource)?.[2];
@@ -137,7 +137,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 				if (value === 'UNLIMITED' || (resource === 'PASSWORD_VERIFY_FUNCTION' && (value === 'NULL' || value === null))) add(u[0], `Profile ${u[3]}: ${resource}=${s(value) || 'unknown (profile metadata incomplete)'}`, profiles);
 			}
 		} else if (id === 'accounts') {
-			Object.assign(c, { title: 'Account Lifecycle', severity: 'info', advice: 'Confirm unused accounts and retained object ownership with application owners before planning account lifecycle changes.' });
+			Object.assign(c, { title: 'Account Lifecycle', severity: 'info', advice: 'For a human DBA: confirm unused accounts and retained object ownership with application owners before planning account lifecycle changes.' });
 			const users = await use('users'), owned = await use('owned');
 			for (const u of users.rows.filter(r => r[1] === 'N')) {
 				if (!s(u[2]).includes('LOCKED') && (s(u[2]).includes('EXPIRED') || u[5] == null || (u[4] != null && new Date(s(u[4])).getTime() < Date.now()))) add(u[0], `${u[2]}; expiry=${s(u[4]) || 'none'}; last login=${s(u[5]) || 'not recorded (does not prove the password was never used)'}`, users);
@@ -145,7 +145,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 				if (s(u[2]).includes('LOCKED') && Number(count) > 0) add(u[0], `${u[2]}; owns ${count} objects`, owned);
 			}
 		} else if (id === 'audit') {
-			Object.assign(c, { title: 'Audit Configuration', severity: 'info', advice: 'Have a DBA validate logon and privilege-use coverage for every relevant principal, including success and failure, policy conditions and the active audit mode. Policy configuration does not prove events are being collected.' });
+			Object.assign(c, { title: 'Audit Configuration', severity: 'info', advice: 'For a human DBA: validate logon and privilege-use coverage for every relevant principal, including success and failure, policy conditions and the active audit mode. Policy configuration does not prove events are being collected.' });
 			const enabled = await use('auditEnabled'), policies = await use('auditPolicies'), traditional = await use('auditTraditional');
 			for (const r of enabled.rows) {
 				const definitions = policies.rows.filter(p => p[0] === r[0]);
@@ -160,7 +160,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 			if (!traditional.rows.length) c.notes.push('No traditional statement audit options observed in available evidence.');
 			for (const r of traditional.rows) add(r[0] ?? 'All users', `Traditional ${r[2]}: success=${r[3]}, failure=${r[4]}; proxy=${r[1] ?? 'none'}`, traditional);
 		} else if (id === 'parameters') {
-			Object.assign(c, { title: 'Security Parameters', severity: 'low', advice: 'Review password-file administration, case-sensitive authentication and audit mode with a DBA against the site security policy.' });
+			Object.assign(c, { title: 'Security Parameters', severity: 'low', advice: 'For a human DBA: review password-file administration, case-sensitive authentication and audit mode with a DBA against the site security policy.' });
 			const e = await use('parameters'); for (const r of e.rows) add(r[0], s(r[1]), e);
 			if (!e.rows.some(r => r[0] === 'o7_dictionary_accessibility') && e.status === 'ok') c.notes.push('O7_DICTIONARY_ACCESSIBILITY: N/A (not exposed on this Oracle 19c target).');
 		}

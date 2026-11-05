@@ -371,3 +371,39 @@ No shared contract, dependency or grant changes are needed. `PLAN.md`,
 No live nested-role/ANY fixture was created: read-only constraints prohibit that.
 Other unverified behavior is explicitly described above (effective session access,
 column grants, proxy access, dictionary ANY semantics, and actual audit collection).
+
+## Review follow-up (M1, L2, L3), 2026-11-05
+
+All three findings in review-wp-20a section 4 are addressed:
+
+- **M1:** the source gate recursively parses every TypeScript file under
+  `src/security/`, using the parser already installed with the test tooling.
+  It inspects every string/template literal, reconstructs adjacent `+` pieces
+  and template interpolations, resolves unambiguous local constants, and decodes
+  escaped characters without executing inspected source. Quote/whitespace
+  normalization catches quoted SYS."USER$" and qualified/quoted forbidden views.
+  Forbidden names include UNIFIED_AUDIT_TRAIL, V$SQL_BIND_CAPTURE (also its
+  dictionary/global spellings), VALUE_STRING, PASSWORD_VERSIONS and all HASH
+  identifiers, alongside the original credential columns. Negative fixtures
+  cover every review bypass, nested/concatenated fragments and encoded characters.
+  SQL profile resource literals and advisory prose are distinguished from column
+  identifiers; source parse failures fail the gate.
+- **L2:** every returned check's advice starts with `For a human DBA:`, including
+  skipped/unavailable checks. A fixture asserts this across all check IDs.
+  The full smoke transcripts above record the initial pre-review wording;
+  current output adds the prefix to each advice paragraph.
+- **L3:** live integration assertions now require a non-empty default-password
+  subject set including HR on d1, an empty set on p1, and the complete
+  SHOPAPP → SHOPAPP.ORDERS owner path on p1.
+
+Validation after these changes:
+
+- `npm run typecheck`: passed.
+- `npm test`: 84 files passed, 1,248 tests passed.
+- `PIAGENT_BROWSER_LIVE=0 PIAGENT_ALERTLOG_LIVE=0 PIAGENT_SQL_LIVE=0 npm run test:browser`:
+  44 passed, 3 opt-in live tests skipped.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/security.test.ts`:
+  2 passed, no skips; both live baseline assertions passed.
+
+Only the security integration file ran. No LLM calls, new dependencies,
+shared contract changes, database writes or permission changes were needed.

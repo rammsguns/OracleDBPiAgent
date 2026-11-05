@@ -17,6 +17,18 @@ for (const [target, whoCan] of [['d1-19c-lab', 'HR.EMPLOYEES'], ['p1-19c-prod', 
 		const result = await readSecurityPosture(session, { whoCan });
 		expect(result.status).toBe('ok');
 		expect(result.checks.every(c => c.status === 'ok')).toBe(true);
+		const defaults = result.checks.find(c => c.id === 'default-passwords');
+		expect(defaults).toBeDefined();
+		const defaultUsers = new Set(defaults!.findings.map(f => f.subject));
+		if (target === 'd1-19c-lab') {
+			expect(defaultUsers.size).toBeGreaterThan(0);
+			expect(defaultUsers.has('HR')).toBe(true);
+		} else {
+			expect(defaultUsers.size).toBe(0);
+			expect(result.whoCan).toEqual(expect.arrayContaining([expect.objectContaining({
+				subject: 'SHOPAPP', privilege: 'OWNER', source: 'owner', object: 'SHOPAPP.ORDERS', path: ['SHOPAPP', 'SHOPAPP.ORDERS'],
+			})]));
+		}
 		expect(result.whoCan?.some(p => p.source === 'owner')).toBe(true);
 		expect(result.whoCan?.some(p => p.privilege === 'SELECT')).toBe(true);
 	} catch (error) {

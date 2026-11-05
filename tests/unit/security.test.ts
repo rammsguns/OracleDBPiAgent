@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { CHECK_IDS, SecurityUsageError, anyPrivileges, readSecurityPosture, renderSecurityMarkdown, rolePaths, validateSecurityOptions } from '../../src/security/index.js';
 import { SQL } from '../../src/security/sql.js';
 import type { OracleSession } from '../../src/contracts.js';
+import { scanSecuritySource } from './security-sql-scan.js';
 import { classifySql } from '../../src/oracle/sqlPolicy.js';
 function fixture(data: Partial<Record<keyof typeof SQL, unknown[][]>> = {}, unavailable: string[] = []): OracleSession {
 	return { target: { name: 'fixture' }, query: async (sql: string) => {
@@ -12,17 +13,9 @@ function fixture(data: Partial<Record<keyof typeof SQL, unknown[][]>> = {}, unav
 	} } as unknown as OracleSession;
 }
 it('scans every security SQL string and source for forbidden credential columns and objects', () => {
-	const forbidden = /\b(?:PASSWORD|SPARE4|AUTHENTICATION_TYPE|PASSWORD_VERSIONS|[A-Z0-9_]*HASH[A-Z0-9_]*)\b|\b(?:SYS\s*\.\s*)?USER\$/i;
-	const strings: string[] = [...Object.values(SQL)];
-	for (const file of readdirSync('src/security').filter(f => f.endsWith('.ts'))) {
-		const source = readFileSync('src/security/' + file, 'utf8');
-		// Backtick SQL plus quoted SQL fragments, including any future inline queries.
-		for (const match of source.matchAll(/`(?:\\[\s\S]|[^`])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g)) {
-			const text = match[0].slice(1, -1);
-			if (/\b(?:SELECT|FROM|JOIN)\b/i.test(text)) strings.push(text);
-		}
+	for (const file of readdirSync('src/security', { recursive: true, encoding: 'utf8' }).filter(f => /\.[cm]?tsx?$/.test(f))) {
+		expect(scanSecuritySource(readFileSync('src/security/' + file, 'utf8'), file), file).toEqual([]);
 	}
-	for (const sql of strings) expect(sql.replace(/'(?:''|[^'])*'/g, "''")).not.toMatch(forbidden);
 	for (const sql of Object.values(SQL)) { expect(() => classifySql(sql)).not.toThrow(); expect(sql).not.toMatch(/SELECT\s+\*/i); }
 });
 it('validates options before reading', () => {
@@ -108,4 +101,11 @@ it('escapes database text and collapses empty checks in Markdown', async () => {
 	expect(text).toContain('&lt;script&gt;&#124; x');
 	expect(text).not.toContain('### PUBLIC Grants');
 	expect(text).not.toContain('"sql"');
+});
+
+it('labels every check advice for a human DBA, including skipped and unavailable checks', async () => {
+	for (const options of [{}, { whoCan: 'HR.EMPLOYEES' }]) {
+		const result = await readSecurityPosture(fixture({}, ['defaults']), options);
+		for (const check of result.checks) expect(check.advice, check.id).toMatch(/^For a human DBA:/);
+	}
 });
