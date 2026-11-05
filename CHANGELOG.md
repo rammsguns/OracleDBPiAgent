@@ -58,6 +58,12 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ### Changed
 
+- Agent database sessions now run in UTC (`ALTER SESSION SET TIME_ZONE = '+00:00'`,
+  session-only). Plain `TIMESTAMP` literals in agent SQL now mean UTC.
+- Tool results now show time-zone-aware timestamps as ISO UTC with `Z`.
+- DATE and plain TIMESTAMP values now show their stored clock time
+  (`YYYY-MM-DD HH24:MI:SS`) instead of JavaScript local date strings.
+- `QueryResult` gains optional `columnTypes`.
 - `list_objects`, `describe_object` and `get_source` fall back to the matching
   `DBA_` view when the `ALL_` view hides an object the account can read through a
   grant. The result names the view that answered; tool definitions are unchanged.

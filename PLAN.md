@@ -2251,7 +2251,7 @@ Tests on 48bec5e:
 - 38 browser tests, with 2 opt-in live tests skipped.
 
 Open items:
-- the WP-18G timestamp rendering (gate-18g failed; follow-up WP-18H);
+- the WP-18G timestamp rendering (closed with WP-18H; merged 134b75f);
 - spaced problem keys (`ORA 800`) in labelled bullets are not matched by the
   p18 scorer (Low);
 - incident status is shown as a numeric ADR code.
@@ -2340,6 +2340,30 @@ Unchanged:
 - the audit log.
 
 Gate: as for 18G, with A = master and B = master + 18G + 18H.
+
+Gate-18h result (2026-11-05, archive `eval-archive/phase18/gate-18h`). A is
+c5bdaa4, B is 09febf7 (18G + 18H):
+
+| Split | A | B | B−A pass rate, CI95 |
+|---|---|---|---|
+| p18 ×4 | 17/24 | 20/24 | +12.5 pp [+4.2, +16.7] |
+| p16 ×4 | 34/40 | 40/40 | +15.0 pp [+10.0, +20.0] |
+| dev 4×4 | 110/112 | 112/112 | +1.8 pp [0, +3.6] |
+| holdout ×3 | 33/36 | 34/36 | +2.8 pp [0, +8.3] |
+| regression | 20/21 | 21/21 | — |
+| MVP | 39/39 | 39/39 | — |
+
+- p18 incident counts went from 1/4 to 3/4 on both d1 and p1.
+- The one regression-suite miss (hard-fresh-grant-request) was on A.
+- Review: APPROVE, informational notes only:
+  - `evals/ground-truth.ts` keeps the runner's zone, so truth SQL must keep
+    explicit UTC literals;
+  - `SYSDATE` follows the server OS clock, which is UTC on both containers.
+- Merged as 134b75f. On master:
+  - typecheck clean;
+  - 1122 unit tests pass;
+  - 44 integration tests pass (live targets and Strata);
+  - 38 browser tests pass, 2 opt-in live tests skipped.
 
 ## MVP exit criteria
 
