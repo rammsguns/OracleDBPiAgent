@@ -121,6 +121,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
 		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
 	});
+	program.command("security").description("Read-only security and privilege review; no LLM").requiredOption("--target <target>").option("--check <ids>", "Comma-separated check IDs").option("--who-can <object>", "OWNER.OBJECT privilege paths").option("--json").option("--markdown").action(async options => {
+		const { runSecurity } = await import("../security/cli.js");
+		const { SecurityUsageError } = await import("../security/index.js");
+		try { await runSecurity(options); }
+		catch (error) {
+			if (!(error instanceof SecurityUsageError)) throw error;
+			console.error(error.message); process.exitCode = 2;
+		}
+	});
 	program.command("sql").description("Read-only single-SQL cursor-cache insight; no LLM").requiredOption("--target <target>").option("--sql-id <id>").option("--text <fragment>").option("--child <number>").option("--json").option("--markdown").action(async options => {
 		const { runSql } = await import("../sqlperf/cli.js");
 		const { SqlUsageError } = await import("../sqlperf/index.js");
