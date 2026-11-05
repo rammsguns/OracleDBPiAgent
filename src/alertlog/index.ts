@@ -21,7 +21,14 @@ export interface AlertRow {
 	/** Bounded unions across the group; singular fields retain the newest example. */
 	incidentIds: string[]; traceFiles: string[]; problemKeys: string[]; metadataTruncated: boolean;
 }
-export interface IncidentRow { incidentId: string; problemKey: string; createTime: string; status: number | null }
+// Oracle Database 19c Reference: V$DIAG_INCIDENT.STATUS.
+export function incidentStatusName(status: number | null): string {
+	return ({ 1: 'Inflight', 2: 'Ready', 3: 'Tracked', 4: 'Closed', 5: 'Data removed', 6: 'Purged', 7: 'Incomplete' } as Record<number, string>)[status ?? -1] ?? 'Unknown';
+}
+export function formatIncidentStatus(status: number | null): string {
+	return `${incidentStatusName(status)} (${status ?? 'null'})`;
+}
+export interface IncidentRow { incidentId: string; problemKey: string; createTime: string; status: number | null; statusName?: string }
 export interface AlertResult<T> {
 	target: string; status: 'ok' | 'unavailable'; view: string; rows: T[];
 	window: { from: string; to: string }; limit: number; truncated: boolean;
@@ -131,7 +138,7 @@ export function readIncidents(ctx: ToolContext, target: string, options: WindowO
 		select: 'SELECT i.INCIDENT_ID, p.PROBLEM_KEY, i.CREATE_TIME, i.STATUS FROM V$DIAG_INCIDENT i LEFT JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID = i.PROBLEM_ID AND p.CON_ID = i.CON_ID',
 		where: `i.CREATE_TIME >= ${time} AND i.CREATE_TIME < ${time.replace(':fromTime', ':toTime')}`,
 		order: 'i.CREATE_TIME DESC, i.INCIDENT_ID DESC', binds: {},
-	}), row => ({ incidentId: str(row[0]), problemKey: safe(row[1]), createTime: str(row[2]), status: row[3] == null ? null : Number(row[3]) }));
+	}), row => ({ incidentId: str(row[0]), problemKey: safe(row[1]), createTime: str(row[2]), status: row[3] == null ? null : Number(row[3]), statusName: incidentStatusName(row[3] == null ? null : Number(row[3])) }));
 }
 const escape = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResult<IncidentRow>): string {
@@ -141,7 +148,7 @@ export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResu
 		for (const r of result.rows as AlertRow[]) lines.push(`| ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
 	} else {
 		lines.push('| Created | Incident | Problem | Status |', '|---|---|---|---|');
-		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${r.status} |`);
+		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${formatIncidentStatus(r.status)} |`);
 	}
 	if (!result.rows.length) lines.push('No rows returned.');
 	if (result.truncated) lines.push('Row cap reached; partial result (folding covers only fetched rows).');

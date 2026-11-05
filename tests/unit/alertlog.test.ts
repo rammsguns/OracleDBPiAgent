@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { loadConfig } from '../../src/config/index.js';
 import type { OracleSession, ToolContext } from '../../src/contracts.js';
-import { readAlertLog, readIncidents, renderAlertLogMarkdown } from '../../src/alertlog/index.js';
+import { readAlertLog, readIncidents, renderAlertLogMarkdown, incidentStatusName } from '../../src/alertlog/index.js';
 import { classifySql } from '../../src/oracle/sqlPolicy.js';
 function fixture(rows: unknown[][] = [], error?: string) {
 	const query = vi.fn<OracleSession['query']>(async sql => { classifySql(sql); if (error) throw new Error(error); return { rows, columns: [], truncated: false, elapsedMs: 1 }; });
@@ -111,4 +111,12 @@ it('separates equal message templates at distinct levels, including null', async
 it('folds repeated abbreviated codes while retaining incident and trace unions', async () => {
 	const result = await readAlertLog(fixture([row('ORA-609 ospid=12 incident=123 /trace/t12.trc'), row('ORA-609 ospid=34 incident=456 /trace/t34.trc')]).ctx, 'd1-19c-lab');
 	expect(result.rows).toHaveLength(1); expect(result.rows[0]).toMatchObject({ count: 2, codes: ['ORA-00609'], incidentIds: ['123', '456'], traceFiles: ['/trace/t12.trc', '/trace/t34.trc'] });
+});
+
+it.each([[1, 'Inflight'], [2, 'Ready'], [3, 'Tracked'], [4, 'Closed'], [5, 'Data removed'], [6, 'Purged'], [7, 'Incomplete'], [99, 'Unknown'], [null, 'Unknown']] as const)('decodes ADR status %s while retaining its raw code', async (status, name) => {
+	const f = fixture([['123', 'ORA 600', '2026-11-04T12:00:00Z', status]]);
+	const result = await readIncidents(f.ctx, 'd1-19c-lab');
+	expect(incidentStatusName(status)).toBe(name);
+	expect(result.rows[0]).toMatchObject({ status, statusName: name });
+	expect(renderAlertLogMarkdown(result)).toContain(`${name} (${status ?? 'null'})`);
 });

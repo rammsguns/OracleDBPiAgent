@@ -17,7 +17,7 @@ async function optionalRead<T>(target: string, view: string, window: { from: str
 	}
 }
 function check<T extends AlertRow | IncidentRow>(label: string, result: AlertResult<T>): Check {
-	const columns = result.view === 'V$DIAG_ALERT_EXT' ? ['timestamp', 'codes', 'messageText', 'count', 'firstTime', 'lastTime', 'incidentIds', 'problemKeys', 'traceFiles'] : ['incidentId', 'problemKey', 'createTime', 'status'];
+	const columns = result.view === 'V$DIAG_ALERT_EXT' ? ['timestamp', 'codes', 'messageText', 'count', 'firstTime', 'lastTime', 'incidentIds', 'problemKeys', 'traceFiles'] : ['incidentId', 'problemKey', 'createTime', 'status', 'statusName'];
 	return { label, sql: result.sql, binds: result.binds, status: result.status, view: result.view, columns, rows: result.rows.map(row => columns.map(key => row[key as keyof T])), truncated: result.truncated, attempts: result.attempts };
 }
 export async function collectAlerts(ctx: ToolContext, target: string, hours: number, codes: string[], runs: unknown[][]): Promise<TriageAlertLog> {

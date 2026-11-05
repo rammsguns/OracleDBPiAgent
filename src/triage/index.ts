@@ -1,3 +1,4 @@
+import { formatIncidentStatus } from '../alertlog/index.js';
 import { collectSql, sqlHypotheses, type TriageSql } from './sqlperf.js';
 import { renderSqlInsightMarkdown } from '../sqlperf/index.js';
 import { collectAlerts, alertHypotheses, mergeAlerts, discoverAlertJobs, alertSuggestions } from './alerts.js';
@@ -275,7 +276,7 @@ function renderTriageAlerts(alert: import('./alerts.js').TriageAlertLog): string
 		...alert.entries.map((r, i) => `| ${i} | ${safe(r.firstTime)} / ${safe(r.lastTime)} | ${r.count} | ${r.codes.join(', ')} | ${safe([...r.incidentIds, ...r.problemKeys, ...r.traceFiles].join('; '))} | ${safe(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`)].join('\n'),
 		...(!alert.entries.length ? ['No matching alert entries returned within the bounded queries.'] : []),
 		...alert.correlations.map(c => `Correlation (${c.kind}): ${safe(c.label)}${c.at ? ' at ' + safe(c.at) : ''}; entry indexes ${c.entryIndexes.join(', ')}. Temporal matches are diagnostic leads.`),
-		...alert.incidents.map(i => `<a id="incident-${/^\d+$/.test(i.incidentId) ? i.incidentId : 'unknown'}"></a>Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${i.status}.`),
+		...alert.incidents.map(i => `<a id="incident-${/^\d+$/.test(i.incidentId) ? i.incidentId : 'unknown'}"></a>Incident ${safe(i.incidentId)}: ${safe(i.problemKey)}; ${safe(i.createTime)}; status ${formatIncidentStatus(i.status)}.`),
 		...(alert.checks.some(c => c.truncated) ? ['Row cap reached; alert evidence is partial and folding covers fetched rows only.'] : []),
 	].join('\n\n');
 }

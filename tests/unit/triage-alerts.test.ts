@@ -31,6 +31,8 @@ it('returns the shared top-level shape, Markdown evidence, checklist and stubbed
 	expect(Object.keys(result.alertLog!).sort()).toEqual(['checks', 'correlations', 'entries', 'incidents', 'status', 'window']);
 	expect(result.issues[0]?.graph.nodes.some(n => n.id === 'alertlog')).toBe(true);
 	const markdown = renderTriageMarkdown(result);
+	expect(markdown).toContain('status Inflight (1)');
+	expect(result.alertLog?.incidents[0]).toMatchObject({ status: 1, statusName: 'Inflight' });
 	expect(markdown).toContain('### Alert log'); expect(markdown).toContain('Correlation (code)'); expect(markdown).toContain('FROM V$DIAG_ALERT_EXT');
 	const stub = vi.fn(async () => 'Incident 12: ORA-00600.');
 	expect((await summarizeTriage(markdown, loadConfig().llm, stub)).unverified).toEqual([]);
