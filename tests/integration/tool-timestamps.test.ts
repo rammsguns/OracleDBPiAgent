@@ -1,24 +1,11 @@
-import { expect, it, vi } from 'vitest';
-import driver from 'oracledb';
+import { expect, it } from 'vitest';
 import { loadConfig } from '../../src/config/index.js';
 import { createSessionProvider } from '../../src/oracle/index.js';
 import { boundedResult, createDbTools } from '../../src/tools/index.js';
 
-it('reports live Oracle timestamp metadata and renders run_query text without ALTER SESSION', async context => {
+it('reports live Oracle timestamp metadata and renders run_query text in a UTC session', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
 	const config = loadConfig();
-	const connect = driver.getConnection.bind(driver);
-	// This SELECT-only probe needs no default schema. Suppress the existing
-	// provider setup statement locally; never send ALTER SESSION to Oracle.
-	const spy = vi.spyOn(driver, 'getConnection').mockImplementation(async (...args: any[]) => {
-		const connection = await (connect as any)(...args);
-		const execute = connection.execute.bind(connection);
-		connection.execute = (sql: string, ...rest: any[]) => {
-			if (sql.startsWith('ALTER SESSION SET CURRENT_SCHEMA')) return Promise.resolve({});
-			return execute(sql, ...rest);
-		};
-		return connection;
-	});
 	const provider = createSessionProvider(config);
 	try {
 		let session;
@@ -45,5 +32,5 @@ it('reports live Oracle timestamp metadata and renders run_query text without AL
 		expect(cells[1]).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}$/);
 		for (const index of [2, 3, 4]) expect(cells[index]).toBe((output.details.rows[0][index] as Date).toISOString());
 		console.info('Live run_query:', (output.content[0] as { text: string }).text);
-	} finally { await provider.closeAll(); spy.mockRestore(); }
+	} finally { await provider.closeAll(); }
 }, 60000);
