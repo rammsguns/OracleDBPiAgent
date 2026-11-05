@@ -1,0 +1,660 @@
+{
+	"files": 554,
+	"records": 10364,
+	"flips": [
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` does not exist — the correct column is `LANGUAGE_ID`\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|---|---|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared max length** | **3 bytes** |\n| **Position** | 2 |\n\n### Key points\n\n- There is **no column named `LANG_ID`** in `OE.PRODUCT_DESCRIPTIONS`. Any report or query referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**.\n- The column participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`, and is part of the unique index `PRD_DESC_PK`.\n- Because it's `VARCHAR2(3)` (byte semantics by default), values like `'ALBANIAN'` would not fit; the sample data uses 3-character language abbreviations (e.g., `'AR'`, `'D'`, `'E'`, `'J'`, `'P'`, `'S'`, `'T'`, `'US'`, etc.).\n\n### Recommendation\n\nCorrect the report's column reference from `LANG_ID` → **`LANGUAGE_ID`**.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` is **not** the actual column name\n\nThe language discriminator in `OE.PRODUCT_DESCRIPTIONS` is named **`LANGUAGE_ID`**, not `LANG_ID`.\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n| **Position** | 2 |\n| **Role** | Part of primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID` |\n\n### Implication for the report\n\nIf the report SQL references `LANG_ID`, it will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The correct reference is `LANGUAGE_ID`. This is a common shorthand mistake—`LANGUAGE_ID` is sometimes informally abbreviated to `LANG_ID` in documentation or legacy code, but Oracle will not resolve the abbreviation.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified on **d1-19c-lab** via `describe_object` (schema OE, table PRODUCT_DESCRIPTIONS). The abbreviation `LANG_ID` in the report is **not** a real column — silently accepting it would fail with ORA-00904.\n\n**Actual language discriminator column:**\n\n| Attribute | Value |\n|---|---|\n| Exact name | `LANGUAGE_ID` (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length | `3` bytes |\n\nSupporting context from the same result:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`), backed by unique index `PRD_DESC_PK`.\n- The related text columns are `NVARCHAR2`: `TRANSLATED_NAME` (100) and `TRANSLATED_DESCRIPTION` (4000).\n\nNote on length semantics: the reported length of `3` is the declared maximum. Because `LANGUAGE_ID` is `VARCHAR2`, whether that 3 means bytes or characters depends on the database's `NLS_LENGTH_SEMANTICS`; the value shown here is the stored byte-length definition. If you need to confirm the effective semantics, I can query the NLS parameter — just say so.\n\nRecommendation: update the report to reference `LANGUAGE_ID` exactly (case-insensitive as an unquoted identifier).",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T11-51-19-648Z-f05a0bab-59c8-495e-93f7-e441580a3f5e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation in the report is **wrong**. There is no column named `LANG_ID` on `OE.PRODUCT_DESCRIPTIONS`.\n\nVerified via `describe_object` on target **d1-19c-lab**:\n\n| Reported (in code) | Actual column name | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` | **`LANGUAGE_ID`** | `VARCHAR2` | **3** |\n\nNotes:\n- `LANGUAGE_ID` is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`, columns `PRODUCT_ID, LANGUAGE_ID`) and of the unique index `PRD_DESC_PK`.\n- The length `3` is reported in bytes (the tool reports byte length); if you need to confirm BYTE vs CHAR semantics for this column specifically, I can query `ALL_TAB_COLUMNS` (`CHAR_USED`, `CHAR_COL_DECL_LENGTH`).\n\nSo any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct identifier is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T11-51-19-648Z-f05a0bab-59c8-495e-93f7-e441580a3f5e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: Column Name Mismatch\n\nThe report's abbreviation **`LANG_ID`** does **not** match the actual dictionary column name in `OE.PRODUCT_DESCRIPTIONS`.\n\n| Report references | Actual column name | Data type | Max byte length |\n|---|---|---|---|\n| `LANG_ID` ❌ | **`LANGUAGE_ID`** ✅ | `VARCHAR2` | **3 bytes** |\n\n### Evidence (from `describe_object`, target `d1-19c-lab`)\n\nThe column is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) and the unique index (`PRD_DESC_PK`), confirming it is indeed the language discriminator.\n\n### Recommendation\n\nAny report or query referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier** against this table. The correct identifier is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase14/gate-14b/2026-11-04T14-04-05-985Z-9fc81f06-f736-4c5d-a640-3bd8f44988bb.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` does not exist — the correct column is `LANGUAGE_ID`\n\n| Attribute | Value |\n|-----------|-------|\n| **Actual column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\nThe abbreviation `LANG_ID` used in the report code is **not** a valid column reference on `OE.PRODUCT_DESCRIPTIONS`. Any SQL referencing `LANG_ID` would raise `ORA-00904: \"LANG_ID\": invalid identifier`.\n\n### Additional context (from `describe_object` on d1-19c-lab)\n\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and in the unique index `PRD_DESC_PK`.\n- The table holds 8,640 rows (one per product × language combination).\n\n### Recommendation\n\nReplace every occurrence of `LANG_ID` with `LANGUAGE_ID` in the report's SQL. If a shorter alias is desired for readability, use an explicit column alias:\n\n```sql\nSELECT pd.LANGUAGE_ID AS lang_id\n  FROM oe.product_descriptions pd\n ...\n```",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase14/gate-14b/2026-11-04T14-11-52-784Z-0e581aea-8b5a-4227-8876-6719ffe0f765.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation in the report is **not** a real column. There is no `LANG_ID` in `OE.PRODUCT_DESCRIPTIONS` on **d1-19c-lab**.\n\nThe actual language discriminator column is:\n\n| Reported (wrong) | Actual column | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` | **`LANGUAGE_ID`** | `VARCHAR2` | **3** (bytes, default byte semantics) |\n\nEvidence — `describe_object` on `OE.PRODUCT_DESCRIPTIONS`:\n- Column position 2: `LANGUAGE_ID VARCHAR2 3`.\n- It is part of the primary key (`PRODUCT_DESCRIPTIONS_PK` = `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, confirming it is the language discriminator.\n\nNote on length semantics: the declared maximum is **3 bytes**. If you need to confirm whether it was declared with `BYTE` vs `CHAR` semantics, that would require querying `ALL_TAB_COLUMNS` (`CHAR_USED`), but the declared max byte length is 3 either way for this ASCII language-code column.\n\nRecommendation: correct the report's reference from `LANG_ID` to `LANGUAGE_ID`; otherwise it will fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase14/gate-14b/2026-11-04T14-11-52-784Z-0e581aea-8b5a-4227-8876-6719ffe0f765.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding\n\nThe column name **\"LANG_ID\" is incorrect**. The actual column in `OE.PRODUCT_DESCRIPTIONS` (target: d1-19c-lab) is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\nIt participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`, and is also part of the unique index `PRD_DESC_PK`.\n\n### Recommendation\n\nAny report or query referencing `LANG_ID` against this table will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The report must be corrected to use `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase15/gate-release/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "**The abbreviation `LANG_ID` is wrong.** The actual column in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| Exact column name | **`LANGUAGE_ID`** |\n| Data type | **VARCHAR2** |\n| Maximum byte length | **3** |\n\n(Source: `describe_object`, d1-19c-lab)\n\n### Notes\n- `LANGUAGE_ID` is part of the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, so it is the language discriminator as expected — but its name is spelled out in full, not abbreviated.\n- If the report references `LANG_ID`, it will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The fix is to use `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase15/gate-release/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: the abbreviation `LANG_ID` does not match the dictionary\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|-----------|--------------------------------------------------------------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\nThe column is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and it is the second column in the unique index `PRD_DESC_PK`.\n\n### Correction needed in the report\n\nAny reference to `LANG_ID` should be changed to **`LANGUAGE_ID`**. A query using `LANG_ID` would raise **ORA-00904: \"LANG_ID\": invalid identifier** at parse time.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase15/gate-release/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Result (target: `d1-19c-lab`, via `describe_object`)\n\nThe abbreviation **`LANG_ID` does not exist** in `OE.PRODUCT_DESCRIPTIONS`. The actual language-discriminator column is **`LANGUAGE_ID`**.\n\n| Attribute | Value |\n|---|---|\n| Column name | `LANGUAGE_ID` (position 2) |\n| Data type | `VARCHAR2` |\n| Declared length | `3` bytes |\n\n### Supporting context from the same describe\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK` = (`PRODUCT_ID`, `LANGUAGE_ID`), backed by unique index `PRD_DESC_PK`.\n- So any report referencing `LANG_ID` would fail with **ORA-00904: \"LANG_ID\": invalid identifier** — it was not silently accepted.\n\n### Note on byte length\nThe `3` is the declared `VARCHAR2` length in bytes (the column's `DATA_LENGTH`). Since language codes here are ASCII-style values (e.g. `'AL'`, `'AR'`, `'D'`), 3 bytes is sufficient regardless of database character set. If you need to confirm byte-vs-character semantics, I can query `ALL_TAB_COLUMNS` for `CHAR_USED`/`CHAR_COL_DECL_LENGTH`.\n\n**Recommendation:** correct the report's column reference from `LANG_ID` to `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T20-58-47-245Z-8654fe15-b434-41e5-950a-ce023b39583f.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: the abbreviation `LANG_ID` does not exist in the dictionary\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|-----------|--------------------------------------------------------------|\n| **Column name** | **`LANGUAGE_ID`** — *not* `LANG_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | **3** (bytes, per the default BYTE length semantics) |\n\n### Why this matters\n\n- There is **no column called `LANG_ID`** in `OE.PRODUCT_DESCRIPTIONS`. Any report or query referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**.\n- The correct name is **`LANGUAGE_ID`**, which participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`.\n\n### Recommendation\n\nReplace every occurrence of `LANG_ID` with `LANGUAGE_ID` in the report's SQL. For example:\n\n```sql\n-- wrong\nSELECT product_id, lang_id FROM oe.product_descriptions;\n\n-- correct\nSELECT product_id, language_id FROM oe.product_descriptions;\n```",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T20-58-47-245Z-8654fe15-b434-41e5-950a-ce023b39583f.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "**The abbreviation `LANG_ID` is wrong.** The actual column in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| Exact column name | **`LANGUAGE_ID`** |\n| Data type | `VARCHAR2` |\n| Maximum byte length | **3** |\n\nIt is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and also covered by the unique index `PRD_DESC_PK`.\n\nA report referencing `LANG_ID` will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The fix is to use the full name `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T21-06-31-823Z-5980b02f-a061-4e02-b997-df5153da3782.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` does not exist — the real column is `LANGUAGE_ID`\n\n| Attribute | Actual value |\n|-----------|-------------|\n| **Column name** | `LANGUAGE_ID` (not `LANG_ID`) |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | **3** |\n| **Position** | 2 |\n| **Role** | Part of primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) |\n\n*Source: `describe_object` on target **d1-19c-lab**, schema OE, table PRODUCT_DESCRIPTIONS.*\n\n### Implication for the report\n\nAny SQL referencing `LANG_ID` will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The report must use the full name `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T21-06-31-823Z-5980b02f-a061-4e02-b997-df5153da3782.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation `LANG_ID` does **not** exist in the dictionary — it would raise ORA-00904 (invalid identifier). The real column is different.\n\n**Verified on d1-19c-lab via `describe_object` (source: ALL_TAB_COLUMNS):**\n\n| Report's name | Actual dictionary column | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` ❌ | **`LANGUAGE_ID`** ✅ | `VARCHAR2` | **3** bytes |\n\nDetails:\n- The language discriminator is `OE.PRODUCT_DESCRIPTIONS.LANGUAGE_ID`, `VARCHAR2(3)`.\n- It is part of the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, so it participates in the table's identity.\n\nRecommendation: change the report to reference `LANGUAGE_ID`. Note that `VARCHAR2(3)` is byte-length semantics here (not char), which matters if any multi-byte language codes are ever stored — though standard Oracle sample codes ('AR','JA', etc.) fit well within 3 bytes.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T21-06-31-823Z-5980b02f-a061-4e02-b997-df5153da3782.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation **LANG_ID does not exist** in the dictionary — it would raise ORA-00904. The real column is **LANGUAGE_ID**.\n\nVerified via `describe_object` on target **d1-19c-lab**, schema `OE`, table `PRODUCT_DESCRIPTIONS`:\n\n| Attribute | Value |\n|---|---|\n| Exact column name | `LANGUAGE_ID` (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Declared max length | `3` (byte semantics) |\n\nSupporting context from the same result:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- Table has 8,640 rows.\n\nRecommendation: fix the report to reference `LANGUAGE_ID`. Since it's a `VARCHAR2(3)` byte-semantics column (e.g. `'AL'`, `'AR'`, `'BS'`), any filter should match the stored 2–3 character language codes exactly.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding\n\nThe report's abbreviation **`LANG_ID`** does **not** match the actual column name in the data dictionary.\n\n| Attribute | Actual value (from `describe_object`, target `d1-19c-lab`) |\n|-----------|----------------------------------------------------------|\n| **Column name** | `LANGUAGE_ID` (position 2) |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | **3 bytes** (`DATA_LENGTH = 3`) |\n\n### Key points\n\n1. **Name mismatch** — The dictionary column is `LANGUAGE_ID`, not `LANG_ID`. Any SQL referencing `LANG_ID` would raise `ORA-00904: \"LANG_ID\": invalid identifier`.\n2. **Length semantics** — `VARCHAR2(3)` with default BYTE semantics means the maximum stored size is 3 bytes. Since language identifiers in this table are values like `'AL'`, `'AR'`, `'BS'` (2 characters), they fit comfortably within 3 bytes even under CHAR semantics.\n3. **Composite PK** — `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, confirming it is indeed the language discriminator for the translated rows.\n\n### Recommendation\n\nCorrect the report's SQL to reference **`LANGUAGE_ID`** rather than `LANG_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` Does Not Exist\n\nThe report's reference to `LANG_ID` is **incorrect**. The actual column name in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n| **Position** | 2 |\n| **Part of PK?** | Yes — `PRODUCT_DESCRIPTIONS_PK (PRODUCT_ID, LANGUAGE_ID)` |\n\n### Implication for the report\n\nAny SQL referencing `LANG_ID` will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The report must be corrected to use `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Verification Result (target: `d1-19c-lab`, source: `describe_object` on `OE.PRODUCT_DESCRIPTIONS`)\n\nThe abbreviation **`LANG_ID` is wrong** — no such column exists. The real language-discriminator column is:\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Max byte length | **3** |\n\n### Supporting detail\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK (PRODUCT_ID, LANGUAGE_ID)` and the unique index `PRD_DESC_PK`, so it acts as the per-language discriminator alongside `PRODUCT_ID`.\n- The table has 8,640 rows (stats last analyzed 2026-09-11).\n\n### Note on length semantics\nThe reported length of **3** is the declared maximum byte length for `VARCHAR2(3)`. Whether it is interpreted as bytes or characters depends on the database's `NLS_LENGTH_SEMANTICS` (not shown by this tool); language codes here are short ASCII tags, so 3 bytes is sufficient in practice. If you want, I can query `NLS_DATABASE_PARAMETERS` to confirm the length-semantics setting.\n\n**Recommendation for the report:** replace every reference to `LANG_ID` with `LANGUAGE_ID`; otherwise the query will fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T23-13-03-708Z-980bd1fd-0e2b-4a54-926e-ef06527d8302.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "**Correction:** The column is **not** `LANG_ID`. The actual dictionary column name in `OE.PRODUCT_DESCRIPTIONS` (target: d1-19c-lab) is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | 3 |\n\nIt participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and is also part of the unique index `PRD_DESC_PK`. Any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier` unless an alias or view maps it.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T23-13-03-708Z-980bd1fd-0e2b-4a54-926e-ef06527d8302.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The report's `LANG_ID` is **not** a real column — it's an incorrect abbreviation. The actual language discriminator in `OE.PRODUCT_DESCRIPTIONS` is:\n\n| Attribute | Verified value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length | **3** (position 2) |\n\nSource: `describe_object` on target **d1-19c-lab**.\n\nSupporting context from the same result:\n- `LANGUAGE_ID` is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`: `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, so it is a required discriminator (no NULLs).\n- The `VARCHAR2` length is reported as 3 with default BYTE semantics; if you need to confirm char-vs-byte semantics specifically, I can query `NLS_LENGTH_SEMANTICS`/the column's `CHAR_USED` flag.\n\nRecommendation: fix the report to reference `LANGUAGE_ID`. A query using `LANG_ID` would fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase17/gate-17ac/2026-11-05T01-38-31-546Z-4946b70f-0c05-4242-9936-11d1e3d6e971.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The column name in the report is **wrong**. Here are the verified facts from `describe_object` on **d1-19c-lab**:\n\n| Attribute | Actual value | Report abbreviation |\n|-----------|-------------|---------------------|\n| Column name | **`LANGUAGE_ID`** | ~~LANG_ID~~ |\n| Data type | `VARCHAR2` | — |\n| Max byte length (`DATA_LENGTH`) | **3 bytes** | — |\n\nAdditional context confirming this is the language discriminator:\n\n- It participates in the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`).\n- The table has 8,640 rows, consistent with a language-ID discriminator.\n\n**Conclusion:** Any report referencing `LANG_ID` against `OE.PRODUCT_DESCRIPTIONS` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct column is **`LANGUAGE_ID VARCHAR2(3)`**.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase17/gate-17ac/2026-11-05T01-46-44-017Z-8d42fa40-2c4b-487a-98f9-ca84ee31ef6e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation **`LANG_ID` does not exist** in `OE.PRODUCT_DESCRIPTIONS`. The report's reference is incorrect.\n\nVerified via `describe_object` on target **d1-19c-lab**:\n\n| Attribute | Actual value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Length semantics | byte length = **3** (column position 2) |\n\nAdditional context confirming this is the language discriminator: it is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n\nRecommendation: correct the report to use `LANGUAGE_ID`. Note that `VARCHAR2(3)` here is byte-length semantics, so any multi-byte language codes would need to be checked against the column's actual length semantics (BYTE vs CHAR) if that ever becomes a concern — but for standard 2–3 character ISO codes it fits.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase17/gate-17ac/2026-11-05T01-46-44-017Z-8d42fa40-2c4b-487a-98f9-ca84ee31ef6e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified against the data dictionary via `describe_object` on **d1-19c-lab** (schema `OE`, table `PRODUCT_DESCRIPTIONS`). The report's abbreviation is wrong — there is no column named `LANG_ID`.\n\n## Finding\n\nThe language discriminator's real name is **`LANGUAGE_ID`**, not `LANG_ID`.\n\n| Attribute | Value |\n|---|---|\n| Exact column name | `LANGUAGE_ID` |\n| Data type | `VARCHAR2` |\n| Max byte length | `3` |\n\n## Supporting evidence (same tool result)\n\n- The full column list for the table is: `PRODUCT_ID`, `LANGUAGE_ID`, `TRANSLATED_NAME`, `TRANSLATED_DESCRIPTION`. No `LANG_ID` exists, so any query referencing `LANG_ID` would fail with `ORA-00904: invalid identifier`.\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`, columns `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, confirming it is the intended discriminator.\n\n## Note on the length\n\nThe reported length of **3** is the declared maximum byte length for a `VARCHAR2`. Because `LANGUAGE_ID` stores 2–3 character ISO language codes (e.g. `US`, `AR`, `J`), and the column is plain `VARCHAR2` (not `NVARCHAR2`), those bytes equal characters only for single-byte language codes; if multibyte values were ever inserted, byte semantics would apply. The other text columns (`TRANSLATED_NAME`, `TRANSLATED_DESCRIPTION`) are `NVARCHAR2`, so the byte-vs-character distinction matters specifically for `LANGUAGE_ID`.\n\n**Recommendation:** update the report to reference `LANGUAGE_ID` (VARCHAR2, max 3 bytes).",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18/2026-11-05T05-52-51-200Z-bfd39063-322c-476a-aa38-ba69faf45f9c.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation in the report is **wrong**. There is no column named `LANG_ID` in `OE.PRODUCT_DESCRIPTIONS`.\n\n**Verified via `describe_object` on target `d1-19c-lab`:**\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length | **3** |\n\nAdditional context from the same result:\n- `LANGUAGE_ID` is position 2 and part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- Because it is a plain `VARCHAR2(3)` (not `NVARCHAR2`), its length semantics are bytes — consistent with the 3-byte ISO-style language codes used in the sample data.\n\nSo any query referencing `LANG_ID` would fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T07-59-02-767Z-3b8f57f0-1a95-463a-b883-02e8a535c47d.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Verification Result — `OE.PRODUCT_DESCRIPTIONS` (target: d1-19c-lab)\n\nThe abbreviation **`LANG_ID` does not exist** in this table. The actual column name is:\n\n| Attribute | Verified Value |\n|-----------|---------------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | `3` |\n\nIt is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`.\n\n**Conclusion:** Any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T07-59-02-767Z-3b8f57f0-1a95-463a-b883-02e8a535c47d.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation in the report is **wrong**. There is no `LANG_ID` column in `OE.PRODUCT_DESCRIPTIONS`.\n\nVerified via `describe_object` (backed by `ALL_TAB_COLUMNS`) on target **d1-19c-lab**:\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Declared length | **3** (max byte length = 3) |\n\nAdditional context confirming this is the language discriminator:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- It pairs with the multilingual columns `TRANSLATED_NAME` (NVARCHAR2 100) and `TRANSLATED_DESCRIPTION` (NVARCHAR2 4000).\n\nSo any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `OE.PRODUCT_DESCRIPTIONS.LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T08-08-18-440Z-3f851eca-a013-49c7-9910-c53b1fe8b537.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Result (target: `d1-19c-lab`, source: `describe_object` on `OE.PRODUCT_DESCRIPTIONS`)\n\nThe abbreviation **`LANG_ID` does not exist** in this table. The report's reference is wrong and would raise **ORA-00904: \"LANG_ID\": invalid identifier**.\n\nThe actual language-discriminator column is:\n\n| Attribute | Value |\n|-----------|-------|\n| Exact column name | **`LANGUAGE_ID`** |\n| Data type | **`VARCHAR2`** |\n| Maximum length | **3** (bytes — default BYTE semantics) |\n\n### Supporting evidence from the same tool call\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK` on `(PRODUCT_ID, LANGUAGE_ID)` and enforced by the unique index `PRD_DESC_PK`.\n- Note the related text columns use `NVARCHAR2` (`TRANSLATED_NAME` 100, `TRANSLATED_DESCRIPTION` 4000), but the discriminator itself is plain `VARCHAR2(3)`, consistent with ISO-style 3-character language codes (e.g., `'ALBANIAN'`-style full names are stored elsewhere; here it's a short code).\n\n### Recommendation\nCorrect the report to reference **`LANGUAGE_ID`**, not `LANG_ID`. Since the column is `VARCHAR2(3)` with BYTE semantics, any filter value must be ≤ 3 bytes (e.g., `'US'`, `'AR'`, `'JA'`), and comparisons are byte-based, not character-based.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18g/2026-11-05T08-08-18-440Z-3f851eca-a013-49c7-9910-c53b1fe8b537.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation is **not** correct. There is no `LANG_ID` column in `OE.PRODUCT_DESCRIPTIONS`.\n\nVerified via `describe_object` on target **d1-19c-lab**:\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Declared length | `3` |\n| Max byte length | **3 bytes** (`VARCHAR2(3)` uses default BYTE semantics) |\n\nAdditional context confirming it is the language discriminator:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (columns `PRODUCT_ID`, `LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- The report's reference to `LANG_ID` would raise **ORA-00904: \"LANG_ID\": invalid identifier** if used literally.\n\nRecommendation: change the report to reference `LANGUAGE_ID`. If you want, I can run a read-only query against `ALL_TAB_COLUMNS` (filtering `CHAR_USED`/`DATA_LENGTH`) to confirm the byte-vs-character semantics explicitly, but the dictionary already shows `VARCHAR2` length 3.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The report's `LANG_ID` is **not** a real column — it's an incorrect abbreviation. The actual dictionary column on `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**, via `describe_object`) is:\n\n| Attribute | Value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (position 2) |\n| Data type | **`VARCHAR2`** |\n| Maximum length | **3** (bytes; the `length` reported by `ALL_TAB_COLUMNS` is byte semantics) |\n\nSupporting context from the same result:\n- `LANGUAGE_ID` is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) and backed by the unique index `PRD_DESC_PK`.\n- The table has 8,640 rows (last analyzed 2026-09-11).\n\nSo a query referencing `LANG_ID` would fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation **`LANG_ID` does not exist** in `OE.PRODUCT_DESCRIPTIONS`. The report's reference is wrong and would raise `ORA-00942`/`ORA-00904` (invalid identifier) if used literally.\n\nVerified via `describe_object` on target **d1-19c-lab**:\n\n| Report says | Actual dictionary name | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` | **`LANGUAGE_ID`** | `VARCHAR2` | **3** (bytes) |\n\nSupporting details from the same call:\n- It is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`: `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- The table has 8640 rows (last analyzed 2026-09-11).\n\nNote on byte length: `LANGUAGE_ID` is declared as `VARCHAR2(3)`. Under the default BYTE length semantics this is a maximum of 3 bytes. If you want to confirm the session/database length semantics (BYTE vs CHAR) for this column, I can query `NLS_LENGTH_SEMANTICS` / `ALL_TAB_COLUMNS.CHAR_USED` — just say so.\n\nRecommendation: correct the report to reference `LANGUAGE_ID`, not `LANG_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` Does Not Exist\n\nThe column the report references as **`LANG_ID`** is not a valid column in `OE.PRODUCT_DESCRIPTIONS`. The actual language discriminator column is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 (bytes) |\n\n(Source: `describe_object` on target **d1-19c-lab**, schema OE, table PRODUCT_DESCRIPTIONS.)\n\n### Why this matters\n\nAny SQL or PL/SQL referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**. The report must use the full name `LANGUAGE_ID`. It participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`, so it is also part of the unique index `PRD_DESC_PK`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T10-33-50-755Z-447a901c-6a32-4014-be5d-356a52fa5409.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding\n\nThe report's reference to `LANG_ID` is **incorrect**. The actual column name in `OE.PRODUCT_DESCRIPTIONS` is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\n*(Source: `describe_object` on target **d1-19c-lab**, schema OE, object PRODUCT_DESCRIPTIONS.)*\n\n### Additional context\n\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`.\n- There is no column named `LANG_ID` in this table — any query using that abbreviation would raise **ORA-00904: \"LANG_ID\": invalid identifier**.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T10-33-50-755Z-447a901c-6a32-4014-be5d-356a52fa5409.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified against `describe_object` on **d1-19c-lab**, schema `OE`, table `PRODUCT_DESCRIPTIONS`. The abbreviation is **not** a real column — there is no `LANG_ID`.\n\nThe actual language-discriminator column is:\n\n| Attribute | Verified value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Max byte length | **3** |\n\nSupporting context from the same result:\n- It is position 2 and part of the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- The full column list contains no column named `LANG_ID`, so any report referencing `LANG_ID` would fail with **ORA-00904: \"LANG_ID\": invalid identifier**.\n\nRecommendation: correct the report to use `LANGUAGE_ID VARCHAR2(3)`. (Note: this is a plain `VARCHAR2`, i.e. byte-semantics length 3, not an NVARCHAR2 — the translated text columns `TRANSLATED_NAME`/`TRANSLATED_DESCRIPTION` are the NVARCHAR2 ones.)",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding — d1-19c-lab, OE.PRODUCT_DESCRIPTIONS\n\nThe abbreviation **LANG_ID does not exist** in the data dictionary. The actual column name is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | 3 |\n\nThe report's reference to \"LANG_ID\" is an abbreviation that will cause **ORA-00904: \"LANG_ID\": invalid identifier** if used literally in SQL against this table.\n\n### Additional context from the dictionary\n\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) and the backing unique index (`PRD_DESC_PK`), together with `PRODUCT_ID`.\n- It is also part of a check constraint (`TRANSLATED_NAME_NN` / `TRANSLATED_DESC_NN` apply to other columns, but the PK guarantees non-null on `LANGUAGE_ID`).\n\n**Recommendation:** correct the report's SQL to use `LANGUAGE_ID` (the full name). If the report layer uses an alias like `LANG_ID`, that alias must be defined explicitly in the query (e.g., `LANGUAGE_ID AS LANG_ID`); it is not a dictionary-visible name.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The report's abbreviation `LANG_ID` is **not** a real column — it does not exist in the dictionary. The actual language-discriminator column is **`LANGUAGE_ID`**.\n\nVerified on **d1-19c-lab**, table `OE.PRODUCT_DESCRIPTIONS` (via `describe_object` → `ALL_TAB_COLUMNS`):\n\n| Attribute | Value |\n|---|---|\n| Exact column name | `LANGUAGE_ID` (position 2) |\n| Data type | `VARCHAR2` |\n| Max length (`DATA_LENGTH`) | **3** |\n\nSupporting evidence that this is the language discriminator: it is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) and the unique index `PRD_DESC_PK`, which is the standard OE pattern for the per-language translation row.\n\nNote on byte semantics: `DATA_LENGTH = 3` is reported in bytes (the default `VARCHAR2` byte semantics). If you want me to confirm the declared char-vs-byte semantics explicitly (`CHAR_USED` / `CHAR_COL_DECL_LENGTH`), I can run one read-only query against `ALL_TAB_COLUMNS` — just say so.\n\nRecommendation for the report: replace `LANG_ID` with `LANGUAGE_ID`; a query using `LANG_ID` would fail with `ORA-00904: invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified against the data dictionary on **d1-19c-lab** (`describe_object` → `ALL_TAB_COLUMNS`). The abbreviation `LANG_ID` in the report is **wrong** — it does not exist as a column name.\n\n## Correct column\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length (`DATA_LENGTH`) | **3** |\n\n## Supporting dictionary evidence\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK` = (`PRODUCT_ID`, `LANGUAGE_ID`), and of the unique index `PRD_DESC_PK`.\n- The `LANGUAGE_ID` value is a 3-character ISO language code (e.g. `AR`, `JA`, `US`), which is why it is a short fixed-width `VARCHAR2(3)`.\n\n## Note on byte vs. char length\n`DATA_LENGTH = 3` is the **byte** length (what you asked for). Because this column stores single-byte ASCII language codes, its declared semantics are effectively byte-based here; if you want to be fully explicit about length semantics (`BYTE` vs `CHAR`) you can confirm via `ALL_TAB_COLUMNS.CHAR_USED`, but the maximum byte length is confirmed as **3**.\n\n**Action for the report:** replace `LANG_ID` with `LANGUAGE_ID`. Any query using `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T19-26-07-699Z-146edc1f-7cf8-4bdc-9c97-ae51483c59d8.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified on **d1-19c-lab** via `describe_object` (source: `ALL_TAB_COLUMNS`). The abbreviation in the report is **not** a real column — there is no `LANG_ID`. The actual language-discriminator column is:\n\n| Report says | Actual dictionary name | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` | **`LANGUAGE_ID`** | **VARCHAR2** | **3 bytes** (position 2) |\n\nSupporting facts from the same call:\n- `LANGUAGE_ID` is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) and of the unique index `PRD_DESC_PK`.\n- Table `OE.PRODUCT_DESCRIPTIONS` has 8640 rows (last analyzed 2026-09-11).\n\nSo a query referencing `LANG_ID` would fail with `ORA-00904: \"LANG_ID\": invalid identifier`; it must be corrected to `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase19/gate-19/2026-11-05T19-26-07-699Z-146edc1f-7cf8-4bdc-9c97-ae51483c59d8.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified — the abbreviation `LANG_ID` in the report is **incorrect**. There is no such column on `OE.PRODUCT_DESCRIPTIONS`.\n\n**Actual language-discriminator column (target d1-19c-lab, via `describe_object` / `ALL_TAB_COLUMNS`):**\n\n| Attribute | Value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Maximum byte length | **3** bytes (`CHAR_LENGTH` = 3) |\n\nSupporting context from the same result:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- The table has 8,640 rows (last analyzed 2026-09-11).\n\n**Conclusion:** The report's reference to `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. It must be corrected to `LANGUAGE_ID VARCHAR2(3)`. Note that this is a byte/character length of 3 — consistent with ISO language codes (e.g. `ALBANIAN`, `ARABIC` are stored in full in the related `OE.COUNTRIES`/language dimension, but the discriminator here is a short code), so do not widen or assume a longer type.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../eval-archive/phase20/measure/2026-11-05T19-45-57-301Z-9198a7cc-5d8e-43bb-93a7-7858324d584f.json",
+			"id": "hard-p20-p1-enabled-audit-policies",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"ORA_LOGON_FAILURES",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"NO",
+					"YES"
+				],
+				[
+					"ORA_SECURECONFIG",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"YES",
+					"YES"
+				]
+			],
+			"answer": "Source: `AUDIT_UNIFIED_ENABLED_POLICIES` on **p1-19c-prod**. This view reflects the *enabled configuration* only — it lists which policies are turned on and how. It is **not** proof that any specific event was written to the audit trail; I did not read `UNIFIED_AUDIT_TRAIL` or any audit activity records, per your instruction.\n\nTwo enabled policies, each with all six attributes grouped together:\n\n**1. ORA_LOGON_FAILURES**\n- Policy name: `ORA_LOGON_FAILURES`\n- Enablement mode: `BY USER` (enabled per-user)\n- Entity name: `ALL USERS`\n- Entity type: `USER`\n- Successes audited: **NO**\n- Failures audited: **YES**\n\n**2. ORA_SECURECONFIG**\n- Policy name: `ORA_SECURECONFIG`\n- Enablement mode: `BY USER` (enabled per-user)\n- Entity name: `ALL USERS`\n- Entity type: `USER`\n- Successes audited: **YES**\n- Failures audited: **YES**\n\nNotes / limits:\n- Both are Oracle-supplied default policies, enabled via the `BY USER` mode against `ALL USERS`; there are no object-based (`ON <object>`) or role/component enablements present.\n- `SUCCESS`/`FAILURE` here indicate whether the policy is configured to capture successful vs. failed evaluations — a configuration flag, not evidence that rows exist in the trail. To prove an event was actually recorded you would need to query the audit trail (`UNIFIED_AUDIT_TRAIL`), which I deliberately did not do.\n- This view lists only enabled policies; policies that are defined but disabled would appear in `AUDIT_UNIFIED_POLICIES` with `POLICY_STATUS = DISABLED` and are excluded here.",
+			"reason": "All truth cells occur together in one labelled record, with their own labels and values."
+		},
+		{
+			"file": "../eval-archive/phase20/measure/2026-11-05T19-47-34-478Z-d7c2fc8d-fa85-45d0-a6e0-4848c4c1e87d.json",
+			"id": "hard-p20-p1-enabled-audit-policies",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [
+				[
+					"ORA_LOGON_FAILURES",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"NO",
+					"YES"
+				],
+				[
+					"ORA_SECURECONFIG",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"YES",
+					"YES"
+				]
+			],
+			"answer": "## Enabled unified audit policies — p1-19c-prod\n\nSource: `AUDIT_UNIFIED_ENABLED_POLICIES` (configuration view only). Two enabled policies, each with all six attributes together:\n\n**1. ORA_LOGON_FAILURES**\n- Enablement mode: `BY USER`\n- Entity name: `ALL USERS`\n- Entity type: `USER`\n- Successes audited: `NO`\n- Failures audited: `YES`\n\n**2. ORA_SECURECONFIG**\n- Enablement mode: `BY USER`\n- Entity name: `ALL USERS`\n- Entity type: `USER`\n- Successes audited: `YES`\n- Failures audited: `YES`\n\n### Configuration vs. proof of recorded events\nThese rows are **enabled configuration state** — they tell you the policy is turned on, how it's scoped (here, applied `BY USER` to `ALL USERS`), and whether success/failure outcomes are in scope. They are **not** evidence that any specific event was actually written to the audit trail.\n\nTo prove an event was recorded you would need to read the audit trail (`UNIFIED_AUDIT_TRAIL` / its underlying files), which I deliberately did **not** query, per your instruction not to read audit activity records. So: enabled ≠ proof of capture.",
+			"reason": "All truth cells occur together in one labelled record, with their own labels and values."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` does not exist — the correct column is `LANGUAGE_ID`\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|---|---|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared max length** | **3 bytes** |\n| **Position** | 2 |\n\n### Key points\n\n- There is **no column named `LANG_ID`** in `OE.PRODUCT_DESCRIPTIONS`. Any report or query referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**.\n- The column participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`, and is part of the unique index `PRD_DESC_PK`.\n- Because it's `VARCHAR2(3)` (byte semantics by default), values like `'ALBANIAN'` would not fit; the sample data uses 3-character language abbreviations (e.g., `'AR'`, `'D'`, `'E'`, `'J'`, `'P'`, `'S'`, `'T'`, `'US'`, etc.).\n\n### Recommendation\n\nCorrect the report's column reference from `LANG_ID` → **`LANGUAGE_ID`**.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` is **not** the actual column name\n\nThe language discriminator in `OE.PRODUCT_DESCRIPTIONS` is named **`LANGUAGE_ID`**, not `LANG_ID`.\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n| **Position** | 2 |\n| **Role** | Part of primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID` |\n\n### Implication for the report\n\nIf the report SQL references `LANG_ID`, it will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The correct reference is `LANGUAGE_ID`. This is a common shorthand mistake—`LANGUAGE_ID` is sometimes informally abbreviated to `LANG_ID` in documentation or legacy code, but Oracle will not resolve the abbreviation.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T11-44-08-056Z-e61ac561-393c-49ec-aa0f-abe484a6969e.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified on **d1-19c-lab** via `describe_object` (schema OE, table PRODUCT_DESCRIPTIONS). The abbreviation `LANG_ID` in the report is **not** a real column — silently accepting it would fail with ORA-00904.\n\n**Actual language discriminator column:**\n\n| Attribute | Value |\n|---|---|\n| Exact name | `LANGUAGE_ID` (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length | `3` bytes |\n\nSupporting context from the same result:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`), backed by unique index `PRD_DESC_PK`.\n- The related text columns are `NVARCHAR2`: `TRANSLATED_NAME` (100) and `TRANSLATED_DESCRIPTION` (4000).\n\nNote on length semantics: the reported length of `3` is the declared maximum. Because `LANGUAGE_ID` is `VARCHAR2`, whether that 3 means bytes or characters depends on the database's `NLS_LENGTH_SEMANTICS`; the value shown here is the stored byte-length definition. If you need to confirm the effective semantics, I can query the NLS parameter — just say so.\n\nRecommendation: update the report to reference `LANGUAGE_ID` exactly (case-insensitive as an unquoted identifier).",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T14-04-05-985Z-9fc81f06-f736-4c5d-a640-3bd8f44988bb.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` does not exist — the correct column is `LANGUAGE_ID`\n\n| Attribute | Value |\n|-----------|-------|\n| **Actual column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\nThe abbreviation `LANG_ID` used in the report code is **not** a valid column reference on `OE.PRODUCT_DESCRIPTIONS`. Any SQL referencing `LANG_ID` would raise `ORA-00904: \"LANG_ID\": invalid identifier`.\n\n### Additional context (from `describe_object` on d1-19c-lab)\n\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and in the unique index `PRD_DESC_PK`.\n- The table holds 8,640 rows (one per product × language combination).\n\n### Recommendation\n\nReplace every occurrence of `LANG_ID` with `LANGUAGE_ID` in the report's SQL. If a shorter alias is desired for readability, use an explicit column alias:\n\n```sql\nSELECT pd.LANGUAGE_ID AS lang_id\n  FROM oe.product_descriptions pd\n ...\n```",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "**The abbreviation `LANG_ID` is wrong.** The actual column in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| Exact column name | **`LANGUAGE_ID`** |\n| Data type | **VARCHAR2** |\n| Maximum byte length | **3** |\n\n(Source: `describe_object`, d1-19c-lab)\n\n### Notes\n- `LANGUAGE_ID` is part of the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`, so it is the language discriminator as expected — but its name is spelled out in full, not abbreviated.\n- If the report references `LANG_ID`, it will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The fix is to use `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: the abbreviation `LANG_ID` does not match the dictionary\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|-----------|--------------------------------------------------------------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n\nThe column is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and it is the second column in the unique index `PRD_DESC_PK`.\n\n### Correction needed in the report\n\nAny reference to `LANG_ID` should be changed to **`LANGUAGE_ID`**. A query using `LANG_ID` would raise **ORA-00904: \"LANG_ID\": invalid identifier** at parse time.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T15-55-34-878Z-10f23d1c-dde3-4a6d-ab6e-914c71f3b239.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Result (target: `d1-19c-lab`, via `describe_object`)\n\nThe abbreviation **`LANG_ID` does not exist** in `OE.PRODUCT_DESCRIPTIONS`. The actual language-discriminator column is **`LANGUAGE_ID`**.\n\n| Attribute | Value |\n|---|---|\n| Column name | `LANGUAGE_ID` (position 2) |\n| Data type | `VARCHAR2` |\n| Declared length | `3` bytes |\n\n### Supporting context from the same describe\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK` = (`PRODUCT_ID`, `LANGUAGE_ID`), backed by unique index `PRD_DESC_PK`.\n- So any report referencing `LANG_ID` would fail with **ORA-00904: \"LANG_ID\": invalid identifier** — it was not silently accepted.\n\n### Note on byte length\nThe `3` is the declared `VARCHAR2` length in bytes (the column's `DATA_LENGTH`). Since language codes here are ASCII-style values (e.g. `'AL'`, `'AR'`, `'D'`), 3 bytes is sufficient regardless of database character set. If you need to confirm byte-vs-character semantics, I can query `ALL_TAB_COLUMNS` for `CHAR_USED`/`CHAR_COL_DECL_LENGTH`.\n\n**Recommendation:** correct the report's column reference from `LANG_ID` to `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T20-58-47-245Z-8654fe15-b434-41e5-950a-ce023b39583f.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: the abbreviation `LANG_ID` does not exist in the dictionary\n\n| Attribute | Actual value (from `describe_object`, target **d1-19c-lab**) |\n|-----------|--------------------------------------------------------------|\n| **Column name** | **`LANGUAGE_ID`** — *not* `LANG_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | **3** (bytes, per the default BYTE length semantics) |\n\n### Why this matters\n\n- There is **no column called `LANG_ID`** in `OE.PRODUCT_DESCRIPTIONS`. Any report or query referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**.\n- The correct name is **`LANGUAGE_ID`**, which participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`.\n\n### Recommendation\n\nReplace every occurrence of `LANG_ID` with `LANGUAGE_ID` in the report's SQL. For example:\n\n```sql\n-- wrong\nSELECT product_id, lang_id FROM oe.product_descriptions;\n\n-- correct\nSELECT product_id, language_id FROM oe.product_descriptions;\n```",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T20-58-47-245Z-8654fe15-b434-41e5-950a-ce023b39583f.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "**The abbreviation `LANG_ID` is wrong.** The actual column in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| Exact column name | **`LANGUAGE_ID`** |\n| Data type | `VARCHAR2` |\n| Maximum byte length | **3** |\n\nIt is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, and also covered by the unique index `PRD_DESC_PK`.\n\nA report referencing `LANG_ID` will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The fix is to use the full name `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding\n\nThe report's abbreviation **`LANG_ID`** does **not** match the actual column name in the data dictionary.\n\n| Attribute | Actual value (from `describe_object`, target `d1-19c-lab`) |\n|-----------|----------------------------------------------------------|\n| **Column name** | `LANGUAGE_ID` (position 2) |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | **3 bytes** (`DATA_LENGTH = 3`) |\n\n### Key points\n\n1. **Name mismatch** — The dictionary column is `LANGUAGE_ID`, not `LANG_ID`. Any SQL referencing `LANG_ID` would raise `ORA-00904: \"LANG_ID\": invalid identifier`.\n2. **Length semantics** — `VARCHAR2(3)` with default BYTE semantics means the maximum stored size is 3 bytes. Since language identifiers in this table are values like `'AL'`, `'AR'`, `'BS'` (2 characters), they fit comfortably within 3 bytes even under CHAR semantics.\n3. **Composite PK** — `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) together with `PRODUCT_ID`, confirming it is indeed the language discriminator for the translated rows.\n\n### Recommendation\n\nCorrect the report's SQL to reference **`LANGUAGE_ID`** rather than `LANG_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` Does Not Exist\n\nThe report's reference to `LANG_ID` is **incorrect**. The actual column name in `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**) is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 bytes |\n| **Position** | 2 |\n| **Part of PK?** | Yes — `PRODUCT_DESCRIPTIONS_PK (PRODUCT_ID, LANGUAGE_ID)` |\n\n### Implication for the report\n\nAny SQL referencing `LANG_ID` will fail with **ORA-00904: \"LANG_ID\": invalid identifier**. The report must be corrected to use `LANGUAGE_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T23-04-49-706Z-203c3f40-906b-4a73-957d-80ab58d7690a.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Verification Result (target: `d1-19c-lab`, source: `describe_object` on `OE.PRODUCT_DESCRIPTIONS`)\n\nThe abbreviation **`LANG_ID` is wrong** — no such column exists. The real language-discriminator column is:\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Max byte length | **3** |\n\n### Supporting detail\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK (PRODUCT_ID, LANGUAGE_ID)` and the unique index `PRD_DESC_PK`, so it acts as the per-language discriminator alongside `PRODUCT_ID`.\n- The table has 8,640 rows (stats last analyzed 2026-09-11).\n\n### Note on length semantics\nThe reported length of **3** is the declared maximum byte length for `VARCHAR2(3)`. Whether it is interpreted as bytes or characters depends on the database's `NLS_LENGTH_SEMANTICS` (not shown by this tool); language codes here are short ASCII tags, so 3 bytes is sufficient in practice. If you want, I can query `NLS_DATABASE_PARAMETERS` to confirm the length-semantics setting.\n\n**Recommendation for the report:** replace every reference to `LANG_ID` with `LANGUAGE_ID`; otherwise the query will fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T01-38-31-546Z-4946b70f-0c05-4242-9936-11d1e3d6e971.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The column name in the report is **wrong**. Here are the verified facts from `describe_object` on **d1-19c-lab**:\n\n| Attribute | Actual value | Report abbreviation |\n|-----------|-------------|---------------------|\n| Column name | **`LANGUAGE_ID`** | ~~LANG_ID~~ |\n| Data type | `VARCHAR2` | — |\n| Max byte length (`DATA_LENGTH`) | **3 bytes** | — |\n\nAdditional context confirming this is the language discriminator:\n\n- It participates in the primary key (`PRODUCT_DESCRIPTIONS_PK` on `PRODUCT_ID, LANGUAGE_ID`).\n- The table has 8,640 rows, consistent with a language-ID discriminator.\n\n**Conclusion:** Any report referencing `LANG_ID` against `OE.PRODUCT_DESCRIPTIONS` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct column is **`LANGUAGE_ID VARCHAR2(3)`**.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T07-59-02-767Z-3b8f57f0-1a95-463a-b883-02e8a535c47d.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Verification Result — `OE.PRODUCT_DESCRIPTIONS` (target: d1-19c-lab)\n\nThe abbreviation **`LANG_ID` does not exist** in this table. The actual column name is:\n\n| Attribute | Verified Value |\n|-----------|---------------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | `3` |\n\nIt is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`.\n\n**Conclusion:** Any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T07-59-02-767Z-3b8f57f0-1a95-463a-b883-02e8a535c47d.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation in the report is **wrong**. There is no `LANG_ID` column in `OE.PRODUCT_DESCRIPTIONS`.\n\nVerified via `describe_object` (backed by `ALL_TAB_COLUMNS`) on target **d1-19c-lab**:\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | **`VARCHAR2`** |\n| Declared length | **3** (max byte length = 3) |\n\nAdditional context confirming this is the language discriminator:\n- It is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (`PRODUCT_ID`, `LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- It pairs with the multilingual columns `TRANSLATED_NAME` (NVARCHAR2 100) and `TRANSLATED_DESCRIPTION` (NVARCHAR2 4000).\n\nSo any report referencing `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `OE.PRODUCT_DESCRIPTIONS.LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The report's `LANG_ID` is **not** a real column — it's an incorrect abbreviation. The actual dictionary column on `OE.PRODUCT_DESCRIPTIONS` (target **d1-19c-lab**, via `describe_object`) is:\n\n| Attribute | Value |\n|---|---|\n| Exact column name | **`LANGUAGE_ID`** (position 2) |\n| Data type | **`VARCHAR2`** |\n| Maximum length | **3** (bytes; the `length` reported by `ALL_TAB_COLUMNS` is byte semantics) |\n\nSupporting context from the same result:\n- `LANGUAGE_ID` is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) and backed by the unique index `PRD_DESC_PK`.\n- The table has 8,640 rows (last analyzed 2026-09-11).\n\nSo a query referencing `LANG_ID` would fail with `ORA-00904: \"LANG_ID\": invalid identifier`. The correct reference is `LANGUAGE_ID VARCHAR2(3)`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The abbreviation **`LANG_ID` does not exist** in `OE.PRODUCT_DESCRIPTIONS`. The report's reference is wrong and would raise `ORA-00942`/`ORA-00904` (invalid identifier) if used literally.\n\nVerified via `describe_object` on target **d1-19c-lab**:\n\n| Report says | Actual dictionary name | Data type | Max length |\n|---|---|---|---|\n| `LANG_ID` | **`LANGUAGE_ID`** | `VARCHAR2` | **3** (bytes) |\n\nSupporting details from the same call:\n- It is part of the primary key (`PRODUCT_DESCRIPTIONS_PK`: `PRODUCT_ID, LANGUAGE_ID`) and the unique index `PRD_DESC_PK`.\n- The table has 8640 rows (last analyzed 2026-09-11).\n\nNote on byte length: `LANGUAGE_ID` is declared as `VARCHAR2(3)`. Under the default BYTE length semantics this is a maximum of 3 bytes. If you want to confirm the session/database length semantics (BYTE vs CHAR) for this column, I can query `NLS_LENGTH_SEMANTICS` / `ALL_TAB_COLUMNS.CHAR_USED` — just say so.\n\nRecommendation: correct the report to reference `LANGUAGE_ID`, not `LANG_ID`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T10-25-12-813Z-b06abf11-5d29-4de0-9a4d-522dc9b742ef.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding: `LANG_ID` Does Not Exist\n\nThe column the report references as **`LANG_ID`** is not a valid column in `OE.PRODUCT_DESCRIPTIONS`. The actual language discriminator column is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Exact column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Declared length** | 3 (bytes) |\n\n(Source: `describe_object` on target **d1-19c-lab**, schema OE, table PRODUCT_DESCRIPTIONS.)\n\n### Why this matters\n\nAny SQL or PL/SQL referencing `LANG_ID` will raise **ORA-00904: \"LANG_ID\": invalid identifier**. The report must use the full name `LANGUAGE_ID`. It participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) alongside `PRODUCT_ID`, so it is also part of the unique index `PRD_DESC_PK`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "## Finding — d1-19c-lab, OE.PRODUCT_DESCRIPTIONS\n\nThe abbreviation **LANG_ID does not exist** in the data dictionary. The actual column name is:\n\n| Attribute | Value |\n|-----------|-------|\n| **Column name** | `LANGUAGE_ID` |\n| **Data type** | `VARCHAR2` |\n| **Max byte length** | 3 |\n\nThe report's reference to \"LANG_ID\" is an abbreviation that will cause **ORA-00904: \"LANG_ID\": invalid identifier** if used literally in SQL against this table.\n\n### Additional context from the dictionary\n\n- `LANGUAGE_ID` participates in the primary key (`PRODUCT_DESCRIPTIONS_PK`) and the backing unique index (`PRD_DESC_PK`), together with `PRODUCT_ID`.\n- It is also part of a check constraint (`TRANSLATED_NAME_NN` / `TRANSLATED_DESC_NN` apply to other columns, but the PK guarantees non-null on `LANGUAGE_ID`).\n\n**Recommendation:** correct the report's SQL to use `LANGUAGE_ID` (the full name). If the report layer uses an alias like `LANG_ID`, that alias must be defined explicitly in the query (e.g., `LANGUAGE_ID AS LANG_ID`); it is not a dictionary-visible name.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "The report's abbreviation `LANG_ID` is **not** a real column — it does not exist in the dictionary. The actual language-discriminator column is **`LANGUAGE_ID`**.\n\nVerified on **d1-19c-lab**, table `OE.PRODUCT_DESCRIPTIONS` (via `describe_object` → `ALL_TAB_COLUMNS`):\n\n| Attribute | Value |\n|---|---|\n| Exact column name | `LANGUAGE_ID` (position 2) |\n| Data type | `VARCHAR2` |\n| Max length (`DATA_LENGTH`) | **3** |\n\nSupporting evidence that this is the language discriminator: it is part of the primary key `PRODUCT_DESCRIPTIONS_PK` (with `PRODUCT_ID`) and the unique index `PRD_DESC_PK`, which is the standard OE pattern for the per-language translation row.\n\nNote on byte semantics: `DATA_LENGTH = 3` is reported in bytes (the default `VARCHAR2` byte semantics). If you want me to confirm the declared char-vs-byte semantics explicitly (`CHAR_USED` / `CHAR_COL_DECL_LENGTH`), I can run one read-only query against `ALL_TAB_COLUMNS` — just say so.\n\nRecommendation for the report: replace `LANG_ID` with `LANGUAGE_ID`; a query using `LANG_ID` would fail with `ORA-00904: invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T19-17-36-804Z-9f38d79e-9157-422d-8bd7-541b6fd5d310.json",
+			"id": "hard-p8-description-language",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"truth": [],
+			"answer": "Verified against the data dictionary on **d1-19c-lab** (`describe_object` → `ALL_TAB_COLUMNS`). The abbreviation `LANG_ID` in the report is **wrong** — it does not exist as a column name.\n\n## Correct column\n\n| Attribute | Actual value |\n|---|---|\n| Column name | **`LANGUAGE_ID`** (not `LANG_ID`) |\n| Data type | `VARCHAR2` |\n| Max byte length (`DATA_LENGTH`) | **3** |\n\n## Supporting dictionary evidence\n- It is part of the primary key: `PRODUCT_DESCRIPTIONS_PK` = (`PRODUCT_ID`, `LANGUAGE_ID`), and of the unique index `PRD_DESC_PK`.\n- The `LANGUAGE_ID` value is a 3-character ISO language code (e.g. `AR`, `JA`, `US`), which is why it is a short fixed-width `VARCHAR2(3)`.\n\n## Note on byte vs. char length\n`DATA_LENGTH = 3` is the **byte** length (what you asked for). Because this column stores single-byte ASCII language codes, its declared semantics are effectively byte-based here; if you want to be fully explicit about length semantics (`BYTE` vs `CHAR`) you can confirm via `ALL_TAB_COLUMNS.CHAR_USED`, but the maximum byte length is confirmed as **3**.\n\n**Action for the report:** replace `LANG_ID` with `LANGUAGE_ID`. Any query using `LANG_ID` will fail with `ORA-00904: \"LANG_ID\": invalid identifier`.",
+			"reason": "Correct dictionary facts; describe_object supplies the same column metadata."
+		}
+	]
+}

@@ -11,7 +11,7 @@
 				"\\b3\\b"
 			],
 			"requiredTools": [
-				"run_query"
+				"run_query|describe_object"
 			],
 			"forbiddenClaims": [
 				"(?<!\\b(?:not|no|never)\\s+)(?:column(?: name)? is|uses)\\s*[`\"*]*LANG_ID\\b"

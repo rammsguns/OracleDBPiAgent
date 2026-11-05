@@ -20,7 +20,7 @@ function p19UtcTimestamps(answer: string): string {
 export function score(test: EvalCase, result: AskResult, truth: unknown[][] = [], truthAfter?: unknown[][]) {
 	const checks: { check: string; pass: boolean }[] = [];
 	// Keep historical splits byte-for-byte in behavior; p18 accepts ordinary short Oracle codes.
-	const normalizeCodes = (text: string) => normalizeHyphens(text).replace(/"([A-Za-z_][\w$#]*)"/g, '$1').replace(/\b(ORA|TNS)-(\d{1,5})(?![\w])/gi,
+	const normalizeCodes = (text: string) => normalizeHyphens(text).replace(/"([A-Za-z_][\w$#]*)"/g, '$1').replace(/\b(ORA|TNS)[ -](\d{1,5})(?![\w])/gi,
 		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
 	const p19 = test.id.startsWith('hard-p19-');
 	const answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
@@ -49,7 +49,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -189,6 +189,34 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (p19) pooledFacts.push(...facts);
 		else if (facts.length) candidates.push(facts.join(' | '));
 	}
+	// Contiguous labelled bullets form one record. Blank lines, headings,
+	// prose, and repeated labels close it; never pool cells across policies.
+	let bulletFields: string[] = [];
+	const bulletLabels = new Set<string>();
+	const flushBullets = () => {
+		if (bulletFields.length) candidates.push(bulletFields.join(' / '));
+		bulletFields = [];
+		bulletLabels.clear();
+	};
+	for (const line of lines) {
+		const match = /^[-•]\s+([A-Za-z][A-Za-z_ ]*)\s*:\s*(.+)$/.exec(line);
+		if (!match) {
+			flushBullets();
+			// A numbered policy heading supplies the identity for its following block.
+			const heading = /^(?:#{1,6}\s+)?\d+[.)]\s+(ORA_[A-Z_]+)$/i.exec(line);
+			if (heading && labels.includes('policy_name')) {
+				bulletLabels.add('policy_name'); bulletFields.push(`policy_name=${heading[1]}`);
+			}
+			continue;
+		}
+		const rawLabel = match[1]!.trim().replace(/\s+/g, '_').toLowerCase();
+		const label = ({ enablement_mode: 'enabled_option', successes_audited: 'success', failures_audited: 'failure' } as Record<string, string>)[rawLabel] ?? rawLabel;
+		if (!labels.some(expected => expected.toLowerCase() === label)) { flushBullets(); continue; }
+		if (bulletLabels.has(label)) flushBullets();
+		bulletLabels.add(label);
+		bulletFields.push(`${label}=${evidence(match[2]!)}`);
+	}
+	flushBullets();
 	const routineColumn = labels.find(label => /^(?:subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
 	const roleColumn = labels.findIndex(label => /^role$/i.test(label));
 	let headingRoutine: string | undefined;

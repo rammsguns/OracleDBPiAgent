@@ -1,0 +1,3628 @@
+[
+	{
+		"id": "chat-lab-context",
+		"before": [
+			[
+				918843
+			]
+		],
+		"after": [
+			[
+				918843
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "chat-prod-context",
+		"before": [
+			[
+				239275
+			]
+		],
+		"after": [
+			[
+				239275
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-channels",
+		"before": [
+			[
+				5
+			]
+		],
+		"after": [
+			[
+				5
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-costs",
+		"before": [
+			[
+				82112
+			]
+		],
+		"after": [
+			[
+				82112
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-countries",
+		"before": [
+			[
+				23
+			]
+		],
+		"after": [
+			[
+				23
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-customers",
+		"before": [
+			[
+				55500
+			]
+		],
+		"after": [
+			[
+				55500
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-products",
+		"before": [
+			[
+				72
+			]
+		],
+		"after": [
+			[
+				72
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-promotions",
+		"before": [
+			[
+				503
+			]
+		],
+		"after": [
+			[
+				503
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-times",
+		"before": [
+			[
+				1826
+			]
+		],
+		"after": [
+			[
+				1826
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-supplementary_demographics",
+		"before": [
+			[
+				4500
+			]
+		],
+		"after": [
+			[
+				4500
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-sales",
+		"before": [
+			[
+				918843
+			]
+		],
+		"after": [
+			[
+				918843
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "shop-customers",
+		"before": [
+			[
+				50000
+			]
+		],
+		"after": [
+			[
+				50000
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "shop-orders",
+		"before": [
+			[
+				239275
+			]
+		],
+		"after": [
+			[
+				239275
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "shop-order_lines",
+		"before": [
+			[
+				717682
+			]
+		],
+		"after": [
+			[
+				717682
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "sh-discovery",
+		"before": [
+			[
+				"PRODUCTS"
+			],
+			[
+				"SALES"
+			]
+		],
+		"after": [
+			[
+				"PRODUCTS"
+			],
+			[
+				"SALES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "lab-version",
+		"before": [
+			[
+				"19.9.1.0.0"
+			]
+		],
+		"after": [
+			[
+				"19.9.1.0.0"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "lab-user",
+		"before": [
+			[
+				"HARNESS_LAB"
+			]
+		],
+		"after": [
+			[
+				"HARNESS_LAB"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "prod-version",
+		"before": [
+			[
+				"19.9.1.0.0"
+			]
+		],
+		"after": [
+			[
+				"19.9.1.0.0"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "prod-user",
+		"before": [
+			[
+				"HARNESS_RO"
+			]
+		],
+		"after": [
+			[
+				"HARNESS_RO"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "shop-tables",
+		"before": [
+			[
+				"CUSTOMERS"
+			]
+		],
+		"after": [
+			[
+				"CUSTOMERS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "shop-table-count",
+		"before": [
+			[
+				4
+			]
+		],
+		"after": [
+			[
+				4
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "prod-waits",
+		"before": [
+			[
+				"db file async I/O submit"
+			]
+		],
+		"after": [
+			[
+				"db file async I/O submit"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hr-access",
+		"before": [
+			[
+				107
+			]
+		],
+		"after": [
+			[
+				107
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "prod-overview",
+		"before": [
+			[
+				"2026-11-04"
+			]
+		],
+		"after": [
+			[
+				"2026-11-04"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "prod-schemas",
+		"before": [
+			[
+				20
+			]
+		],
+		"after": [
+			[
+				20
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-region-channel",
+		"before": [
+			[
+				"Americas",
+				"Direct Sales",
+				"7967141.89"
+			],
+			[
+				"Americas",
+				"Partners",
+				"4658838.57"
+			],
+			[
+				"Europe",
+				"Direct Sales",
+				"4493735.78"
+			]
+		],
+		"after": [
+			[
+				"Americas",
+				"Direct Sales",
+				"7967141.89"
+			],
+			[
+				"Americas",
+				"Partners",
+				"4658838.57"
+			],
+			[
+				"Europe",
+				"Direct Sales",
+				"4493735.78"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-category-leaders",
+		"before": [
+			[
+				"Electronics",
+				20,
+				"1675991.85"
+			],
+			[
+				"Hardware",
+				18,
+				"3453656.62"
+			],
+			[
+				"Peripherals and Accessories",
+				14,
+				"1874621.96"
+			],
+			[
+				"Photo",
+				17,
+				"2819074.98"
+			],
+			[
+				"Software/Other",
+				28,
+				"1020370.87"
+			]
+		],
+		"after": [
+			[
+				"Electronics",
+				20,
+				"1675991.85"
+			],
+			[
+				"Hardware",
+				18,
+				"3453656.62"
+			],
+			[
+				"Peripherals and Accessories",
+				14,
+				"1874621.96"
+			],
+			[
+				"Photo",
+				17,
+				"2819074.98"
+			],
+			[
+				"Software/Other",
+				28,
+				"1020370.87"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-yoy",
+		"before": [
+			[
+				"Direct Sales",
+				"-6.10"
+			],
+			[
+				"Internet",
+				"256.51"
+			],
+			[
+				"Partners",
+				"5.41"
+			]
+		],
+		"after": [
+			[
+				"Direct Sales",
+				"-6.10"
+			],
+			[
+				"Internet",
+				"256.51"
+			],
+			[
+				"Partners",
+				"5.41"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-share",
+		"before": [
+			[
+				"Electronics",
+				"13.13"
+			],
+			[
+				"Hardware",
+				"17.02"
+			],
+			[
+				"Peripherals and Accessories",
+				"34.95"
+			],
+			[
+				"Photo",
+				"17.48"
+			],
+			[
+				"Software/Other",
+				"17.42"
+			]
+		],
+		"after": [
+			[
+				"Electronics",
+				"13.13"
+			],
+			[
+				"Hardware",
+				"17.02"
+			],
+			[
+				"Peripherals and Accessories",
+				"34.95"
+			],
+			[
+				"Photo",
+				"17.48"
+			],
+			[
+				"Software/Other",
+				"17.42"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-country-average",
+		"before": [
+			[
+				"Singapore",
+				77,
+				"9363.99"
+			],
+			[
+				"Canada",
+				81,
+				"8036.88"
+			],
+			[
+				"Spain",
+				75,
+				"6704.80"
+			]
+		],
+		"after": [
+			[
+				"Singapore",
+				77,
+				"9363.99"
+			],
+			[
+				"Canada",
+				81,
+				"8036.88"
+			],
+			[
+				"Spain",
+				75,
+				"6704.80"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-quarter-winners",
+		"before": [
+			[
+				1,
+				"Direct Sales",
+				"3194385.57"
+			],
+			[
+				2,
+				"Direct Sales",
+				"3313394.74"
+			],
+			[
+				3,
+				"Direct Sales",
+				"3519853.32"
+			],
+			[
+				4,
+				"Direct Sales",
+				"3360801.73"
+			]
+		],
+		"after": [
+			[
+				1,
+				"Direct Sales",
+				"3194385.57"
+			],
+			[
+				2,
+				"Direct Sales",
+				"3313394.74"
+			],
+			[
+				3,
+				"Direct Sales",
+				"3519853.32"
+			],
+			[
+				4,
+				"Direct Sales",
+				"3360801.73"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-price-plan",
+		"before": [
+			[
+				"INDEX",
+				"UNIQUE SCAN",
+				"SYS_C007655"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID",
+				"PRODUCTS"
+			]
+		],
+		"after": [
+			[
+				"INDEX",
+				"UNIQUE SCAN",
+				"SYS_C007655"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID",
+				"PRODUCTS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-orders-plan",
+		"before": [
+			[
+				"INDEX",
+				"FAST FULL SCAN",
+				"SYS_C007661"
+			]
+		],
+		"after": [
+			[
+				"INDEX",
+				"FAST FULL SCAN",
+				"SYS_C007661"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-lines-plan",
+		"before": [
+			[
+				"INDEX",
+				"FAST FULL SCAN",
+				"ORDER_LINES_PK"
+			]
+		],
+		"after": [
+			[
+				"INDEX",
+				"FAST FULL SCAN",
+				"ORDER_LINES_PK"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-wait-limits",
+		"before": [
+			[
+				"db file async I/O submit"
+			]
+		],
+		"after": [
+			[
+				"db file async I/O submit"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-follow-ratio",
+		"before": [
+			[
+				"Electronics",
+				"13.13"
+			],
+			[
+				"Hardware",
+				"17.02"
+			],
+			[
+				"Peripherals and Accessories",
+				"34.95"
+			],
+			[
+				"Photo",
+				"17.48"
+			],
+			[
+				"Software/Other",
+				"17.42"
+			]
+		],
+		"after": [
+			[
+				"Electronics",
+				"13.13"
+			],
+			[
+				"Hardware",
+				"17.02"
+			],
+			[
+				"Peripherals and Accessories",
+				"34.95"
+			],
+			[
+				"Photo",
+				"17.48"
+			],
+			[
+				"Software/Other",
+				"17.42"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-follow-plan",
+		"before": [
+			[
+				"INDEX",
+				"UNIQUE SCAN",
+				"SYS_C007655"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID",
+				"PRODUCTS"
+			]
+		],
+		"after": [
+			[
+				"INDEX",
+				"UNIQUE SCAN",
+				"SYS_C007655"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID",
+				"PRODUCTS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-fresh-hr-top-dept-salary",
+		"before": [
+			[
+				"Executive"
+			]
+		],
+		"after": [
+			[
+				"Executive"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-fresh-oe-top-customer",
+		"before": [
+			[
+				"Rampling",
+				"403119.70"
+			]
+		],
+		"after": [
+			[
+				"Rampling",
+				"403119.70"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-fresh-hr-employee-fks",
+		"before": [
+			[
+				"DEPARTMENT_ID",
+				"DEPARTMENTS"
+			],
+			[
+				"JOB_ID",
+				"JOBS"
+			],
+			[
+				"MANAGER_ID",
+				"EMPLOYEES"
+			]
+		],
+		"after": [
+			[
+				"DEPARTMENT_ID",
+				"DEPARTMENTS"
+			],
+			[
+				"JOB_ID",
+				"JOBS"
+			],
+			[
+				"MANAGER_ID",
+				"EMPLOYEES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-fresh-p1-wait-class",
+		"before": [
+			[
+				"System I/O"
+			]
+		],
+		"after": [
+			[
+				"System I/O"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-customers-scope",
+		"before": [
+			[
+				"CO",
+				"CUSTOMERS",
+				392
+			],
+			[
+				"OE",
+				"CUSTOMERS",
+				319
+			],
+			[
+				"SH",
+				"CUSTOMERS",
+				55500
+			]
+		],
+		"after": [
+			[
+				"CO",
+				"CUSTOMERS",
+				392
+			],
+			[
+				"OE",
+				"CUSTOMERS",
+				319
+			],
+			[
+				"SH",
+				"CUSTOMERS",
+				55500
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-orders-status-scope",
+		"before": [
+			[
+				"CO",
+				"ORDER_STATUS",
+				"VARCHAR2",
+				"N"
+			],
+			[
+				"OE",
+				"ORDER_STATUS",
+				"NUMBER",
+				"Y"
+			]
+		],
+		"after": [
+			[
+				"CO",
+				"ORDER_STATUS",
+				"VARCHAR2",
+				"N"
+			],
+			[
+				"OE",
+				"ORDER_STATUS",
+				"NUMBER",
+				"Y"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-fiscal-calendar",
+		"before": [
+			[
+				"2000-01",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-02",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-03",
+				2000,
+				2000,
+				92
+			],
+			[
+				"2000-04",
+				2000,
+				2000,
+				92
+			]
+		],
+		"after": [
+			[
+				"2000-01",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-02",
+				2000,
+				2000,
+				91
+			],
+			[
+				"2000-03",
+				2000,
+				2000,
+				92
+			],
+			[
+				"2000-04",
+				2000,
+				2000,
+				92
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-plan-line-tree",
+		"before": [
+			[
+				0,
+				"ROOT",
+				0,
+				"SELECT STATEMENT",
+				"NONE"
+			],
+			[
+				1,
+				"0",
+				1,
+				"INDEX",
+				"UNIQUE SCAN"
+			]
+		],
+		"after": [
+			[
+				0,
+				"ROOT",
+				0,
+				"SELECT STATEMENT",
+				"NONE"
+			],
+			[
+				1,
+				"0",
+				1,
+				"INDEX",
+				"UNIQUE SCAN"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-commission-zero",
+		"before": [
+			[
+				72,
+				0,
+				35
+			]
+		],
+		"after": [
+			[
+				72,
+				0,
+				35
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-sales-primary-key",
+		"before": [
+			[
+				0
+			],
+			[
+				5
+			]
+		],
+		"after": [
+			[
+				0
+			],
+			[
+				5
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-order-customer-key",
+		"before": [
+			[
+				"CUSTOMER_ID",
+				"CUSTOMERS",
+				"SYS_C007649",
+				"SYS_C007649",
+				"UNIQUE",
+				1,
+				"CUSTOMER_ID",
+				"NUMBER"
+			]
+		],
+		"after": [
+			[
+				"CUSTOMER_ID",
+				"CUSTOMERS",
+				"SYS_C007649",
+				"SYS_C007649",
+				"UNIQUE",
+				1,
+				"CUSTOMER_ID",
+				"NUMBER"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-warehouse-location-key",
+		"before": [
+			[
+				"LOCATION_ID",
+				"HR",
+				"LOCATIONS",
+				"LOC_ID_PK",
+				"LOC_ID_PK",
+				"UNIQUE",
+				1,
+				"LOCATION_ID",
+				"NUMBER"
+			]
+		],
+		"after": [
+			[
+				"LOCATION_ID",
+				"HR",
+				"LOCATIONS",
+				"LOC_ID_PK",
+				"LOC_ID_PK",
+				"UNIQUE",
+				1,
+				"LOCATION_ID",
+				"NUMBER"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-second-department",
+		"before": [
+			[
+				80,
+				"Sales",
+				34,
+				304500,
+				"John Russell"
+			]
+		],
+		"after": [
+			[
+				80,
+				"Sales",
+				34,
+				304500,
+				"John Russell"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-second-warehouse",
+		"before": [
+			[
+				6,
+				"Sydney",
+				"Sydney",
+				"Australia",
+				"Asia"
+			]
+		],
+		"after": [
+			[
+				6,
+				"Sydney",
+				"Sydney",
+				"Australia",
+				"Asia"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-job-salary-bands",
+		"before": [
+			[
+				"AC_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"AC_MGR",
+				8200,
+				16000
+			],
+			[
+				"AD_ASST",
+				3000,
+				6000
+			],
+			[
+				"AD_PRES",
+				20080,
+				40000
+			],
+			[
+				"AD_VP",
+				15000,
+				30000
+			],
+			[
+				"FI_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"FI_MGR",
+				8200,
+				16000
+			],
+			[
+				"HR_REP",
+				4000,
+				9000
+			],
+			[
+				"IT_PROG",
+				4000,
+				10000
+			],
+			[
+				"MK_MAN",
+				9000,
+				15000
+			],
+			[
+				"MK_REP",
+				4000,
+				9000
+			],
+			[
+				"PR_REP",
+				4500,
+				10500
+			],
+			[
+				"PU_CLERK",
+				2500,
+				5500
+			],
+			[
+				"PU_MAN",
+				8000,
+				15000
+			],
+			[
+				"SA_MAN",
+				10000,
+				20080
+			],
+			[
+				"SA_REP",
+				6000,
+				12008
+			],
+			[
+				"SH_CLERK",
+				2500,
+				5500
+			],
+			[
+				"ST_CLERK",
+				2008,
+				5000
+			],
+			[
+				"ST_MAN",
+				5500,
+				8500
+			]
+		],
+		"after": [
+			[
+				"AC_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"AC_MGR",
+				8200,
+				16000
+			],
+			[
+				"AD_ASST",
+				3000,
+				6000
+			],
+			[
+				"AD_PRES",
+				20080,
+				40000
+			],
+			[
+				"AD_VP",
+				15000,
+				30000
+			],
+			[
+				"FI_ACCOUNT",
+				4200,
+				9000
+			],
+			[
+				"FI_MGR",
+				8200,
+				16000
+			],
+			[
+				"HR_REP",
+				4000,
+				9000
+			],
+			[
+				"IT_PROG",
+				4000,
+				10000
+			],
+			[
+				"MK_MAN",
+				9000,
+				15000
+			],
+			[
+				"MK_REP",
+				4000,
+				9000
+			],
+			[
+				"PR_REP",
+				4500,
+				10500
+			],
+			[
+				"PU_CLERK",
+				2500,
+				5500
+			],
+			[
+				"PU_MAN",
+				8000,
+				15000
+			],
+			[
+				"SA_MAN",
+				10000,
+				20080
+			],
+			[
+				"SA_REP",
+				6000,
+				12008
+			],
+			[
+				"SH_CLERK",
+				2500,
+				5500
+			],
+			[
+				"ST_CLERK",
+				2008,
+				5000
+			],
+			[
+				"ST_MAN",
+				5500,
+				8500
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11-subcategory-counts",
+		"before": [
+			[
+				"Accessories",
+				10
+			],
+			[
+				"Bulk Pack Diskettes",
+				2
+			],
+			[
+				"CD-ROM",
+				6
+			],
+			[
+				"Camcorders",
+				1
+			],
+			[
+				"Camera Batteries",
+				5
+			],
+			[
+				"Camera Media",
+				3
+			],
+			[
+				"Cameras",
+				1
+			],
+			[
+				"Desktop PCs",
+				1
+			],
+			[
+				"Documentation",
+				6
+			],
+			[
+				"Game Consoles",
+				1
+			],
+			[
+				"Home Audio",
+				2
+			],
+			[
+				"Memory",
+				2
+			],
+			[
+				"Modems/Fax",
+				2
+			],
+			[
+				"Monitors",
+				2
+			],
+			[
+				"Operating Systems",
+				1
+			],
+			[
+				"Portable PCs",
+				1
+			],
+			[
+				"Printer Supplies",
+				4
+			],
+			[
+				"Recordable CDs",
+				7
+			],
+			[
+				"Recordable DVD Discs",
+				5
+			],
+			[
+				"Y Box Accessories",
+				2
+			],
+			[
+				"Y Box Games",
+				8
+			]
+		],
+		"after": [
+			[
+				"Accessories",
+				10
+			],
+			[
+				"Bulk Pack Diskettes",
+				2
+			],
+			[
+				"CD-ROM",
+				6
+			],
+			[
+				"Camcorders",
+				1
+			],
+			[
+				"Camera Batteries",
+				5
+			],
+			[
+				"Camera Media",
+				3
+			],
+			[
+				"Cameras",
+				1
+			],
+			[
+				"Desktop PCs",
+				1
+			],
+			[
+				"Documentation",
+				6
+			],
+			[
+				"Game Consoles",
+				1
+			],
+			[
+				"Home Audio",
+				2
+			],
+			[
+				"Memory",
+				2
+			],
+			[
+				"Modems/Fax",
+				2
+			],
+			[
+				"Monitors",
+				2
+			],
+			[
+				"Operating Systems",
+				1
+			],
+			[
+				"Portable PCs",
+				1
+			],
+			[
+				"Printer Supplies",
+				4
+			],
+			[
+				"Recordable CDs",
+				7
+			],
+			[
+				"Recordable DVD Discs",
+				5
+			],
+			[
+				"Y Box Accessories",
+				2
+			],
+			[
+				"Y Box Games",
+				8
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-header-fanout",
+		"before": [
+			[
+				"direct",
+				73,
+				1903629.2,
+				15647
+			],
+			[
+				"online",
+				32,
+				1764425.5,
+				14440
+			]
+		],
+		"after": [
+			[
+				"direct",
+				73,
+				1903629.2,
+				15647
+			],
+			[
+				"online",
+				32,
+				1764425.5,
+				14440
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-nullable-manager",
+		"before": [
+			[
+				10,
+				1,
+				1,
+				"101.00"
+			],
+			[
+				30,
+				6,
+				6,
+				"111.67"
+			],
+			[
+				90,
+				3,
+				2,
+				"100.00"
+			],
+			[
+				100,
+				6,
+				6,
+				"106.83"
+			],
+			[
+				110,
+				2,
+				2,
+				"153.00"
+			],
+			[
+				120,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				130,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				140,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				150,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				160,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				170,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				180,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				190,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				200,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				210,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				220,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				230,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				240,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				250,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				260,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				270,
+				0,
+				0,
+				"NONE"
+			]
+		],
+		"after": [
+			[
+				10,
+				1,
+				1,
+				"101.00"
+			],
+			[
+				30,
+				6,
+				6,
+				"111.67"
+			],
+			[
+				90,
+				3,
+				2,
+				"100.00"
+			],
+			[
+				100,
+				6,
+				6,
+				"106.83"
+			],
+			[
+				110,
+				2,
+				2,
+				"153.00"
+			],
+			[
+				120,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				130,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				140,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				150,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				160,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				170,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				180,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				190,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				200,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				210,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				220,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				230,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				240,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				250,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				260,
+				0,
+				0,
+				"NONE"
+			],
+			[
+				270,
+				0,
+				0,
+				"NONE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-commission-denominators",
+		"before": [
+			[
+				100,
+				14,
+				5,
+				0.3,
+				0.1071
+			],
+			[
+				145,
+				6,
+				6,
+				0.225,
+				0.225
+			]
+		],
+		"after": [
+			[
+				100,
+				14,
+				5,
+				0.3,
+				0.1071
+			],
+			[
+				145,
+				6,
+				6,
+				0.225,
+				0.225
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-salary-ties",
+		"before": [
+			[
+				100,
+				"King",
+				24000,
+				1
+			],
+			[
+				101,
+				"Kochhar",
+				17000,
+				2
+			],
+			[
+				102,
+				"De Haan",
+				17000,
+				2
+			],
+			[
+				145,
+				"Russell",
+				14000,
+				3
+			]
+		],
+		"after": [
+			[
+				100,
+				"King",
+				24000,
+				1
+			],
+			[
+				101,
+				"Kochhar",
+				17000,
+				2
+			],
+			[
+				102,
+				"De Haan",
+				17000,
+				2
+			],
+			[
+				145,
+				"Russell",
+				14000,
+				3
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-timestamp-boundary",
+		"before": [
+			[
+				4,
+				1
+			]
+		],
+		"after": [
+			[
+				4,
+				1
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-history-chain",
+		"before": [
+			[
+				101,
+				"1997-09-21",
+				110,
+				"Shelley Higgins",
+				"Accounting Manager",
+				"Seattle",
+				"United States of America",
+				"Americas"
+			]
+		],
+		"after": [
+			[
+				101,
+				"1997-09-21",
+				110,
+				"Shelley Higgins",
+				"Accounting Manager",
+				"Seattle",
+				"United States of America",
+				"Americas"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-salesperson-chain",
+		"before": [
+			[
+				161,
+				661734.5,
+				"Sales",
+				"John Russell",
+				"Sales Manager",
+				"United Kingdom"
+			]
+		],
+		"after": [
+			[
+				161,
+				661734.5,
+				"Sales",
+				"John Russell",
+				"Sales Manager",
+				"United Kingdom"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-stats-grain",
+		"before": [
+			[
+				10,
+				10,
+				7
+			]
+		],
+		"after": [
+			[
+				10,
+				10,
+				7
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-partial-memory",
+		"before": [
+			[
+				"PRODCDB"
+			],
+			[
+				"19"
+			]
+		],
+		"after": [
+			[
+				"PRODCDB"
+			],
+			[
+				"19"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p11b-partial-backup",
+		"before": [
+			[
+				"PRODCDB"
+			],
+			[
+				"READ WRITE"
+			]
+		],
+		"after": [
+			[
+				"PRODCDB"
+			],
+			[
+				"READ WRITE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-entry-points",
+		"before": [
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS"
+			]
+		],
+		"after": [
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-writes",
+		"before": [
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"PRODUCTS",
+				"UPDATE"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDER_LINES",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"SHIP_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDER_LINES",
+				"DELETE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDERS",
+				"DELETE"
+			]
+		],
+		"after": [
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"PRODUCTS",
+				"UPDATE"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDER_LINES",
+				"INSERT"
+			],
+			[
+				"PLACE_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"SHIP_ORDERS",
+				"ORDERS",
+				"UPDATE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDER_LINES",
+				"DELETE"
+			],
+			[
+				"NIGHTLY_PURGE",
+				"ORDERS",
+				"DELETE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-purge-behavior",
+		"before": [
+			[
+				"ORDER_LINES"
+			],
+			[
+				"ORDERS"
+			]
+		],
+		"after": [
+			[
+				"ORDER_LINES"
+			],
+			[
+				"ORDERS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-scheduler-map",
+		"before": [
+			[
+				"NIGHTLY_PURGE_JOB",
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS_JOB",
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS_JOB",
+				"SHIP_ORDERS"
+			]
+		],
+		"after": [
+			[
+				"NIGHTLY_PURGE_JOB",
+				"NIGHTLY_PURGE"
+			],
+			[
+				"PLACE_ORDERS_JOB",
+				"PLACE_ORDERS"
+			],
+			[
+				"SHIP_ORDERS_JOB",
+				"SHIP_ORDERS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-purge-constraint",
+		"before": [
+			[
+				"CHILD",
+				"ORDER_LINES",
+				"ORDER_ID"
+			],
+			[
+				"PARENT",
+				"ORDERS",
+				"ORDER_ID"
+			]
+		],
+		"after": [
+			[
+				"CHILD",
+				"ORDER_LINES",
+				"ORDER_ID"
+			],
+			[
+				"PARENT",
+				"ORDERS",
+				"ORDER_ID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-purge-line",
+		"before": [
+			[
+				"27"
+			],
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"DELETE"
+			],
+			[
+				"ORDERS"
+			]
+		],
+		"after": [
+			[
+				"27"
+			],
+			[
+				"NIGHTLY_PURGE"
+			],
+			[
+				"DELETE"
+			],
+			[
+				"ORDERS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-history-trigger",
+		"before": [
+			[
+				"AFTER"
+			],
+			[
+				"ROW"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"UPDATE"
+			]
+		],
+		"after": [
+			[
+				"AFTER"
+			],
+			[
+				"ROW"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"UPDATE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-security-trigger",
+		"before": [
+			[
+				"BEFORE"
+			],
+			[
+				"STATEMENT"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"INSERT"
+			],
+			[
+				"UPDATE"
+			],
+			[
+				"DELETE"
+			]
+		],
+		"after": [
+			[
+				"BEFORE"
+			],
+			[
+				"STATEMENT"
+			],
+			[
+				"EMPLOYEES"
+			],
+			[
+				"INSERT"
+			],
+			[
+				"UPDATE"
+			],
+			[
+				"DELETE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-history-arguments",
+		"before": [
+			[
+				"P_EMP_ID",
+				1,
+				"IN",
+				"NUMBER"
+			],
+			[
+				"P_START_DATE",
+				2,
+				"IN",
+				"DATE"
+			],
+			[
+				"P_END_DATE",
+				3,
+				"IN",
+				"DATE"
+			],
+			[
+				"P_JOB_ID",
+				4,
+				"IN",
+				"VARCHAR2"
+			],
+			[
+				"P_DEPARTMENT_ID",
+				5,
+				"IN",
+				"NUMBER"
+			]
+		],
+		"after": [
+			[
+				"P_EMP_ID",
+				1,
+				"IN",
+				"NUMBER"
+			],
+			[
+				"P_START_DATE",
+				2,
+				"IN",
+				"DATE"
+			],
+			[
+				"P_END_DATE",
+				3,
+				"IN",
+				"DATE"
+			],
+			[
+				"P_JOB_ID",
+				4,
+				"IN",
+				"VARCHAR2"
+			],
+			[
+				"P_DEPARTMENT_ID",
+				5,
+				"IN",
+				"NUMBER"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p16-failed-lab-job",
+		"before": [
+			[
+				"FAILED",
+				"ORA-20001",
+				"destination unavailable",
+				1
+			]
+		],
+		"after": [
+			[
+				"FAILED",
+				"ORA-20001",
+				"destination unavailable",
+				1
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-d1-critical-incident",
+		"before": [
+			[
+				"ORA-00800",
+				"225332"
+			]
+		],
+		"after": [
+			[
+				"ORA-00800",
+				"225332"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-p1-failed-job",
+		"before": [
+			[
+				"SHOPAPP.NIGHTLY_PURGE_JOB",
+				"SHOPAPP.SYS_C007669"
+			]
+		],
+		"after": [
+			[
+				"SHOPAPP.NIGHTLY_PURGE_JOB",
+				"SHOPAPP.SYS_C007669"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-d1-incident-count",
+		"before": [
+			[
+				"ORA 800",
+				6
+			]
+		],
+		"after": [
+			[
+				"ORA 800",
+				6
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-d1-frequent-code",
+		"before": [
+			[
+				"ORA-00031"
+			]
+		],
+		"after": [
+			[
+				"ORA-00031"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-p1-incident-count",
+		"before": [
+			[
+				"ORA 800",
+				6
+			]
+		],
+		"after": [
+			[
+				"ORA 800",
+				6
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p18-p1-frequent-code",
+		"before": [
+			[
+				"ORA-00313"
+			]
+		],
+		"after": [
+			[
+				"ORA-00313"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p19-cursor-inventory",
+		"before": [
+			[
+				2134003100,
+				1
+			]
+		],
+		"after": [
+			[
+				2134003100,
+				1
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p19-object-statistics",
+		"before": [
+			[
+				"SHOPAPP",
+				"PRODUCTS",
+				"YES",
+				"2026-11-04T22:00:07Z"
+			],
+			[
+				"SHOPAPP",
+				"SYS_C007655",
+				"YES",
+				"2026-11-04T22:00:07Z"
+			]
+		],
+		"after": [
+			[
+				"SHOPAPP",
+				"PRODUCTS",
+				"YES",
+				"2026-11-04T22:00:07Z"
+			],
+			[
+				"SHOPAPP",
+				"SYS_C007655",
+				"YES",
+				"2026-11-04T22:00:07Z"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p19-bind-metadata",
+		"before": [
+			[
+				":B1",
+				1,
+				"NUMBER",
+				"YES"
+			]
+		],
+		"after": [
+			[
+				":B1",
+				1,
+				"NUMBER",
+				"YES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p19-plan-controls",
+		"before": [
+			[
+				"f1yj0hbhj9nna",
+				0,
+				0
+			]
+		],
+		"after": [
+			[
+				"f1yj0hbhj9nna",
+				0,
+				0
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-d1-open-default-count",
+		"before": [
+			[
+				"HR"
+			],
+			[
+				"IX"
+			],
+			[
+				"OE"
+			],
+			[
+				"PM"
+			],
+			[
+				"SH"
+			]
+		],
+		"after": [
+			[
+				"HR"
+			],
+			[
+				"IX"
+			],
+			[
+				"OE"
+			],
+			[
+				"PM"
+			],
+			[
+				"SH"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-d1-role-any-paths",
+		"before": [
+			[
+				"HARNESS_MAINTENANCE_ROLE",
+				1,
+				"ALTER ANY PROCEDURE"
+			],
+			[
+				"HARNESS_MAINTENANCE_ROLE",
+				1,
+				"ANALYZE ANY"
+			]
+		],
+		"after": [
+			[
+				"HARNESS_MAINTENANCE_ROLE",
+				1,
+				"ALTER ANY PROCEDURE"
+			],
+			[
+				"HARNESS_MAINTENANCE_ROLE",
+				1,
+				"ANALYZE ANY"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-d1-public-file-execute",
+		"before": [
+			[
+				"PUBLIC",
+				"SYS",
+				"UTL_FILE",
+				"EXECUTE"
+			]
+		],
+		"after": [
+			[
+				"PUBLIC",
+				"SYS",
+				"UTL_FILE",
+				"EXECUTE"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-p1-inherited-profile-limit",
+		"before": [
+			[
+				"GSM_PROF",
+				"DEFAULT",
+				"180"
+			]
+		],
+		"after": [
+			[
+				"GSM_PROF",
+				"DEFAULT",
+				"180"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-p1-default-profile",
+		"before": [
+			[
+				"FAILED_LOGIN_ATTEMPTS",
+				"10"
+			],
+			[
+				"PASSWORD_LIFE_TIME",
+				"180"
+			],
+			[
+				"PASSWORD_VERIFY_FUNCTION",
+				"NULL"
+			]
+		],
+		"after": [
+			[
+				"FAILED_LOGIN_ATTEMPTS",
+				"10"
+			],
+			[
+				"PASSWORD_LIFE_TIME",
+				"180"
+			],
+			[
+				"PASSWORD_VERIFY_FUNCTION",
+				"NULL"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p20-p1-enabled-audit-policies",
+		"before": [
+			[
+				"ORA_LOGON_FAILURES",
+				"BY USER",
+				"ALL USERS",
+				"USER",
+				"NO",
+				"YES"
+			],
+			[
+				"ORA_SECURECONFIG",
+				"BY USER",
+				"ALL USERS",
+				"USER",
+				"YES",
+				"YES"
+			]
+		],
+		"after": [
+			[
+				"ORA_LOGON_FAILURES",
+				"BY USER",
+				"ALL USERS",
+				"USER",
+				"NO",
+				"YES"
+			],
+			[
+				"ORA_SECURECONFIG",
+				"BY USER",
+				"ALL USERS",
+				"USER",
+				"YES",
+				"YES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-history-signature",
+		"before": [
+			[
+				"P_EMP_ID",
+				"N"
+			],
+			[
+				"P_START_DATE",
+				"N"
+			],
+			[
+				"P_END_DATE",
+				"N"
+			],
+			[
+				"P_JOB_ID",
+				"N"
+			],
+			[
+				"P_DEPARTMENT_ID",
+				"N"
+			]
+		],
+		"after": [
+			[
+				"P_EMP_ID",
+				"N"
+			],
+			[
+				"P_START_DATE",
+				"N"
+			],
+			[
+				"P_END_DATE",
+				"N"
+			],
+			[
+				"P_JOB_ID",
+				"N"
+			],
+			[
+				"P_DEPARTMENT_ID",
+				"N"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-trigger-state",
+		"before": [
+			[
+				"SECURE_EMPLOYEES",
+				"DISABLED",
+				"BEFORE STATEMENT"
+			],
+			[
+				"UPDATE_JOB_HISTORY",
+				"ENABLED",
+				"AFTER EACH ROW"
+			]
+		],
+		"after": [
+			[
+				"SECURE_EMPLOYEES",
+				"DISABLED",
+				"BEFORE STATEMENT"
+			],
+			[
+				"UPDATE_JOB_HISTORY",
+				"ENABLED",
+				"AFTER EACH ROW"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-package-validity",
+		"before": [
+			[
+				"PACKAGE",
+				"VALID"
+			],
+			[
+				"PACKAGE BODY",
+				"VALID"
+			]
+		],
+		"after": [
+			[
+				"PACKAGE",
+				"VALID"
+			],
+			[
+				"PACKAGE BODY",
+				"VALID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-incident-range",
+		"before": [
+			[
+				122927,
+				225332,
+				6
+			]
+		],
+		"after": [
+			[
+				122927,
+				225332,
+				6
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-alert-levels",
+		"before": [
+			[
+				1,
+				1
+			],
+			[
+				16,
+				1082
+			]
+		],
+		"after": [
+			[
+				1,
+				1
+			],
+			[
+				16,
+				1082
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-problem-identity",
+		"before": [
+			[
+				1,
+				"ORA 800"
+			]
+		],
+		"after": [
+			[
+				1,
+				"ORA 800"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-products-indexes",
+		"before": [
+			[
+				"SYS_C007655",
+				"UNIQUE",
+				"VALID"
+			],
+			[
+				"SYS_C007656",
+				"UNIQUE",
+				"VALID"
+			]
+		],
+		"after": [
+			[
+				"SYS_C007655",
+				"UNIQUE",
+				"VALID"
+			],
+			[
+				"SYS_C007656",
+				"UNIQUE",
+				"VALID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-products-stats",
+		"before": [
+			[
+				"PRODUCTS",
+				"YES",
+				"YES"
+			]
+		],
+		"after": [
+			[
+				"PRODUCTS",
+				"YES",
+				"YES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-price-plan-operations",
+		"before": [
+			[
+				"INDEX",
+				"UNIQUE SCAN"
+			],
+			[
+				"SELECT STATEMENT",
+				"NONE"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID"
+			]
+		],
+		"after": [
+			[
+				"INDEX",
+				"UNIQUE SCAN"
+			],
+			[
+				"SELECT STATEMENT",
+				"NONE"
+			],
+			[
+				"TABLE ACCESS",
+				"BY INDEX ROWID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-profile-lock",
+		"before": [
+			[
+				"PASSWORD_GRACE_TIME",
+				"7"
+			],
+			[
+				"PASSWORD_LOCK_TIME",
+				"1"
+			]
+		],
+		"after": [
+			[
+				"PASSWORD_GRACE_TIME",
+				"7"
+			],
+			[
+				"PASSWORD_LOCK_TIME",
+				"1"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-public-directory",
+		"before": [],
+		"after": [],
+		"equal": true
+	},
+	{
+		"id": "hard-p21-audit-outcomes",
+		"before": [
+			[
+				"ORA_LOGON_FAILURES",
+				"NO",
+				"YES"
+			],
+			[
+				"ORA_SECURECONFIG",
+				"YES",
+				"YES"
+			]
+		],
+		"after": [
+			[
+				"ORA_LOGON_FAILURES",
+				"NO",
+				"YES"
+			],
+			[
+				"ORA_SECURECONFIG",
+				"YES",
+				"YES"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-grant-p1-parameters",
+		"before": [
+			[
+				"PGA_AGGREGATE_TARGET",
+				"1073741824"
+			],
+			[
+				"SGA_TARGET",
+				"3221225472"
+			]
+		],
+		"after": [
+			[
+				"PGA_AGGREGATE_TARGET",
+				"1073741824"
+			],
+			[
+				"SGA_TARGET",
+				"3221225472"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-grant-p1-backups",
+		"before": [
+			[
+				"V$RMAN_BACKUP_JOB_DETAILS",
+				"unavailable"
+			]
+		],
+		"after": [
+			[
+				"V$RMAN_BACKUP_JOB_DETAILS",
+				"unavailable"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-name-promo-parent",
+		"before": [
+			[
+				"PROMOTIONS",
+				"PROMO_ID"
+			]
+		],
+		"after": [
+			[
+				"PROMOTIONS",
+				"PROMO_ID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-name-missing-archive",
+		"before": [
+			[
+				"does not exist"
+			]
+		],
+		"after": [
+			[
+				"does not exist"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-precision-revenue-1998",
+		"before": [
+			[
+				"24083914.95"
+			]
+		],
+		"after": [
+			[
+				"24083914.95"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-precision-revenue-2000",
+		"before": [
+			[
+				"23765506.62"
+			]
+		],
+		"after": [
+			[
+				"23765506.62"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-precision-revenue-1999",
+		"before": [
+			[
+				"22219947.66"
+			]
+		],
+		"after": [
+			[
+				"22219947.66"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-precision-revenue-2001",
+		"before": [
+			[
+				"28136461.98"
+			]
+		],
+		"after": [
+			[
+				"28136461.98"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-units-sales-gb",
+		"before": [
+			[
+				"0.125000"
+			]
+		],
+		"after": [
+			[
+				"0.125000"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-units-customers-mb",
+		"before": [
+			[
+				"13.00"
+			]
+		],
+		"after": [
+			[
+				"13.00"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-units-costs-gb",
+		"before": [
+			[
+				"0.125000"
+			]
+		],
+		"after": [
+			[
+				"0.125000"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-units-products-mb",
+		"before": [
+			[
+				"0.0625"
+			]
+		],
+		"after": [
+			[
+				"0.0625"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-store-status",
+		"before": [
+			[
+				"Online",
+				"COMPLETE",
+				1312
+			]
+		],
+		"after": [
+			[
+				"Online",
+				"COMPLETE",
+				1312
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-inventory-value",
+		"before": [
+			[
+				"San Francisco",
+				175,
+				"7510324.00"
+			],
+			[
+				"Sydney",
+				206,
+				"5607002.00"
+			],
+			[
+				"Seattle, Washington",
+				107,
+				"4874557.00"
+			]
+		],
+		"after": [
+			[
+				"San Francisco",
+				175,
+				"7510324.00"
+			],
+			[
+				"Sydney",
+				206,
+				"5607002.00"
+			],
+			[
+				"Seattle, Washington",
+				107,
+				"4874557.00"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-jobs-plan",
+		"before": [
+			[
+				"TABLE ACCESS",
+				"FULL",
+				"JOBS"
+			]
+		],
+		"after": [
+			[
+				"TABLE ACCESS",
+				"FULL",
+				"JOBS"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-job-history-duration",
+		"before": [
+			[
+				"AC_ACCOUNT",
+				"1570.50"
+			],
+			[
+				"AC_MGR",
+				"1234.00"
+			],
+			[
+				"AD_ASST",
+				"2100.00"
+			],
+			[
+				"IT_PROG",
+				"2018.00"
+			],
+			[
+				"MK_REP",
+				"1401.00"
+			],
+			[
+				"SA_MAN",
+				"364.00"
+			],
+			[
+				"SA_REP",
+				"282.00"
+			],
+			[
+				"ST_CLERK",
+				"505.50"
+			]
+		],
+		"after": [
+			[
+				"AC_ACCOUNT",
+				"1570.50"
+			],
+			[
+				"AC_MGR",
+				"1234.00"
+			],
+			[
+				"AD_ASST",
+				"2100.00"
+			],
+			[
+				"IT_PROG",
+				"2018.00"
+			],
+			[
+				"MK_REP",
+				"1401.00"
+			],
+			[
+				"SA_MAN",
+				"364.00"
+			],
+			[
+				"SA_REP",
+				"282.00"
+			],
+			[
+				"ST_CLERK",
+				"505.50"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-archive-access",
+		"before": [
+			[
+				"V$ARCHIVED_LOG",
+				"unavailable"
+			],
+			[
+				"V$LOG_HISTORY",
+				"unavailable"
+			]
+		],
+		"after": [
+			[
+				"V$ARCHIVED_LOG",
+				"unavailable"
+			],
+			[
+				"V$LOG_HISTORY",
+				"unavailable"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-description-language",
+		"before": [
+			[
+				"LANGUAGE_ID",
+				"VARCHAR2",
+				3
+			]
+		],
+		"after": [
+			[
+				"LANGUAGE_ID",
+				"VARCHAR2",
+				3
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-line-extension",
+		"before": [
+			[
+				"3668054.70"
+			]
+		],
+		"after": [
+			[
+				"3668054.70"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-location-country",
+		"before": [
+			[
+				"COUNTRIES",
+				"REGION_ID",
+				"REGIONS",
+				"REGION_ID"
+			],
+			[
+				"LOCATIONS",
+				"COUNTRY_ID",
+				"COUNTRIES",
+				"COUNTRY_ID"
+			]
+		],
+		"after": [
+			[
+				"COUNTRIES",
+				"REGION_ID",
+				"REGIONS",
+				"REGION_ID"
+			],
+			[
+				"LOCATIONS",
+				"COUNTRY_ID",
+				"COUNTRIES",
+				"COUNTRY_ID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-p8-jobs-decimal-mb",
+		"before": [
+			[
+				"0.065536"
+			]
+		],
+		"after": [
+			[
+				"0.065536"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-fk-chain",
+		"before": [
+			[
+				"ORDERS",
+				"CUSTOMER_ID",
+				"CUSTOMERS",
+				"CUSTOMER_ID"
+			],
+			[
+				"ORDER_LINES",
+				"ORDER_ID",
+				"ORDERS",
+				"ORDER_ID"
+			],
+			[
+				"ORDER_LINES",
+				"PRODUCT_ID",
+				"PRODUCTS",
+				"PRODUCT_ID"
+			]
+		],
+		"after": [
+			[
+				"ORDERS",
+				"CUSTOMER_ID",
+				"CUSTOMERS",
+				"CUSTOMER_ID"
+			],
+			[
+				"ORDER_LINES",
+				"ORDER_ID",
+				"ORDERS",
+				"ORDER_ID"
+			],
+			[
+				"ORDER_LINES",
+				"PRODUCT_ID",
+				"PRODUCTS",
+				"PRODUCT_ID"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-pk-index",
+		"before": [
+			[
+				"ORDER_LINES_PK",
+				"ORDER_LINES_PK",
+				1,
+				"ORDER_ID"
+			],
+			[
+				"ORDER_LINES_PK",
+				"ORDER_LINES_PK",
+				2,
+				"LINE_NO"
+			]
+		],
+		"after": [
+			[
+				"ORDER_LINES_PK",
+				"ORDER_LINES_PK",
+				1,
+				"ORDER_ID"
+			],
+			[
+				"ORDER_LINES_PK",
+				"ORDER_LINES_PK",
+				2,
+				"LINE_NO"
+			]
+		],
+		"equal": true
+	},
+	{
+		"id": "hard-sh-fks",
+		"before": [
+			[
+				"CHANNEL_ID",
+				"CHANNELS",
+				"CHANNEL_ID"
+			],
+			[
+				"CUST_ID",
+				"CUSTOMERS",
+				"CUST_ID"
+			],
+			[
+				"PROD_ID",
+				"PRODUCTS",
+				"PROD_ID"
+			],
+			[
+				"PROMO_ID",
+				"PROMOTIONS",
+				"PROMO_ID"
+			],
+			[
+				"TIME_ID",
+				"TIMES",
+				"TIME_ID"
+			]
+		],
+		"after": [
+			[
+				"CHANNEL_ID",
+				"CHANNELS",
+				"CHANNEL_ID"
+			],
+			[
+				"CUST_ID",
+				"CUSTOMERS",
+				"CUST_ID"
+			],
+			[
+				"PROD_ID",
+				"PRODUCTS",
+				"PROD_ID"
+			],
+			[
+				"PROMO_ID",
+				"PROMOTIONS",
+				"PROMO_ID"
+			],
+			[
+				"TIME_ID",
+				"TIMES",
+				"TIME_ID"
+			]
+		],
+		"equal": true
+	}
+]

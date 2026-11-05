@@ -43,7 +43,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge').map(test => test.category)])) {
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
 		// Phase 20 made the former grant-limited dev case positive; backup regression and archive-log holdout retain coverage.
 		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
@@ -58,8 +58,13 @@ export function checkHardCases(cases: EvalCase[]): void {
 			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
 		}
 	}
-	const dev = cases.filter(test => test.split === 'dev').length;
-	if (dev / cases.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / cases.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+	// Phase 21 is an additional blind release holdout, not a tuning split.
+	for (const test of cases.filter(test => test.id.startsWith('hard-p21-'))) {
+		if (test.split !== 'holdout' || !test.groundTruth) throw new Error('Phase 21 requires holdout truth');
+	}
+	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
+	const dev = balanced.filter(test => test.split === 'dev').length;
+	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
 }
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
@@ -100,6 +105,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 	checkHardCases(cases);
 	const config = loadConfig();
 	const records = [];
+	const skipped: { id: string; reason: string }[] = [];
 	const sessions = createSessionProvider(config);
 	try {
 		for (const test of cases) {
@@ -109,6 +115,10 @@ export async function validateHardCases(input?: EvalCase[]) {
 				if (test.groundTruth.setupSql) await session.query(test.groundTruth.setupSql, {}, { maxRows: 1 });
 				const result = await session.query(test.groundTruth.sql, {}, { maxRows: 100 });
 				const rows = result.rows;
+				if (!rows.length && test.skipWhenTruthEmpty) {
+					skipped.push({ id: test.id, reason: 'Empty truth permitted by skipWhenTruthEmpty' });
+					continue;
+				}
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
@@ -127,7 +137,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 			} finally { await session.close(); }
 		}
 	} finally { await sessions.closeAll(); }
-	return { validatedAt: new Date().toISOString(), caseCount: cases.length, records };
+	return { validatedAt: new Date().toISOString(), caseCount: cases.length, records, skipped };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

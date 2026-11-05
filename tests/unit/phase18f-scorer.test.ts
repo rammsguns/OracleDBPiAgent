@@ -29,9 +29,9 @@ it('rejects wrong codes, incidents, code suffixes and codes borrowed from anothe
 		expect(matches(answer, incident)).toBe(false);
 	}
 });
-it('rejects negated labelled facts and never pools multi-row truth', () => {
+it('rejects negated facts and accepts separate complete labelled records', () => {
 	expect(matches(bullets.replace('`SHOPAPP.SYS_C007669`', 'not caused by SHOPAPP.SYS_C007669'), job)).toBe(false);
 	expect(matches(bullets, [...job, ['SHOPAPP.OTHER_JOB', 'SHOPAPP.OTHER_KEY']])).toBe(false);
 	expect(matches('- Code: ORA-00800\n- Incident: 225332\n- Code: ORA-00801\n- Incident: 225333',
-		[...incident, ['ORA-00801', '225333']])).toBe(false);
+		[...incident, ['ORA-00801', '225333']])).toBe(true);
 });
