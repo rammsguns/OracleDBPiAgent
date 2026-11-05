@@ -1,0 +1,116 @@
+[
+	{
+		"id": "hard-p18-d1-latest-code",
+		"target": "d1-19c-lab",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On d1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), report the first ORA- code in the newest V$DIAG_ALERT_EXT message containing an ORA- code. Accept one to five digits after ORA- and pad the code to five digits (ORA-0 becomes ORA-00000); include zero codes; do not filter by MESSAGE_LEVEL. Break timestamp ties by RECORD_ID descending.",
+		"groundTruth": {
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)') ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p18-d1-incident-count",
+		"target": "d1-19c-lab",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On d1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), report the total number of ADR incidents in V$DIAG_INCIDENT, counting incident rows rather than distinct problems or alert messages.",
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) AS incident_count FROM V$DIAG_INCIDENT WHERE CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM')",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p18-d1-incident-problem",
+		"target": "d1-19c-lab",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On d1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), give the newest ADR incident id and its problem key from V$DIAG_INCIDENT joined to V$DIAG_PROBLEM by PROBLEM_ID and CON_ID. Break CREATE_TIME ties by INCIDENT_ID descending. Keep the id and key paired.",
+		"groundTruth": {
+			"sql": "SELECT i.INCIDENT_ID AS incident_id, p.PROBLEM_KEY AS problem_key FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY i.CREATE_TIME DESC, i.INCIDENT_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p18-p1-latest-code",
+		"target": "p1-19c-prod",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On p1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), report the first ORA- code in the newest V$DIAG_ALERT_EXT message containing an ORA- code. Accept one to five digits after ORA- and pad the code to five digits (ORA-0 becomes ORA-00000); include zero codes; do not filter by MESSAGE_LEVEL. Break timestamp ties by RECORD_ID descending.",
+		"groundTruth": {
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)') ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p18-p1-incident-count",
+		"target": "p1-19c-prod",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On p1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), report the total number of ADR incidents in V$DIAG_INCIDENT, counting incident rows rather than distinct problems or alert messages.",
+		"groundTruth": {
+			"sql": "SELECT COUNT(*) AS incident_count FROM V$DIAG_INCIDENT WHERE CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM')",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p18-p1-incident-problem",
+		"target": "p1-19c-prod",
+		"category": "alert-log",
+		"split": "challenge",
+		"question": "On p1, using only read-only SQL and the UTC window [2026-10-06T00:00:00Z, 2026-11-04T00:00:00Z) (inclusive start, exclusive end), give the newest ADR incident id and its problem key from V$DIAG_INCIDENT joined to V$DIAG_PROBLEM by PROBLEM_ID and CON_ID. Break CREATE_TIME ties by INCIDENT_ID descending. Keep the id and key paired.",
+		"groundTruth": {
+			"sql": "SELECT i.INCIDENT_ID AS incident_id, p.PROBLEM_KEY AS problem_key FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY i.CREATE_TIME DESC, i.INCIDENT_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]
