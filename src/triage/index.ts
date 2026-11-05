@@ -148,10 +148,13 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		if (evidence.length) hypotheses.push({ rank: 0, title: 'The recorded run or error is visible, but the cause is not yet established.', evidence });
 		else {
 			const searched = reader.checks.filter(c => /scheduler|Compile errors|Invalid objects|Identifier candidate lookup/i.test(c.label));
-			const views = unique(searched.flatMap(c => [c.view, ...c.attempts.map(a => `${a.view} (${a.code})`)]));
+			const views = unique(searched.flatMap(c => [
+				...c.view.split(', ').filter(Boolean),
+				...c.attempts.flatMap(a => a.view.split(', ').map(view => `${view} (${a.code})`)),
+			]));
 			const names = unique([...parsed.jobs, ...parsed.unqualifiedObjects, ...parsed.objects, ...missingNames.map(c => c.name)]);
 			hypotheses.push({ rank: 0, title: `No recorded failure was found${names.length ? ' for ' + names.join(', ') : '; no job or object name was recognized'}.`, evidence: [
-				`Searched ${views.join(', ')} for ${runs.scopes.map(scopeName).join(', ') || 'no recognizable job name'}, in the requested ${options.since ?? '24h'} window and (for named jobs/objects) up to 5 latest runs without a time filter.`,
+				`Searched ${views.join(', ')} for ${runs.scopes.map(scopeName).join(', ') || names.join(', ') || 'no recognizable job name'}, in the requested ${options.since ?? '24h'} window and (for named jobs/objects) up to 5 latest runs without a time filter.`,
 				`Owner scope for compile errors and invalid objects: ${owners.join(', ')}. No matching run history, compiler errors or invalid objects were returned; unavailable views and caps are listed in the evidence.`,
 			] });
 			diagnosis.suggestions.push('Try a wider window, for example --since 30d, to inspect more history; the latest-run lookup is limited to 5 rows.', 'Check the spelling and provide OWNER.JOB_NAME or OWNER.OBJECT_NAME to remove owner ambiguity.', 'The job may have been dropped or may belong to an owner this account cannot see; ask the DBA to confirm its owner and retained scheduler history.');

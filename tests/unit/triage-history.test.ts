@@ -100,3 +100,20 @@ it('does not assume the default owner for an unresolved unqualified object with 
 	const issue = (await triage(ctx, { target: 'd1-19c-lab', issue: 'object K7Q_FAILJOB fails' })).issues[0]!;
 	expect(issue.codes).toContain('ORA-20001'); expect(issue.checks.find(c => c.label.startsWith('Compile errors'))?.binds.owner).toBe('K7Q_OWNER');
 });
+
+it('deduplicates searched views in first-seen order and names unknown candidates', async () => {
+	const result = await triage(context(async () => empty), {
+		target: 'd1-19c-lab', issue: 'NO_SUCH_JOB_X failed this morning',
+	});
+	const evidence = result.issues[0]!.hypotheses[0]!.evidence[0]!;
+	expect(evidence).toBe('Searched DBA_SCHEDULER_JOBS, DBA_SCHEDULER_JOB_RUN_DETAILS, DBA_OBJECTS, DBA_ERRORS for NO_SUCH_JOB_X, in the requested 24h window and (for named jobs/objects) up to 5 latest runs without a time filter.');
+});
+
+it('keeps the no-recognizable-name wording when no name was recognized', async () => {
+	const result = await triage(context(async () => empty), {
+		target: 'd1-19c-lab', issue: 'failed',
+	});
+	const evidence = result.issues[0]!.hypotheses[0]!.evidence[0]!;
+	expect(evidence).toContain('for no recognizable job name, in the requested 24h window');
+	expect(evidence).toContain('Searched DBA_SCHEDULER_JOBS, DBA_SCHEDULER_JOB_RUN_DETAILS, DBA_ERRORS, DBA_OBJECTS for ');
+});
