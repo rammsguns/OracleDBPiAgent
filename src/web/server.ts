@@ -1,3 +1,4 @@
+import { readWebSql, validateWebSql } from './sql.js';
 import { readAlertLog, readIncidents, renderAlertLogMarkdown, AlertlogUsageError } from '../alertlog/index.js';
 import { parseTriageCommand } from '../cli/chatTriage.js';
 import { listPlsql, documentPlsql } from '../plsql/index.js';
@@ -20,6 +21,8 @@ import { createSessions } from "../agent/dbToolsAdapter.js";
 import { JsonlAuditSink } from "../audit/index.js";
 
 export interface WebServerOptions extends SessionOptions {
+	readSqlInsight?: typeof import('../sqlperf/index.js').readSqlInsight;
+	findSqlCandidates?: typeof import('../sqlperf/index.js').findSqlCandidates;
 	readAlertLog?: typeof readAlertLog;
 	readIncidents?: typeof readIncidents;
 	plsqlList?: typeof listPlsql;
@@ -88,7 +91,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
-			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog'].includes(raw)) {
+			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';
 				if (req.method !== (isTriage ? 'POST' : 'GET')) throw new WebError(405, 'Method not allowed');
@@ -97,7 +100,9 @@ export function createWebServer(options: WebServerOptions = {}) {
 				if (typeof target !== 'string' || !['d1-19c-lab', 'p1-19c-prod'].includes(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
-					if (isAlert) {
+					if (raw === '/api/sql') {
+						validateWebSql(data);
+					} else if (isAlert) {
 						sinceHours(data.since as string | undefined);
 						if (data.text !== undefined && String(data.text).length > 2048) throw new Error();
 						if (data.codes && (String(data.codes).split(',').length > 20 || String(data.codes).split(',').some(code => !/^(ORA|TNS)-\d{5}$/.test(code.trim().toUpperCase())))) throw new Error();
@@ -116,6 +121,12 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
+					if (raw === '/api/sql') {
+						const output = await readWebSql(ctx, target, data, options);
+						if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
+						const finished = sessions; sessions = undefined; await finished.closeAll();
+						return json(res, 200, output);
+					}
 					if (isAlert) {
 						try {
 							const entries = await (options.readAlertLog ?? readAlertLog)(ctx, target, { since: data.since as string | undefined, codes: data.codes ? String(data.codes).split(',').map(code => code.trim().toUpperCase()) : [], text: data.text as string | undefined });

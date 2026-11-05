@@ -1,3 +1,4 @@
+import { sqlFixture } from './sql-fixture.js';
 import { alertResult, alertRow, incidentRow } from './alertlog-fixture.js';
 import { insightFakes } from './insight-fixture.js';
 import { mkdtemp, appendFile, rm } from 'node:fs/promises';
@@ -15,6 +16,8 @@ export async function startFakeServer() {
 	let now = 0;
 	const stats = { aborted: 0, prompts: 0, lastQuestion: '' };
 	const web = createWebServer({ ...insightFakes, port: 0,
+		readSqlInsight: async (_session, options) => ({ ...sqlFixture, sqlId: options.sqlId }),
+		findSqlCandidates: async () => ({ columns: ['SQL_ID', 'SQL_TEXT'], rows: [['0123456789abc', 'SELECT one'], ['123456789abcd', 'SELECT two']], truncated: false, elapsedMs: 0 }),
 		readAlertLog: async (_ctx, target) => { await new Promise(resolve => setTimeout(resolve, 100)); return alertResult(target, [alertRow]); },
 		readIncidents: async (_ctx, target) => ({ ...alertResult(target, [incidentRow]), view: 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM' }), config, reportDirectory: join(dir, 'reports'),
 		loadHistory: async (_dir, target) => ({ target, scanned: target === 'p1-19c-prod' ? 0 : 3, skipped: 0, notes: [], reports: target === 'p1-19c-prod' ? [] : [60, 70, 90].map((used, i) => ({ target, generatedAt: `2026-10-${26 + i}T00:00:00.000Z`, sections: [

@@ -1,3 +1,4 @@
+import { initSql } from "./sql.js";
 import { initAlertLog } from "./alertlog.js";
 import { initInsight } from './insight.js';
 import { initDrift } from './drift.js';
@@ -147,7 +148,7 @@ async function audit() {
 	}
 }
 function tab(selected) {
-	for (const id of ['audit', 'trace', 'report', 'drift', 'plsql', 'alertlog', 'triage']) {
+	for (const id of ['audit', 'trace', 'report', 'drift', 'plsql', 'alertlog', 'sql', 'triage']) {
 		$(`${id}-tab`).setAttribute('aria-selected', String(id === selected));
 		$(`${id}-tab`).tabIndex = id === selected ? 0 : -1; $(`${id}-panel`).hidden = id !== selected;
 	}
@@ -225,7 +226,7 @@ $('target').addEventListener('change', async () => {
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
-const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'alertlog', 'triage'];
+const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'alertlog', 'sql', 'triage'];
 for (const [index, id] of tabs.entries()) {
 	$(`${id}-tab`).addEventListener('click', () => tab(id));
 	$(`${id}-tab`).addEventListener('keydown', event => {
@@ -247,6 +248,7 @@ async function init() {
 		initDrift(api, targets);
 		initInsight(api, targets);
 		initAlertLog(api, targets);
+		initSql(api, targets);
 		await newSession(); await health();
 	} catch (error) { status(error.message); } finally { busy(false); }
 }

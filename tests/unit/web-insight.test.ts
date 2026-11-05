@@ -10,7 +10,7 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 	const list = vi.fn(async () => ({ target: 'd1-19c-lab', status: 'ok', rows: [] } as any));
 	const triage = vi.fn(async () => ({ target: 'd1-19c-lab', issues: [], scan: null }));
 	const web = createWebServer({ port: 0, token: 'test', config: loadConfig({}), plsqlList: list, triage,
-		sessionFactory: async () => ({ get: vi.fn(), closeAll }), ...overrides });
+		sessionFactory: async () => ({ get: vi.fn(async () => ({ target: {}, identity: {}, close: async () => {}, query: vi.fn() } as any)), closeAll }), ...overrides });
 	const url = new URL(await web.listen()); cleanups.push(web.close);
 	const call = (path = '/api/plsql/list?owner=HR', data?: unknown, headers = {}, method = data === undefined ? 'GET' : 'POST') =>
 		new Promise<{ status: number; text: string }>((resolve, reject) => {
@@ -22,7 +22,7 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 }
 it('requires token, approved Host/Origin, method, target and identifiers before opening sessions', async () => {
 	const f = await fixture();
-	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog']) {
+	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql']) {
 		expect((await f.call(path, undefined, { Authorization: '' })).status).toBe(401);
 		expect((await f.call(path, undefined, { Host: 'evil.test' })).status).toBe(403);
 		expect((await f.call(path, undefined, { Origin: 'null' })).status).toBe(403);
@@ -48,7 +48,7 @@ it('shares lock across insight routes and releases after failures', async () => 
 	const pending = new Promise<void>(r => { release = r; }), start = new Promise<void>(r => { started = r; });
 	const f = await fixture({ plsqlList: async () => { started(); await pending; throw new Error('private DSN'); } });
 	const first = f.call(); await start;
-	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); } finally { release(); }
+	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); } finally { release(); }
 	const failed = await first; expect(failed.status).toBe(500); expect(failed.text).not.toContain('DSN'); expect((await f.call()).status).toBe(500);
 });
 it('accepts dollar and hash identifiers and forwards doc selection', async () => {
@@ -78,4 +78,24 @@ it('alert failures are private and release the shared lock and sessions', async 
 		expect(response.status).toBe(500); expect(response.text).not.toContain('private');
 	}
 	expect(f.closeAll).toHaveBeenCalledTimes(2);
+});
+
+it('validates SQL requests before sessions and returns candidate picks or insight', async () => {
+	const { sqlFixture } = await import('../browser/sql-fixture.js');
+	const read = vi.fn(async () => sqlFixture);
+	const f = await fixture({ readSqlInsight: read, findSqlCandidates: async () => ({ columns: [], rows: [['0123456789abc', 'SELECT x'], ['123456789abcd', 'SELECT y']], elapsedMs: 0, truncated: false }) });
+	for (const query of ['', '?sqlId=bad', '?sqlId=0123456789abc&text=x', '?text=', '?text=' + 'x'.repeat(2049), '?sqlId=0123456789abc&target=FREEPDB1']) expect((await f.call('/api/sql' + query)).status).toBe(400);
+	expect(f.closeAll).not.toHaveBeenCalled();
+	const candidates = await f.call('/api/sql?text=SELECT');
+	expect(JSON.parse(candidates.text).candidates).toHaveLength(2); expect(read).not.toHaveBeenCalled();
+	const result = await f.call('/api/sql?sqlId=0123456789abc');
+	expect(result.status).toBe(200); expect(JSON.parse(result.text).markdown).toContain('# SQL insight');
+	expect(f.closeAll).toHaveBeenCalledTimes(2);
+});
+it('SQL errors stay private, output is bounded and sessions and lock recover', async () => {
+	const { sqlFixture } = await import('../browser/sql-fixture.js');
+	let mode = 'fail';
+	const f = await fixture({ readSqlInsight: async () => { if (mode === 'fail') throw new Error('private database address'); return { ...sqlFixture, text: 'x'.repeat(1048576) }; } });
+	for (let i = 0; i < 2; i++) { const response = await f.call('/api/sql?sqlId=0123456789abc'); expect(response.status).toBe(500); expect(response.text).not.toContain('private'); }
+	mode = 'cap'; expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(413); expect(f.closeAll).toHaveBeenCalledTimes(3);
 });

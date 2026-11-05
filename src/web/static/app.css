@@ -146,3 +146,23 @@ td:nth-child(2) { max-width: 24rem; }
 @media (max-width: 800px) {
 	.graph-scroll svg { min-width: 600px; }
 }
+
+#sql-panel, .sql-evidence { min-width: 0; overflow-wrap: anywhere; }
+#sql-panel input { display: block; width: 100%; max-width: 28rem; padding: .5rem; font: inherit; }
+.sql-chip { display: inline-block; border: 1px solid currentColor; border-radius: .35rem; padding: .1rem .4rem; margin: .15rem; font-size: .8rem; font-weight: 600; }
+.sql-chip.warning, .sql-chip.unavailable { color: #805000; }
+.sql-chip.ok, .sql-chip.best { color: #235663; }
+.sql-evidence pre, #triage-panel .sql-evidence pre { max-width: 100%; overflow: auto; white-space: pre; overflow-wrap: normal; padding: .75rem; border: 1px solid #859ba5; }
+.sql-plan-tree { overflow: auto; max-width: 100%; font-family: monospace; }
+.sql-plan-tree ul { padding-left: 1.25rem; list-style: none; }
+.sql-plan-tree > ul { padding-left: 0; }
+.sql-plan-tree li > span { display: block; border-left: 2px solid #859ba5; padding-left: .4rem; margin: .3rem 0; }
+.sql-candidate { display: block; width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; margin: .5rem 0; }
+@media (min-width: 801px) { main:has(#sql-tab[aria-selected="true"]), main:has(#triage-panel:not([hidden]) .sql-evidence) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
+@media (prefers-color-scheme: dark) { .sql-chip.warning, .sql-chip.unavailable { color: #ffd080; } .sql-chip.ok, .sql-chip.best { color: #b8dce7; } }
+/* Keep short badges and plan branches intact; wide evidence scrolls locally. */
+.sql-table table { min-width: 38rem; }
+.sql-table .sql-chip { white-space: nowrap; }
+.sql-plan-tree > ul { width: max-content; min-width: 100%; }
+.sql-plan-tree li > span { white-space: nowrap; }
+.sql-table td { white-space: nowrap; }
