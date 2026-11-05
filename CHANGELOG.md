@@ -4,7 +4,12 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-05
+
 ### Added
+
+- Twelve blind holdout cases covering PL/SQL, ADR, SQL performance and security;
+  legitimate empty truth is skipped. See [eval hygiene](docs/wp-21b-eval-hygiene.md).
 
 - `piagent sql` drills into one cached SQL statement:
   - cursor children with per-execution timings;
@@ -16,7 +21,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   - findings: plan instability, stale statistics, large full scans on the
     nested-loop inner side, and high child counts.
 
-  `--text` lists candidates and never guesses. The SQL policy accepts exactly
+  `--text` opens a unique untruncated match; otherwise it lists candidates for
+  explicit selection with `--sql-id`. See [SQL insight](docs/sqlperf.md).
+  The SQL policy accepts exactly
   `SELECT … FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(a, b, c))` and nothing else
   from the package.
 - Triage pulls SQL evidence when an issue names a SQL_ID, or reports slowness
@@ -32,7 +39,8 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   - `--who-can OWNER.OBJECT` privilege paths.
 
   It never selects password hashes, `SYS.USER$` or audit trails; a
-  parser-based test guards this. Advice is prose labelled for a human DBA.
+  parser-based test guards this. Advice is prose for a human DBA. See
+  [security](docs/security.md).
 - `report --sections security` (opt-in; the default report is unchanged),
   security severity trends in report history, and `drift --scope security`.
 - Web SQL and Security tabs: a plan tree, plan changes, statistics badges,
@@ -126,6 +134,20 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   score from 33/40 to 38/40.
 
 ### Fixed
+
+- ADR incident status is decoded to a name in alert-log, triage and web output;
+  JSON retains the numeric code. See [hardening](docs/wp-21a-lows.md).
+- Init's API-key placeholder is rejected before health checks or database access;
+  the configuration error names `PIAGENT_LLM_API_KEY_FILE`. The CLI entry point
+  currently masks it with its generic failure message; see
+  [installation guidance](docs/install.md#upgrade-to-120).
+- Generated report schedules warn when the pinned Node executable is outside
+  recognized stable installation paths. See [installation](docs/install.md).
+- Eval hygiene: ground-truth sessions use UTC; p18 scoring accepts spaced problem
+  keys in labelled bullets; row-cell scoring accepts complete labelled records
+  without pooling separate records. The description-language holdout accepts
+  equivalent `describe_object` evidence. Archive replays and truth comparisons
+  are recorded in [WP-21B](docs/wp-21b-eval-hygiene.md).
 
 - PL/SQL dependency graph labels are readable in dark mode, and the graph
   no longer clips its right-most nodes.

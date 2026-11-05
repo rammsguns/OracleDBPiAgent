@@ -1,4 +1,4 @@
-# Security core and CLI (WP-20A)
+# Security and privilege review
 
 Implemented on `wp-20a-security`, 2026-11-05. No LLM calls, privilege changes,
 credential/hash reads, database writes, or additional dependencies.
@@ -18,6 +18,27 @@ are mutually exclusive. Invalid input exits 2 before connecting. Check IDs:
 `accounts`, `audit`, `parameters`, `who-can`. With no filter, all checks run;
 who-can is skipped unless an object is supplied. Supplying `--who-can` always
 includes that check, including with a check filter.
+
+## Reports, drift and web
+
+`piagent report --target d1-19c-lab --sections security` selects the optional
+security section; the fourteen default checks do not include it. Saved security
+reports contribute severity counts to history trends.
+`piagent drift --left d1-19c-lab --right p1-19c-prod --scope security --json`
+compares privilege counts and principal/grant sets; it is not a complete grant diff.
+Drift uses exit 3 for observed differences, 1 for incomplete results without
+observed differences or failure, and 0 for complete equality.
+
+The web **Security** tab groups findings by severity, filters them, shows check
+availability and draws who-can paths as a graph with a list fallback. It exports
+Markdown and uses no LLM. Select the target before reading the report.
+`ok` describes evidence availability, not a security certification. The CLI can
+exit 0 with unavailable checks: inspect the JSON `status` and per-check notes.
+
+See the [grant-request index](grants.md) for prerequisites. `UNIFIED_AUDIT_TRAIL`
+and `SYS.USER$` are deliberately not granted or queried. Policy configuration
+and default-password account names suffice; neither audit records nor password
+hashes are needed.
 
 ## API and evidence
 
