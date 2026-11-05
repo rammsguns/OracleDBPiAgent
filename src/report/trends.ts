@@ -53,6 +53,13 @@ export function buildReportTrends(history: ReportHistory): ReportTrends {
 		const times = rows(s!).filter(r => String(r.STATUS).startsWith('COMPLETED') && typeof r.END_TIME === 'string').map(r => Date.parse(String(r.END_TIME))).filter(t => Number.isFinite(t) && t <= at);
 		return times.length ? (at - Math.max(...times)) / 3600000 : null;
 	}, [['STATUS', 'END_TIME']], 'backup');
+	if (reports.some(r => r.sections.some(s => s.name === 'security'))) {
+		for (const severity of ['high', 'medium', 'low', 'info']) add(`security:${severity}`, `Security ${severity} findings`, 'count', ['security'], ([section]) => {
+			const data = rows(section!).filter(r => r.SEVERITY === severity);
+			if (!data.length || data.some(r => r.STATUS !== 'ok')) return null;
+			return data.filter(r => r.SUBJECT !== null).length;
+		}, [['CHECK', 'SEVERITY', 'STATUS', 'SUBJECT']]);
+	}
 	if (gaps) result.notes.push(`${gaps} series observation(s) missing, unavailable or incompatible; shown as gaps.`);
 	if (reports.some(r => r.sections.some(s => /row limit/i.test(s.note)))) result.notes.push('Row-limited snapshots: counts describe visible saved rows, not database totals.');
 	return result;
