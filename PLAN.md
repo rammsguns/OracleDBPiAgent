@@ -3015,6 +3015,188 @@ Follow-ups (phase 22 candidates):
 - The `PIAGENT_HOME must be private (mode 0700)` error is masked by the
   generic CLI catch; make it a SafeConfigError.
 
+## Phase 22: release follow-ups (approved 2026-11-05: "continue with proposed phase 22")
+
+### Goal
+Close the follow-ups from the 1.2.0 release gate:
+- two defective holdout cases;
+- an agent gap in alert-log and ADR discovery;
+- a masked configuration error.
+
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-22A eval cases | `wp-22a-holdout-fixes` | codex | `evals/` case files and scoring, eval unit tests and fixtures, `docs/` |
+| WP-22B ADR discovery | `wp-22b-adr-discovery` | codex | `src/agent/index.ts` (system prompt), the `run_query` hints in `src/tools/index.ts`, tests, `docs/` |
+| WP-22C safe config errors | `wp-22c-safe-config` | codex | `src/config/`, the CLI error boundary in `src/cli/index.ts`, tests, `docs/install.md` |
+| Review | `review-wp-22x` | antigravity | each WP |
+
+All three own disjoint files and run in parallel. None calls the LLM; the
+coordinator runs every Strata measurement.
+
+### WP-22A: holdout case defects and holdout hygiene
+1. `hard-p21-history-signature`: the answer "No" (or "None") must count as
+   Oracle `DEFAULTED = N`. Prefer a case-scoped fix: a truth SQL that
+   selects a yes/no word, or a per-case cell alias. Do not add a global
+   N=No equivalence.
+2. `hard-p21-products-stats`: accept the correct YES/YES in a vertical
+   attribute table, either by changing the truth mode or by scoped scorer
+   support with tests. A global change needs the full archive replay.
+3. WP-22B targets the two agent gaps, so those cases can no longer serve as
+   blind holdout:
+   - move `hard-p21-alert-levels` and `hard-p21-problem-identity` to `dev`;
+   - write two fresh blind holdout cases on the same skills, with different
+     targets, dates or wording (for example, alert messages on d1 for another
+     day; ADR problems with their last incident on p1).
+
+   Never run the agent on them.
+4. Run an offline replay over `eval-archive` and `needlefish/evals/results`
+   that lists every flip, with zero unjustified flips. Run `validate-hard`
+   live.
+
+### WP-22B: alert-log and ADR discovery
+In the release gate, the agent:
+- searched user tables for "alert messages" instead of the alert log;
+- claimed ADR problem keys are visible only in adrci.
+
+Add short, general guidance. Oracle's own alert log, incidents and problems
+are readable through `V$DIAG_ALERT_EXT`, `V$DIAG_INCIDENT` and
+`V$DIAG_PROBLEM`. This applies whenever a question mentions alert log or
+alert messages, ORA- errors, incidents, problems or ADR. Do not name eval
+cases or answers.
+
+Optionally add a `run_query` hint. It fires when a user-table search for
+`%ALERT%` or `%MESSAGE%` returns nothing, or when a query uses an ADR column
+name that does not exist.
+
+Keep the added prompt under about 60 tokens and report the exact delta.
+
+Gate: A/B 4×4 alternating against master:
+- p18;
+- the two moved dev cases;
+- dev, holdout ×3, regression and MVP.
+
+Pass criteria:
+- the moved cases improve;
+- no suite regresses beyond noise;
+- token change is reported.
+
+### WP-22C: safe configuration errors
+The generic CLI catch hides fixed, safe configuration guidance. One example
+is `PIAGENT_HOME must be private (mode 0700)`.
+- Audit every error thrown by `src/config/` and the CLI preflight.
+- Messages with fixed text that contain no paths, values or secrets become
+  `SafeConfigError` subclasses or instances. Construction stays fixed: no
+  interpolated input.
+- Everything else stays generic.
+- Include a unit test that lists each safe message, and an end-to-end
+  subprocess test for the mode-0700 case.
+
+### Gate
+- WP-22A and WP-22C: tests and validation.
+- WP-22B: the A/B above.
+- Then push to `main` with a 1.2.1 patch version. The `v1.2.1` tag is pushed
+  only if the owner says so.
+
+## Phase 23: sessions, blocking and waits (proposed 2026-11-05; needs owner approval and p1 grants)
+
+### Goal
+`piagent sessions`: a read-only live view of who is blocking whom. It shows:
+- active sessions;
+- blocking chains;
+- top wait events since startup;
+- long-running transactions;
+- for each blocker, its SQL_ID, linked to `piagent sql`.
+
+It never uses ASH or AWR (Diagnostics Pack licence). The SQL policy already
+rejects them.
+
+### Access (probed read-only on 2026-11-05)
+- d1 (HARNESS_LAB) can read everything needed:
+  - V$SESSION, V$LOCK, V$SESSION_WAIT, V$SESSION_EVENT;
+  - V$WAIT_CHAINS, V$TRANSACTION, V$PROCESS, V$LOCKED_OBJECT;
+  - V$SYSTEM_EVENT, V$SYS_TIME_MODEL, V$EVENT_NAME;
+  - DBA_BLOCKERS, DBA_WAITERS.
+- p1 (HARNESS_RO) can read only V$SESSION, V$LOCK and V$SYSTEM_EVENT.
+- A grant request
+  (`docs/grants-request-<date>-sessions.sql`, SELECT only, to HARNESS_RO)
+  would add:
+  - V_$SESSION_WAIT, V_$WAIT_CHAINS, V_$TRANSACTION and V_$LOCKED_OBJECT;
+  - V_$SYS_TIME_MODEL and V_$EVENT_NAME;
+  - DBA_BLOCKERS and DBA_WAITERS.
+
+Never select V$SESSION columns that could hold secrets beyond identity,
+state, wait and SQL_ID: no `CLIENT_INFO` or `MODULE` free text without
+redaction.
+
+### WPs
+- **WP-23A, core and CLI** (`src/sessions/`):
+  - a blocking tree from `V$WAIT_CHAINS` or `BLOCKING_SESSION`;
+  - top waits by class, excluding Idle;
+  - long transactions;
+  - JSON and Markdown output;
+  - per-section status;
+  - exit codes as in `sql` and `security`.
+- **WP-23B, integration:**
+  - triage uses the blocking tree when the issue mentions hangs, locks or
+    slowness;
+  - a report section with history trends, covering waits by class.
+- **WP-23C, web:** a Sessions tab with a blocking-tree graph that reuses
+  `graphLayout.js`. Ship fresh screenshots.
+- **WP-23D, evals (p23):** blocking itself is transient, so truth must be
+  stable or use `skipWhenTruthEmpty`. Cases:
+  - top non-idle wait class since startup;
+  - sessions per user;
+  - and so on.
+
+Gate: A/B if the agent prompt changes, otherwise single side plus the full
+suites.
+
+## Phase 24: space and capacity (proposed 2026-11-05; needs owner approval and p1 grants)
+
+### Goal
+`piagent space` reports:
+- tablespace usage (used, free, autoextend headroom);
+- top segments;
+- temp and undo usage;
+- online redo log size;
+- recovery area usage;
+- growth from report history.
+
+### Access (probed read-only on 2026-11-05)
+- d1 can read everything needed:
+  - DBA_TABLESPACES, DBA_DATA_FILES, DBA_TEMP_FILES, DBA_FREE_SPACE;
+  - DBA_TABLESPACE_USAGE_METRICS, DBA_SEGMENTS, DBA_LOBS, DBA_UNDO_EXTENTS;
+  - V$TEMPSEG_USAGE, V$SORT_SEGMENT, V$UNDOSTAT;
+  - V$RECOVERY_FILE_DEST, V$FLASH_RECOVERY_AREA_USAGE;
+  - V$DATAFILE, V$TEMPFILE, V$LOG.
+- p1 can read only DBA_TABLESPACES, DBA_DATA_FILES, DBA_FREE_SPACE,
+  DBA_TABLESPACE_USAGE_METRICS and DBA_SEGMENTS.
+- A grant request (`docs/grants-request-<date>-space.sql`) would add the rest
+  on p1: DBA_TEMP_FILES, DBA_LOBS, DBA_UNDO_EXTENTS, V_$TEMPSEG_USAGE,
+  V_$UNDOSTAT, V_$RECOVERY_FILE_DEST, V_$FLASH_RECOVERY_AREA_USAGE, V_$LOG
+  and V_$TEMPFILE.
+- DBA_EXTENTS is not needed and is slow.
+
+### WPs
+- **WP-24A, core and CLI** (`src/space/`): tablespaces with autoextend-aware
+  headroom, top N segments (LOB segments mapped to their table), temp,
+  undo, redo, FRA, JSON and Markdown.
+- **WP-24B:**
+  - a report section;
+  - history growth trends with days-to-full when there are at least three
+    points;
+  - `drift --scope space` for tablespace sets and sizes.
+- **WP-24C, web:** a Space tab with usage bars. Screenshots at 1280 and 390,
+  light and dark.
+- **WP-24D, evals (p24):**
+  - the largest segment in a schema;
+  - tablespace autoextend headroom;
+  - redo log group sizes;
+  - FRA usage.
+
+Gate: single side plus the full suites. If both phases are approved, phases
+23 and 24 ship together as 1.3.0.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
