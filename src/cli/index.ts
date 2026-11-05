@@ -2,7 +2,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
-import { loadEnvironment, initializeHome, assertConfiguredLlmKeyFile } from "../config/environment.js";
+import { loadEnvironment, initializeHome, assertConfiguredLlmKeyFile, SafeConfigError } from "../config/environment.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
@@ -155,7 +155,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	plsql.command("doc").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
 	});
-	program.command("drift").description("Compare two approved targets (parameters, schema or objects); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+	program.command("drift").description("Compare two approved targets (parameters, schema, objects or security); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
 	});
@@ -234,4 +234,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("chat").option("--target <target>").action(options => run(undefined, options));
 	await program.parseAsync(argv);
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(() => { console.error("piagent failed; check local configuration and service availability"); process.exitCode = 1; });
+export function handleCliError(error: unknown): void {
+	console.error(error instanceof SafeConfigError ? error.message : "piagent failed; check local configuration and service availability");
+	process.exitCode = 1;
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(handleCliError);

@@ -130,8 +130,9 @@ is an install step. New security report sections are opt-in.
 
 Before using ask/chat, replace init's `/absolute/path/to/strata-api-key` with the
 existing private key-file path in `PIAGENT_LLM_API_KEY_FILE`. The placeholder is
-rejected before any service contact. The current top-level CLI catch still prints
-its generic failure message; check this setting first after a fresh init.
+rejected before any service contact. The CLI exits 1 with guidance naming
+`PIAGENT_LLM_API_KEY_FILE` and asks you to edit your private `.env` or export
+the setting.
 
 Generated schedules pin the current Node and CLI executables. A warning now flags
 Node paths outside recognized system locations, including temporary, bundled and
