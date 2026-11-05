@@ -169,3 +169,29 @@ For example, `/triage --since 7d NIGHTLY_PURGE_JOB ORA-02292` searches seven day
 omitting the flag keeps the 24-hour default. Invalid windows show usage without
 collecting evidence or sending a model prompt. The web Triage panel's **Since**
 field accepts the same durations and defaults to `24h`.
+
+### Names in free text
+
+Names need no `_JOB` suffix or keyword: `daily_load failed` and
+`NO_SUCH_JOB_X failed` are accepted. Triage extracts up to 20 unique identifier
+candidates (at least three characters), normalizes them to uppercase and skips
+common English/SQL words and ORA/PLS codes. `OWNER.NAME` restricts the owner.
+One lookup with bind variables checks scheduler jobs, retained scheduler run
+names (including dropped jobs), and objects. It uses DBA views with ALL fallback
+on missing-view or privilege errors, returning at most 200 matches (also subject
+to the configured row cap). Found objects and jobs use the existing diagnostic
+and latest-five historical-run paths.
+
+Unmatched candidates containing underscores or digits, or written in all caps,
+are listed under limitations as `not found: X - check spelling, owner visibility,
+or whether it was dropped`. This means no visible match, not proof of absence;
+unavailable or capped lookups are marked partial. Ordinary lowercase prose is
+looked up but produces no missing-name notice.
+
+WP-17B verification (2026-11-04): typecheck clean; 971 unit tests passed;
+read-only integration suite 35 passed, 1 skipped (the explicitly excluded LLM
+e2e test), run with `--no-file-parallelism -t '^(?!.*answers one end-to-end ask)'`.
+The existing NIGHTLY_PURGE_JOB and K7Q_FAILJOB integration assertions passed.
+Live CLI smokes confirmed the missing-name message for `NO_SUCH_JOB_X failed`
+and ORA-20001 historical evidence for `k7q_failjob failed`. No LLM calls or evals
+were run. No shared contract changes are required.
