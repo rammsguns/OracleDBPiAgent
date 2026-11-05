@@ -17,6 +17,11 @@ for (const [target, whoCan] of [['d1-19c-lab', 'HR.EMPLOYEES'], ['p1-19c-prod', 
 		const result = await readSecurityPosture(session, { whoCan });
 		expect(result.status).toBe('ok');
 		expect(result.checks.every(c => c.status === 'ok')).toBe(true);
+		const profileCheck = result.checks.find(c => c.id === 'profiles')!;
+		const verify = profileCheck.findings.filter(f => f.subject === 'Profile DEFAULT' && f.detail.startsWith('PASSWORD_VERIFY_FUNCTION=NULL;'));
+		expect(verify).toHaveLength(1);
+		expect(verify[0]!.detail).toContain('Affected Open Users (' + (target === 'd1-19c-lab' ? '10' : '2') + ')');
+		expect(profileCheck.evidence.find(e => e.view === 'DBA_USERS')!.rows.length).toBeGreaterThan(2);
 		const defaults = result.checks.find(c => c.id === 'default-passwords');
 		expect(defaults).toBeDefined();
 		const defaultUsers = new Set(defaults!.findings.map(f => f.subject));

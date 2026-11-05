@@ -129,12 +129,22 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 		} else if (id === 'profiles') {
 			Object.assign(c, { title: 'Password Profiles for Open Users', severity: 'medium', advice: 'For a human DBA: review effective profile limits, password verification and application authentication requirements with a DBA.' });
 			const profiles = await use('profiles'), users = await use('users');
+			const groups = new Map<string, { profile: string; resource: string; value: string; users: Set<string> }>();
 			for (const u of users.rows.filter(r => r[1] === 'N' && s(r[2]).startsWith('OPEN'))) for (const resource of ['FAILED_LOGIN_ATTEMPTS', 'PASSWORD_LIFE_TIME', 'PASSWORD_VERIFY_FUNCTION']) {
 				let value = profiles.rows.find(r => r[0] === u[3] && r[1] === resource)?.[2];
 				if (value === 'DEFAULT') value = profiles.rows.find(r => r[0] === 'DEFAULT' && r[1] === resource)?.[2];
 				if (profiles.status !== 'ok') continue;
 				if (value === undefined) { c.status = 'unavailable'; result.status = 'unavailable'; if (!c.notes.includes('Effective profile metadata incomplete.')) c.notes.push('Effective profile metadata incomplete.'); continue; }
-				if (value === 'UNLIMITED' || (resource === 'PASSWORD_VERIFY_FUNCTION' && (value === 'NULL' || value === null))) add(u[0], `Profile ${u[3]}: ${resource}=${s(value) || 'unknown (profile metadata incomplete)'}`, profiles);
+				if (value === 'UNLIMITED' || (resource === 'PASSWORD_VERIFY_FUNCTION' && (value === 'NULL' || value === null))) {
+					const profile = s(u[3]), effective = value === null ? 'NULL' : s(value), key = JSON.stringify([profile, resource, effective]);
+					let group = groups.get(key);
+					if (!group) { group = { profile, resource, value: effective, users: new Set() }; groups.set(key, group); }
+					group.users.add(s(u[0]));
+				}
+			}
+			for (const group of [...groups.values()].sort((a, b) => a.profile.localeCompare(b.profile) || a.resource.localeCompare(b.resource))) {
+				const affected = [...group.users].sort();
+				add(`Profile ${group.profile}`, `${group.resource}=${group.value}; Affected Open Users (${affected.length}): ${affected.join(', ')}`, profiles);
 			}
 		} else if (id === 'accounts') {
 			Object.assign(c, { title: 'Account Lifecycle', severity: 'info', advice: 'For a human DBA: confirm unused accounts and retained object ownership with application owners before planning account lifecycle changes.' });

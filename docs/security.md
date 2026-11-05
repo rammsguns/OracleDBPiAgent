@@ -425,3 +425,14 @@ statement in the current SQL catalog.
 
 Validation: `npm run typecheck` passed; `npm test` passed (84 files, 1,249 tests).
 This follow-up changes test infrastructure only; no DB or LLM calls were made.
+
+### Profile finding aggregation (WP-20C coordinator review)
+
+Current profile findings use one row per profile/resource/effective limit, with
+the profile as subject and a sorted list/count of affected open custom users in
+the detail. DEFAULT inheritance resolves before grouping. The d1 DEFAULT verify
+function finding therefore lists ten users once, and p1 lists two users once;
+the earlier smoke transcripts above retain the historical per-user format.
+Core findings drive CLI Markdown, reports and the web tab, so all consumers get
+the aggregation. Counts of profile findings now mean profile-limit groups, not
+users. Complete DBA_USERS/DBA_PROFILES evidence rows are retained in JSON.
