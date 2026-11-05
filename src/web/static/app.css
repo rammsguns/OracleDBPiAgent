@@ -105,20 +105,19 @@ td:nth-child(2) { max-width: 24rem; }
 @media (min-width: 801px) {
 	main:has(#alertlog-tab[aria-selected="true"]), main:has(#triage-panel:not([hidden]) .alert-evidence) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); }
 }
-/* Other tabs also only themed their inner panels. Scope the shell fix to alert views. */
+/* Shared dark shell for every evidence tab and the conversation. */
 @media (prefers-color-scheme: dark) {
-	:root:has(#alertlog-tab[aria-selected="true"]), :root:has(#triage-panel:not([hidden]) .alert-evidence) {
+	:root {
 		color-scheme: dark; color: #e0edf0; background: #19282e;
-		--alert-surface: #19282e; --alert-fill: #223b45; --alert-text: #e0edf0;
+		--surface: #19282e; --surface-fill: #223b45; --surface-text: #e0edf0;
 	}
-	body:has(#alertlog-tab[aria-selected="true"]), body:has(#triage-panel:not([hidden]) .alert-evidence) {
-		background: var(--alert-surface); color: var(--alert-text);
-	}
-	body:has(#alertlog-tab[aria-selected="true"]) section, body:has(#triage-panel:not([hidden]) .alert-evidence) section { background: var(--alert-surface); }
-	body:has(#alertlog-tab[aria-selected="true"]) [role="tablist"], body:has(#triage-panel:not([hidden]) .alert-evidence) [role="tablist"] { background: var(--alert-surface); }
-	body:has(#alertlog-tab[aria-selected="true"]) button, body:has(#triage-panel:not([hidden]) .alert-evidence) button { background: var(--alert-fill); color: var(--alert-text); }
-	body:has(#alertlog-tab[aria-selected="true"]) button[aria-selected="true"], body:has(#triage-panel:not([hidden]) .alert-evidence) button[aria-selected="true"] { background: #185b67; }
-	.alert-message small { color: #b0bdc8; }
+	body { background: var(--surface); color: var(--surface-text); }
+	section, [role="tablist"] { background: var(--surface); }
+	button { background: var(--surface-fill); color: var(--surface-text); }
+	button[aria-selected="true"], #send { background: #185b67; }
+	.message { background: var(--surface-fill); }
+	small { color: #b0bdc8; }
+	.unverified { color: #ffd080; }
 }
 @media (max-width: 800px) {
 	.alert-entries { display: block; min-width: 0 !important; }

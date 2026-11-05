@@ -106,3 +106,51 @@ for (const width of [1280, 390]) test(`message disclosure, compact traces, cappe
 		expect(columns[3]).toBeGreaterThan(columns[0]! + columns[1]! + columns[2]!);
 	}
 });
+
+test('trace basenames stay in messages and disclosure tracks actual overflow on resize', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	await page.route('**/api/alertlog?*', async route => {
+		const response = await route.fetch(); const body = await response.json();
+		const base = body.entries.rows[0];
+		body.entries.rows = [
+			{ ...base, messageText: 'Errors in file /opt/oracle/diag/PRODCDB_j005_704.trc:', traceFiles: ['/opt/oracle/diag/PRODCDB_j005_704.trc'] },
+			{ ...base, messageText: 'word '.repeat(40), traceFiles: [] },
+		];
+		await route.fulfill({ json: body });
+	});
+	await page.locator('#alertlog-tab').click(); await page.locator('#alertlog-run').click();
+	const messages = page.locator('#alertlog-content .alert-message');
+	await expect(messages.first().locator('.alert-message-preview')).toHaveText('Errors in file PRODCDB_j005_704.trc:');
+	await expect(messages.first().locator('.alert-full-message')).toBeHidden();
+	await expect(messages.nth(1).locator('.alert-full-message')).toBeHidden();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await expect(messages.nth(1).locator('.alert-full-message')).toBeVisible();
+	await expect(messages.first().locator('.alert-full-message')).toBeHidden();
+	await page.locator('#plsql-tab').click(); await page.locator('#alertlog-tab').click();
+	await expect(messages.nth(1).locator('.alert-full-message')).toBeVisible();
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await expect(messages.nth(1).locator('.alert-full-message')).toBeHidden();
+});
+
+test('every evidence tab has the same dark shell, including PL/SQL', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 1000 });
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await page.goto(process.env.PIAGENT_BROWSER_URL!);
+	for (const tab of ['trace', 'audit', 'report', 'drift', 'plsql', 'triage', 'alertlog']) {
+		await page.locator(`#${tab}-tab`).click();
+		for (const selector of ['html', 'body', '.chat', '.evidence', '[role="tablist"]']) {
+			expect(await page.locator(selector).evaluate(node => getComputedStyle(node).backgroundColor)).toBe('rgb(25, 40, 46)');
+		}
+	}
+	await page.locator('#plsql-tab').click();
+	await page.locator('#plsql-owner').fill('WORKLOAD_FIXTURE');
+	await page.locator('#plsql-run').click();
+	await expect(page.locator('#plsql-object option')).toHaveCount(1);
+	await page.locator('#plsql-doc').click();
+	await expect(page.locator('#plsql-content .graph-scroll > svg')).toBeVisible();
+	if (process.env.PIAGENT_ALERTLOG_CAPTURE_FIXTURE === '1') {
+		await mkdir('docs/img', { recursive: true });
+		await page.screenshot({ path: 'docs/img/plsql-dark-shell.png', fullPage: true });
+	}
+});

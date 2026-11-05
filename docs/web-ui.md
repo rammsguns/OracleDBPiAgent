@@ -403,8 +403,9 @@ WP-18C visual-review follow-up:
   Alert evidence uses a wider desktop evidence pane. Timestamps omit milliseconds,
   preserve exact ISO values in their titles, and show last time on a second line
   only when it differs from first time.
-- Messages have a three-line preview and a native **Show full message** disclosure.
-  Trace paths are removed from message text and collected in a separate collapsed
+- Messages have a three-line preview and a native **Show full message** disclosure
+  only when the rendered preview overflows. Trace paths are replaced with basenames
+  in message text and collected in a separate collapsed
   **Trace files (N)** list. Items show basenames with full paths in their titles.
   Markdown exports retain the reader's complete bounded evidence.
 - Incident badges wrap inline, with at most five followed by **+N more**.
@@ -412,9 +413,11 @@ WP-18C visual-review follow-up:
 - The white surround was a stylesheet issue, not a screenshot media-setting issue:
   existing PL/SQL/Triage dark rules themed their inner panels but the root, section
   and tab bar retained light backgrounds. The fix uses the existing dark colours
-  (`#19282e`, `#223b45`, `#e0edf0`) for the page, section and tab shell only while
-  Alert Log or a Triage panel containing alert evidence is visible. Other tab views
-  keep their prior styling.
+  (`#19282e`, `#223b45`, `#e0edf0`) for the page, section and tab shell across
+  **every tab**, including PL/SQL, and the conversation. The initial alert-scoped
+  version was broadened after coordinator review.
+  [PL/SQL dark shell screenshot](img/plsql-dark-shell.png) uses the WORKLOAD
+  browser fixture at a 1280px viewport; no LLM or DB access is needed.
 - Desktop screenshots above were retaken with a **1280px viewport**, now including
   the full page to show the shell. [390px phone capture](img/alertlog-p1-19c-prod-phone.png)
   uses stacked alert entries and has no horizontal page scroll. The ADR table can
@@ -429,3 +432,20 @@ WP-18C visual-review follow-up:
   five-badge cap, Message width, compact timestamps, Status code, dark shell colours,
   and no page overflow at 1280px and 390px. No DB or LLM code changed and no LLM
   calls were made; no contract changes are needed.
+
+Final visual follow-up:
+
+- Trace references preserve their basenames inline (for example,
+  `Errors in file PRODCDB_j005_704.trc:`); full paths remain in trace-list titles.
+- A ResizeObserver checks actual preview overflow, including tab activation and
+  viewport resizing. Short messages have no full-message toggle. The three-line
+  preview gains a toggle only when clipped; the separate text-cap note still
+  reports upstream reader truncation independently.
+- The dark shell now applies globally across all seven evidence tabs and the
+  conversation. A browser test checks root/body, both sections and the tab bar
+  on each tab; the PL/SQL screenshot above confirms the WORKLOAD fixture view.
+- Validation: `npm run typecheck` passed; `npm test` passed all 1,071 tests;
+  `PIAGENT_ALERTLOG_CAPTURE_FIXTURE=1 npm run test:browser` passed 36 tests,
+  with the 2 opt-in live tests skipped. The separate Oracle-only capture test
+  passed on both targets, refreshed the five live images and stopped its server
+  by listening PID. No DB/LLM code or contracts changed; no LLM calls were made.

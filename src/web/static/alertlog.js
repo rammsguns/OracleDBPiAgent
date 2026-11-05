@@ -36,6 +36,14 @@ function compactTime(value) {
 	const date = new Date(value);
 	return Number.isNaN(date.getTime()) ? value : date.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, 'Z');
 }
+// Recheck the rendered clamp when a hidden tab opens or its available width changes.
+const messageObserver = new ResizeObserver(entries => {
+	for (const { target: preview } of entries) {
+		if (!preview.isConnected) { messageObserver.unobserve(preview); continue; }
+		const full = preview.nextElementSibling;
+		if (!full.open && preview.clientHeight) full.hidden = preview.scrollHeight <= preview.clientHeight + 1;
+	}
+});
 function messageCell(row) {
 	const cell = el('div', undefined, 'alert-message');
 	const traces = [...new Set((row.traceFiles || [row.traceFile]).filter(Boolean))];
@@ -44,12 +52,15 @@ function messageCell(row) {
 		if (!traces.includes(match[0])) traces.push(match[0]);
 	}
 	let text = row.messageText;
-	for (const path of traces) text = text.replaceAll(path, '');
+	for (const path of [...traces].sort((a, b) => b.length - a.length)) text = text.replaceAll(path, path.split(/[\\/]/).pop());
 	text = text.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
-	cell.append(el('div', text || '(Trace file reference)', 'alert-message-preview'));
+	const preview = el('div', text || '(Trace file reference)', 'alert-message-preview');
+	cell.append(preview);
 	const full = el('details', undefined, 'alert-full-message');
+	full.hidden = true;
 	full.append(el('summary', 'Show full message'), el('div', text, 'alert-message-text'));
 	cell.append(full);
+	messageObserver.observe(preview);
 	if (row.codes.length) cell.append(el('div', row.codes.join(', '), 'alert-codes'));
 	const ids = [...new Set(row.incidentIds || (row.incidentId ? [row.incidentId] : []))];
 	const badges = el('div', undefined, 'incident-badges');
