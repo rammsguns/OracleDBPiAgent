@@ -2053,7 +2053,7 @@ Tests on 0c3d865:
 - 36 integration tests;
 - 27 browser tests.
 
-Open item (addressed by WP-17E): because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
+Closed by WP-17E (merged 3197a99; review APPROVE; replay: 678 unverified lists shrink, none grow, 0 number changes): because of the same-result rule, `HR.SECURE_DML` and `HR.EMPLOYEES`
 can still be listed as unverified when the owner and the name come from
 different tool results. The security-trigger case passes regardless, and the
 answer is no longer rewritten.

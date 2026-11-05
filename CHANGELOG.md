@@ -56,8 +56,8 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 - Grounding no longer flags SQL/PL/SQL keywords (`FOR EACH ROW`), or numbers that
   differ from the evidence only by a leading minus (`20205` vs `-20205`). An
-  `OWNER.NAME` now counts as verified only when both parts appear in the same tool
-  result.
+  `OWNER.NAME` now counts as verified when both parts appear in the same tool
+  result, or when that result's call named the owner as its schema.
 - Challenge scoring: one-cell value lists (`INSERT OR UPDATE OR DELETE`) satisfy
   single-column truth rows; negated cells still fail.
 - Challenge scoring: Unicode dashes in ORA codes, and child/parent rows of a
