@@ -2493,6 +2493,87 @@ Gate:
 - A/B like gate-18h for 19B, because it touches the agent hint.
 - Merge with no regression on p16, p18, dev, holdout, regression and MVP.
 
+### WP-19B: triage and agent integration (branch `wp-19b-sql-triage`)
+Owns:
+- `src/triage/` (a new `sqlperf.ts` next to `alerts.ts`);
+- the DBMS_XPLAN rejection message in `src/oracle/sqlPolicy.ts`;
+- tests and `docs/`.
+
+`triageIssue` pulls `SqlInsight` when the issue:
+- names a SQL_ID (13 base-32 characters, validated); or
+- says slow, slowness, timeout or "takes long" and names a table or a
+  schema-qualified object. Then it lists the top 3 `V$SQL` statements by
+  elapsed time per execution that reference that object
+  (`V$SQL_PLAN.OBJECT_OWNER/OBJECT_NAME`) and were active in the window, and
+  reads insight for the first.
+
+Evidence and hypotheses:
+- Each section becomes a `Check` with its exact SQL and binds.
+- Findings become ranked hypotheses: plan regression (with both plan hashes),
+  stale statistics (with the object and last analyzed), full scan on the
+  nested-loop inner side, and cursor sharing.
+- Every hypothesis has "verify next" SQL that is shown, never run.
+
+Resilience, as in 18E (`optionalRead`):
+- Unavailable views appear once with the view named.
+- Cache misses give "SQL not in cursor cache".
+- Neither ever fails triage.
+
+Other changes:
+- The renderer tolerates an absent `sql` section in old fixtures.
+- Chat `/triage` includes it automatically.
+
+Agent:
+- No new tool, and no system prompt or tool-definition change (byte-identical
+  snapshot test).
+- The only agent-visible change: when `run_query` rejects a DBMS_XPLAN call,
+  the error names the exact allowed form, `SELECT * FROM
+  TABLE(DBMS_XPLAN.DISPLAY_CURSOR('<sql_id>', <child>, 'TYPICAL'))`, so the
+  model can retry once.
+- Unit-test the message, and that the policy itself is unchanged from 19A.
+
+Tests: unit tests with fixtures, and integration on p1 with the issue "orders
+query slow on SHOPAPP.ORDERS" or a real SQL_ID found by text.
+
+### WP-19C: web SQL tab (branch `wp-19c-sql-web`)
+Owns:
+- `src/web/` (a `/api/sql` route with the same auth and loopback rules, and a
+  `src/web/static/sql.js` tab);
+- the triage panel's SQL section;
+- browser tests and `docs/img/`.
+
+The tab:
+- Inputs are a target plus a SQL_ID, or a text fragment with a candidate
+  picker. It never auto-picks when there is more than one candidate.
+- A plan tree with indentation from `PARENT_ID`; a monospace `DISPLAY_CURSOR`
+  text toggle; a plan-change table with best and worst highlighted; table and
+  index stats with stale/missing badges; findings first; Markdown export.
+- Status chips per section; an `unavailable` chip names the view.
+- Dark and light themes, and phone width with no horizontal page scroll
+  (plan text scrolls inside its own box).
+- Browser stubs, plus live screenshots in light and dark modes on d1 and p1.
+
+### WP-19D: p19 evals (branch `wp-19d-p19-evals`)
+`evals/cases-hard/phase19-sqlperf.json`, suite `p19`, 4 to 6 challenge cases.
+
+Ground truth is computed at run time with fixed truth SQL that finds its
+statement by a stable SQL text fragment in `V$SQL`. For example:
+- the plan hash value(s) of the scheduler workload's statement on p1;
+- whether a named table in the plan has stale statistics, and its last
+  analyzed date (UTC);
+- the child count;
+- the access path (FULL or INDEX) on a named table.
+
+Rules:
+- Do not duplicate `cached-plan.json` / `phase8-cached-plan.json`; read them
+  first.
+- A case is skipped, not failed, when its statement aged out of the cursor
+  cache (truth returns 0 rows). Reuse the existing skip mechanism if there is
+  one; otherwise report it as a contract need.
+- Truth SQL uses explicit UTC literals (WP-18H review note).
+- Run p19 ×2 locally as a measurement and report per-case results.
+- No product changes.
+
 ## Phase 20: security and privilege review (proposed 2026-11-05; needs owner approval)
 
 ### Goal
