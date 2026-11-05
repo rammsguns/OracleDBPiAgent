@@ -27,9 +27,12 @@ export function validateSqlOptions(options: { sqlId: string; child?: number; max
 	if (options.child !== undefined && (!Number.isInteger(options.child) || options.child < 0)) throw new SqlUsageError('child must be a nonnegative integer');
 	if (options.maxPlans !== undefined && (!Number.isInteger(options.maxPlans) || options.maxPlans < 1 || options.maxPlans > 20)) throw new SqlUsageError('maxPlans must be 1–20');
 }
-export async function findSqlCandidates(session: OracleSession, text: string): Promise<QueryResult> {
+export async function findSqlCandidates(session: OracleSession, text: string): Promise<QueryResult & { excluded: number }> {
 	if (!text.trim() || text.length > 2048) throw new SqlUsageError('text must contain 1–2048 characters');
-	return session.query("SELECT SQL_ID, MIN(SQL_TEXT) SQL_TEXT FROM V$SQL WHERE SQL_TEXT LIKE :fragment ESCAPE '\\' GROUP BY SQL_ID ORDER BY SQL_ID FETCH FIRST 11 ROWS ONLY", { fragment: '%' + text.replace(/[\\%_]/g, '\\$&') + '%' }, { maxRows: 11 });
+	const binds = { fragment: '%' + text.replace(/[\\%_]/g, '\\$&') + '%' };
+	const excluded = await session.query("SELECT COUNT(DISTINCT SQL_ID) FROM V$SQL WHERE SQL_TEXT LIKE :fragment ESCAPE '\\' AND PARSING_SCHEMA_NAME = SYS_CONTEXT('USERENV', 'SESSION_USER')", binds);
+	const candidates = await session.query("SELECT SQL_ID, MIN(SQL_TEXT) SQL_TEXT FROM V$SQL WHERE SQL_TEXT LIKE :fragment ESCAPE '\\' AND PARSING_SCHEMA_NAME <> SYS_CONTEXT('USERENV', 'SESSION_USER') GROUP BY SQL_ID ORDER BY SQL_ID FETCH FIRST 11 ROWS ONLY", binds, { maxRows: 11 });
+	return { ...candidates, excluded: Number(excluded.rows[0]?.[0] ?? 0) };
 }
 export async function readSqlInsight(session: OracleSession, options: { sqlId: string; child?: number; maxPlans?: number }): Promise<SqlInsight> {
 	validateSqlOptions(options);
@@ -89,6 +92,7 @@ export async function readSqlInsight(session: OracleSession, options: { sqlId: s
 	}
 	for (const key of ['tables', 'indexes']) {
 		const sections = Object.entries(result.sections).filter(([k]) => k.startsWith(key + ':')).map(([, v]) => v);
+		for (const name of Object.keys(result.sections)) if (name.startsWith(key + ':')) delete result.sections[name];
 		result.sections[key] = { status: !sections.length ? 'skipped' : sections.some(s => s.status === 'unavailable') ? 'unavailable' : 'ok', view: [...new Set(sections.map(s => s.view))].join(', '), truncated: sections.some(s => s.truncated), attempts: sections.flatMap(s => s.attempts) };
 	}
 	const records = (data?: QueryResult) => data?.rows.map(r => Object.fromEntries(data.columns.map((c, i) => [c, r[i] instanceof Date ? str(r[i]) : r[i]]))) ?? [];
@@ -131,20 +135,45 @@ export async function readSqlInsight(session: OracleSession, options: { sqlId: s
 	return result;
 }
 const escape = (v: unknown) => (typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
+export const displayLabel = (key: string): string => ({ child: 'Child', CHILD_NUMBER: 'Child', DATATYPE_STRING: 'Type', WAS_CAPTURED: 'Captured', elapsedPerExec: 'Elapsed / Exec (ms)', cpuPerExec: 'CPU / Exec (ms)', execs: 'Executions' }[key] ?? key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()));
+export function displayValue(key: string, value: unknown): unknown {
+	if (typeof value !== 'number') return value;
+	return /^(elapsedPerExec|cpuPerExec)$/.test(key) ? (value / 1000).toPrecision(3) : /PerExec$/.test(key) ? Number(value.toPrecision(3)) : value;
+}
+export function findingPresentation(f: Check, sqlId: string): { finding: string; evidence: string; verifyNext: string } {
+	const stats = /statistics/i.test(f.label), index = f.view.includes('IND_STATISTICS');
+	const object = f.rows[0];
+	const literal = (v: unknown) => "'" + String(v ?? '').replace(/'/g, "''") + "'";
+	const verifyNext = stats
+		? `SELECT OWNER, ${index ? 'INDEX_NAME' : 'TABLE_NAME'}, STALE_STATS, LAST_ANALYZED FROM ${f.view} WHERE OWNER = ${literal(object?.[0])} AND ${index ? 'INDEX_NAME' : 'TABLE_NAME'} = ${literal(object?.[1])}`
+		: /inner side/i.test(f.label)
+			? `SELECT ID, PARENT_ID, OPERATION, OPTIONS, OBJECT_OWNER, OBJECT_NAME FROM V$SQL_PLAN WHERE SQL_ID = ${literal(sqlId)} ORDER BY CHILD_NUMBER, ID`
+			: `SELECT CHILD_NUMBER, PLAN_HASH_VALUE, EXECUTIONS, ELAPSED_TIME FROM V$SQL WHERE SQL_ID = ${literal(sqlId)} ORDER BY CHILD_NUMBER`;
+	return { finding: f.label, evidence: f.view + ': ' + f.rows.map(row => f.columns.map((key, i) => displayLabel(key) + ': ' + (typeof displayValue(key, row[i]) === 'object' ? JSON.stringify(row[i]) : String(displayValue(key, row[i]) ?? ''))).join('; ')).join(' / '), verifyNext };
+}
 export function renderSqlInsightMarkdown(result: SqlInsight): string {
-	const lines = [`# SQL insight: ${escape(result.target)} / ${result.sqlId}`, '', `${result.status}; all times UTC; elapsed and CPU in microseconds.`, '', escape(result.text), ''];
-	for (const [name, section] of Object.entries(result.sections)) lines.push(`- ${name}: ${section.status}; ${escape(section.view)}${section.truncated ? '; row/plan cap reached (partial)' : ''}${section.attempts.length ? '; ' + escape(section.attempts) : ''}`);
-	for (const name of ['children', 'planChanges', 'tables', 'indexes', 'baselines', 'profiles', 'binds', 'mismatches', 'findings'] as const) {
-		lines.push('', '## ' + name, '');
+	const lines = [`# SQL Insight: ${escape(result.target)} / ${result.sqlId}`, '', `${result.status}; all times UTC; time per execution in ms (3 significant digits).`, '', escape(result.text), ''];
+	const table = (columns: string[], rows: unknown[][]) => {
+		lines.push('| ' + columns.map(displayLabel).join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |');
+		for (const row of rows) lines.push('| ' + row.map(escape).join(' | ') + ' |');
+	};
+	lines.push('## Findings', '');
+	if (!result.findings.length) lines.push('No findings in available evidence.');
+	else table(['Finding', 'Evidence', 'Verify Next (Shown, Never Run)'], result.findings.map(f => { const p = findingPresentation(f, result.sqlId); return [p.finding, p.evidence, p.verifyNext]; }));
+	lines.push('', '## Sections', '');
+	lines.push(Object.entries(result.sections).map(([name, section]) => `${displayLabel(name)}: ${section.status}`).join(' · '));
+	for (const [name, section] of Object.entries(result.sections)) if (section.status !== 'ok') lines.push(`- ${displayLabel(name)}: ${section.status}; ${escape(section.view)}${section.truncated ? '; cap reached (partial)' : ''}`);
+	const optional = ['baselines', 'profiles', 'binds', 'mismatches'] as const;
+	if (optional.every(k => !result[k].length)) lines.push('', 'No baselines, profiles, binds or mismatches.');
+	for (const name of ['children', 'planChanges', 'tables', 'indexes', ...optional] as const) {
 		const rows = result[name];
-		if (!rows.length) { lines.push('No rows returned.'); continue; }
+		if (!rows.length) continue;
+		lines.push('', '## ' + displayLabel(name), '');
 		const columns = [...new Set(rows.flatMap(row => Object.keys(row)))];
-		lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |');
-		for (const row of rows) lines.push('| ' + columns.map(c => escape((row as unknown as Record<string, unknown>)[c])).join(' | ') + ' |');
+		table(columns, rows.map(row => columns.map(c => displayValue(c, (row as unknown as Record<string, unknown>)[c]))));
 	}
 	for (const plan of result.plans) {
 		const text = (plan.text ?? plan.lines.map(l => JSON.stringify(l))).join('\n');
-		// Longer than every embedded backtick run, including an attempted closing fence.
 		const fence = '`'.repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map(m => m[0].length + 1)));
 		lines.push('', `## Plan ${plan.planHashValue} (${plan.source})`, '', fence, text, fence);
 	}

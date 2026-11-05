@@ -93,7 +93,7 @@ it('integrates optional SQL failures into triage and renders legacy fixtures wit
 	const markdown = renderTriageMarkdown(result);
 	expect(markdown).toContain('Verify next (not executed)');
 	expect(markdown).toContain('V$SQL_BIND_CAPTURE');
-	expect(markdown).toContain('### SQL performance');
+	expect(markdown).toContain('### SQL Performance');
 	delete (result.issues[0] as { sql?: unknown }).sql;
-	expect(renderTriageMarkdown(result)).not.toContain('### SQL performance');
+	expect(renderTriageMarkdown(result)).not.toContain('### SQL Performance');
 });

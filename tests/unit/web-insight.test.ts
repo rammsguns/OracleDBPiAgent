@@ -89,7 +89,7 @@ it('validates SQL requests before sessions and returns candidate picks or insigh
 	const candidates = await f.call('/api/sql?text=SELECT');
 	expect(JSON.parse(candidates.text).candidates).toHaveLength(2); expect(read).not.toHaveBeenCalled();
 	const result = await f.call('/api/sql?sqlId=0123456789abc');
-	expect(result.status).toBe(200); expect(JSON.parse(result.text).markdown).toContain('# SQL insight');
+	expect(result.status).toBe(200); expect(JSON.parse(result.text).markdown).toContain('# SQL Insight');
 	expect(f.closeAll).toHaveBeenCalledTimes(2);
 });
 it('SQL errors stay private, output is bounded and sessions and lock recover', async () => {

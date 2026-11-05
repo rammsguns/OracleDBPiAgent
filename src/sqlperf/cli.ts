@@ -29,15 +29,18 @@ export async function runSql(options: { target: string; sqlId?: string; text?: s
 			},
 		};
 		let sqlId = options.sqlId;
+		let excluded: number | undefined;
 		if (sqlId === undefined) {
 			const candidates = await findSqlCandidates(session, options.text!);
+			excluded = candidates.excluded;
+			if (!options.json) console.log(`${candidates.excluded} diagnostic statements excluded (session user).`);
 			if (candidates.rows.length !== 1 || candidates.truncated) {
-				const result = { status: 'skipped', target: options.target, message: candidates.rows.length ? 'Select a candidate with --sql-id; never guessing.' : 'No cached SQL matched.', truncated: candidates.truncated || candidates.rows.length > 10, candidates: candidates.rows.slice(0, 10).map(r => ({ sqlId: r[0], text: r[1] })) };
+				const result = { status: 'skipped', excluded: candidates.excluded, target: options.target, message: candidates.rows.length ? 'Select a candidate with --sql-id; never guessing.' : 'No cached SQL matched.', truncated: candidates.truncated || candidates.rows.length > 10, candidates: candidates.rows.slice(0, 10).map(r => ({ sqlId: r[0], text: r[1] })) };
 				console.log(options.json ? JSON.stringify(result) : result.message + '\n' + result.candidates.map(r => String(r.sqlId) + ' | ' + String(r.text).replace(/[\r\n]/g, ' ')).join('\n') + (result.truncated ? '\nCandidate cap reached.' : '')); return;
 			}
 			sqlId = String(candidates.rows[0]![0]);
 		}
 		const result = await readSqlInsight(session, { sqlId, child });
-		console.log(options.json ? JSON.stringify(result) : renderSqlInsightMarkdown(result));
+		console.log(options.json ? JSON.stringify({ ...result, ...(excluded === undefined ? {} : { excluded }) }) : renderSqlInsightMarkdown(result));
 	} finally { await sessions.closeAll(); }
 }

@@ -282,7 +282,8 @@ function renderTriageAlerts(alert: import('./alerts.js').TriageAlertLog): string
 
 function renderTriageSql(sql: TriageSql): string[] {
 	if (sql.status === 'skipped' && !sql.reason) return [];
-	return ['### SQL performance', safe(sql.status + (sql.reason ? ': ' + sql.reason : '')),
+	return ['### SQL Performance', safe(sql.status + (sql.reason ? ': ' + sql.reason : '')),
+		...(sql.excluded !== undefined ? [`${sql.excluded} diagnostic statements excluded (session user).`] : []),
 		...(sql.insight ? [renderSqlInsightMarkdown(sql.insight)] : []),
 	];
 }
