@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-04T04:31:51.193Z",
-	"caseCount": 73,
+	"validatedAt": "2026-11-05T19:58:21.287Z",
+	"caseCount": 109,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -331,33 +331,45 @@
 		{
 			"id": "hard-p11-customers-scope",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'OWNER=CO / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM co.customers UNION ALL SELECT 'OWNER=OE / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM oe.customers UNION ALL SELECT 'OWNER=SH / TABLE=CUSTOMERS / ROWS='||COUNT(*) FROM sh.customers",
-			"mode": "allCells",
+			"sql": "SELECT 'CO','CUSTOMERS',COUNT(*) FROM co.customers UNION ALL SELECT 'OE','CUSTOMERS',COUNT(*) FROM oe.customers UNION ALL SELECT 'SH','CUSTOMERS',COUNT(*) FROM sh.customers",
+			"mode": "rowCells",
 			"rowCount": 3,
 			"rows": [
 				[
-					"OWNER=CO / TABLE=CUSTOMERS / ROWS=392"
+					"CO",
+					"CUSTOMERS",
+					392
 				],
 				[
-					"OWNER=OE / TABLE=CUSTOMERS / ROWS=319"
+					"OE",
+					"CUSTOMERS",
+					319
 				],
 				[
-					"OWNER=SH / TABLE=CUSTOMERS / ROWS=55500"
+					"SH",
+					"CUSTOMERS",
+					55500
 				]
 			]
 		},
 		{
 			"id": "hard-p11-orders-status-scope",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'OWNER='||owner||' / COLUMN='||column_name||' / TYPE='||data_type||' / NULLABLE='||nullable FROM all_tab_columns WHERE owner IN ('CO','OE') AND table_name='ORDERS' AND column_name LIKE '%STATUS%' ORDER BY owner,column_id",
-			"mode": "allCells",
+			"sql": "SELECT owner,column_name,data_type,nullable FROM all_tab_columns WHERE owner IN ('CO','OE') AND table_name='ORDERS' AND column_name LIKE '%STATUS%' ORDER BY owner,column_id",
+			"mode": "rowCells",
 			"rowCount": 2,
 			"rows": [
 				[
-					"OWNER=CO / COLUMN=ORDER_STATUS / TYPE=VARCHAR2 / NULLABLE=N"
+					"CO",
+					"ORDER_STATUS",
+					"VARCHAR2",
+					"N"
 				],
 				[
-					"OWNER=OE / COLUMN=ORDER_STATUS / TYPE=NUMBER / NULLABLE=Y"
+					"OE",
+					"ORDER_STATUS",
+					"NUMBER",
+					"Y"
 				]
 			]
 		},
@@ -365,7 +377,7 @@
 			"id": "hard-p11-fiscal-calendar",
 			"target": "d1-19c-lab",
 			"sql": "SELECT calendar_quarter_desc,MIN(fiscal_year),MAX(fiscal_year),COUNT(DISTINCT time_id) FROM sh.times WHERE calendar_year=2000 GROUP BY calendar_quarter_desc ORDER BY calendar_quarter_desc",
-			"mode": "allCells",
+			"mode": "rowCells",
 			"rowCount": 4,
 			"rows": [
 				[
@@ -397,39 +409,52 @@
 		{
 			"id": "hard-p11-plan-line-tree",
 			"target": "p1-19c-prod",
-			"sql": "SELECT 'LINE='||p.id||' / PARENT='||NVL(TO_CHAR(p.parent_id),'ROOT')||' / DEPTH='||p.depth||' / OP='||p.operation||' / OPTIONS='||NVL(p.options,'NONE') FROM v$sql_plan p WHERE (p.sql_id,p.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE UPPER(sql_text) LIKE 'SELECT /* P11_ORDER_PROBE */ ORDER_ID FROM SHOPAPP.ORDERS WHERE ORDER_ID = -110011%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) ORDER BY p.id",
-			"mode": "allCells",
+			"sql": "SELECT p.id,NVL(TO_CHAR(p.parent_id),'ROOT'),p.depth,p.operation,NVL(p.options,'NONE') FROM v$sql_plan p WHERE (p.sql_id,p.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE UPPER(sql_text) LIKE 'SELECT /* P11_ORDER_PROBE */ ORDER_ID FROM SHOPAPP.ORDERS WHERE ORDER_ID = -110011%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) ORDER BY p.id",
+			"mode": "rowCells",
 			"rowCount": 2,
 			"rows": [
 				[
-					"LINE=0 / PARENT=ROOT / DEPTH=0 / OP=SELECT STATEMENT / OPTIONS=NONE"
+					0,
+					"ROOT",
+					0,
+					"SELECT STATEMENT",
+					"NONE"
 				],
 				[
-					"LINE=1 / PARENT=0 / DEPTH=1 / OP=INDEX / OPTIONS=UNIQUE SCAN"
+					1,
+					"0",
+					1,
+					"INDEX",
+					"UNIQUE SCAN"
 				]
 			]
 		},
 		{
 			"id": "hard-p11-commission-zero",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'NULL_COMMISSION='||COUNT(CASE WHEN commission_pct IS NULL THEN 1 END)||' / ZERO_COMMISSION='||COUNT(CASE WHEN commission_pct=0 THEN 1 END)||' / POSITIVE_COMMISSION='||COUNT(CASE WHEN commission_pct>0 THEN 1 END) FROM hr.employees",
-			"mode": "allCells",
+			"sql": "SELECT COUNT(CASE WHEN commission_pct IS NULL THEN 1 END),COUNT(CASE WHEN commission_pct=0 THEN 1 END),COUNT(CASE WHEN commission_pct>0 THEN 1 END) FROM hr.employees",
+			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
-					"NULL_COMMISSION=72 / ZERO_COMMISSION=0 / POSITIVE_COMMISSION=35"
+					72,
+					0,
+					35
 				]
 			]
 		},
 		{
 			"id": "hard-p11-sales-primary-key",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'PK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='P' THEN 1 END)||' / FK_CONSTRAINTS='||COUNT(CASE WHEN constraint_type='R' THEN 1 END) FROM all_constraints WHERE owner='SH' AND table_name='SALES'",
-			"mode": "allCells",
-			"rowCount": 1,
+			"sql": "SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='P' UNION ALL SELECT COUNT(*) FROM all_constraints WHERE owner='SH' AND table_name='SALES' AND constraint_type='R'",
+			"mode": "rowCells",
+			"rowCount": 2,
 			"rows": [
 				[
-					"PK_CONSTRAINTS=0 / FK_CONSTRAINTS=5"
+					0
+				],
+				[
+					5
 				]
 			]
 		},
@@ -437,7 +462,7 @@
 			"id": "hard-p11-order-customer-key",
 			"target": "p1-19c-prod",
 			"sql": "SELECT cc.column_name,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='SHOPAPP' AND c.table_name='ORDERS' AND c.constraint_type='R' AND p.table_name='CUSTOMERS' ORDER BY cc.position,ic.column_position",
-			"mode": "allCells",
+			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
@@ -456,7 +481,7 @@
 			"id": "hard-p11-warehouse-location-key",
 			"target": "d1-19c-lab",
 			"sql": "SELECT cc.column_name,p.owner,p.table_name,p.constraint_name,p.index_name,i.uniqueness,ic.column_position,ic.column_name,tc.data_type FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_indexes i ON i.owner=p.index_owner AND i.index_name=p.index_name JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic.index_name=i.index_name JOIN all_tab_columns tc ON tc.owner=ic.table_owner AND tc.table_name=ic.table_name AND tc.column_name=ic.column_name WHERE c.owner='OE' AND c.table_name='WAREHOUSES' AND c.constraint_type='R' ORDER BY cc.position,ic.column_position",
-			"mode": "allCells",
+			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
@@ -476,7 +501,7 @@
 			"id": "hard-p11-second-department",
 			"target": "d1-19c-lab",
 			"sql": "SELECT d.department_id,d.department_name,r.n,r.salary_total,m.first_name||' '||m.last_name FROM (SELECT department_id,COUNT(*) n,SUM(salary) salary_total,ROW_NUMBER() OVER(ORDER BY COUNT(*) DESC,department_id) rn FROM hr.employees WHERE department_id IS NOT NULL GROUP BY department_id) r JOIN hr.departments d ON d.department_id=r.department_id JOIN hr.employees m ON m.employee_id=d.manager_id WHERE r.rn=2",
-			"mode": "allCells",
+			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
@@ -492,7 +517,7 @@
 			"id": "hard-p11-second-warehouse",
 			"target": "d1-19c-lab",
 			"sql": "SELECT w.warehouse_id,w.warehouse_name,l.city,c.country_name,r.region_name FROM (SELECT warehouse_id,ROW_NUMBER() OVER(ORDER BY SUM(quantity_on_hand) DESC,warehouse_id) rn FROM oe.inventories GROUP BY warehouse_id) q JOIN oe.warehouses w ON w.warehouse_id=q.warehouse_id JOIN hr.locations l ON l.location_id=w.location_id JOIN hr.countries c ON c.country_id=l.country_id JOIN hr.regions r ON r.region_id=c.region_id WHERE q.rn=2",
-			"mode": "allCells",
+			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
@@ -507,151 +532,1016 @@
 		{
 			"id": "hard-p11-job-salary-bands",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'JOB='||job_id||' / MIN='||min_salary||' / MAX='||max_salary FROM hr.jobs ORDER BY job_id",
-			"mode": "allCells",
+			"sql": "SELECT job_id,min_salary,max_salary FROM hr.jobs ORDER BY job_id",
+			"mode": "rowCells",
 			"rowCount": 19,
 			"rows": [
 				[
-					"JOB=AC_ACCOUNT / MIN=4200 / MAX=9000"
+					"AC_ACCOUNT",
+					4200,
+					9000
 				],
 				[
-					"JOB=AC_MGR / MIN=8200 / MAX=16000"
+					"AC_MGR",
+					8200,
+					16000
 				],
 				[
-					"JOB=AD_ASST / MIN=3000 / MAX=6000"
+					"AD_ASST",
+					3000,
+					6000
 				],
 				[
-					"JOB=AD_PRES / MIN=20080 / MAX=40000"
+					"AD_PRES",
+					20080,
+					40000
 				],
 				[
-					"JOB=AD_VP / MIN=15000 / MAX=30000"
+					"AD_VP",
+					15000,
+					30000
 				],
 				[
-					"JOB=FI_ACCOUNT / MIN=4200 / MAX=9000"
+					"FI_ACCOUNT",
+					4200,
+					9000
 				],
 				[
-					"JOB=FI_MGR / MIN=8200 / MAX=16000"
+					"FI_MGR",
+					8200,
+					16000
 				],
 				[
-					"JOB=HR_REP / MIN=4000 / MAX=9000"
+					"HR_REP",
+					4000,
+					9000
 				],
 				[
-					"JOB=IT_PROG / MIN=4000 / MAX=10000"
+					"IT_PROG",
+					4000,
+					10000
 				],
 				[
-					"JOB=MK_MAN / MIN=9000 / MAX=15000"
+					"MK_MAN",
+					9000,
+					15000
 				],
 				[
-					"JOB=MK_REP / MIN=4000 / MAX=9000"
+					"MK_REP",
+					4000,
+					9000
 				],
 				[
-					"JOB=PR_REP / MIN=4500 / MAX=10500"
+					"PR_REP",
+					4500,
+					10500
 				],
 				[
-					"JOB=PU_CLERK / MIN=2500 / MAX=5500"
+					"PU_CLERK",
+					2500,
+					5500
 				],
 				[
-					"JOB=PU_MAN / MIN=8000 / MAX=15000"
+					"PU_MAN",
+					8000,
+					15000
 				],
 				[
-					"JOB=SA_MAN / MIN=10000 / MAX=20080"
+					"SA_MAN",
+					10000,
+					20080
 				],
 				[
-					"JOB=SA_REP / MIN=6000 / MAX=12008"
+					"SA_REP",
+					6000,
+					12008
 				],
 				[
-					"JOB=SH_CLERK / MIN=2500 / MAX=5500"
+					"SH_CLERK",
+					2500,
+					5500
 				],
 				[
-					"JOB=ST_CLERK / MIN=2008 / MAX=5000"
+					"ST_CLERK",
+					2008,
+					5000
 				],
 				[
-					"JOB=ST_MAN / MIN=5500 / MAX=8500"
+					"ST_MAN",
+					5500,
+					8500
 				]
 			]
 		},
 		{
 			"id": "hard-p11-subcategory-counts",
 			"target": "d1-19c-lab",
-			"sql": "SELECT 'SUBCATEGORY='||prod_subcategory||' / PRODUCTS='||COUNT(*) FROM sh.products GROUP BY prod_subcategory ORDER BY prod_subcategory",
-			"mode": "allCells",
+			"sql": "SELECT prod_subcategory,COUNT(*) FROM sh.products GROUP BY prod_subcategory ORDER BY prod_subcategory",
+			"mode": "rowCells",
 			"rowCount": 21,
 			"rows": [
 				[
-					"SUBCATEGORY=Accessories / PRODUCTS=10"
+					"Accessories",
+					10
 				],
 				[
-					"SUBCATEGORY=Bulk Pack Diskettes / PRODUCTS=2"
+					"Bulk Pack Diskettes",
+					2
 				],
 				[
-					"SUBCATEGORY=CD-ROM / PRODUCTS=6"
+					"CD-ROM",
+					6
 				],
 				[
-					"SUBCATEGORY=Camcorders / PRODUCTS=1"
+					"Camcorders",
+					1
 				],
 				[
-					"SUBCATEGORY=Camera Batteries / PRODUCTS=5"
+					"Camera Batteries",
+					5
 				],
 				[
-					"SUBCATEGORY=Camera Media / PRODUCTS=3"
+					"Camera Media",
+					3
 				],
 				[
-					"SUBCATEGORY=Cameras / PRODUCTS=1"
+					"Cameras",
+					1
 				],
 				[
-					"SUBCATEGORY=Desktop PCs / PRODUCTS=1"
+					"Desktop PCs",
+					1
 				],
 				[
-					"SUBCATEGORY=Documentation / PRODUCTS=6"
+					"Documentation",
+					6
 				],
 				[
-					"SUBCATEGORY=Game Consoles / PRODUCTS=1"
+					"Game Consoles",
+					1
 				],
 				[
-					"SUBCATEGORY=Home Audio / PRODUCTS=2"
+					"Home Audio",
+					2
 				],
 				[
-					"SUBCATEGORY=Memory / PRODUCTS=2"
+					"Memory",
+					2
 				],
 				[
-					"SUBCATEGORY=Modems/Fax / PRODUCTS=2"
+					"Modems/Fax",
+					2
 				],
 				[
-					"SUBCATEGORY=Monitors / PRODUCTS=2"
+					"Monitors",
+					2
 				],
 				[
-					"SUBCATEGORY=Operating Systems / PRODUCTS=1"
+					"Operating Systems",
+					1
 				],
 				[
-					"SUBCATEGORY=Portable PCs / PRODUCTS=1"
+					"Portable PCs",
+					1
 				],
 				[
-					"SUBCATEGORY=Printer Supplies / PRODUCTS=4"
+					"Printer Supplies",
+					4
 				],
 				[
-					"SUBCATEGORY=Recordable CDs / PRODUCTS=7"
+					"Recordable CDs",
+					7
 				],
 				[
-					"SUBCATEGORY=Recordable DVD Discs / PRODUCTS=5"
+					"Recordable DVD Discs",
+					5
 				],
 				[
-					"SUBCATEGORY=Y Box Accessories / PRODUCTS=2"
+					"Y Box Accessories",
+					2
 				],
 				[
-					"SUBCATEGORY=Y Box Games / PRODUCTS=8"
+					"Y Box Games",
+					8
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-header-fanout",
+			"target": "d1-19c-lab",
+			"sql": "SELECT o.order_mode,COUNT(*),ROUND(SUM(o.order_total),2),SUM(i.qty) FROM oe.orders o JOIN (SELECT order_id,SUM(quantity) qty FROM oe.order_items GROUP BY order_id) i ON i.order_id=o.order_id GROUP BY o.order_mode ORDER BY o.order_mode",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"direct",
+					73,
+					1903629.2,
+					15647
+				],
+				[
+					"online",
+					32,
+					1764425.5,
+					14440
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-nullable-manager",
+			"target": "d1-19c-lab",
+			"sql": "SELECT d.department_id,COUNT(e.employee_id),COUNT(e.manager_id),NVL(TO_CHAR(ROUND(AVG(e.manager_id),2),'FM9999990.00'),'NONE') FROM hr.departments d LEFT JOIN hr.employees e ON e.department_id=d.department_id WHERE d.location_id=1700 GROUP BY d.department_id ORDER BY d.department_id",
+			"mode": "rowCells",
+			"rowCount": 21,
+			"rows": [
+				[
+					10,
+					1,
+					1,
+					"101.00"
+				],
+				[
+					30,
+					6,
+					6,
+					"111.67"
+				],
+				[
+					90,
+					3,
+					2,
+					"100.00"
+				],
+				[
+					100,
+					6,
+					6,
+					"106.83"
+				],
+				[
+					110,
+					2,
+					2,
+					"153.00"
+				],
+				[
+					120,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					130,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					140,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					150,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					160,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					170,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					180,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					190,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					200,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					210,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					220,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					230,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					240,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					250,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					260,
+					0,
+					0,
+					"NONE"
+				],
+				[
+					270,
+					0,
+					0,
+					"NONE"
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-commission-denominators",
+			"target": "d1-19c-lab",
+			"sql": "SELECT manager_id,COUNT(*),COUNT(commission_pct),ROUND(AVG(commission_pct),4),ROUND(AVG(NVL(commission_pct,0)),4) FROM hr.employees WHERE manager_id IN (100,145) GROUP BY manager_id ORDER BY manager_id",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					100,
+					14,
+					5,
+					0.3,
+					0.1071
+				],
+				[
+					145,
+					6,
+					6,
+					0.225,
+					0.225
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-salary-ties",
+			"target": "d1-19c-lab",
+			"sql": "SELECT employee_id,last_name,salary,rnk FROM (SELECT employee_id,last_name,salary,DENSE_RANK() OVER(ORDER BY salary DESC) rnk FROM hr.employees) WHERE rnk<=3 ORDER BY salary DESC,employee_id",
+			"mode": "rowCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					100,
+					"King",
+					24000,
+					1
+				],
+				[
+					101,
+					"Kochhar",
+					17000,
+					2
+				],
+				[
+					102,
+					"De Haan",
+					17000,
+					2
+				],
+				[
+					145,
+					"Russell",
+					14000,
+					3
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-timestamp-boundary",
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(CASE WHEN order_date>=TIMESTAMP '2007-11-18 00:00:00' AND order_date<TIMESTAMP '2007-11-20 00:00:00' THEN 1 END),COUNT(CASE WHEN order_date BETWEEN TIMESTAMP '2007-11-18 00:00:00' AND TIMESTAMP '2007-11-19 00:00:00' THEN 1 END) FROM oe.orders",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					4,
+					1
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-history-chain",
+			"target": "d1-19c-lab",
+			"sql": "SELECT e.employee_id,TO_CHAR(h.start_date,'YYYY-MM-DD'),d.department_id,m.first_name||' '||m.last_name,j.job_title,l.city,c.country_name,r.region_name FROM (SELECT employee_id FROM hr.job_history GROUP BY employee_id ORDER BY COUNT(*) DESC,employee_id FETCH FIRST 1 ROW ONLY) e JOIN hr.job_history h ON h.employee_id=e.employee_id JOIN hr.departments d ON d.department_id=h.department_id JOIN hr.employees m ON m.employee_id=d.manager_id JOIN hr.jobs j ON j.job_id=m.job_id JOIN hr.locations l ON l.location_id=d.location_id JOIN hr.countries c ON c.country_id=l.country_id JOIN hr.regions r ON r.region_id=c.region_id ORDER BY h.start_date,h.end_date,h.job_id FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					101,
+					"1997-09-21",
+					110,
+					"Shelley Higgins",
+					"Accounting Manager",
+					"Seattle",
+					"United States of America",
+					"Americas"
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-salesperson-chain",
+			"target": "d1-19c-lab",
+			"sql": "SELECT s.sales_rep_id,ROUND(s.total,2),d.department_name,m.first_name||' '||m.last_name,j.job_title,c.country_name FROM (SELECT sales_rep_id,SUM(order_total) total FROM oe.orders WHERE sales_rep_id IS NOT NULL GROUP BY sales_rep_id ORDER BY total DESC,sales_rep_id FETCH FIRST 1 ROW ONLY) s JOIN hr.employees e ON e.employee_id=s.sales_rep_id JOIN hr.departments d ON d.department_id=e.department_id JOIN hr.employees m ON m.employee_id=d.manager_id JOIN hr.jobs j ON j.job_id=m.job_id JOIN hr.locations l ON l.location_id=d.location_id JOIN hr.countries c ON c.country_id=l.country_id",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					161,
+					661734.5,
+					"Sales",
+					"John Russell",
+					"Sales Manager",
+					"United Kingdom"
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-stats-grain",
+			"target": "d1-19c-lab",
+			"sql": "SELECT t.num_rows,(SELECT COUNT(*) FROM hr.job_history),(SELECT COUNT(DISTINCT employee_id) FROM hr.job_history) FROM all_tables t WHERE owner='HR' AND table_name='JOB_HISTORY'",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					10,
+					10,
+					7
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-partial-memory",
+			"target": "p1-19c-prod",
+			"sql": "SELECT instance_name FROM v$instance UNION ALL SELECT REGEXP_SUBSTR(version,'^[0-9]+') FROM v$instance",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"PRODCDB"
+				],
+				[
+					"19"
+				]
+			]
+		},
+		{
+			"id": "hard-p11b-partial-backup",
+			"target": "p1-19c-prod",
+			"sql": "SELECT name FROM v$database UNION ALL SELECT open_mode FROM v$database",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"PRODCDB"
+				],
+				[
+					"READ WRITE"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-entry-points",
+			"target": "p1-19c-prod",
+			"sql": "SELECT procedure_name FROM dba_procedures WHERE owner='SHOPAPP' AND object_name='WORKLOAD' AND procedure_name IS NOT NULL ORDER BY procedure_name",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"NIGHTLY_PURGE"
+				],
+				[
+					"PLACE_ORDERS"
+				],
+				[
+					"SHIP_ORDERS"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-writes",
+			"target": "p1-19c-prod",
+			"sql": "SELECT (SELECT UPPER(REGEXP_SUBSTR(p.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) FROM dba_source p WHERE p.owner=s.owner AND p.name=s.name AND p.type=s.type AND p.line=(SELECT MAX(h.line) FROM dba_source h WHERE h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line<s.line AND REGEXP_LIKE(h.text,'PROCEDURE +','i'))) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'(INSERT INTO|UPDATE|DELETE FROM) +([a-z_]+)',1,1,'i',2)) AS table_name,UPPER(REGEXP_SUBSTR(s.text,'INSERT|UPDATE|DELETE',1,1,'i')) AS operation FROM dba_source s WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND REGEXP_LIKE(s.text,'^ *(INSERT INTO|UPDATE|DELETE FROM) ','i') ORDER BY s.line",
+			"mode": "rowCells",
+			"rowCount": 7,
+			"rows": [
+				[
+					"PLACE_ORDERS",
+					"ORDERS",
+					"INSERT"
+				],
+				[
+					"PLACE_ORDERS",
+					"PRODUCTS",
+					"UPDATE"
+				],
+				[
+					"PLACE_ORDERS",
+					"ORDER_LINES",
+					"INSERT"
+				],
+				[
+					"PLACE_ORDERS",
+					"ORDERS",
+					"UPDATE"
+				],
+				[
+					"SHIP_ORDERS",
+					"ORDERS",
+					"UPDATE"
+				],
+				[
+					"NIGHTLY_PURGE",
+					"ORDER_LINES",
+					"DELETE"
+				],
+				[
+					"NIGHTLY_PURGE",
+					"ORDERS",
+					"DELETE"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-purge-behavior",
+			"target": "p1-19c-prod",
+			"sql": "SELECT UPPER(REGEXP_SUBSTR(text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source WHERE owner='SHOPAPP' AND name='WORKLOAD' AND type='PACKAGE BODY' AND REGEXP_LIKE(text,'^ *DELETE FROM','i') ORDER BY line",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"ORDER_LINES"
+				],
+				[
+					"ORDERS"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-scheduler-map",
+			"target": "p1-19c-prod",
+			"sql": "SELECT job_name,UPPER(REGEXP_SUBSTR(job_action,'workload[.]([a-z_]+)',1,1,'i',1)) AS entry_point FROM dba_scheduler_jobs WHERE owner='SHOPAPP' AND LOWER(job_action) LIKE '%workload.%' ORDER BY job_name",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"NIGHTLY_PURGE_JOB",
+					"NIGHTLY_PURGE"
+				],
+				[
+					"PLACE_ORDERS_JOB",
+					"PLACE_ORDERS"
+				],
+				[
+					"SHIP_ORDERS_JOB",
+					"SHIP_ORDERS"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-purge-constraint",
+			"target": "p1-19c-prod",
+			"sql": "SELECT 'CHILD' AS role,c.table_name AS table_name,cc.column_name AS column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY) UNION ALL SELECT 'PARENT' AS role,p.table_name AS table_name,pc.column_name AS column_name FROM all_constraints c JOIN all_cons_columns cc ON cc.owner=c.owner AND cc.constraint_name=c.constraint_name JOIN all_constraints p ON p.owner=c.r_owner AND p.constraint_name=c.r_constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=cc.position WHERE c.owner='SHOPAPP' AND c.constraint_name=(SELECT REGEXP_SUBSTR(additional_info,'SHOPAPP[.]([A-Z0-9_]+)',1,1,NULL,1) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY)",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"CHILD",
+					"ORDER_LINES",
+					"ORDER_ID"
+				],
+				[
+					"PARENT",
+					"ORDERS",
+					"ORDER_ID"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-purge-line",
+			"target": "p1-19c-prod",
+			"sql": "SELECT fact FROM (SELECT TO_CHAR(line) AS source_line,subprogram,operation,table_name FROM (SELECT s.line,UPPER(REGEXP_SUBSTR(h.text,'PROCEDURE +([a-z_]+)',1,1,'i',1)) AS subprogram,UPPER(REGEXP_SUBSTR(s.text,'DELETE',1,1,'i')) AS operation,UPPER(REGEXP_SUBSTR(s.text,'DELETE FROM +([a-z_]+)',1,1,'i',1)) AS table_name FROM dba_source s JOIN dba_source h ON h.owner=s.owner AND h.name=s.name AND h.type=s.type AND h.line=(SELECT MAX(x.line) FROM dba_source x WHERE x.owner=s.owner AND x.name=s.name AND x.type=s.type AND x.line<s.line AND REGEXP_LIKE(x.text,'PROCEDURE +','i')) WHERE s.owner='SHOPAPP' AND s.name='WORKLOAD' AND s.type='PACKAGE BODY' AND s.line=(SELECT TO_NUMBER(REGEXP_SUBSTR(additional_info,'WORKLOAD\", line ([0-9]+)',1,1,NULL,1)) FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND job_name='NIGHTLY_PURGE_JOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY))) UNPIVOT (fact FOR item IN (source_line,subprogram,operation,table_name))",
+			"mode": "rowCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					"27"
+				],
+				[
+					"NIGHTLY_PURGE"
+				],
+				[
+					"DELETE"
+				],
+				[
+					"ORDERS"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-history-trigger",
+			"target": "d1-19c-lab",
+			"sql": "SELECT fact FROM (SELECT REGEXP_SUBSTR(trigger_type,'^[A-Z]+') AS timing,REGEXP_SUBSTR(trigger_type,'ROW|STATEMENT') AS granularity,table_name,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,1) AS event1,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,2) AS event2,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,3) AS event3 FROM dba_triggers WHERE owner='HR' AND trigger_name='UPDATE_JOB_HISTORY') UNPIVOT (fact FOR item IN (timing,granularity,table_name,event1,event2,event3))",
+			"mode": "rowCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					"AFTER"
+				],
+				[
+					"ROW"
+				],
+				[
+					"EMPLOYEES"
+				],
+				[
+					"UPDATE"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-security-trigger",
+			"target": "d1-19c-lab",
+			"sql": "SELECT fact FROM (SELECT REGEXP_SUBSTR(trigger_type,'^[A-Z]+') AS timing,REGEXP_SUBSTR(trigger_type,'ROW|STATEMENT') AS granularity,table_name,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,1) AS event1,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,2) AS event2,REGEXP_SUBSTR(triggering_event,'INSERT|UPDATE|DELETE',1,3) AS event3 FROM dba_triggers WHERE owner='HR' AND trigger_name='SECURE_EMPLOYEES') UNPIVOT (fact FOR item IN (timing,granularity,table_name,event1,event2,event3))",
+			"mode": "rowCells",
+			"rowCount": 6,
+			"rows": [
+				[
+					"BEFORE"
+				],
+				[
+					"STATEMENT"
+				],
+				[
+					"EMPLOYEES"
+				],
+				[
+					"INSERT"
+				],
+				[
+					"UPDATE"
+				],
+				[
+					"DELETE"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-history-arguments",
+			"target": "d1-19c-lab",
+			"sql": "SELECT argument_name,position,in_out,data_type FROM dba_arguments WHERE owner='HR' AND object_name='ADD_JOB_HISTORY' AND package_name IS NULL ORDER BY sequence",
+			"mode": "rowCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"P_EMP_ID",
+					1,
+					"IN",
+					"NUMBER"
+				],
+				[
+					"P_START_DATE",
+					2,
+					"IN",
+					"DATE"
+				],
+				[
+					"P_END_DATE",
+					3,
+					"IN",
+					"DATE"
+				],
+				[
+					"P_JOB_ID",
+					4,
+					"IN",
+					"VARCHAR2"
+				],
+				[
+					"P_DEPARTMENT_ID",
+					5,
+					"IN",
+					"NUMBER"
+				]
+			]
+		},
+		{
+			"id": "hard-p16-failed-lab-job",
+			"target": "d1-19c-lab",
+			"sql": "SELECT status,'ORA-'||LPAD(TO_CHAR(error#),5,'0') AS error_code,REGEXP_SUBSTR(additional_info,'ORA-20001: ([^'||CHR(10)||']+)',1,1,NULL,1) AS message,TO_NUMBER(REGEXP_SUBSTR(additional_info,'at line ([0-9]+)',1,1,NULL,1)) AS source_line FROM dba_scheduler_job_run_details WHERE owner='K7Q_OWNER' AND job_name='K7Q_FAILJOB' AND status='FAILED' ORDER BY log_id DESC FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"FAILED",
+					"ORA-20001",
+					"destination unavailable",
+					1
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-critical-incident",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code, REGEXP_SUBSTR(MESSAGE_TEXT,'incident=([0-9]+)',1,1,'i',1) AS incident_id FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND MESSAGE_LEVEL=1 ORDER BY ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC FETCH FIRST 1 ROWS ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"ORA-00800",
+					"225332"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-failed-job",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT REPLACE(REGEXP_SUBSTR(MESSAGE_TEXT,'job ([^[:space:]]+)',1,1,'i',1),'\"','') AS job_name, REGEXP_SUBSTR(MESSAGE_TEXT,'constraint [(]([^)]*)[)]',1,1,'i',1) AS constraint_name FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-05 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND INSTR(MESSAGE_TEXT,'ORA-12012')>0 AND INSTR(MESSAGE_TEXT,'ORA-02292')>0 ORDER BY job_name, constraint_name",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"SHOPAPP.NIGHTLY_PURGE_JOB",
+					"SHOPAPP.SYS_C007669"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-incident-count",
+			"target": "d1-19c-lab",
+			"sql": "SELECT p.PROBLEM_KEY AS problem_key, COUNT(*) AS incident_count FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') GROUP BY p.PROBLEM_KEY ORDER BY p.PROBLEM_KEY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"ORA 800",
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-d1-frequent-code",
+			"target": "d1-19c-lab",
+			"sql": "SELECT code FROM (SELECT code, DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS frequency_rank FROM (SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)')) WHERE code <> 'ORA-00000' GROUP BY code) WHERE frequency_rank=1 ORDER BY code",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"ORA-00031"
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-incident-count",
+			"target": "p1-19c-prod",
+			"sql": "SELECT p.PROBLEM_KEY AS problem_key, COUNT(*) AS incident_count FROM V$DIAG_INCIDENT i JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID=i.PROBLEM_ID AND p.CON_ID=i.CON_ID WHERE i.CREATE_TIME >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND i.CREATE_TIME < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') GROUP BY p.PROBLEM_KEY ORDER BY p.PROBLEM_KEY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"ORA 800",
+					6
+				]
+			]
+		},
+		{
+			"id": "hard-p18-p1-frequent-code",
+			"target": "p1-19c-prod",
+			"sql": "SELECT code FROM (SELECT code, DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS frequency_rank FROM (SELECT 'ORA-' || LPAD(REGEXP_SUBSTR(UPPER(MESSAGE_TEXT),'ORA-([0-9]{1,5})([^0-9]|$)',1,1,'c',1),5,'0') AS code FROM V$DIAG_ALERT_EXT WHERE ORIGINATING_TIMESTAMP >= TO_TIMESTAMP_TZ('2026-10-06 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND ORIGINATING_TIMESTAMP < TO_TIMESTAMP_TZ('2026-11-04 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND REGEXP_LIKE(UPPER(MESSAGE_TEXT),'ORA-[0-9]{1,5}([^0-9]|$)')) WHERE code <> 'ORA-00000' GROUP BY code) WHERE frequency_rank=1 ORDER BY code",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"ORA-00313"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-cursor-inventory",
+			"target": "p1-19c-prod",
+			"sql": "SELECT s.plan_hash_value AS plan_hash_value, COUNT(*) AS child_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.plan_hash_value ORDER BY s.plan_hash_value",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					2134003100,
+					1
+				]
+			]
+		},
+		{
+			"id": "hard-p19-object-statistics",
+			"target": "p1-19c-prod",
+			"sql": "SELECT DISTINCT t.owner AS owner, t.table_name AS object_name, NVL(t.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(t.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_tab_statistics t JOIN v$sql_plan p ON p.object_owner=t.owner AND p.object_name=t.table_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND t.object_type='TABLE' UNION SELECT DISTINCT i.owner AS owner, i.index_name AS object_name, NVL(i.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(i.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_ind_statistics i JOIN v$sql_plan p ON p.object_owner=i.owner AND p.object_name=i.index_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND i.object_type='INDEX' ORDER BY owner, object_name",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"SHOPAPP",
+					"PRODUCTS",
+					"YES",
+					"2026-11-04T22:00:07Z"
+				],
+				[
+					"SHOPAPP",
+					"SYS_C007655",
+					"YES",
+					"2026-11-04T22:00:07Z"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-bind-metadata",
+			"target": "p1-19c-prod",
+			"sql": "SELECT b.name AS bind_name, b.position AS position, b.datatype_string AS datatype, b.was_captured AS was_captured FROM v$sql_bind_capture b WHERE (b.sql_id,b.child_number) IN (SELECT s.sql_id,s.child_number FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) ORDER BY s.child_number FETCH FIRST 1 ROW ONLY) ORDER BY b.position",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					":B1",
+					1,
+					"NUMBER",
+					"YES"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-plan-controls",
+			"target": "p1-19c-prod",
+			"sql": "SELECT s.sql_id AS sql_id, COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.sql_id",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"f1yj0hbhj9nna",
+					0,
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p20-d1-open-default-count",
+			"target": "d1-19c-lab",
+			"sql": "SELECT u.username AS username FROM dba_users u JOIN dba_users_with_defpwd d ON d.username=u.username WHERE u.account_status='OPEN' ORDER BY u.username",
+			"mode": "rowCells",
+			"rowCount": 5,
+			"rows": [
+				[
+					"HR"
+				],
+				[
+					"IX"
+				],
+				[
+					"OE"
+				],
+				[
+					"PM"
+				],
+				[
+					"SH"
+				]
+			]
+		},
+		{
+			"id": "hard-p20-d1-role-any-paths",
+			"target": "d1-19c-lab",
+			"sql": "SELECT DISTINCT r.granted_role AS granting_role, r.role_depth AS role_depth, p.privilege AS privilege FROM (SELECT granted_role, LEVEL AS role_depth FROM dba_role_privs START WITH grantee='HARNESS_APP' CONNECT BY NOCYCLE PRIOR granted_role=grantee AND LEVEL<=10) r JOIN dba_sys_privs p ON p.grantee=r.granted_role WHERE INSTR(' ' || p.privilege || ' ',' ANY ')>0 ORDER BY granting_role, role_depth, privilege",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"HARNESS_MAINTENANCE_ROLE",
+					1,
+					"ALTER ANY PROCEDURE"
+				],
+				[
+					"HARNESS_MAINTENANCE_ROLE",
+					1,
+					"ANALYZE ANY"
+				]
+			]
+		},
+		{
+			"id": "hard-p20-d1-public-file-execute",
+			"target": "d1-19c-lab",
+			"sql": "SELECT grantee AS grantee, owner AS owner, table_name AS object_name, privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND owner='SYS' AND table_name='UTL'||'_FILE' AND privilege='EXECUTE' ORDER BY grantee, owner, table_name, privilege",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"PUBLIC",
+					"SYS",
+					"UTL_FILE",
+					"EXECUTE"
+				]
+			]
+		},
+		{
+			"id": "hard-p20-p1-inherited-profile-limit",
+			"target": "p1-19c-prod",
+			"sql": "SELECT p.profile AS profile, p.limit AS stored_limit, CASE WHEN p.limit='DEFAULT' THEN d.limit ELSE p.limit END AS effective_limit FROM dba_profiles p JOIN dba_profiles d ON d.profile='DEFAULT' AND d.resource_name=p.resource_name AND d.resource_type=p.resource_type WHERE p.profile='GSM_PROF' AND p.resource_name='PASSWORD_LIFE_TIME'",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"GSM_PROF",
+					"DEFAULT",
+					"180"
+				]
+			]
+		},
+		{
+			"id": "hard-p20-p1-default-profile",
+			"target": "p1-19c-prod",
+			"sql": "SELECT resource_name AS resource_name, limit AS configured_limit FROM dba_profiles WHERE profile='DEFAULT' AND resource_type='PASSWORD' AND resource_name IN ('FAILED_LOGIN_ATTEMPTS','PASSWORD_LIFE_TIME','PASSWORD_VERIFY_FUNCTION') ORDER BY resource_name",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"FAILED_LOGIN_ATTEMPTS",
+					"10"
+				],
+				[
+					"PASSWORD_LIFE_TIME",
+					"180"
+				],
+				[
+					"PASSWORD_VERIFY_FUNCTION",
+					"NULL"
+				]
+			]
+		},
+		{
+			"id": "hard-p20-p1-enabled-audit-policies",
+			"target": "p1-19c-prod",
+			"sql": "SELECT policy_name AS policy_name, enabled_option AS enabled_option, entity_name AS entity_name, entity_type AS entity_type, success AS success, failure AS failure FROM audit_unified_enabled_policies ORDER BY policy_name, entity_name, entity_type, enabled_option, success, failure",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"ORA_LOGON_FAILURES",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"NO",
+					"YES"
+				],
+				[
+					"ORA_SECURECONFIG",
+					"BY USER",
+					"ALL USERS",
+					"USER",
+					"YES",
+					"YES"
 				]
 			]
 		},
 		{
 			"id": "hard-grant-p1-parameters",
 			"target": "p1-19c-prod",
-			"sql": "SELECT 'V$PARAMETER', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$PARAMETER' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"sql": "SELECT UPPER(name), value FROM v$parameter WHERE name IN ('sga_target','pga_aggregate_target') ORDER BY name",
 			"mode": "allCells",
-			"rowCount": 1,
+			"rowCount": 2,
 			"rows": [
 				[
-					"V$PARAMETER",
-					"unavailable"
+					"PGA_AGGREGATE_TARGET",
+					"1073741824"
+				],
+				[
+					"SGA_TARGET",
+					"3221225472"
 				]
 			]
 		},
