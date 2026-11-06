@@ -45,7 +45,7 @@ export class Dictionary {
 				const code = /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED';
 				await this.ctx.audit.record({ ...base, kind: 'tool_error', detail: code });
 				attempts.push({ view, code });
-				if (!['ORA-00942', 'ORA-01031'].includes(code)) return { status: 'unavailable', view, rows: [], truncated: false, attempts };
+				if (!['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) return { status: 'unavailable', view, rows: [], truncated: false, attempts };
 			} finally { await session.close(); }
 		}
 		return { status: 'unavailable', view: `ALL_${suffix}`, rows: [], truncated: false, attempts };

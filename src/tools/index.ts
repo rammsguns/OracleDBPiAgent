@@ -168,6 +168,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				return output;
 			} catch (error) {
 				await ctx.audit.record({ ...base, kind: "tool_error", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), detail: error instanceof Error ? error.name : "Error" });
+				if (name !== "run_query" && /ORA-01031|ORA-65040/.test(String(error))) throw new Error(`${name} not available in this container / not granted (ORA-01031/ORA-65040); ask the DBA to check PDB view access`, { cause: error });
 				throw error;
 			}
 		},

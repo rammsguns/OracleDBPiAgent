@@ -44,11 +44,19 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 				if(!page.rows.length) break;
 			}
 		} 
-		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';s.note='Missing view access ('+code+').';}}
+		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031','ORA-65040'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';s.note=code==='ORA-65040'?'Not available in a PDB (ORA-65040).':'Missing view access ('+code+').';}}
 		if(c.truncated) s.note='Row cap reached; snapshot is incomplete.';
 		return c.rows;
 	}
-	const selected=(id:SectionId)=>!options.sections||options.sections.includes(id);
+	const selected=(id:SectionId)=> {
+		const requested=!options.sections||options.sections.includes(id);
+		if(requested && session.identity?.isCdb && ['undo','redo','recovery'].includes(id)) {
+			const s=report.sections[id]; s.status='unavailable';
+			s.note=id==='undo'?'Not available in a PDB: undo depends on local/shared undo mode; instance undo findings withheld.':'Not available in a PDB: CDB-wide redo/recovery configuration; PDB-local findings withheld.';
+			return false;
+		}
+		return requested;
+	};
 	if(selected('tablespaces')) {
 		const rows=await read('tablespaces','tablespaces'), grouped=new Map<string,unknown[][]>();
 		for(const r of rows) grouped.set(str(r[0]),[...(grouped.get(str(r[0]))??[]),r]);
@@ -84,6 +92,9 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 		s.rows=rs.filter(r=>num(r[1])>0).map(r=>({kind:'Area',path:str(r[0]),limitBytes:num(r[1]),usedBytes:num(r[2]),reclaimableBytes:num(r[3]),fileCount:num(r[4]),usedPercent:Math.max(0,num(r[2])-num(r[3]))/num(r[1])*100}));
 		if(!s.rows.length&&s.status==='ok') s.note='no recovery area configured';
 		s.rows.push(...(await read('recovery','recoveryTypes')).filter(r=>num(r[3])>0).map(r=>({kind:'File type',type:str(r[0]),usedPercent:num(r[1]),reclaimablePercent:num(r[2]),fileCount:num(r[3])})));
+	}
+	if(session.identity?.isCdb) for(const id of ['tablespaces','segments','temp'] as const) {
+		const s=report.sections[id]; if(s.status!=='skipped') s.note=[s.note, 'Current PDB visibility only; file visibility and temporary/undo allocation depend on container configuration.'].filter(Boolean).join(' ');
 	}
 	report.findings=spaceFindings(report);
 	const ss=Object.values(report.sections).filter(s=>s.status!=='skipped');report.status=ss.every(s=>s.status==='unavailable')?'failed':ss.some(s=>s.status==='unavailable'||[s.evidence,...s.supportingEvidence].some(c=>c.truncated||c.status==='unavailable'))?'partial':'ok';return report;

@@ -30,7 +30,7 @@ export function formatIncidentStatus(status: number | null): string {
 }
 export interface IncidentRow { incidentId: string; problemKey: string; createTime: string; status: number | null; statusName?: string }
 export interface AlertResult<T> {
-	target: string; status: 'ok' | 'unavailable'; view: string; rows: T[];
+	note?: string; target: string; status: 'ok' | 'unavailable'; view: string; rows: T[];
 	window: { from: string; to: string }; limit: number; truncated: boolean;
 	/** Exact executed SQL and binds for downstream evidence; binds are never audited. */
 	sql: string; binds: Record<string, unknown>; grants: string[]; attempts: { view: string; code: string }[];
@@ -71,6 +71,7 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 	const binds = { fromTime: window.from.replace('Z', '+00:00'), toTime: window.to.replace('Z', '+00:00'), ...query.binds, fetchLimit };
 	const base: AlertResult<T> = { target, status: 'ok', view, rows: [], window, limit, truncated: false, sql, binds, grants: [], attempts: [] };
 	const session = await ctx.sessions.get(target);
+	if (session.identity?.isCdb) base.note = 'Current PDB ADR visibility only; empty results do not establish absence of CDB incidents or alerts. Not available / not granted when the PDB cannot expose this view.';
 	const audit = { at: new Date().toISOString(), runId: ctx.runId, target, tool: 'alertlog:read', sqlSha256: createHash('sha256').update(sql).digest('hex') };
 	try {
 		const result = await session.query(sql, binds, { maxRows: fetchLimit, timeoutSeconds: ctx.config.limits.statementTimeoutSeconds });
@@ -79,7 +80,7 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 	} catch (error) {
 		const code = /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED';
 		await ctx.audit.record({ ...audit, kind: 'tool_error', detail: code });
-		if (!['ORA-00942', 'ORA-01031'].includes(code)) throw error;
+		if (!['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) throw error;
 		return { ...base, status: 'unavailable', grants: views.map(v => `GRANT SELECT ON SYS.${v.replace('V$', 'V_$')} TO ${configured.username};`), attempts: [{ view, code }] };
 	} finally { await session.close(); }
 }
@@ -142,7 +143,7 @@ export function readIncidents(ctx: ToolContext, target: string, options: WindowO
 }
 const escape = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResult<IncidentRow>): string {
-	const lines = [`# ${result.view === 'V$DIAG_ALERT_EXT' ? 'Alert log' : 'ADR incidents'}: ${escape(result.target)}`, '', `${result.status}; ${escape(result.view)}; ${result.window.from} to ${result.window.to} (exclusive)`, '', ...result.grants.map(g => '`' + g + '`')];
+	const lines = [`# ${result.view === 'V$DIAG_ALERT_EXT' ? 'Alert log' : 'ADR incidents'}: ${escape(result.target)}`, '', `${result.status}; ${escape(result.view)}; ${result.window.from} to ${result.window.to} (exclusive)`, '', ...(result.note ? [escape(result.note)] : []), ...result.grants.map(g => '`' + g + '`')];
 	if (result.view === 'V$DIAG_ALERT_EXT') {
 		lines.push('| First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |', '|---|---|---|---|---|---|---|---|');
 		for (const r of result.rows as AlertRow[]) lines.push(`| ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
