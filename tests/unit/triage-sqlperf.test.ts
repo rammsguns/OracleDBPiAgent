@@ -76,12 +76,17 @@ it('gives the exact DISPLAY_CURSOR retry form without broadening the 19A policy'
 	for (const sql of ['SELECT DBMS_XPLAN.DISPLAY() FROM dual', 'SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR(:id, :child, :format)) WHERE 1=1', 'SELECT UTL_HTTP.REQUEST(1) FROM dual']) expect(() => classifySql(sql)).toThrow();
 });
 
-it('keeps the 19A policy source byte-identical apart from its rejection message', () => {
+it('preserves the 19A policy outside the authorized Diagnostics Pack guard and messages', () => {
 	const source = readFileSync(new URL('../../src/oracle/sqlPolicy.ts', import.meta.url), 'utf8').replace(
 		"DISPLAY_CURSOR requires the exact allowed form: SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('<sql_id>', <child>, 'TYPICAL')) (scalar bind or literal arguments)",
 		'DISPLAY_CURSOR requires the exact SELECT FROM TABLE form with scalar bind or literal arguments',
 	);
-	const normalized = source.replace(/throw new StatementRejectedError\(`Function \$\{name\} is not allowed[^\n]+/, 'throw new StatementRejectedError(`Function ${name} is not allowed`);');
+	// Coordinator authorized the phase 27 Diagnostics Pack guard. Keep the
+	// original checksum gate on all other policy code, rather than blessing a new hash.
+	const baseline = source.replace(/\/\*\* Conservative Diagnostics Pack guard;[\s\S]*?\n}\n\n/, '')
+		.replace('\trejectDiagnosticsPack(callClean);\n', '')
+		.replace('\treturn (terminators.length', '\tif (/\\b(V\\$ACTIVE_SESSION_HISTORY|DBA_HIST_\\w+)\\b/i.test(clean)) reject("Diagnostics Pack views are out of scope");\n\treturn (terminators.length');
+	const normalized = baseline.replace(/throw new StatementRejectedError\(`Function \$\{name\} is not allowed[^\n]+/, 'throw new StatementRejectedError(`Function ${name} is not allowed`);');
 	// SHA-256 of the merged WP-19A policy, before this message-only change.
 	expect(createHash('sha256').update(normalized).digest('hex')).toBe('00c45e5ca760a52961c8599d4a7659622d9adf05dedccea5709cfec1bd4855fd');
 });
