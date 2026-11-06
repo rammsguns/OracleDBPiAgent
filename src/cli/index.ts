@@ -154,6 +154,12 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			console.error(error.message); process.exitCode = 2;
 		}
 	});
+	program.command("jobs").description("Read-only scheduler and maintenance health; no LLM").requiredOption("--target <target>").option("--since <duration>", "History window, default 24h, maximum 30d").option("--owner <owner>").option("--failed-only").option("--json").action(async options => {
+		const { runJobs } = await import("../jobs/cli.js");
+		const { JobsUsageError } = await import("../jobs/index.js");
+		try { await runJobs(options); }
+		catch (error) { if (!(error instanceof JobsUsageError)) throw error; console.error(error.message); process.exitCode = 2; }
+	});
 	program.command("alertlog").description("Read-only Oracle alert log and ADR incidents; no LLM").requiredOption("--target <target>").option("--since <duration>", "Recent window, default 24h, at most 30d").option("--from <timestamp>").option("--to <timestamp>").option("--code <code>", "ORA-/TNS- code (repeatable)", (value: string, previous: string[]) => [...previous, value], [] as string[]).option("--grep <text>").option("--level <level>", "default, all, or maximum numeric level").option("--limit <rows>").option("--incidents").option("--json").option("--markdown").action(async options => {
 		const { runAlertLog } = await import("../alertlog/cli.js");
 		const { AlertlogUsageError } = await import("../alertlog/index.js");

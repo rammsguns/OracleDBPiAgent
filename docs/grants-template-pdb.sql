@@ -139,3 +139,11 @@ GRANT SELECT ON SYS.V_$WAIT_CHAINS TO &ro_user CONTAINER=CURRENT;
 -- No EXECUTE, write, ANY privilege, grant option, or role grant is included.
 -- SELECT_CATALOG_ROLE is a broader alternative discussed in docs/real-targets.md;
 -- it is deliberately not executable here because it exceeds this view inventory.
+
+-- Phase 26: scheduler and maintenance health.
+GRANT SELECT ON SYS.DBA_SCHEDULER_WINDOWS TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.DBA_AUTOTASK_CLIENT TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.DBA_AUTOTASK_JOB_HISTORY TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.DBA_OPTSTAT_OPERATIONS TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.DBA_IND_PARTITIONS TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.DBA_IND_SUBPARTITIONS TO &ro_user CONTAINER=CURRENT;
