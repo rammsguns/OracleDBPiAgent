@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
-const commands = ['init', 'web', 'report', 'report history', 'report schedule', 'report schedule run', 'triage', 'space', 'sessions', 'security', 'sql', 'alertlog', 'plsql', 'plsql list', 'plsql doc', 'drift', 'targets', 'targets check', 'doctor', 'ask', 'chat'];
+const commands = ['init', 'web', 'report', 'report history', 'report schedule', 'report schedule run', 'triage', 'space', 'top', 'sessions', 'security', 'sql', 'alertlog', 'plsql', 'plsql list', 'plsql doc', 'drift', 'targets', 'targets check', 'doctor', 'ask', 'chat'];
 it.each(commands)('%s has a nonempty description and working help', command => {
 	const p = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/index.ts', ...command.split(' '), '--help'], { encoding: 'utf8', timeout: 10000 });
 	expect(p.status, p.stderr).toBe(0);

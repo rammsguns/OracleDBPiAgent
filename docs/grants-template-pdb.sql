@@ -139,3 +139,10 @@ GRANT SELECT ON SYS.V_$WAIT_CHAINS TO &ro_user CONTAINER=CURRENT;
 -- No EXECUTE, write, ANY privilege, grant option, or role grant is included.
 -- SELECT_CATALOG_ROLE is a broader alternative discussed in docs/real-targets.md;
 -- it is deliberately not executable here because it exceeds this view inventory.
+
+-- Live top sampler (CDB-wide system and host counters).
+GRANT SELECT ON SYS.V_$SYSSTAT TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$OSSTAT TO &ro_user CONTAINER=CURRENT;
+-- Phase 27 session-stat consumers; the top sampler itself does not query these.
+GRANT SELECT ON SYS.V_$SESSTAT TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$STATNAME TO &ro_user CONTAINER=CURRENT;

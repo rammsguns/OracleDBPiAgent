@@ -64,7 +64,7 @@ const configuredTables = new Set<string>((JSON.parse(readFileSync(new URL('../..
 const MODULE_FEATURE: Record<string, string> = {
 	report: 'report', sessions: 'sessions', space: 'space', security: 'security',
 	sqlperf: 'sql', alertlog: 'alertlog', plsql: 'plsql', triage: 'triage',
-	tools: 'ask', oracle: 'connection', drift: 'drift',
+	tools: 'ask', oracle: 'connection', drift: 'drift', top: 'top',
 };
 const files = sources(root).filter(path => !path.startsWith(`${root}/preflight/`));
 function composedReferences(path: string, source: string): string[] {
