@@ -1,4 +1,4 @@
-import { collectSessions, needsSessions, sessionHypotheses } from './sessions.js';
+import { collectSessions, needsSessions, sessionHypotheses, sessionWaitContext } from './sessions.js';
 import { renderSessionsMarkdown } from '../sessions/index.js';
 import { formatIncidentStatus } from '../alertlog/index.js';
 import { collectSql, sqlHypotheses, type TriageSql } from './sqlperf.js';
@@ -184,7 +184,9 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 			diagnosis.suggestions.push('Try a wider window, for example --since 30d, to inspect more history; the latest-run lookup is limited to 5 rows.', 'Check the spelling and provide OWNER.JOB_NAME or OWNER.OBJECT_NAME to remove owner ambiguity.', 'The job may have been dropped or may belong to an owner this account cannot see; ask the DBA to confirm its owner and retained scheduler history.');
 		}
 	}
-	hypotheses.unshift(...sessionHypotheses(sessions?.activity), ...blockerSql.flatMap(sqlHypotheses));
+	const sessionLeads = sessionHypotheses(sessions?.activity);
+	hypotheses.unshift(...sessionLeads);
+	hypotheses.push(...blockerSql.flatMap(sqlHypotheses), ...(!sessionLeads.length ? sessionWaitContext(sessions?.activity) : []));
 	for (const hypothesis of hypotheses) hypothesis.evidence = unique([...hypothesis.evidence, ...runs.notes, ...alertLog.correlations.filter(c => c.kind === 'code').flatMap(c => c.entryIndexes.map(i => { const r = alertLog.entries[i]!; return `Alert code match at ${r.timestamp}: ${r.messageText}`; }))]).filter(e => e.trim());
 	hypotheses.forEach((h, i) => { h.rank = i + 1; });
 	const graph: PlsqlGraph = { nodes: [], edges: [] };

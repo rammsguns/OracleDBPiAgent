@@ -6,7 +6,18 @@ import { issueSqlId } from './sqlperf.js';
 import type { Hypothesis } from './index.js';
 
 export function needsSessions(issue: string): boolean {
-	return /\b(hang|hangs|hanging|hung|lock|locks|locked|blocked|blocking|waiting|enqueue|deadlock|stuck)\b/i.test(issue) || (!issueSqlId(issue) && /\b(slow|slowness|takes\s+long)\b/i.test(issue));
+	// Authentication lockout/expiry is not row or session blocking, even when
+	// the description also says that the user is waiting or the login is stuck.
+	if (/\bORA-2800[012]\b/i.test(issue)
+		|| /\b(?:account|password|login|logon|authentication)\s+(?:(?:is|was|has(?:\s+been)?|will\s+be)\s+)?(?:lock(?:ed|out)?|blocked|expir\w*)\b/i.test(issue)
+		|| /\b(?:lock(?:ed|out)?|blocked|expir\w*)\s+(?:user\s+)?(?:account|password|login|logon|authentication)\b/i.test(issue)
+		|| /\baccount\s+[a-z][a-z0-9_$#]*\s+(?:(?:is|was)\s+)?(?:locked|blocked)\b/i.test(issue)
+		|| /\buser\s+(?:(?:is|was|has\s+been)\s+)?blocked\b/i.test(issue)) return false;
+	const locking = /\b(?:row|table|transaction|session|query|queries|request|requests|update|updates)\b[^.!?\n]{0,40}\b(?:lock|locks|locked|blocked|blocking)\b/i.test(issue)
+		|| /\b(?:lock|locks|locked|blocked|blocking)\b[^.!?\n]{0,40}\b(?:row|table|transaction|session|query|queries|request|requests|update|updates|wait|waits|contention)\b/i.test(issue)
+		|| /\benq\s*:|\b(?:TX|TM)\s+(?:lock|enqueue|contention|wait)/i.test(issue);
+	return locking || /\b(hang|hangs|hanging|hung|waiting|enqueue|deadlock|stuck)\b/i.test(issue)
+		|| (!issueSqlId(issue) && /\b(slow|slowness|takes\s+long)\b/i.test(issue));
 }
 export function blockingNodes(roots: BlockingNode[]): BlockingNode[] {
 	return roots.flatMap(n => [n, ...blockingNodes(n.children)]);
@@ -38,10 +49,11 @@ export function sessionHypotheses(activity?: SessionActivity): Hypothesis[] {
 	const leads: Hypothesis[] = [];
 	if (nodes.some(n => n.cycle)) leads.push({ rank: 0, title: 'A blocking cycle indicates a deadlock in progress.', evidence: ['Live session snapshot; sessions may vanish between queries.'] });
 	for (const n of nodes.filter(n => n.children.length && n.session?.status === 'INACTIVE')) leads.push({ rank: 0, title: `Idle-in-transaction blocker SID ${n.sid} (${n.session!.username}) is a likely cause.`, evidence: [`SID ${n.sid} blocks ${n.children.map(c => c.sid).join(', ')}; SQL_ID ${n.session!.sqlId || 'unavailable'}.`] });
-	if (nodes.length && !leads.length) leads.push({ rank: 0, title: 'A live blocking chain is a likely cause.', evidence: activity.sections.blocking.rows.map(n => `Root blocker SID ${n.sid}${n.vanished ? ' vanished between queries' : ''}.`) });
-	if (!leads.length && activity.sections.waits.rows[0]) {
-		const w = activity.sections.waits.rows[0];
-		leads.push({ rank: 0, title: `Dominant non-idle wait class: ${w.waitClass} (context).`, evidence: [`${w.percent.toFixed(1)}% of non-idle wait time since startup; cumulative context does not establish the current cause.`] });
-	}
+	if (nodes.some(n => n.children.length) && !leads.length) leads.push({ rank: 0, title: 'A live blocking chain is a likely cause.', evidence: activity.sections.blocking.rows.map(n => `Root blocker SID ${n.sid}${n.vanished ? ' vanished between queries' : ''}.`) });
 	return leads;
+}
+/** Cumulative startup waits are context, never a cause to promote. */
+export function sessionWaitContext(activity?: SessionActivity): Hypothesis[] {
+	const w = activity?.sections.waits.rows[0];
+	return w ? [{ rank: 0, title: `Dominant non-idle wait class: ${w.waitClass} (context).`, evidence: [`${w.percent.toFixed(1)}% of non-idle wait time since startup; cumulative context does not establish the current cause.`] }] : [];
 }
