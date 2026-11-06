@@ -44,3 +44,11 @@ it('pages SQL snapshots within one session when the normal row limit is reached'
 	expect(calls.filter(([sql]) => sql.includes('OFFSET'))).toEqual([[SQL.sql + ' OFFSET :topOffset ROWS', { topOffset:1 }], [SQL.sql + ' OFFSET :topOffset ROWS', { topOffset:1 }]]);
 	expect(result.sql.rows.map(r => r.name)).toEqual(['a','b']); expect(result.sql.status).toBe('ok');
 });
+it.each([1,2,3,4,5])('counts a reset in metric column %s once per SQL_ID', async column => {
+	const { renderTop } = await import('../../src/top/index.js');
+	let second = false;
+	const before = ['abc',10,10,10,10,10], after = ['abc',20,20,20,20,20]; after[column] = 1;
+	const result = await sampleTop(session(async sql => ({ columns:[], rows:sql === SQL.sql ? [second ? after : before] : [], truncated:false, elapsedMs:0 })),5,
+		{ now: () => second ? 5000 : 0, sleep: async () => { second = true; } });
+	expect(renderTop(result)).toContain('reset: 1');
+});

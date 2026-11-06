@@ -9,8 +9,11 @@ export const METRICS = ['elapsedUs', 'cpuUs', 'bufferGets', 'physicalReads', 'ex
 export type Metric = typeof METRICS[number];
 export interface Snapshot { rows: unknown[][]; truncated: boolean; at: number; note?: string }
 export interface Delta { name: string; delta: number | null; perSecond: number | null; state: 'measured' | 'new' | 'reset' | 'aged-out' }
+export class TopUsageError extends Error {
+	constructor(message: string) { super(message); this.name = 'TopUsageError'; }
+}
 export function validateSeconds(seconds: number): void {
-	if (!Number.isInteger(seconds) || seconds < 5 || seconds > 120) throw new Error('seconds must be an integer from 5 to 120');
+	if (!Number.isInteger(seconds) || seconds < 5 || seconds > 120) throw new TopUsageError('seconds must be an integer from 5 to 120');
 }
 export function deltas(before: unknown[][], after: unknown[][], column: number, seconds: number): Delta[] {
 	const a = new Map(before.map(r => [String(r[0]), Number(r[column])])), b = new Map(after.map(r => [String(r[0]), Number(r[column])]));
@@ -73,7 +76,10 @@ export function renderTop(result: Awaited<ReturnType<typeof sampleTop>>): string
 		lines.push(`\n${key}: ${section.status}; ${section.intervalSeconds.toFixed(3)}s; ${result.scope[key]}`, ...section.notes);
 		if (key === 'sql') {
 			for (const metric of METRICS) { lines.push(metric + ':'); for (const r of result.sql.rankings[metric]) lines.push(`${r.name} delta=${r.delta} — ${r.command}`); }
-			for (const state of ['new','aged-out','reset']) lines.push(`${state}: ${section.rows.filter(r => r.state === state).length}`);
+			for (const state of ['new','aged-out','reset']) {
+				const names = new Set(Object.values(result.sql.counters).flatMap(rows => rows.filter(r => r.state === state).map(r => r.name)));
+				lines.push(`${state}: ${names.size}`);
+			}
 		} else for (const r of section.rows) lines.push(`${r.name}: delta=${r.delta ?? 'unknown'}; /s=${r.perSecond?.toFixed(3) ?? 'unknown'} (${r.state})`);
 	}
 	lines.push(`Host CPU busy: ${result.host.cpuPercent === null ? 'unavailable' : result.host.cpuPercent.toFixed(2) + '%'}`, ...result.host.gauges.map(r => `${r.name}: ${r.value}`));

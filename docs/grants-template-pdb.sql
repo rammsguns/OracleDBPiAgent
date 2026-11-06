@@ -143,6 +143,3 @@ GRANT SELECT ON SYS.V_$WAIT_CHAINS TO &ro_user CONTAINER=CURRENT;
 -- Live top sampler (CDB-wide system and host counters).
 GRANT SELECT ON SYS.V_$SYSSTAT TO &ro_user CONTAINER=CURRENT;
 GRANT SELECT ON SYS.V_$OSSTAT TO &ro_user CONTAINER=CURRENT;
--- Phase 27 session-stat consumers; the top sampler itself does not query these.
-GRANT SELECT ON SYS.V_$SESSTAT TO &ro_user CONTAINER=CURRENT;
-GRANT SELECT ON SYS.V_$STATNAME TO &ro_user CONTAINER=CURRENT;

@@ -8,6 +8,3 @@
 -- Never execute from the application or automated tests. V$SQLSTATS already granted.
 GRANT SELECT ON SYS.V_$SYSSTAT TO HARNESS_RO;
 GRANT SELECT ON SYS.V_$OSSTAT TO HARNESS_RO;
--- Phase 27 session-stat access for follow-on consumers (not queried by top):
-GRANT SELECT ON SYS.V_$SESSTAT TO HARNESS_RO;
-GRANT SELECT ON SYS.V_$STATNAME TO HARNESS_RO;

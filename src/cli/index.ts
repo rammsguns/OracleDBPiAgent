@@ -127,8 +127,14 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			console.error(error.message); process.exitCode = 2;
 		}
 	});
-	program.command("top").description("Two-snapshot live SQL and load sample; no ASH or LLM").requiredOption("--target <target>").option("--seconds <N>", "Sample interval, 5–120 seconds", "15").option("--json").action(async options => {
-		const { runTop } = await import("../top/cli.js"); await runTop(options);
+	program.command("top").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Two-snapshot live SQL and load sample; no ASH or LLM").requiredOption("--target <target>").option("--seconds <N>", "Sample interval, 5–120 seconds", "15").option("--json").action(async options => {
+		const { runTop } = await import("../top/cli.js");
+		const { TopUsageError } = await import("../top/index.js");
+		try { await runTop(options); }
+		catch (error) {
+			if (!(error instanceof TopUsageError)) throw error;
+			console.error(error.message); process.exitCode = 2;
+		}
 	});
 	program.command("sessions").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Read-only live sessions, blocking and cumulative waits; no LLM").requiredOption("--target <target>").option("--section <ids>", "Comma-separated sections").option("--all", "Include background sessions").option("--min-tx-seconds <N>", "Transaction age threshold, 0–86400").option("--top <N>", "Top wait events, 1–50").option("--json").option("--markdown").action(async options => {
 		const { runSessions } = await import("../sessions/cli.js");

@@ -2,7 +2,8 @@
 
 `piagent top --target d1-19c-lab --seconds 15` prints one sample. Add
 `--json` for structured output. Seconds defaults to 15 and must be an integer
-from 5 through 120. There is no LLM call, SQL text, automatic polling or database sleep.
+from 5 through 120. Invalid intervals, unknown targets and command usage errors
+print specific guidance and exit 2. There is no LLM call, SQL text, automatic polling or database sleep.
 
 The reader uses one already gated, read-only session. It captures V$SQLSTATS,
 V$SYSSTAT and V$OSSTAT twice, sleeping in Node between snapshots. Each view's
@@ -39,14 +40,15 @@ behaviour remain unverified; the labs are non-CDB 19.9.1.
 ## Licensing
 
 This sampler uses current V$SQLSTATS, V$SYSSTAT and V$OSSTAT counters, not
-Diagnostics Pack history. V$SESSTAT is also a current session statistics view,
-although this command does not need it. Oracle's [19c licensing guide](https://docs.oracle.com/en/database/oracle/oracle-database/19/dblic/Licensing-Information.html)
+Diagnostics Pack history. Oracle's [19c licensing guide](https://docs.oracle.com/en/database/oracle/oracle-database/19/dblic/Licensing-Information.html)
 identifies ASH, AWR and DBMS_WORKLOAD_REPOSITORY as Diagnostics Pack features;
 these current counter views are not in that restricted list. See the
 [statistics reference](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/statistics-descriptions-2.html)
 and [OSSTAT reference](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-OSSTAT.html)
 for counter semantics. This command never accesses ASH, DBA_HIST_*, metric
 history, DBMS_WORKLOAD_REPOSITORY, DBMS_SCHEDULER or DBMS_LOCK.
+
+The reset summary counts each SQL_ID once if any of the five SQL metrics resets.
 
 The global SQL policy refuses these identifiers wherever they occur in executable
 SQL, including nested queries, CTEs, joins, quoted names and SYS/PUBLIC qualification.
@@ -82,3 +84,33 @@ future matching names. DBA_TABLESPACE_USAGE_METRICS remains allowed.
 p1 currently has V$SQLSTATS only. The proposed SELECT-only request is
 `docs/grants-request-2026-11-06-top.sql`; it has not been applied. The PDB template
 and preflight `top` group include the sampler's three views.
+
+## Review hardening
+
+The refusal also covers V$ALL_ACTIVE_SESSION_HISTORY (and GV$/V_$/GV_$
+variants), CDB_HIST_*, CDB_ADVISOR_*, CDB_ADDM_*, AWR_CDB_*, AWR_PDB_* and
+AWR_ROOT_*. Snapshot views are included. WRH$_* and WRM$_* AWR tables and
+WRI$_ADV_* advisor tables are conservatively refused too. Oracle documents
+[ALL_ACTIVE_SESSION_HISTORY](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-ALL_ACTIVE_SESSION_HISTORY.html)
+as sampled activity and identifies AWR table examples in
+[DBMS_WORKLOAD_CAPTURE](https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_WORKLOAD_CAPTURE.html).
+
+Re-reading the [19c Diagnostics and Tuning Pack lists](https://docs.oracle.com/en/database/oracle/oracle-database/19/dblic/Licensing-Information.html)
+also identified Streams diagnostics, the listed MGMT$ monitoring/template
+repository views, AWR Hub, performance/UMF APIs and Tuning Pack SQL Monitor
+views and APIs. These are now refused explicitly, including SQL_MONITOR and
+SQL_PLAN_MONITOR in all four dynamic-view prefixes. The named packages are
+DBMS_WORKLOAD_REPOSITORY, DBMS_ADDM, DBMS_PERF, DBMS_UMF, DBMS_ADVISOR,
+DBMS_WORKLOAD_REPLAY, DBMS_AWRHUB, DBMS_AUTO_SQLTUNE, DBMS_SQL_MONITOR and
+DBMS_SQLTUNE. The message names both packs and suggests `piagent top`.
+
+Some listed functionality is conditional (Streams component statistics,
+advisor data, DBMS_ADVISOR, DBMS_WORKLOAD_REPLAY.COMPARE_PERIOD_REPORT), and
+the guide notes DBMS_SQLTUNE exceptions. The project conservatively refuses
+these entire objects/packages rather than evaluating data or package arguments.
+This does not prohibit reading SQL profile metadata through existing allowed
+views or the exact allowed DBMS_XPLAN.DISPLAY_CURSOR form.
+
+Only V$SQLSTATS, V$SYSSTAT and V$OSSTAT are in the top preflight group.
+The grant request and PDB template no longer request unused V$SESSTAT or
+V$STATNAME privileges for this feature.

@@ -2,13 +2,13 @@ import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
 import { JsonlAuditSink } from '../audit/index.js';
-import { sampleTop, renderTop, validateSeconds } from './index.js';
+import { sampleTop, renderTop, validateSeconds, TopUsageError } from './index.js';
 import type { OracleSession } from '../contracts.js';
 export async function runTop(options: { target: string; seconds?: string; json?: boolean }): Promise<void> {
 	const seconds = options.seconds === undefined ? 15 : /^\d+$/.test(options.seconds) ? Number(options.seconds) : NaN;
 	validateSeconds(seconds);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new Error('Unknown top target');
+	if (!config.targets.some(t => t.name === options.target)) throw new TopUsageError('Unknown top target');
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);
