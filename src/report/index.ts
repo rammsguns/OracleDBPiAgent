@@ -1,3 +1,4 @@
+import { readReportSessions } from './sessions.js';
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError } from '../contracts.js';
 import type { ToolContext } from '../contracts.js';
@@ -14,7 +15,7 @@ export interface ReportSection {
 }
 export interface DatabaseReport { target: string; generatedAt: string; sections: ReportSection[] }
 export interface ReportOptions { target?: string; owner?: string; sections?: string[] }
-export const sectionNames = [...reportQueries.map(q => q.name), 'security'];
+export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions'];
 const groups: Record<string, string[]> = { backups: ['backups', 'archive_switches'], scheduler_jobs: ['scheduler_jobs', 'scheduler_failures'], index_health: ['index_health', 'index_partitions', 'index_subpartitions'] };
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
@@ -74,6 +75,13 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 		catch (error) {
 			if (error instanceof UnsupportedVersionError) throw error;
 			report.sections.push({ name: 'security', status: 'unavailable', source: 'readSecurityPosture', columns: [], rows: [], note: `not available: ${safeReason(error, 'security metadata')}` });
+		}
+	}
+	if (selected?.has('sessions')) {
+		try { report.sections.push(await readReportSessions(ctx, target)); }
+		catch (error) {
+			if (error instanceof UnsupportedVersionError) throw error;
+			report.sections.push({ name: 'sessions', status: 'unavailable', source: 'readSessionActivity', columns: [], rows: [], note: `not available: ${safeReason(error, 'sessions metadata')}` });
 		}
 	}
 	return report;

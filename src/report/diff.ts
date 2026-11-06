@@ -1,3 +1,4 @@
+import { sessionMetrics } from './sessions.js';
 import type { DatabaseReport, ReportSection } from './index.js';
 
 export const DIFF_THRESHOLDS = { tablespaceIncreasePoints: 5, tablespaceWarningPercent: 85, backupRecentHours: 24 } as const;
@@ -44,6 +45,22 @@ export function diff(previous: DatabaseReport | null | undefined, current: Datab
 			if (!old) continue;
 			const a = percent(old), b = percent(row);
 			if (b - a >= DIFF_THRESHOLDS.tablespaceIncreasePoints || (a < DIFF_THRESHOLDS.tablespaceWarningPercent && b >= DIFF_THRESHOLDS.tablespaceWarningPercent)) add(name, 'tablespace_usage', String(row.TABLESPACE_NAME), `${row.TABLESPACE_NAME}: used ${a.toFixed(2)}% → ${b.toFixed(2)}%`);
+		}
+		if (name === 'sessions') {
+			const a = sessionMetrics(before), b = sessionMetrics(after);
+			for (const metric of ['blockers', 'long_transactions']) {
+				const old = a.find(r => r.METRIC === metric), next = b.find(r => r.METRIC === metric);
+				if (old && next && old.VALUE !== next.VALUE) add(name, 'session_count', metric, `${metric}: ${old.VALUE} → ${next.VALUE}`);
+			}
+			const waits = (data: typeof a) => data.filter(r => r.METRIC === 'wait_seconds' && typeof r.WAIT_CLASS === 'string');
+			const oldWaits = waits(a), newWaits = waits(b);
+			const startup = oldWaits[0]?.STARTUP_TIME;
+			if (!startup || !oldWaits.length || !newWaits.length || [...oldWaits, ...newWaits].some(r => r.STARTUP_TIME !== startup) || oldWaits.length !== newWaits.length || oldWaits.some(r => !newWaits.some(n => n.WAIT_CLASS === r.WAIT_CLASS && Number(n.VALUE) >= Number(r.VALUE)))) result.notes.push('sessions: wait classes not compared across missing evidence, instance restart or counter decrease.');
+			else {
+				const dominant = (data: typeof a) => [...data].sort((x, y) => Number(y.VALUE) - Number(x.VALUE) || String(x.WAIT_CLASS).localeCompare(String(y.WAIT_CLASS)))[0];
+				const old = dominant(oldWaits), next = dominant(newWaits);
+				if (old && next && old.WAIT_CLASS !== next.WAIT_CLASS) add(name, 'wait_class_shift', 'dominant', `Wait-class shift since startup (cumulative): ${old.WAIT_CLASS} → ${next.WAIT_CLASS}`);
+			}
 		}
 		if (name === 'backups' && recent(before, previous.generatedAt) && !recent(after, current.generatedAt)) add(name, 'backup_not_recent', name, `No completed backup within ${DIFF_THRESHOLDS.backupRecentHours} hours.`);
 	}
