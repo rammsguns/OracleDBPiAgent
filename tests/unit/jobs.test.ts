@@ -80,5 +80,18 @@ describe('jobs read-only evidence', () => {
 	for (const options of [{ since: '0h' }, { since: '31d' }, { owner: 'SH OR 1=1' }]) it('rejects bad options before acquiring a session', async () => { const f = fixture(); await expect(readJobs(f.ctx, 'd1-19c-lab', options)).rejects.toThrow(); expect(f.get).not.toHaveBeenCalled(); });
 	it('rejects unknown and unpinned targets', async () => { const f = fixture(); f.ctx.pinnedTarget = 'p1-19c-prod'; await expect(readJobs(f.ctx, 'd1-19c-lab')).rejects.toThrow(); await expect(readJobs(f.ctx, 'other')).rejects.toThrow(); });
 	it('covers every view in preflight', () => { for (const def of Object.values(jobQueries)) expect(FEATURE_VIEWS.jobs).toContain(def.view); });
+	it('renders every section with contiguous tables, single spacing and UTC timestamp columns', async () => {
+		const f = fixture();
+		f.query.mockResolvedValue({ columns: ['LOG_DATE', 'NEXT_RUN_DATE', 'ADDITIONAL_INFO'], rows: [['2026-11-06T01:30:00.000-05:00', '2026-11-07T02:30:00.000+02:00', 'line one\nline two | <value>']], truncated: false, elapsedMs: 1 });
+		const result = await readJobs(f.ctx, 'd1-19c-lab');
+		const md = renderJobs(result);
+		expect(result.sections.jobs!.rows[0]!.LOG_DATE).toBe('2026-11-06T01:30:00.000-05:00');
+		expect(md).toContain('2026-11-06T06:30:00.000Z');
+		expect(md).toContain('2026-11-07T00:30:00.000Z');
+		expect(md).not.toContain('-05:00');
+		expect(md).toContain('line one<br>line two &#124; &lt;value&gt;');
+		expect(md).not.toMatch(/\n{3}|\|\n\n\|/);
+		for (const name of Object.keys(result.sections)) expect(md).toContain(`## ${name} (${result.sections[name]!.view}): ok\n|`);
+	});
 	it('redacts split credentials and keeps small text', () => { expect(safeJobText("token =\n'sensitive'").text).not.toContain('sensitive'); expect(safeJobText('ORA-00001')).toEqual({ text: 'ORA-00001', truncated: false }); });
 });

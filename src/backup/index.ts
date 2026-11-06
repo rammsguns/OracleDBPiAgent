@@ -61,7 +61,10 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 	const core: EvidenceId[] = ['database','datafiles','backups','sets','pieces'];
 	if (!good(...core) || !good('jobs')) add('no-backups', 'high', 'Backup history is not verifiable from ' + 'this database: required views are unreadable or incomplete.', [...core,'jobs']);
 	else if (!rows('backups').length && !rows('jobs').length && !rows('sets').length) add('no-backups', 'high', pdb ? 'Backups are not verifiable from ' + 'this database: no rows visible in this PDB.' : 'No backups recorded at all in the visible control-file history; external catalogs and aged-out records are not checked.', ['backups','jobs','sets']);
-	if (good(...core) && files.length && (!pdb || rows('backups').length)) for (const f of files) if ((!pdb && !f.level0) || (f.level0 && now.getTime()-Date.parse(f.level0)>7*86400000)) add(`level0-${f.file}`, 'high', `Datafile ${f.file}: no available full / level 0 backup completed in 7 days.`, core);
+	if (!findings.some(f => f.id === 'no-backups') && good(...core) && (!pdb || rows('backups').length)) {
+		const overdue = files.filter(f => (!pdb && !f.level0) || (f.level0 && now.getTime() - Date.parse(f.level0) > 7 * 86400000)).map(f => f.file).sort((a, b) => a - b);
+		if (overdue.length) add('level0', 'high', `${overdue.length} datafile${overdue.length === 1 ? ' has' : 's have'} no available full / level 0 backup completed in 7 days: ${overdue.join(', ')}.`, core);
+	}
 	const checkpoint = files.length && files.every(f => f.checkpointScn != null) ? Math.min(...files.map(f => f.checkpointScn!)) : null;
 	const gaps: ArchiveGap[] = [];
 	if (checkpoint !== null && good('archives','history','database')) {
@@ -94,12 +97,12 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 	const through=complete && ends.length && ends.every(Boolean) ? ends.sort()[0]! : null;
 	const from=files.length&&files.every(f=>f.level0)?files.map(f=>f.level0!).sort().at(-1)!:null;
 	return {target,capturedAt:now.toISOString(),scope:pdb?'CDB-wide (shared by all PDBs). Current PDB visibility only; empty rows do not establish absence.':'Database-wide (non-CDB).',status:good(...Object.keys(evidence) as EvidenceId[])?'ok':'partial',evidence,findings,files,gaps,
-		restoreEstimate:{status:through&&from&&through>=from?'candidate':'not-verifiable',from,through,detail:'Metadata estimate only; no restore or media validation performed. Time X is a candidate only within the reported bounds, with every datafile and redo thread covered. Incremental times do not prove an applicable chain. Control-file history can age out; archived-log rows do not prove backup-media readability. Online redo, external catalogs, encryption keys, storage and restore duration are unverified.',evidence:[...core,'archives','history','corruption','recoverFiles']},
+		restoreEstimate:{status:through&&from&&through>=from?'candidate':'not-verifiable',from,through,detail:(rows('database')[0]?.LOG_MODE === 'NOARCHIVELOG' ? 'The database is in NOARCHIVELOG mode: point-in-time recovery is not possible. Only consistent (cold/mounted) backups can be restored. ' : '') + 'Metadata estimate only; no restore or media validation performed. Time X is a candidate only within the reported bounds, with every datafile and redo thread covered. Incremental times do not prove an applicable chain. Control-file history can age out; archived-log rows do not prove backup-media readability. Online redo, external catalogs, encryption keys, storage and restore duration are unverified.',evidence:[...core,'archives','history','corruption','recoverFiles']},
 		recoveryArea:rows('recoveryArea').map(r=>({limitBytes:n(r.SPACE_LIMIT),usedBytes:n(r.SPACE_USED),reclaimableBytes:n(r.SPACE_RECLAIMABLE),nonReclaimableBytes:Math.max(0,n(r.SPACE_USED)-n(r.SPACE_RECLAIMABLE)),availableAfterReclaimBytes:Math.max(0,n(r.SPACE_LIMIT)-n(r.SPACE_USED)+n(r.SPACE_RECLAIMABLE))}))};
 }
 export function renderBackupMarkdown(r: BackupReport): string {
 	const safe=(v:unknown)=>JSON.stringify(v).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-	return [`# Backup — ${r.target}`,r.scope,`Captured ${r.capturedAt}. Sequential bounded SELECT snapshots.`, `Restore-to-time estimate: ${safe(r.restoreEstimate)}`,
+	return [`# Backup — ${r.target}`,r.scope,`Captured ${r.capturedAt}. Sequential bounded SELECT snapshots.`, `## Restore-to-time estimate\nStatus: ${r.restoreEstimate.status === 'candidate' ? 'Candidate recovery window' : 'Not verifiable from this database'}.\n\n- From: ${r.restoreEstimate.from ?? 'not established'}.\n- Through: ${r.restoreEstimate.through ?? 'not established'}.\n- Evidence: ${r.restoreEstimate.evidence.join(', ')}.\n\n${r.restoreEstimate.detail}`,
 		...r.findings.map(f=>`${f.severity}: ${f.detail} Evidence: ${f.evidence.join(', ')}. ${f.advice}`),
 		`Per-datafile backups: ${safe(r.files)}`,`Archive gaps: ${safe(r.gaps)}`,`Recovery-area balance (bytes): ${safe(r.recoveryArea)}`,
 		...Object.entries(r.evidence).map(([id,e])=>`Evidence ${id} (${e.view}): ${e.status}${e.note?' — '+e.note:''}\n${safe(e.rows)}`)].join('\n\n')+'\n';

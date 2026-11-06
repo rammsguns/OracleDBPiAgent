@@ -87,12 +87,20 @@ export async function readJobs(ctx: ToolContext, target: string, options: JobsOp
 	} finally { await session.close(); }
 }
 const escape = (v: unknown) => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, '<br>');
+// Only timestamp columns are normalized; durations and free-form job text stay intact.
+const timestampColumns = new Set(['LOG_DATE', 'ACTUAL_START_DATE', 'LAST_START_DATE', 'NEXT_RUN_DATE', 'NEXT_START_DATE', 'WINDOW_START_TIME', 'JOB_START_TIME', 'START_TIME', 'END_TIME']);
+function utcTimestamp(value: unknown): unknown {
+	if (value == null) return value;
+	const parsed = value instanceof Date ? value : typeof value === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? new Date(value) : null;
+	return parsed && Number.isFinite(parsed.getTime()) ? parsed.toISOString() : value;
+}
 export function renderJobs(result: JobsResult): string {
-	const lines = [`# Jobs: ${result.target}`, '', `${result.window.from} to ${result.window.to} (exclusive)`, '', result.note];
+	const lines = [`# Jobs: ${result.target}`, '', `${utcTimestamp(result.window.from)} to ${utcTimestamp(result.window.to)} (exclusive; UTC)`, '', result.note];
 	for (const [name, section] of Object.entries(result.sections)) {
-		lines.push('', `## ${name} (${section.view}): ${section.status}`, '', section.note ?? '');
+		lines.push('', `## ${name} (${section.view}): ${section.status}`);
+		if (section.note) lines.push(section.note);
 		if (!section.rows.length) lines.push(section.status === 'ok' ? 'No rows returned within visible scope.' : 'Evidence unavailable.');
-		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(row[c])).join(' | ') + ' |'); }
+		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(timestampColumns.has(c) ? utcTimestamp(row[c]) : row[c])).join(' | ') + ' |'); }
 		if (section.truncated) lines.push('', 'Row cap reached; partial evidence.');
 	}
 	return lines.join('\n') + '\n';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readBackup, SQL, type EvidenceId } from '../../src/backup/index.js';
+import { readBackup, renderBackupMarkdown, SQL, type EvidenceId } from '../../src/backup/index.js';
 import type { OracleSession } from '../../src/contracts.js';
 import { classifySql } from '../../src/oracle/sqlPolicy.js';
 const now = new Date('2026-11-06T12:00:00Z');
@@ -48,7 +48,7 @@ describe('backup evidence',()=>{
 	it('withholds a candidate on truncation',async()=>{expect((await readBackup(session(base,false,undefined,true),now)).restoreEstimate.status).toBe('not-verifiable');});
 	it('detects gaps, corruption, recovery, autobackup and stale fulls',async()=>{
 		const r=await readBackup(session({...base,archives:[],configuration:[{NAME:'CONTROLFILE AUTOBACKUP',VALUE:'OFF'}],corruption:[{'FILE#':1}],recoverFiles:[{'FILE#':1}]}),new Date('2026-11-20'));
-		expect(r.findings.map(f=>f.id)).toEqual(expect.arrayContaining(['archive-gap','corruption','recoverFiles','autobackup-off','level0-1']));
+		expect(r.findings.map(f=>f.id)).toEqual(expect.arrayContaining(['archive-gap','corruption','recoverFiles','autobackup-off','level0']));
 	});
 	it('does not treat an omitted autobackup configuration as explicit OFF',async()=>{expect((await readBackup(session(base),now)).findings.some(f=>f.id==='autobackup-off')).toBe(false);});
 	it('keeps duplicated archives and other incarnations separate',async()=>{
@@ -64,12 +64,29 @@ describe('backup evidence',()=>{
 	});
 	it('withholds missing-file backup claims under PDB visibility',async()=>{
 		const r=await readBackup(session({...base,datafiles:[...base.datafiles,{'FILE#':2,'CREATION_CHANGE#':5}]},true),now);
-		expect(r.findings.some(f=>f.id==='level0-2')).toBe(false);
+		expect(r.findings.some(f=>f.id==='level0')).toBe(false);
 	});
 	it('reports incremental inventory and reclaimable balance separately',async()=>{
 		const r=await readBackup(session({...base,backups:[...base.backups,{...base.backups[0],INCREMENTAL_LEVEL:1,COMPLETION_TIME:'2026-11-06T00:00:00Z'}],recoveryArea:[{SPACE_LIMIT:100,SPACE_USED:90,SPACE_RECLAIMABLE:30}]}),now);
 		expect(r.files[0]?.incremental).toBe('2026-11-06T00:00:00.000Z');
 		expect(r.recoveryArea[0]).toEqual({limitBytes:100,usedBytes:90,reclaimableBytes:30,nonReclaimableBytes:60,availableAfterReclaimBytes:40});
+	});
+	it('groups missing full backups and suppresses them when no backups are recorded', async () => {
+		const datafiles = [7, 1, 5, 3, 4].map(file => ({ 'FILE#': file, 'CREATION_CHANGE#': 2 }));
+		const r = await readBackup(session({ ...base, datafiles, pieces: [] }), now);
+		expect(r.findings.filter(f => f.id === 'level0').map(f => f.detail)).toEqual(['5 datafiles have no available full / level 0 backup completed in 7 days: 1, 3, 4, 5, 7.']);
+		const empty = await readBackup(session({ datafiles }), now);
+		expect(empty.findings.map(f => f.id)).toEqual(['no-backups']);
+		expect(empty.scope).toBe('Database-wide (non-CDB).');
+	});
+	it('renders readable restore bounds and explains NOARCHIVELOG recovery', async () => {
+		const r = await readBackup(session({ ...base, database: [{ 'RESETLOGS_CHANGE#': 1, LOG_MODE: 'NOARCHIVELOG' }] }), now);
+		const md = renderBackupMarkdown(r);
+		expect(r.restoreEstimate.status).toBe('not-verifiable');
+		expect(md).toContain('point-in-time recovery is not possible');
+		expect(md).toContain('Only consistent (cold/mounted) backups can be restored');
+		expect(md).toContain('- From: 2026-11-05T00:00:00.000Z');
+		expect(md).not.toContain('"status":"not-verifiable"');
 	});
 	it('propagates unexpected errors',async()=>{await expect(readBackup(session({},false,'ORA-00600'))).rejects.toThrow('ORA-00600');});
 });

@@ -80,6 +80,7 @@ it.each([[3, 'APPPDB', false], [3, 'APPPDB', true], [2, 'PDB$SEED', false]] as c
 it.each([[0, 'ORCL', false], [0, 'ORCL', true], [1, 'CDB$ROOT', true]] as const)('uses the container rather than isCdb for %s/%s with flag=%s', async (id, name, flag) => {
 	const report = await inspectP25(session(undefined, id, name, flag), await backupCases());
 	expect(report.container).toEqual({ id, name });
+	expect(report.scope).toBe('Database-wide (non-CDB)');
 	expect(report.records.every(record => record.status === 'readable')).toBe(true);
 });
 
