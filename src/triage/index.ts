@@ -1,3 +1,5 @@
+import { collectSessions, needsSessions, sessionHypotheses } from './sessions.js';
+import { renderSessionsMarkdown } from '../sessions/index.js';
 import { formatIncidentStatus } from '../alertlog/index.js';
 import { collectSql, sqlHypotheses, type TriageSql } from './sqlperf.js';
 import { renderSqlInsightMarkdown } from '../sqlperf/index.js';
@@ -139,6 +141,13 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	}
 	const alertLog = mergeAlerts([discovery.alert, await collectAlerts(ctx, target.name, hours, combined.codes, runs.rows)])!;
 	reader.checks.push(...alertLog.checks);
+	const sessions = needsSessions(options.issue ?? '') ? await collectSessions(ctx, target.name) : undefined;
+	if (sessions) reader.checks.push(...sessions.checks);
+	const blockerSql = [];
+	for (const id of sessions?.sqlIds ?? []) {
+		const evidence = await collectSql(ctx, target.name, id, hours, []);
+		blockerSql.push(evidence); reader.checks.push(...evidence.checks);
+	}
 	const sql = await collectSql(ctx, target.name, options.issue ?? '', hours, parsed.objects);
 	reader.checks.push(...sql.checks);
 	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
@@ -175,6 +184,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 			diagnosis.suggestions.push('Try a wider window, for example --since 30d, to inspect more history; the latest-run lookup is limited to 5 rows.', 'Check the spelling and provide OWNER.JOB_NAME or OWNER.OBJECT_NAME to remove owner ambiguity.', 'The job may have been dropped or may belong to an owner this account cannot see; ask the DBA to confirm its owner and retained scheduler history.');
 		}
 	}
+	hypotheses.unshift(...sessionHypotheses(sessions?.activity), ...blockerSql.flatMap(sqlHypotheses));
 	for (const hypothesis of hypotheses) hypothesis.evidence = unique([...hypothesis.evidence, ...runs.notes, ...alertLog.correlations.filter(c => c.kind === 'code').flatMap(c => c.entryIndexes.map(i => { const r = alertLog.entries[i]!; return `Alert code match at ${r.timestamp}: ${r.messageText}`; }))]).filter(e => e.trim());
 	hypotheses.forEach((h, i) => { h.rank = i + 1; });
 	const graph: PlsqlGraph = { nodes: [], edges: [] };
@@ -200,7 +210,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		for (const job of runs.rows.filter(r => correlation.kind === 'jobRun' && correlation.label.includes(`${r[0]}.${r[1]} `))) edge(node(`job:${job[0]}.${job[1]}`, 'job', `${job[0]}.${job[1]}`), alert);
 	}
 	graph.edges = [...new Map(graph.edges.map(e => [JSON.stringify(e), e])).values()];
-	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, sql, checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
+	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, sql, ...(sessions ? { sessions, blockerSql } : {}), checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
 }
 async function columns(reader: TriageReader, owner: string, name: string) {
 	const existing = reader.checks.find(c => c.label === `Columns for ${owner}.${name}`); if (existing) return existing;
@@ -240,6 +250,7 @@ export function renderTriageMarkdown(result: TriageResult): string {
 		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ') || 'none'}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
 		...(issue.alertLog ? ['### Alert log', renderTriageAlerts(issue.alertLog)] : []),
 		...(issue.sql ? renderTriageSql(issue.sql) : []),
+		...(issue.sessions ? ['### Sessions evidence', issue.sessions.activity ? renderSessionsMarkdown(issue.sessions.activity) : safe(issue.sessions.reason), ...(issue.blockerSql ?? []).flatMap(renderTriageSql)] : []),
 		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.filter(e => e.trim()).map(e => '- ' + evidenceText(e)).join('\n')}${h.verifyNext ? '\n\nVerify next (not executed):\n\n' + block('sql', h.verifyNext.sql) + '\nBinds: ' + safe(JSON.stringify(h.verifyNext.binds)) : ''}`),
 		'### Limitations', ...(issue.limitations.length ? issue.limitations.map(safe) : ['No additional limitations identified; view failures and caps are reported below.']), '### Concurrency review', ...(issue.concurrency.length ? issue.concurrency.map(safe) : ['No supported concurrent child-insert path identified from the available source and job evidence.']), '### Suggested fixes (not executed)', 'Suggestions for a developer; no changes were run.', ...(issue.suggestions.length ? issue.suggestions.map(s => '- ' + safe(s)) : ['Inspect the unavailable source and raising condition before choosing a remediation; preserve exception/backtrace logging without credentials.']), '### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${inline(e.statement)}\n\n${e.source.length ? block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n')) : 'Source unavailable; historical job_action and raising condition cannot be inspected.'}`),
 		'### Evidence', ...issue.checks.map(c => `${safe(c.label)}: ${c.status}; ${safe(c.view)}${c.truncated ? '; row cap reached (partial)' : ''}${c.attempts.map(a => `; ${a.view} ${a.code}`).join('')}\n\n${c.rows.length ? '| ' + c.columns.map(safe).join(' | ') + ' |\n| ' + c.columns.map(() => '---').join(' | ') + ' |\n' + c.rows.map(r => '| ' + r.map(safe).join(' | ') + ' |').join('\n') : c.label.startsWith('Source around') ? 'See the redacted frame excerpt above; source was collected through the bounded dictionary reader.' : 'No rows returned; absence is limited to visible evidence.'}`),
