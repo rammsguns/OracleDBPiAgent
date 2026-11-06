@@ -1,0 +1,107 @@
+# Sessions, blocking and waits
+
+Run this command against an approved Oracle 19c target:
+
+```sh
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- sessions --target p1-19c-prod
+npm run piagent -- sessions --target d1-19c-lab --json
+npm run piagent -- sessions --target p1-19c-prod --section blocking,transactions --min-tx-seconds 60
+npm run piagent -- sessions --target p1-19c-prod --all --top 20 --markdown
+```
+
+Markdown is the default. Findings precede active sessions, the indented blocking
+tree, cumulative waits, the time model and long transactions. Empty and skipped
+sections collapse. SQL IDs in the tree and findings include a
+`piagent sql --target T --sql-id X` command for further investigation.
+Findings do not change the exit status.
+
+Options:
+
+| Option | Meaning |
+| --- | --- |
+| `--target T` | Required approved target |
+| `--section a,b` | Any of active, blocking, waits, timeModel, transactions; default all |
+| `--all` | Include background sessions; otherwise user sessions only |
+| `--min-tx-seconds N` | Integer 0–86400, default 300 |
+| `--top N` | Top N events across all non-idle classes, 1–50, default 10 |
+| `--json` / `--markdown` | Mutually exclusive formats |
+
+Exit 0 means usable evidence (including findings or a partial snapshot), 2 means
+invalid usage, and 1 means a connection/query failure or all requested sections
+unavailable. Missing grants (ORA-00942 / ORA-01031) affect individual sections.
+Unexpected errors propagate to the CLI's safe error boundary.
+
+The snapshot is a short sequence of SELECTs, not one consistent read. Sessions,
+locks and transactions may vanish between queries. Missing blocker sessions remain
+visible as placeholders. Trees stop at ten edges and mark cycles as a deadlock in
+progress. The view never creates locks or transactions to demonstrate blocking.
+
+Wait totals, class percentages, event percentages and average milliseconds are
+**cumulative since instance startup, not current activity**. Percentages use all
+non-idle events before the top-N display limit; classes with no displayed event
+still show their aggregate. Time-model seconds include DB time, DB CPU,
+background elapsed time and background CPU time.
+
+Active rows exclude the reader's SID and use SQL_ID, falling back to PREV_SQL_ID.
+The blocking snapshot also reads inactive sessions, so an idle-in-transaction
+blocker remains visible. Wait chains are queried first; missing access falls back
+to V$SESSION blocking and final-blocking pointers. Object names fall back from
+DBA_OBJECTS to ALL_OBJECTS. TX, TM and UL locks and modes 0–6 have readable names;
+other lock types retain their Oracle code.
+
+Oracle DATE wall clocks (logon and transaction start) are interpreted in the
+database server's SYSTIMESTAMP time-zone region/offset and emitted as UTC strings.
+The approved containers use UTC. Age uses server SYSDATE, avoiding client clock
+differences.
+
+Reads respect the configured session row cap, paging ordered results up to 10,000
+rows per query. A remaining row cap is marked partial. Paging is also part of the
+non-atomic snapshot caveat. Missing auxiliary lock/object grants mark blocking
+details unavailable, while preserving any available tree.
+
+No SQL text, bind capture, application session metadata, ASH, AWR or historical
+Diagnostics Pack views are read. The command does not call an LLM. Audit records
+contain query hashes and outcome metadata, without credentials or bind values.
+
+## Exported API for WP-23B and WP-23C
+
+Import from `src/sessions/index.ts`:
+
+- `readSessionActivity(session, options?)`: options are `sections?: string[]`,
+  `includeBackground?: boolean`, `minTxSeconds?: number`, `topWaits?: number`.
+- `SessionActivity`: overall ok/partial/failed, target, capturedAt ISO UTC,
+  self.sid, five typed sections and findings.
+- Each `SessionSection<T>` has status, typed rows, primary `evidence: Check`,
+  `supportingEvidence: Check[]` for supplementary/fallback reads, and optional note.
+- `buildBlockingTree(SessionRow[])` returns `BlockingNode[]`, with SID,
+  optional session, children, cycle, depthLimited and vanished.
+- `classifyWaits(WaitRow[])` returns descending `WaitClass[]`: waitClass,
+  seconds, percent and events; it is pure and does not impose display limits.
+- `renderSessionsMarkdown(activity)`, `validateSessionsOptions(options)`,
+  `SessionsUsageError`, `SECTION_IDS` and the row/finding types are exported.
+
+WaitRow uses seconds (not Oracle microseconds), totalWaits, averageMs and percent.
+TransactionRow uses ageSeconds, undoBlocks, undoRecords and UTC startTime.
+SessionRow uses blockerSid/finalBlockerSid, sqlId, status, secondsInWait, object,
+lockType and lockMode. No shared-contract changes are required.
+
+## Live smokes — 2026-11-06 UTC
+
+Executed the JSON command above for each target with the approved secret directory.
+Both exited 0; every section was ok and no evidence was truncated.
+
+| Target | Captured at UTC | Active users | Blocking roots | Wait classes | Time-model rows | Long transactions |
+| --- | --- | --- | --- | --- | --- | --- |
+| d1-19c-lab | 2026-11-06T05:59:46.574Z | 0 | 0 | 9 | 4 | 0 |
+| p1-19c-prod | 2026-11-06T05:59:49.584Z | 2 | 0 | 9 | 4 | 0 |
+
+Each produced one informational finding: System I/O exceeded half of cumulative
+non-idle wait time. These observations describe those snapshots only.
+Markdown smokes also exited 0 on both targets (d1 at 2026-11-06T06:02:26.492Z and
+p1 at 2026-11-06T06:02:29.369Z). The p1 background/active-only JSON smoke
+exited 0 at 2026-11-06T06:02:31.777Z and returned 86 active rows
+(84 background), with other sections skipped.
+The integration tests independently verify the structure and all five section
+statuses on each target. Blocking chains, cycles, vanished blockers, idle
+transactions and missing grants are tested with unit fixtures; no workload or
+locks were created.
