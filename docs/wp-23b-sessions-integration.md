@@ -64,3 +64,34 @@ Implementation commits: `32454a3` (triage), `156a8ea` (report, trends and diff).
 No shared contract changes, dependencies, CLI registration changes, prompt changes or coordinator edits are required. `src/contracts.ts`, `package.json`, `PLAN.md` and `src/sessions/` are unchanged.
 
 No LLM calls were made. The requested integration name filter excludes the existing Strata end-to-end ask. No locks or transactions were created as fixtures; blocking chains, cycles and idle blockers are exercised with unit fixtures. Live blocking and deadlock reproduction was intentionally not attempted. Session snapshots remain sequences of SELECTs and can observe sessions vanishing between queries. Count trends describe visible snapshots, not historical database-wide totals.
+
+## Review remediation (MAJOR)
+
+Addressed the trigger/ranking finding in `../review-wp-23b/docs/review-wp-23b.md`:
+
+- `needsSessions` rejects authentication/account lockout and password expiry descriptions, including ORA-28000/28001/28002. Lock/locked/blocked/blocking now require nearby session/database-work context (row/table/session/query/request/transaction/update, lock waits or contention). Hang, enqueue, deadlock, waiting and stuck diagnostics remain available, with authentication exclusions taking precedence. Slowness still requires no named SQL_ID.
+- `sessionHypotheses` now returns actual blocking causes only; a chain requires a blocker with children. Cumulative startup waits are produced separately by `sessionWaitContext` and appended after all existing causes and blocker SQL findings. Only a blocking chain, deadlock or idle-in-transaction blocker is promoted ahead of existing hypotheses.
+- Expanded `tests/unit/triage-sessions.test.ts` to cover 24 positive and 28 negative trigger phrasings, ORA-28000 issues with waiting/blocked/stuck words retaining authentication error evidence at rank 1 without session queries, compile-error evidence ranking ahead of cumulative wait context, and an actual blocking chain ranking first even with error evidence.
+- Kept the accepted audited `V$INSTANCE.STARTUP_TIME` SELECT unchanged. No changes to report behavior, shared contracts, the sessions core, prompts or dependencies.
+
+Remediation commit: `7df4feb`.
+
+Re-ran all requested commands after the fix:
+
+```text
+npm run typecheck
+> tsc -p tsconfig.json --noEmit
+Exit 0; no diagnostics.
+
+npm test -- --maxWorkers=2
+Test Files  96 passed (96)
+Tests       1437 passed (1437)
+Duration    48.15s
+
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern="^(?!.*answers one end-to-end ask through local Strata)"
+Test Files  24 passed (24)
+Tests       58 passed | 1 skipped (59)
+Duration    147.65s
+```
+
+The only skipped integration test is the excluded Strata end-to-end ask. Both approved 19c targets pass. Default triage/report snapshot tests remain byte-identical. `git diff --check` is clean. No LLM calls, database mutations or new live blocking fixtures were used. Contract needs and unverified live blocking/deadlock scenarios remain as documented above.
