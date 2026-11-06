@@ -18,10 +18,13 @@ statistics counts. Autotask clients, windows and statistics-operation history
 have no owner column and remain visible as maintenance context.
 
 `--failed-only` selects current jobs whose FAILURE_COUNT is positive or whose
-state is BROKEN, non-successful scheduler runs, failed/stopped/broken job logs,
+state is FAILED, BROKEN or RETRY SCHEDULED, or whose latest retained run failed;
+it also selects non-successful scheduler runs, failed/stopped/broken job logs,
 non-successful autotask jobs and failed statistics operations. It retains current
 maintenance context and debt. A positive current failure count does not mean a
-failure occurred within the selected history window.
+failure occurred within the selected history window. The latest-run status check
+is independent of that window, uses LOG_DATE then LOG_ID to break ties, and
+falls back to state/failure count with an explicit note if run details are unavailable.
 
 The JSON result has `target`, `identity`, `window`, `owner`, `failedOnly`, `note`
 and `sections`. Each section carries its source `view`, executed `sql`, `status`,
@@ -39,9 +42,15 @@ object type, so table and partition statistics are not silently combined.
 Unknown or missing statistics are not counted as explicitly stale.
 
 All returned string fields pass through the existing triage credential redactor
-before a 2,048-byte UTF-8 cap. A clipped field has a companion
+and a jobs-local second pass before a 2,048-byte UTF-8 cap. The local pass masks
+Authorization/Bearer tokens, connection-string userinfo, and assignments whose
+keys contain PASSWORD, PASSWD, PWD, PASS, SECRET, TOKEN, KEY or CREDENTIAL
+(case-insensitive, including prefixes and suffixes). A clipped field has a companion
 `<COLUMN>_TRUNCATED` flag. The credential redactor preserves business literals;
-it is not a general anonymizer. Audit events contain SQL hashes, counts and
+it is not a general anonymizer. Treat JSON job error fields such as
+`ADDITIONAL_INFO` and `JOB_ERROR` as **application text, may contain data**,
+including business identifiers or personal information that credential matching
+does not remove. Audit events contain SQL hashes, counts and
 Oracle error codes; they contain no bind values or job-error text.
 
 Each view degrades separately for ORA-00942, ORA-01031 and ORA-65040. Other errors

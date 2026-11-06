@@ -8,6 +8,10 @@ for (const target of ['d1-19c-lab', 'p1-19c-prod']) it(`reads scheduler maintena
 	try {
 		const result = await readJobs({ config, sessions, audit: { record: async () => {} }, runId: 'jobs-integration' }, target, { since: '30d' });
 		expect(result.sections.jobs!.status).toBe('ok');
+		const failed = await readJobs({ config, sessions, audit: { record: async () => {} }, runId: 'jobs-failed-integration' }, target, { since: '30d', failedOnly: true });
+		expect(failed.sections.jobs!.status).toBe('ok');
+		expect(failed.sections.jobs!.note).toBeUndefined();
+		for (const row of failed.sections.runs!.rows) expect(row.STATUS).not.toBe('SUCCEEDED');
 		for (const section of Object.values(result.sections)) {
 			expect(section.rows.length).toBeLessThanOrEqual(config.limits.maxRows);
 			if (target === 'd1-19c-lab') expect(section.status).toBe('ok');

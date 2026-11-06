@@ -14,6 +14,45 @@ function fixture(code?: string) {
 	return { ctx: { config: loadConfig(), sessions: { get }, audit: { record }, runId: 'jobs-test' } as unknown as ToolContext, query, close, get, record };
 }
 describe('jobs read-only evidence', () => {
+	it.each([
+		'Authorization: Bearer hidden-value', 'authorization: Basic hidden-value',
+		'Bearer hidden-value', 'pass=hidden-value', 'SECRET_KEY: "hidden-value"',
+		'credentials = hidden-value', '{"clientSecret": "hidden-value"}', 'PASSWORD_SUFFIX=hidden-value', 'prefixPASSWDsuffix: hidden-value',
+		'appPWDextra=hidden-value', 'appPASSextra=hidden-value', 'mySECRETstuff=hidden-value',
+		'appTOKENextra=hidden-value', 'monKEY: hidden-value', 'myCREDENTIALSextra=hidden-value',
+		'https://hidden-value@example.test/path', '//hidden-value@example.test/path',
+		'https://user:hidden-value@example.test/path', 'user/hidden-value@service',
+		"myKEY = 'hidden-value' || 'hidden-other'", "myKEY = q'[hidden-value]'",
+		"myKEY = 'hidden-value\ncontinued'", 'Authorization:\nBearer hidden-value',
+	])('redacts application credential pattern %s', value => {
+		const safe = safeJobText(value); expect(safe.text).not.toContain('hidden-value');
+		expect(safe.text).not.toContain('hidden-other'); expect(safe.text).toContain('REDACTED');
+	});
+	it('preserves application business text rather than promising anonymization', () => {
+		const text = 'ORA-20001 Customer SSN 123-45-6789 Salary $250,000 cannot be processed';
+		expect(safeJobText(text).text).toBe(text);
+	});
+	it('includes failed/retry states and the latest retained failure in current jobs', async () => {
+		const f = fixture(), result = await readJobs(f.ctx, 'd1-19c-lab', { failedOnly: true });
+		const sql = result.sections.jobs!.sql;
+		expect(sql).toContain("STATE IN ('FAILED', 'BROKEN', 'RETRY SCHEDULED')");
+		expect(sql).toContain('MAX(latest_run.STATUS) KEEP (DENSE_RANK LAST ORDER BY latest_run.LOG_DATE, latest_run.LOG_ID)');
+		expect(sql).toContain('latest_run.OWNER = DBA_SCHEDULER_JOBS.OWNER');
+		expect(sql).toContain('latest_run.JOB_NAME = DBA_SCHEDULER_JOBS.JOB_NAME');
+		expect(sql).not.toContain(':fromTime');
+		expect(result.sections.lastErrors!.sql).toContain('ORDER BY DBA_SCHEDULER_JOB_RUN_DETAILS.LOG_DATE DESC, DBA_SCHEDULER_JOB_RUN_DETAILS.LOG_ID DESC)');
+	});
+	for (const code of ['ORA-00942', 'ORA-01031', 'ORA-65040']) it(`retains current job evidence without last-run privileges for ${code}`, async () => {
+		const f = fixture(); f.query.mockImplementation(async sql => {
+			if (sql.includes('FROM DBA_SCHEDULER_JOB_RUN_DETAILS')) throw new Error(code);
+			return { columns: ['JOB_NAME'], rows: [['FAILED_ONCE']], truncated: false, elapsedMs: 1 };
+		});
+		const result = await readJobs(f.ctx, 'd1-19c-lab', { failedOnly: true });
+		expect(result.sections.jobs!.status).toBe('ok'); expect(result.sections.jobs!.note).toContain('last-run status not available');
+		expect(result.sections.jobs!.sql).not.toContain('latest_run'); expect(result.sections.jobs!.rows).toEqual([{ JOB_NAME: 'FAILED_ONCE' }]);
+		expect(result.sections.lastErrors!.status).toBe('unavailable'); expect(f.close).toHaveBeenCalledOnce();
+	});
+
 	for (const sql of ["BEGIN DBMS_SCHEDULER.RUN_JOB('X'); END;", "SELECT DBMS_SCHEDULER.RUN_JOB('X') FROM DUAL", "SELECT DBMS_LOCK.SLEEP(1) FROM DUAL", "SELECT DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT() FROM DUAL"]) it('blocks scheduler and maintenance writers before database access', () => { expect(() => classifySql(sql)).toThrow(); });
 	it('binds filters, caps, redacts before UTF8 clipping, audits hashes and closes', async () => {
 		const f = fixture(); const result = await readJobs(f.ctx, 'd1-19c-lab', { owner: 'sh', since: '2d', failedOnly: true });

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ToolContext, DatabaseIdentity } from '../contracts.js';
 import { sinceHours } from '../triage/parse.js';
 import { redactCredentials } from '../triage/redact.js';
+import { redactJobCredentials } from './redact.js';
 
 export class JobsUsageError extends Error {}
 export interface JobsOptions { since?: string; owner?: string; failedOnly?: boolean }
@@ -15,7 +16,7 @@ export interface JobsResult {
 }
 interface Definition { view: string; columns: string; where?: string; owner?: string; order: string; group?: string; failed?: string; latest?: boolean }
 export const jobQueries: Record<string, Definition> = {
-	jobs: { view: 'DBA_SCHEDULER_JOBS', columns: 'OWNER, JOB_NAME, ENABLED, STATE, LAST_START_DATE, NEXT_RUN_DATE, RUN_COUNT, FAILURE_COUNT', owner: 'OWNER', order: 'OWNER, JOB_NAME', failed: "(FAILURE_COUNT > 0 OR STATE = 'BROKEN')" },
+	jobs: { view: 'DBA_SCHEDULER_JOBS', columns: 'OWNER, JOB_NAME, ENABLED, STATE, LAST_START_DATE, NEXT_RUN_DATE, RUN_COUNT, FAILURE_COUNT', owner: 'OWNER', order: 'OWNER, JOB_NAME', failed: "(FAILURE_COUNT > 0 OR STATE IN ('FAILED', 'BROKEN', 'RETRY SCHEDULED'))" },
 	lastErrors: { view: 'DBA_SCHEDULER_JOB_RUN_DETAILS', columns: 'OWNER, JOB_NAME, LOG_ID, LOG_DATE, STATUS, ERROR#, ADDITIONAL_INFO', owner: 'OWNER', where: "LOG_DATE >= :fromTime AND LOG_DATE < :toTime AND STATUS = 'FAILED'", order: 'OWNER, JOB_NAME', latest: true },
 	runs: { view: 'DBA_SCHEDULER_JOB_RUN_DETAILS', columns: 'OWNER, JOB_NAME, LOG_ID, LOG_DATE, STATUS, ERROR#, ACTUAL_START_DATE, RUN_DURATION, ADDITIONAL_INFO', owner: 'OWNER', where: 'LOG_DATE >= :fromTime AND LOG_DATE < :toTime', order: 'LOG_DATE DESC, LOG_ID DESC', failed: "STATUS <> 'SUCCEEDED'" },
 	jobLog: { view: 'DBA_SCHEDULER_JOB_LOG', columns: 'OWNER, JOB_NAME, LOG_ID, LOG_DATE, OPERATION, STATUS', owner: 'OWNER', where: 'LOG_DATE >= :fromTime AND LOG_DATE < :toTime', order: 'LOG_DATE DESC, LOG_ID DESC', failed: "STATUS IN ('FAILED', 'STOPPED', 'BROKEN')" },
@@ -30,7 +31,7 @@ export const jobQueries: Record<string, Definition> = {
 	staleStatistics: { view: 'DBA_TAB_STATISTICS', columns: 'OWNER, OBJECT_TYPE, COUNT(*) STALE_COUNT', owner: 'OWNER', where: "STALE_STATS = 'YES'", group: 'OWNER, OBJECT_TYPE', order: 'OWNER, OBJECT_TYPE' },
 };
 export function safeJobText(value: string): { text: string; truncated: boolean } {
-	const redacted = redactCredentials(value);
+	const redacted = redactJobCredentials(redactCredentials(value));
 	let text = '';
 	for (const char of redacted) { if (Buffer.byteLength(text + char) > 2048) break; text += char; }
 	return { text, truncated: text.length < redacted.length };
@@ -44,29 +45,40 @@ export async function readJobs(ctx: ToolContext, target: string, options: JobsOp
 	const to = new Date(), from = new Date(to.getTime() - hours * 3600000);
 	const session = await ctx.sessions.get(target);
 	const result: JobsResult = { target, identity: session.identity, window: { from: from.toISOString(), to: to.toISOString() }, owner, failedOnly: options.failedOnly ?? false,
-		note: 'Current state and maintenance debt are snapshots; history uses [from, to). Owner filters apply only to owner-bearing views. Failed-only filters scheduler jobs with recorded failures and non-successful runs/logs, failed autotask and statistics history; maintenance context remains visible. Next run is a scheduler estimate, not a guarantee. Empty rows do not prove absence beyond visible/retained history.' + (session.identity?.isCdb ? ' Current PDB visibility only; empty rows do not establish CDB-wide absence.' : ''), sections: {} };
+		note: 'Current state and maintenance debt are snapshots; history uses [from, to). Owner filters apply only to owner-bearing views. Failed-only filters scheduler jobs with recorded failures, failed/broken/retry states or a latest retained failed run and non-successful runs/logs, failed autotask and statistics history; maintenance context remains visible. Next run is a scheduler estimate, not a guarantee. Empty rows do not prove absence beyond visible/retained history.' + (session.identity?.isCdb ? ' Current PDB visibility only; empty rows do not establish CDB-wide absence.' : ''), sections: {} };
 	try {
 		for (const [name, def] of Object.entries(jobQueries)) {
-			const clauses = [def.where, owner && def.owner ? `${def.owner} = :owner` : undefined, options.failedOnly ? def.failed : undefined].filter(Boolean);
+			const lastRunFailed = `(SELECT MAX(latest_run.STATUS) KEEP (DENSE_RANK LAST ORDER BY latest_run.LOG_DATE, latest_run.LOG_ID) FROM DBA_SCHEDULER_JOB_RUN_DETAILS latest_run WHERE latest_run.OWNER = DBA_SCHEDULER_JOBS.OWNER AND latest_run.JOB_NAME = DBA_SCHEDULER_JOBS.JOB_NAME) = 'FAILED'`;
+			const failureFilter = name === 'jobs' && def.failed ? `(${def.failed} OR ${lastRunFailed})` : def.failed;
+			const clauses = [def.where, owner && def.owner ? `${def.owner} = :owner` : undefined, options.failedOnly ? failureFilter : undefined].filter(Boolean);
 			const columns = def.columns.replace(/\b(LOG_DATE|ACTUAL_START_DATE|LAST_START_DATE|NEXT_RUN_DATE|NEXT_START_DATE|WINDOW_START_TIME|JOB_START_TIME|START_TIME|END_TIME)\b/g, column => `TO_CHAR(${column}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM') ${column}`);
 			const where = clauses.join(' AND ').replace(/:(fromTime|toTime)/g, bind => `TO_TIMESTAMP_TZ(${bind}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM')`);
 			const order = def.order.replace(/\b(LOG_DATE|WINDOW_START_TIME|START_TIME)\b/g, column => `${def.view}.${column}`);
 			const selectSql = `SELECT ${columns} FROM ${def.view}${clauses.length ? ' WHERE ' + where : ''}${def.group ? ' GROUP BY ' + def.group : ''} ORDER BY ${order}`;
-			const sql = def.latest ? `SELECT ${def.columns} FROM (SELECT ${columns}, ROW_NUMBER() OVER (PARTITION BY OWNER, JOB_NAME ORDER BY LOG_DATE DESC, LOG_ID DESC) RN FROM ${def.view} WHERE ${where}) WHERE RN = 1 ORDER BY ${def.order}` : selectSql;
+			let sql = def.latest ? `SELECT ${def.columns} FROM (SELECT ${columns}, ROW_NUMBER() OVER (PARTITION BY OWNER, JOB_NAME ORDER BY ${def.view}.LOG_DATE DESC, ${def.view}.LOG_ID DESC) RN FROM ${def.view} WHERE ${where}) WHERE RN = 1 ORDER BY ${def.order}` : selectSql;
 			const binds = { ...(def.where?.includes(':fromTime') ? { fromTime: from.toISOString().replace('Z', '+00:00'), toTime: to.toISOString().replace('Z', '+00:00') } : {}), ...(owner && def.owner ? { owner } : {}) };
-			const audit = { at: new Date().toISOString(), runId: ctx.runId, target, tool: `jobs:${name}`, sqlSha256: createHash('sha256').update(sql).digest('hex') };
+			const audit = () => ({ at: new Date().toISOString(), runId: ctx.runId, target, tool: `jobs:${name}`, sqlSha256: createHash('sha256').update(sql).digest('hex') });
 			try {
-				const data = await session.query(sql, binds, { maxRows: ctx.config.limits.maxRows, timeoutSeconds: ctx.config.limits.statementTimeoutSeconds });
+				const queryOptions = { maxRows: ctx.config.limits.maxRows, timeoutSeconds: ctx.config.limits.statementTimeoutSeconds };
+				let note: string | undefined;
+				const data = await session.query(sql, binds, queryOptions).catch(async error => {
+					const code = /ORA-\d{5}/.exec(String(error))?.[0];
+					if (name !== 'jobs' || !options.failedOnly || !['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code ?? '')) throw error;
+					await ctx.audit.record({ ...audit(), kind: 'tool_error', detail: code });
+					sql = sql.replace(failureFilter!, def.failed!);
+					note = `${code}: last-run status not available in this PDB / not granted; filtered by current state and failure count only.`;
+					return session.query(sql, binds, queryOptions);
+				});
 				const rows = data.rows.map(row => Object.fromEntries(data.columns.flatMap((column, i): [string, unknown][] => {
 					const value = row[i];
 					if (typeof value === 'string') { const safe = safeJobText(value); return [[column, safe.text], ...(safe.truncated ? [[column + '_TRUNCATED', true] as [string, unknown]] : [])]; }
 					return [[column, value instanceof Date ? value.toISOString() : value]];
 				})));
-				result.sections[name] = { view: def.view, status: 'ok', rows, truncated: data.truncated, sql };
-				await ctx.audit.record({ ...audit, kind: 'tool_call', rows: rows.length, truncated: data.truncated, elapsedMs: data.elapsedMs });
+				result.sections[name] = { view: def.view, status: 'ok', rows, truncated: data.truncated, sql, ...(note ? { note } : {}) };
+				await ctx.audit.record({ ...audit(), kind: 'tool_call', rows: rows.length, truncated: data.truncated, elapsedMs: data.elapsedMs });
 			} catch (error) {
 				const code = /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED';
-				await ctx.audit.record({ ...audit, kind: 'tool_error', detail: code });
+				await ctx.audit.record({ ...audit(), kind: 'tool_error', detail: code });
 				if (!['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) throw error;
 				result.sections[name] = { view: def.view, status: 'unavailable', rows: [], truncated: false, sql, note: `${code}: not available in this PDB / not granted; no absence inferred.` };
 			}
