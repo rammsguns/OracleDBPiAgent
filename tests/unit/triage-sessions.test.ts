@@ -43,11 +43,14 @@ it.each([
 ])('does not collect session evidence for %s', issue => {
 	expect(needsSessions(issue)).toBe(false);
 });
-it('keeps nontriggered triage JSON and Markdown byte-identical to pre-WP snapshot', async () => {
+it('keeps session-unrelated evidence byte-identical apart from the new jobs evidence', async () => {
 	vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-06T00:00:00.000Z'));
 	const { ctx, query } = setup();
 	const baseline = JSON.parse(readFileSync(new URL('./fixtures/triage-before-sessions.json', import.meta.url), 'utf8'));
 	const result = await triage(ctx, { target: 'd1-19c-lab', issue: 'NIGHTLY_JOB failed ORA-20001' });
+	expect(result.issues[0]?.jobEvidence).toBeDefined();
+	Reflect.deleteProperty(result.issues[0]!, 'jobEvidence');
+	result.issues[0]!.checks = result.issues[0]!.checks.filter(c => !c.label.startsWith('Jobs '));
 	expect(JSON.stringify(result)).toBe(JSON.stringify(baseline.result));
 	expect(renderTriageMarkdown(result)).toBe(baseline.markdown);
 	expect(query.mock.calls.some(([sql]) => sql === SQL.self)).toBe(false);

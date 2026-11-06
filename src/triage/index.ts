@@ -170,7 +170,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		blockerSql.push(evidence); reader.checks.push(...evidence.checks);
 	}
 	const topSql = [];
-	for (const row of top?.sql.rankings.elapsedUs.slice(0, 3) ?? []) {
+	for (const row of top?.sql.rankings.elapsedUs.slice(0, 1) ?? []) {
 		options.signal?.throwIfAborted();
 		const evidence = await collectSql(ctx, target.name, row.name, hours, []);
 		topSql.push(evidence); reader.checks.push(...evidence.checks);

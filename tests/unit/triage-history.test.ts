@@ -20,7 +20,7 @@ it('uses a single latest-five bound lookup for an older dropped job and scopes d
 			expect(sql).toContain('ORDER BY ACTUAL_START_DATE DESC NULLS LAST, LOG_ID DESC'); expect(sql.split('WHERE')[1]).not.toContain('ACTUAL_START_DATE >=');
 			return { ...empty, rows: [historical], columns: ['OWNER','JOB_NAME','STATUS','ERROR#','ACTUAL_START_DATE','ADDITIONAL_INFO','OUTSIDE_WINDOW'] };
 		}
-		if (/_ERRORS|_OBJECTS/.test(sql) && !sql.startsWith('WITH candidates')) diagnosticOwners.push(binds?.owner);
+		if (/_ERRORS|_OBJECTS/.test(sql) && !sql.startsWith('WITH candidates') && !sql.includes('COUNT(*)')) diagnosticOwners.push(binds?.owner);
 		return empty;
 	});
 	const result = await triage(ctx, { target: 'd1-19c-lab', issue: 'K7Q_FAILJOB on the lab keeps failing, what is wrong?' });
@@ -69,7 +69,7 @@ it('discovers an unqualified object in another owner and follows its jobs withou
 		if (sql.startsWith('WITH candidates')) return { ...empty, rows: [[0, 'OBJECT', 'K7Q_OWNER', 'TASKS']] };
 		if (sql.includes('_SCHEDULER_JOBS') && sql.includes('INSTR')) return { ...empty, rows: [['K7Q_OWNER', 'K7Q_FAILJOB', 'PLSQL_BLOCK', 'BEGIN K7Q_OWNER.TASKS.RUN; END;', 'TRUE', 'SCHEDULED']] };
 		if (sql.includes('AS OUTSIDE_WINDOW') && binds?.name === 'K7Q_FAILJOB') return { ...empty, rows: [historical] };
-		if (sql.includes('_ERRORS') || (sql.includes('_OBJECTS') && sql.includes("STATUS = 'INVALID'"))) owners.push(binds?.owner);
+		if (sql.includes('_ERRORS') || (sql.includes('_OBJECTS') && sql.includes("STATUS = 'INVALID'") && !sql.includes('COUNT(*)'))) owners.push(binds?.owner);
 		return empty;
 	});
 	const result = await triage(ctx, { target: 'd1-19c-lab', issue: 'package TASKS keeps failing' });
@@ -84,7 +84,7 @@ it('shows failed view access as unavailable in an empty search instead of implyi
 it('preserves an explicitly requested owner in both job discovery and history fallback', async () => {
 	const ctx = context(async (sql, binds) => {
 		classifySql(sql);
-		if (sql.includes('_SCHEDULER_JOBS') && !sql.includes('INSTR')) { expect(sql).toContain('OWNER = :namedOwner0_0'); expect(binds?.namedOwner0_0).toBe('APP'); }
+		if (sql.includes('_SCHEDULER_JOBS') && sql.includes('JOB_TYPE') && !sql.includes('INSTR')) { expect(sql).toContain('OWNER = :namedOwner0_0'); expect(binds?.namedOwner0_0).toBe('APP'); }
 		if (sql.includes('AS OUTSIDE_WINDOW')) { expect(binds?.owner).toBe('APP'); expect(binds?.name).toBe('MISSING_JOB'); }
 		return empty;
 	});

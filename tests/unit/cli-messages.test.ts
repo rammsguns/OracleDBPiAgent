@@ -65,5 +65,5 @@ it("drift help lists every supported scope without network access", () => {
 		env: { PATH: process.env.PATH, HOME: root, PIAGENT_HOME: root }, encoding: "utf8", timeout: 15000,
 	});
 	expect(child.status).toBe(0);
-	expect(child.stdout).toMatch(/parameters, schema, objects, security or space/);
+	expect(child.stdout).toMatch(/parameters, schema, objects, security, space or\s+backup/);
 });
