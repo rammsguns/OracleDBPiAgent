@@ -4,6 +4,7 @@ import { systemPrompt } from '../../src/agent/index.js';
 import { createDbTools } from '../../src/agent/dbToolsAdapter.js';
 import { loadConfig } from '../../src/config/index.js';
 import { parseTriageCommand, prepareChatQuestion } from '../../src/cli/chatTriage.js';
+import { ADR_GUIDANCE } from './fixtures/adr-guidance.js';
 import type { ToolContext } from '../../src/contracts.js';
 it('parses only the slash command, requires issue and caps UTF-8 bytes', () => {
 	expect(parseTriageCommand('/triage ORA-02292\nline 27')).toEqual({ issue: 'ORA-02292\nline 27', since: '24h' });
@@ -22,7 +23,7 @@ it('snapshots default agent prompt and tool schemas/descriptions against master'
 	// Captured only after verifying the constructors byte-for-byte against the recorded master commit.
 	const baseline = JSON.parse(readFileSync(new URL('./fixtures/chat-master.json', import.meta.url), 'utf8'));
 	const ctx = { config: loadConfig({}), sessions: {}, audit: {}, runId: 'snapshot' } as ToolContext;
-	expect(systemPrompt(ctx)).toBe(baseline.systemPrompt);
+	expect(systemPrompt(ctx)).toBe(baseline.systemPrompt + ADR_GUIDANCE);
 	const tools = (await createDbTools(ctx)).map(t => ({ name: t.name, label: t.label, description: t.description, parameters: t.parameters }));
 	expect(JSON.stringify(tools)).toBe(JSON.stringify(baseline.tools));
 });
