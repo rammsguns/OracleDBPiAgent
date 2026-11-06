@@ -217,3 +217,28 @@ td:nth-child(2) { max-width: 24rem; }
 @media (min-width: 801px) { main:has(#dbsessions-tab[aria-selected="true"]) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
 @media (prefers-color-scheme: dark) { #dbsessions-panel { --graph-node-fill: #223b45; --graph-node-stroke: #b8dce7; } }
 .dbsessions-toolbar[hidden] { display: none; }
+
+#space-panel, #space-content { min-width: 0; overflow-wrap: anywhere; }
+.space-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem .75rem; margin: .75rem 0; }
+.space-field { min-width: 0; max-width: 100%; }
+.space-field label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .25rem; }
+.space-field input { width: 12rem; max-width: 100%; padding: .5rem; font: inherit; border: 1px solid #859ba5; border-radius: .35rem; }
+.space-field select { max-width: 100%; }
+#space-top { width: 7rem; }
+.space-card { border: 1px solid #859ba5; border-radius: .4rem; padding: .75rem; margin: .75rem 0; min-width: 0; }
+#space-content .table-scroll { display: block; width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
+#space-content table { width: 100%; min-width: 38rem; border-collapse: collapse; overflow-wrap: normal; }
+#space-content th, #space-content td { padding: .5rem; text-align: left; border-bottom: 1px solid #859ba5; min-width: 6rem; }
+#space-content th { white-space: nowrap; }
+.space-scroll-hint { position: sticky; left: 0; width: fit-content; max-width: 100%; font-size: .8rem; }
+.space-usage { margin: 1.2rem 0; }
+.space-usage p { margin: .35rem 0; }
+.space-bar { position: relative; display: flex; height: 1.5rem; border: 1px solid currentColor; margin-top: .5rem; }
+.space-used { background: #236a8a; }
+.space-free { background: repeating-linear-gradient(45deg,#bdd9df 0 4px,#65828b 4px 6px); }
+.space-expansion { background: repeating-linear-gradient(90deg,transparent 0 7px,#859ba5 7px 8px); }
+.space-threshold { position: absolute; top: -.2rem; bottom: -.2rem; border-left: 2px dashed #a22d12; }
+@media (min-width: 801px) { main:has(#space-tab[aria-selected="true"]) { grid-template-columns: minmax(12rem,1fr) minmax(0,3fr); } }
+@media (prefers-color-scheme: dark) { .space-used { background: #66b9df; } .space-threshold { border-color: #ffb39e; } }
+.space-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.space-legend span { display: inline-block; width: 1.2rem; height: 1rem; border: 1px solid currentColor; margin-left: .5rem; }
