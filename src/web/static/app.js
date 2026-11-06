@@ -1,3 +1,4 @@
+import { initOperations } from './operations.js';
 import { initSpace } from './space.js';
 import { initDbSessions } from './dbsessions.js';
 import { initSecurity } from "./security.js";
@@ -151,7 +152,7 @@ async function audit() {
 	}
 }
 function tab(selected) {
-	for (const id of ['audit', 'trace', 'report', 'drift', 'plsql', 'alertlog', 'sql', 'security', 'dbsessions', 'space', 'triage']) {
+	for (const id of tabs) {
 		$(`${id}-tab`).setAttribute('aria-selected', String(id === selected));
 		$(`${id}-tab`).tabIndex = id === selected ? 0 : -1; $(`${id}-panel`).hidden = id !== selected;
 	}
@@ -229,7 +230,7 @@ $('target').addEventListener('change', async () => {
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
-const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'sql', 'dbsessions', 'space', 'security', 'alertlog', 'triage'];
+const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'sql', 'dbsessions', 'space', 'backup', 'jobs', 'top', 'security', 'alertlog', 'triage'];
 for (const [index, id] of tabs.entries()) {
 	$(`${id}-tab`).addEventListener('click', () => tab(id));
 	$(`${id}-tab`).addEventListener('keydown', event => {
@@ -255,6 +256,7 @@ async function init() {
 		initSecurity(api, targets);
 		initDbSessions(api, targets);
 		initSpace(api, targets);
+		initOperations(api, targets);
 		await newSession(); await health();
 	} catch (error) { status(error.message); } finally { busy(false); }
 }
