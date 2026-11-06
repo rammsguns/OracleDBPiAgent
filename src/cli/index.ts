@@ -95,7 +95,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const previous = compare ? await loadLatestReport(out!, options.target, config.targets) : null;
 		const sessions = await createSessions(config);
 		try {
-			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, sections: options.sections?.split(",").map(s => s.trim()) });
+			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, historyDirectory: out, sections: options.sections?.split(",").map(s => s.trim()) });
 			const markdown = renderMarkdown(report);
 			const changes = compare ? diff(previous, report) : undefined;
 			if (out) await saveReport(out, report, config.targets, options.out === undefined);

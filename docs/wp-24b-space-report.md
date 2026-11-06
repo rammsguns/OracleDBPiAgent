@@ -22,6 +22,8 @@ Implemented on branch `wp-24b-space-report`, 2026-11-06.
 - `src/drift/index.ts`: scope validation and dispatch.
 - `tests/unit/report-space.test.ts`, `tests/unit/drift-space.test.ts`, `tests/unit/__snapshots__/report-space.test.ts.snap`.
 - `tests/integration/report-space.test.ts` and this document.
+- `src/cli/index.ts`: coordinator-authorized one-line forwarding of `historyDirectory: out`.
+- `tests/unit/report-cli.test.ts`: custom-output forecast regression test with real saved histories.
 
 ## Validation
 
@@ -35,7 +37,7 @@ PASS (exit 0)
 
 npm test -- --maxWorkers=2
 Test Files 101 passed (101)
-Tests      1569 passed (1569)
+Tests      1570 passed (1570)
 
 npx vitest run tests/unit/report-space.test.ts tests/unit/drift-space.test.ts --maxWorkers=2
 Test Files 2 passed (2)
@@ -63,10 +65,14 @@ exit 3; complete comparison
 
 The d1 report contained five tablespaces and the p1 report six. P1-only `SHOP_DATA` was permanent, smallfile, with maximum 4,294,967,296 bytes (4 GiB). Redo size/count and FRA configuration matched. Neither target had a configured FRA. Both reports correctly displayed `not enough history` for forecasts. No live 24-hour history was fabricated; positive, noisy, flat, negative, short-span, invalid and capacity-boundary cases were verified using unit fixtures.
 
-## Contracts and coordinator follow-up
+## Contracts and custom output history
 
 No changes are needed to `src/contracts.ts`, `package.json` or `PLAN.md`; none were edited. The local `ReportOptions` adapter adds optional `historyDirectory`, defaulting to the existing `reportDirectory()` (including `PIAGENT_REPORT_DIRECTORY`). Existing history JSON schema is unchanged.
 
-One CLI wiring change is outside this WP's owned paths: in `src/cli/index.ts`, pass `historyDirectory: out` to `generateReport` alongside `target`, `owner` and `sections`. This makes an explicit custom `report --out DIR` also select DIR for forecasting. Until the coordinator adds that line, forecasts read the default/environment history directory even when the CLI saves to a different `--out`; programmatic callers can already pass `historyDirectory`. Use `PIAGENT_REPORT_DIRECTORY=DIR` with the same `--out DIR` as the current CLI workaround. No CLI files were edited.
+The coordinator authorized the CLI wiring change in `src/cli/index.ts`. The report command now passes `historyDirectory: out` to `generateReport`, so `report --out DIR` reads the same history directory it writes. No coordinator follow-up remains.
+
+The new CLI regression test seeds two distinct private temporary history directories and invokes the actual report command with `--out` pointing to the custom directory. The CLI unit harness mocks configuration, session creation, audit and the space reader; history loading, fitting, JSON output and persistence execute normally. Custom history (10, 20 bytes) followed by current usage (30 bytes) gives 10 bytes/day and 7 days to maximum. Conflicting default-directory history (90, 80 bytes) would instead give a negative slope. The test also verifies the forecast is saved in the custom directory and the default history stays unchanged. Before the wiring change, the test failed with `not growing` and −30 bytes/day, proving it detects the defect.
+
+After the wiring change, `npm run typecheck`, `npm test -- --maxWorkers=2`, and the full integration command above were rerun. Results are recorded in Validation. The requested Strata end-to-end test remained excluded.
 
 Database activity used only the existing space reader and approved read-only providers. No secrets were printed or copied. No changes were made to other projects, services or containers. No push or merge was performed.

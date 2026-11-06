@@ -85,3 +85,36 @@ it('reads history with no database or LLM calls and supports the child target op
 		await expect(main(['node', 'piagent', 'report', 'history', '--target', 'lab', '--last', '3x'])).rejects.toThrow('--last');
 	} finally { vi.unstubAllEnvs(); log.mockRestore(); await rm(dir, { recursive: true, force: true }); }
 });
+
+it('uses --out history for space forecasts instead of the default history directory', async () => {
+	const { mkdtemp, rm } = await import('node:fs/promises');
+	const { tmpdir } = await import('node:os');
+	const { join } = await import('node:path');
+	const { saveReport, loadLatestReport } = await import('../../src/report/history.js');
+	const reader = await import('../../src/space/index.js');
+	const root = await mkdtemp(join(tmpdir(), 'space-forecast-cli-'));
+	const out = join(root, 'custom'), fallback = join(root, 'default');
+	const targets = [{ name: 'lab' }];
+	const saved = (day: number, value: number) => ({ target: 'lab', generatedAt: `2026-11-0${day}T00:00:00.000Z`, sections: [{ name: 'space', status: 'ok' as const, source: 'readSpaceUsage', columns: ['METRIC', 'NAME', 'VALUE', 'MAX_BYTES', 'STATUS'], rows: [['tablespace', 'USERS', value, 100, 'ok']], note: '' }] });
+	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+	const read = vi.spyOn(reader, 'readSpaceUsage').mockResolvedValue({ target: 'lab', capturedAt: '2026-11-03T00:00:00.000Z', status: 'ok', findings: [], sections: {
+		tablespaces: { status: 'ok', evidence: { status: 'ok', truncated: false }, supportingEvidence: [], rows: [{ name: 'USERS', usedBytes: 30, maxBytes: 100 }] },
+	} } as unknown as reader.SpaceReport);
+	vi.stubEnv('PIAGENT_REPORT_DIRECTORY', fallback);
+	vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-03T00:00:00.000Z'));
+	try {
+		await saveReport(out, saved(1, 10), targets);
+		await saveReport(out, saved(2, 20), targets);
+		await saveReport(fallback, saved(1, 90), targets);
+		await saveReport(fallback, saved(2, 80), targets);
+		await main(['node', 'piagent', 'report', '--target', 'lab', '--sections', 'space', '--out', out, '--json']);
+		const result = JSON.parse(log.mock.calls.at(-1)?.[0]);
+		expect(result.sections[0].rows[0]).toEqual(['tablespace', 'USERS', 30, 100, 'ok', 10, 7, 'growing']);
+		expect(await loadLatestReport(out, 'lab', targets)).toEqual(result);
+		expect((await loadLatestReport(fallback, 'lab', targets))?.generatedAt).toBe(saved(2, 80).generatedAt);
+		expect(mocks.summary).not.toHaveBeenCalled();
+	} finally {
+		vi.useRealTimers(); vi.unstubAllEnvs(); read.mockRestore(); log.mockRestore();
+		await rm(root, { recursive: true, force: true });
+	}
+});
