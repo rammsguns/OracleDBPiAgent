@@ -3614,6 +3614,151 @@ The coordinator's live smoke on p1 and the WP-23F review found:
 - Phases 23 and 24 together make 1.3.0. Bump the version and tag only when
   the owner asks.
 
+## Phase 25: backup and recoverability (proposed 2026-11-06; needs owner approval and p1 grants)
+
+### Goal
+`piagent backup --target T` is a read-only recoverability review. It covers:
+- RMAN job history and outcomes;
+- the last good full (level 0) and incremental backup of each datafile;
+- archived-log continuity since the last full backup (gaps);
+- control-file autobackup and RMAN configuration;
+- the recovery-area reclaimable balance;
+- block corruption;
+- datafiles needing recovery.
+
+The result is a "can we restore to time X?" estimate that names its
+evidence. It never runs RMAN and never writes to the database. Example
+commands are prose, prefixed "For a human DBA:".
+
+### Access (probed read-only 2026-11-06)
+- **d1:** HARNESS_LAB can read every needed view:
+  - V$RMAN_BACKUP_JOB_DETAILS, V$BACKUP_SET, V$BACKUP_PIECE and
+    V$BACKUP_DATAFILE;
+  - V$ARCHIVED_LOG, V$LOG_HISTORY, V$CONTROLFILE and V$RMAN_CONFIGURATION;
+  - V$DATABASE_BLOCK_CORRUPTION and V$RECOVER_FILE.
+- **p1:** HARNESS_RO can read none of them. The grant file
+  `docs/grants-request-<date>-backup.sql` would add SELECT on each.
+
+### Eval premise impact (must be handled before granting)
+The phase 20 grants broke eval premises, and the same would happen here.
+Two cases assume p1 cannot read these views:
+- `hard-grant-p1-backups` (regression);
+- `hard-p8-archive-access` (holdout).
+
+WP-25D runs before the grants are applied. It re-premises both cases to a
+view that stays unreadable, or converts them to positive cases, in the same
+way as WP-20E: a frozen fixture, a checksum update and an archive replay.
+- Because the holdout case is exposed by the change, it moves to dev and a
+  fresh blind holdout case replaces it.
+- After the grants, `validate-hard` must pass live.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-25A core and CLI | `wp-25a-backup` | codex | new `src/backup/`, the `backup` command, docs, tests |
+| WP-25B integration | `wp-25b-backup-integration` | codex | triage ("can we recover", "backup failed", "ORA-19*"/RMAN errors), an opt-in report `backup` section with trends, and `drift --scope backup` (configuration only) |
+| WP-25C web | `wp-25c-backup-web` | codex | a Backup tab with a recoverability timeline (backups and archived-log coverage as lanes, gaps highlighted) |
+| WP-25D evals and premises | `wp-25d-backup-evals` | codex | the re-premise above (first), then p25 cases (last level-0 time, archived-log gap count, the RMAN retention setting, and the "no backups recorded" contract) |
+
+Findings:
+
+| Finding | Severity |
+|---|---|
+| No successful level 0 backup in 7 days | high |
+| An archived-log sequence gap after the last level 0 | high |
+| Control-file autobackup OFF | medium |
+| A corrupt block listed | high |
+| A datafile needing recovery | high |
+| No backups recorded at all | high, worded as "not verifiable from this database" if the views are unreadable |
+
+Gate: single side plus the full suites, with a mandatory `validate-hard` run
+after the grants.
+
+## Phase 26: scheduler jobs and maintenance health (proposed 2026-11-06; needs owner approval and p1 grants)
+
+### Goal
+`piagent jobs --target T` gives a read-only view of:
+- scheduler jobs: state, last and next run, failure counts, and the last
+  error per job from run details;
+- autotask clients (optimizer statistics, segment advisor and SQL tuning)
+  and their recent windows;
+- statistics-gathering history;
+- maintenance debt: invalid objects, unusable or invalid indexes and
+  partitions, and stale-statistics counts per schema.
+
+It answers "what failed overnight and why?" together with the alert log
+(phase 18). It never runs, enables, disables or changes a job.
+
+### Access (probed read-only 2026-11-06)
+- **d1:** can read all of the views below.
+- **p1:** can read only DBA_SCHEDULER_JOBS, DBA_SCHEDULER_JOB_RUN_DETAILS and
+  DBA_OBJECTS. A grant file would add:
+  - DBA_SCHEDULER_JOB_LOG and DBA_SCHEDULER_WINDOWS;
+  - DBA_AUTOTASK_CLIENT and DBA_AUTOTASK_JOB_HISTORY;
+  - DBA_OPTSTAT_OPERATIONS and DBA_INDEXES (plus DBA_IND_PARTITIONS, to
+    probe).
+
+  DBA_TAB_STATISTICS already came with the phase 19 grants.
+- Before granting, check every grant-limited eval case for the new views,
+  as in phase 25.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-26A core and CLI | `wp-26a-jobs` | codex | new `src/jobs/`; `--since` window, `--owner` and `--failed-only` options |
+| WP-26B integration | `wp-26b-jobs-integration` | codex | triage: a job failure in the alert log links to the job's run details, so "the nightly job failed" resolves to the job, its error and the related object. An opt-in report `jobs` section with failure trends. |
+| WP-26C web | `wp-26c-jobs-web` | codex | a Jobs tab: a run timeline per job with failed runs marked, and maintenance-debt cards |
+| WP-26D evals | `wp-26d-p26-evals` | codex | p26: last failed job and its error, number of invalid objects in SHOPAPP, whether the stats autotask is enabled, and next run time semantics |
+
+The job-error text in run details may contain data values, so it is
+truncated and redacted with the triage redactor.
+
+Gate: single side plus the full suites. Use A/B if the triage changes alter
+answers in the chat path.
+
+## Phase 27: live top-SQL and load sampler without ASH (proposed 2026-11-06; needs owner approval and p1 grants)
+
+### Goal
+`piagent top --target T [--seconds N]` measures what the database is doing
+right now, without the Diagnostics Pack:
+- It takes two reads of V$SQLSTATS, V$SYSSTAT and V$OSSTAT N seconds apart
+  (default 15, range 5 to 120) and reports deltas.
+- **Top SQL:** by elapsed time, CPU, buffer gets, physical reads and
+  executions in the interval. SQL_ID only, with each SQL_ID linked to
+  `piagent sql`; no SQL text unless policy-filtered.
+- **Load profile:** per second, covering user calls, logical and physical
+  reads, redo size, parses (hard and total) and commits.
+- **Host CPU and load** from V$OSSTAT.
+
+This fills the gap left by refusing ASH and AWR.
+
+Licensing:
+- V$SQLSTATS, V$SYSSTAT, V$OSSTAT and V$SESSTAT are not Diagnostics Pack
+  views. A WP-27A doc note cites this.
+- V$ACTIVE_SESSION_HISTORY, DBA_HIST_*, V$METRIC* history and
+  DBMS_WORKLOAD_REPOSITORY stay refused by sqlPolicy, and a test proves it.
+
+### Access (probed read-only 2026-11-06)
+- **d1:** can read V$SQLSTATS, V$SYSSTAT, V$OSSTAT, V$SESSTAT, V$STATNAME
+  and V$SQLAREA.
+- **p1:** can read only V$SQLSTATS. A grant file would add V_$SYSSTAT,
+  V_$OSSTAT, V_$SESSTAT and V_$STATNAME.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-27A core and CLI | `wp-27a-top` | codex | new `src/top/`. Two-snapshot deltas that handle cursors aged out, new between snapshots, or showing counter resets. Uses one session, and sleeps in Node, never with DBMS_LOCK. |
+| WP-27B integration | `wp-27b-top-integration` | codex | triage on "slow right now": a 15 s sample whose top SQL feeds the SQL evidence path. A chat `/top` command, with no agent prompt change unless gated A/B. |
+| WP-27C web | `wp-27c-top-web` | codex | a Top tab with a sample button, a progress state and delta tables. It never auto-polls. |
+| WP-27D evals | `wp-27d-p27-evals` | codex | Live load is not stable truth, so the cases test interpretation instead: fixed facts (statistic names and classes, the meaning of a delta) and refusal cases ("show me ASH for the last hour" must refuse and offer `top`). |
+
+Gate: A/B if the triage or chat changes alter the agent path; otherwise
+single side plus the full suites.
+
+### After phases 25 to 27
+Release them as 1.4.0, after a full release gate (dev, holdout, regression,
+MVP, and p23 to p27) and a package smoke.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
