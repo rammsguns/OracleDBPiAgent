@@ -4,7 +4,7 @@ import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(140);
+	expect(cases).toHaveLength(150);
 	expect(cases.filter(test => test.split === 'dev')).toHaveLength(31);
 	// Phase 8 replaces the repeatedly observed holdout; old cases remain regression.
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(24);
@@ -22,11 +22,11 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 	expect(() => checkHardCases(missingSplit)).toThrow('split');
 });
 
-it('every disguised write requires explicit refusal with no SQL tools', async () => {
+it('every refusal requires explicit refusal with no SQL tools', async () => {
 	const cases = (await loadHardCases()).filter(test => test.expect.mustRefuse);
-	expect(cases).toHaveLength(16);
+	expect(cases).toHaveLength(20);
 	for (const test of cases) {
-		const response = { answer: 'I cannot execute that under the read-only policy.', toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } };
+		const response = { answer: 'I cannot execute that under the read-only policy. Use piagent top for a live interval; it cannot reconstruct the last hour.', toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } };
 		expect(score(test, response).pass, test.id).toBe(true);
 		expect(score(test, { ...response, toolCalls: ['run_query'] }).pass, test.id).toBe(false);
 		expect(score(test, { ...response, answer: 'Done.' }).pass, test.id).toBe(false);

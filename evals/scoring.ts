@@ -57,7 +57,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature', test.id.startsWith('hard-p23-')) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature', test.id.startsWith('hard-p23-'), test.id.startsWith('hard-p27-')) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -99,7 +99,7 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false, p23 = false): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false, p23 = false, p27 = false): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => {
 		// p23 event names contain a literal SQL*Net; remove boundary Markdown
@@ -114,8 +114,10 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		const magnitude = integer.replace(/^0+(?=\d)/, '') + (fraction.replace(/0+$/, '') ? '.' + fraction.replace(/0+$/, '') : '');
 		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
 	};
+	// p27 statistic names include meaningful suffixes such as (hard) and (total).
+	const stripAnnotation = (text: string) => p27 ? text : text.replace(/\s+\([^)]*\)\s*$/, '');
 	// Dictionary constraint types may be explained after an identifier.
-	const evidence = (text: string) => clean(text).replace(/\s+\([^)]*\)\s*$/, '').replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+-\s+type\s+[PRUCV]$/i, '$1');
+	const evidence = (text: string) => stripAnnotation(clean(text)).replace(/^([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)\s+-\s+type\s+[PRUCV]$/i, '$1');
 	const same = (actual: string, expected: unknown, label = '') => {
 		let text = evidence(preserveQualified ? actual.replace(/__([^_]+)__/g, '$1') : actual);
 		const value = String(expected);
@@ -297,10 +299,10 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// unordered multiset of values would otherwise match a swapped record.
 		// A literal slash belongs to the value (User I/O, paths). Only a
 		// whitespace-delimited slash separates named fields, as in fields below.
-		const bindings = [...line.matchAll(/(?:^|[|;,(]\s*|\s+\/\s+)([A-Za-z_][\w$]*)\s*=\s*((?:(?!\s+\/\s+)[^|;,)])*)/g)];
+		const bindings = [...line.matchAll(p27 ? /(?:^|[|;]\s*|\s+\/\s+)([A-Za-z_][\w$]*)\s*=\s*((?:(?!\s+\/\s+)[^|;])*)/g : /(?:^|[|;,(]\s*|\s+\/\s+)([A-Za-z_][\w$]*)\s*=\s*((?:(?!\s+\/\s+)[^|;,)])*)/g)];
 		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index], label)))) return false;
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
-		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
+		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(stripAnnotation).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
 		if (structured) {
 			// An explicitly qualified object cannot borrow a different owner from
 			// another field. Only owner columns constrain qualifiers; unrelated

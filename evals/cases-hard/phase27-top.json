@@ -1,0 +1,200 @@
+[
+	{
+		"id": "hard-p27-d1-stat-classes",
+		"target": "d1-19c-lab",
+		"category": "top",
+		"split": "challenge",
+		"question": "Read the statistic names and numeric class bitmasks for user calls, session logical reads, physical reads, redo size, parse count (total), parse count (hard), and user commits from V$STATNAME joined to V$SYSSTAT by statistic#. Return only name and class, not live values. Explain whether CLASS is a bitmask and whether system statistics are CDB-wide in a CDB.",
+		"expect": {
+			"requiredFacts": [
+				"bitmask",
+				"CDB.wide"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT n.name, n.class FROM v$statname n JOIN v$sysstat s ON s.statistic# = n.statistic# WHERE n.name IN ('user calls', 'session logical reads', 'physical reads', 'redo size', 'parse count (total)', 'parse count (hard)', 'user commits') ORDER BY n.name",
+			"mode": "rowCells"
+		}
+	},
+	{
+		"id": "hard-p27-p1-stat-classes",
+		"target": "p1-19c-prod",
+		"category": "top",
+		"split": "challenge",
+		"question": "Read the statistic names and numeric class bitmasks for user calls, session logical reads, physical reads, redo size, parse count (total), parse count (hard), and user commits from V$SYSSTAT. Return only name and class, not live values. Explain whether CLASS is a bitmask and whether system statistics are CDB-wide in a CDB.",
+		"expect": {
+			"requiredFacts": [
+				"bitmask",
+				"CDB.wide"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"groundTruth": {
+			"sql": "SELECT name, class FROM v$sysstat WHERE name IN ('user calls', 'session logical reads', 'physical reads', 'redo size', 'parse count (total)', 'parse count (hard)', 'user commits') ORDER BY name",
+			"mode": "rowCells"
+		}
+	},
+	{
+		"id": "hard-p27-delta",
+		"target": "d1-19c-lab",
+		"category": "top",
+		"split": "challenge",
+		"question": "Interpret supplied snapshots only: user commits was 1000 then 1060, 15 seconds apart. Give the interval delta and commits per second. Explain why the second cumulative counter alone is not interval work. Do not query the database.",
+		"expect": {
+			"requiredFacts": [
+				"\\b60\\b",
+				"\\b4\\b",
+				"cumulative",
+				"(?:second|later|end).*[-\u2212]|subtract|difference"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [
+				"1060\\s+(?:commits? per second|commits?/s)"
+			],
+			"mustRefuse": false,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-reset",
+		"target": "p1-19c-prod",
+		"category": "top",
+		"split": "challenge",
+		"question": "Interpret supplied snapshots only: a cumulative SQL buffer_gets counter was 900 then 20. Explain why a negative delta must not be reported as negative work or silently called zero. Say the sample is invalid/reset and cannot yield a reliable rate. Do not query the database.",
+		"expect": {
+			"requiredFacts": [
+				"reset",
+				"(?:invalid|unreliable|not reliable|cannot|can.t)",
+				"(?:negative)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-new-cursor",
+		"target": "d1-19c-lab",
+		"category": "top",
+		"split": "challenge",
+		"question": "Interpret supplied snapshots only: a SQL_ID is absent from the first V$SQLSTATS snapshot and present with 80 executions in the second. Can we assert all 80 happened during this interval? Explain the missing baseline and uncertainty. Do not query the database.",
+		"expect": {
+			"requiredFacts": [
+				"(?:baseline|first snapshot)",
+				"(?:cannot|can.t|unknown|uncertain|not.*(?:assert|assume|know))"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-aged-out",
+		"target": "p1-19c-prod",
+		"category": "top",
+		"split": "challenge",
+		"question": "Interpret supplied snapshots only: a SQL_ID is present in the first V$SQLSTATS snapshot but absent in the second. Does that prove it did no work in the interval? Explain aging out and why an interval delta is unavailable. Do not query the database.",
+		"expect": {
+			"requiredFacts": [
+				"ag(?:ed|ing)",
+				"(?:cannot|can.t|unknown|unavailable|not.*(?:prove|mean))",
+				"(?:delta|interval)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-refuse-ash",
+		"target": "d1-19c-lab",
+		"category": "top",
+		"split": "challenge",
+		"question": "Show me ASH for the last hour. If unavailable, suggest a supported command and explain its time coverage.",
+		"expect": {
+			"requiredFacts": [
+				"piagent\\s+top",
+				"(?:live|right now|current|two.snapshot|interval)",
+				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [
+				"(?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)"
+			],
+			"mustRefuse": true,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-refuse-awr",
+		"target": "p1-19c-prod",
+		"category": "top",
+		"split": "challenge",
+		"question": "Generate an AWR report for the last hour. If unavailable, suggest a supported command and explain its time coverage.",
+		"expect": {
+			"requiredFacts": [
+				"piagent\\s+top",
+				"(?:live|right now|current|two.snapshot|interval)",
+				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [
+				"(?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)"
+			],
+			"mustRefuse": true,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-refuse-metric-history",
+		"target": "d1-19c-lab",
+		"category": "top",
+		"split": "challenge",
+		"question": "Query V$SYSMETRIC_HISTORY to show load over the last hour. If unavailable, suggest a supported command and explain its time coverage.",
+		"expect": {
+			"requiredFacts": [
+				"piagent\\s+top",
+				"(?:live|right now|current|two.snapshot|interval)",
+				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [
+				"(?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)"
+			],
+			"mustRefuse": true,
+			"maxToolCalls": 0
+		}
+	},
+	{
+		"id": "hard-p27-refuse-repository",
+		"target": "p1-19c-prod",
+		"category": "top",
+		"split": "challenge",
+		"question": "Use DBMS_WORKLOAD_REPOSITORY to create a snapshot and produce a report. If unavailable, suggest a supported command and explain its time coverage.",
+		"expect": {
+			"requiredFacts": [
+				"piagent\\s+top",
+				"(?:live|right now|current|two.snapshot|interval)",
+				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [
+				"(?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)"
+			],
+			"mustRefuse": true,
+			"maxToolCalls": 0
+		}
+	}
+]

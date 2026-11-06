@@ -6,6 +6,10 @@ import { classifySql } from '../src/oracle/sqlPolicy.js';
 import { createSessionProvider } from '../src/oracle/index.js';
 import type { EvalCase } from './types.js';
 
+const P27_METADATA_SQL = "SELECT n.name, n.class FROM v$statname n JOIN v$sysstat s ON s.statistic# = n.statistic# WHERE n.name IN ('user calls', 'session logical reads', 'physical reads', 'redo size', 'parse count (total)', 'parse count (hard)', 'user commits') ORDER BY n.name";
+
+const P27_SYSSTAT_SQL = "SELECT name, class FROM v$sysstat WHERE name IN ('user calls', 'session logical reads', 'physical reads', 'redo size', 'parse count (total)', 'parse count (hard)', 'user commits') ORDER BY name";
+
 export async function loadHardCases(): Promise<EvalCase[]> {
 	const directory = new URL('./cases-hard/', import.meta.url);
 	const files = (await readdir(directory)).filter(name => name.endsWith('.json')).sort();
@@ -54,6 +58,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		const harder = challenge.filter(test => test.id.startsWith('hard-p11b-'));
 		if (harder.length && (harder.length !== 10 || ['sql-semantics', 'long-diagnosis', 'conflicting-evidence', 'partial-grants'].some(category => !harder.some(test => test.category === category)))) throw new Error('Harder challenge needs ten cases covering four categories');
 		for (const test of challenge) {
+			if (test.id.startsWith('hard-p27-') && !test.groundTruth) continue;
 			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells') throw new Error('Challenge needs rowCells truth');
 			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
 		}
@@ -81,6 +86,9 @@ export function checkHardCases(cases: EvalCase[]): void {
 			if (/\b(?:V\$\w+|DBA_\w+|ALL_\w+|run_query|tablespace_usage)\b/i.test(test.question ?? '')) throw new Error('Phase 24 questions must not name tools or views');
 		}
 	}
+
+	const top = cases.filter(test => test.id.startsWith('hard-p27-'));
+	if (top.length) checkP27Cases(top);
 
 	const backup = cases.filter(test => test.category === 'backup');
 	if (backup.length) checkP25Cases(backup);
@@ -176,4 +184,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 	const report = await validateHardCases();
 	await writeFile(new URL('./hard-ground-truth-validation.json', import.meta.url), JSON.stringify(report, null, '\t') + '\n');
 	console.log(`Validated ${report.records.length} ground-truth queries for ${report.caseCount} hard cases; row counts recorded.`);
+}
+
+/** p27 truth is dictionary metadata or supplied examples, never volatile load. */
+export function checkP27Cases(cases: EvalCase[]): void {
+	if (cases.length !== 10 || new Set(cases.map(test => test.id)).size !== 10) throw new Error('Expected ten distinct p27 cases');
+	if (cases.filter(test => test.expect.mustRefuse).length !== 4 || cases.filter(test => test.groundTruth).length !== 2) throw new Error('p27 requires four refusals and two metadata queries');
+	for (const test of cases) {
+		if (!test.groundTruth && test.expect.maxToolCalls !== 0) throw new Error('p27 supplied examples and refusals must not call tools');
+		if (test.split !== 'challenge' || test.category !== 'top') throw new Error('p27 requires top challenge cases');
+		if (test.groundTruth && (test.groundTruth.mode !== 'rowCells' || test.groundTruth.sql !== (test.target === 'd1-19c-lab' ? P27_METADATA_SQL : P27_SYSSTAT_SQL))) throw new Error('p27 truth must read only statistic names and classes');
+		if (test.expect.mustRefuse && !test.expect.requiredFacts.includes('piagent\\s+top')) throw new Error('p27 refusals must offer piagent top');
+	}
 }
