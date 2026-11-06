@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-05T23:37:35.507Z",
-	"caseCount": 123,
+	"validatedAt": "2026-11-06T16:06:57.273Z",
+	"caseCount": 135,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -1356,7 +1356,7 @@
 			"rows": [
 				[
 					2134003100,
-					2
+					1
 				]
 			]
 		},
@@ -1754,6 +1754,219 @@
 					1,
 					"ORA 800",
 					86767
+				]
+			]
+		},
+		{
+			"id": "hard-p23-d1-dominant-wait-class",
+			"target": "d1-19c-lab",
+			"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"System I/O"
+				]
+			]
+		},
+		{
+			"id": "hard-p23-p1-dominant-wait-class",
+			"target": "p1-19c-prod",
+			"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"System I/O"
+				]
+			]
+		},
+		{
+			"id": "hard-p23-d1-commit-events",
+			"target": "d1-19c-lab",
+			"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('log file sync','log file parallel write') ORDER BY name",
+			"mode": "rowCells",
+			"rowCount": 2,
+			"rows": [
+				[
+					"log file parallel write",
+					"System I/O"
+				],
+				[
+					"log file sync",
+					"Commit"
+				]
+			]
+		},
+		{
+			"id": "hard-p23-p1-lock-idle-events",
+			"target": "p1-19c-prod",
+			"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('enq: TX - row lock contention','enq: TM - contention','SQL*Net message from client') ORDER BY name",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"SQL*Net message from client",
+					"Idle"
+				],
+				[
+					"enq: TM - contention",
+					"Application"
+				],
+				[
+					"enq: TX - row lock contention",
+					"Application"
+				]
+			]
+		},
+		{
+			"id": "hard-p23-d1-event-definition-counts",
+			"target": "d1-19c-lab",
+			"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('Application','Commit','Concurrency') GROUP BY wait_class ORDER BY wait_class",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"Application",
+					17
+				],
+				[
+					"Commit",
+					5
+				],
+				[
+					"Concurrency",
+					56
+				]
+			]
+		},
+		{
+			"id": "hard-p23-p1-event-definition-counts",
+			"target": "p1-19c-prod",
+			"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('User I/O','System I/O','Idle') GROUP BY wait_class ORDER BY wait_class",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"Idle",
+					140
+				],
+				[
+					"System I/O",
+					40
+				],
+				[
+					"User I/O",
+					59
+				]
+			]
+		},
+		{
+			"id": "hard-p24-p1-largest-segment",
+			"target": "p1-19c-prod",
+			"sql": "SELECT owner AS owner, segment_name AS segment_name, segment_type AS segment_type, NVL(partition_name, 'NONE') AS partition_name FROM dba_segments WHERE owner = 'SHOPAPP' ORDER BY bytes DESC, segment_name, partition_name NULLS FIRST, segment_type FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"SHOPAPP",
+					"ORDER_LINES",
+					"TABLE",
+					"NONE"
+				]
+			]
+		},
+		{
+			"id": "hard-p24-p1-autoextend-max",
+			"target": "p1-19c-prod",
+			"sql": "SELECT t.tablespace_name AS tablespace_name, SUM(CASE WHEN f.autoextensible = 'YES' THEN GREATEST(f.bytes, f.maxbytes) ELSE f.bytes END) AS maximum_bytes FROM dba_tablespaces t JOIN dba_data_files f ON f.tablespace_name = t.tablespace_name WHERE t.contents = 'PERMANENT' GROUP BY t.tablespace_name ORDER BY t.tablespace_name",
+			"mode": "rowCells",
+			"rowCount": 4,
+			"rows": [
+				[
+					"SHOP_DATA",
+					4294967296
+				],
+				[
+					"SYSAUX",
+					34359721984
+				],
+				[
+					"SYSTEM",
+					34359721984
+				],
+				[
+					"USERS",
+					34359721984
+				]
+			]
+		},
+		{
+			"id": "hard-p24-d1-redo-layout",
+			"target": "d1-19c-lab",
+			"sql": "SELECT thread# AS thread_number, group# AS group_number, bytes AS size_bytes, members AS member_count FROM v$log ORDER BY thread#, group#",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					1,
+					1,
+					209715200,
+					1
+				],
+				[
+					1,
+					2,
+					209715200,
+					1
+				],
+				[
+					1,
+					3,
+					209715200,
+					1
+				]
+			]
+		},
+		{
+			"id": "hard-p24-p1-recovery-limit",
+			"target": "p1-19c-prod",
+			"sql": "SELECT CASE WHEN COUNT(*) = 0 OR NVL(MAX(space_limit), 0) = 0 THEN 'NOT CONFIGURED' ELSE 'CONFIGURED' END AS configuration, NVL(MAX(space_limit), 0) AS limit_bytes FROM v$recovery_file_dest",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"NOT CONFIGURED",
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p24-d1-undo-settings",
+			"target": "d1-19c-lab",
+			"sql": "SELECT t.tablespace_name AS tablespace_name, r.value AS retention_seconds, t.retention AS retention_guarantee FROM v$parameter u JOIN dba_tablespaces t ON t.tablespace_name = u.value CROSS JOIN v$parameter r WHERE u.name = 'undo_tablespace' AND r.name = 'undo_retention'",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"UNDOTBS1",
+					"900",
+					"NOGUARANTEE"
+				]
+			]
+		},
+		{
+			"id": "hard-p24-d1-largest-lob-owner",
+			"target": "d1-19c-lab",
+			"sql": "SELECT s.owner AS owner, s.segment_name AS segment_name, l.table_name AS table_name, l.column_name AS column_name FROM dba_segments s JOIN dba_lobs l ON l.owner = s.owner AND l.segment_name = s.segment_name JOIN dba_users u ON u.username = s.owner WHERE s.segment_type = 'LOBSEGMENT' AND u.oracle_maintained = 'N' ORDER BY s.bytes DESC, s.owner, s.segment_name FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"CO",
+					"SYS_LOB0000074050C00004$$",
+					"PRODUCTS",
+					"PRODUCT_DETAILS"
 				]
 			]
 		},
