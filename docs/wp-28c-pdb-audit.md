@@ -278,3 +278,65 @@ undo-mode property. All lab integration checks passed. No live PDB was available
 PDB property visibility and shared-view visibility remain unverified beyond fake
 identities/errors and the cited Oracle 19c semantics. `git diff --check` passed.
 Implementation commit: `ed65f0a`; all work remains on `wp-28c-pdb-audit`.
+
+## Approved review follow-up: five findings
+
+Addressed all findings in
+`../review-wp-28c-pdb-audit/docs/review-wp-28c-pdb-audit.md`:
+
+1. `top_sql` now retries V$SQL after ORA-01031 as well as ORA-00942. The fallback
+   retains the existing SQL, limits and source disclosure. Other tools' retry
+   conditions are unchanged. This explicitly requested additional grant fallback
+   applies to both PDB and non-CDB connections; successful existing output stays
+   byte-identical.
+2. ORA-65040 report notes now read `not available: operation not supported in a PDB
+   (...)`, with no repeated unavailable prefix.
+3. Unknown undo scope is a phrase without terminal punctuation, so insertion into
+   the section note produces one period before `Empty rows ...`.
+4. PDB overview delegates query audit to its six independent view reads. The
+   outer tool wrapper no longer logs a successful monolithic query event, nor
+   attaches that unexecuted SQL hash to a failure event. Non-CDB overview retains
+   its original monolithic query and audit path.
+5. PDB space view failures produce one view-specific failure sentence; the
+   redundant generic failure sentence is omitted. Existing non-CDB error notes
+   remain unchanged.
+
+Changed: `src/tools/index.ts`, `src/report/index.ts`, `src/space/index.ts`,
+`tests/unit/tools.test.ts`, `tests/unit/pdb-audit.test.ts`, and this report.
+Regression tests cover both container modes for the new top-SQL fallback, exact
+report phrasing, single error-code occurrence in space failure notes, unknown
+undo punctuation, and equality between audited/executed overview SQL hashes on
+success, denied-view degradation and unexpected query failures. Existing
+non-CDB output byte-comparison tests remain in the suite.
+
+Contract changes needed: none. Live PDB behavior remains unverified. No agent
+prompt, shared contract, dependency or coordinator-owned path changed. No LLM
+calls; the Strata end-to-end integration test remains excluded.
+
+Review-fix validation:
+
+```text
+npm run typecheck
+> tsc -p tsconfig.json --noEmit
+exit 0
+
+npm test -- --maxWorkers=2
+Test Files  104 passed (104)
+Tests       1639 passed (1639)
+Duration    64.33s
+exit 0
+```
+
+Implementation commit: `0abad23`. All work is on `wp-28c-pdb-audit`.
+
+```text
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'
+Test Files  26 passed (26)
+Tests       61 passed | 1 skipped (62)
+Duration    156.74s
+exit 0
+```
+
+The skipped test is the Strata end-to-end ask. Both lab integration paths passed.
+No live PDB verification was possible; the new PDB regressions use fake identities
+and view failures. `git diff --check` passed. No contract changes are needed.
