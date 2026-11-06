@@ -6,93 +6,39 @@ JSON carries raw bytes and query evidence. Markdown uses binary units and text b
 
 Headroom means maximum minus used bytes; the pure file helper returns expansion headroom (maximum minus allocated). Each autoextend maximum is clamped to at least its current allocation. Used tablespace bytes use usage-metric blocks multiplied by block size, with allocated minus free as fallback. Undo figures are cumulative over the available last 24 hours of V$UNDOSTAT buckets. Temp usage is current sort-segment allocation. FRA thresholds subtract reclaimable bytes. No log-switch-rate query is made.
 
-## Live verification
+Redo JSON adds `sections.redo.logMode` (omitted when redo is skipped). Markdown displays the mode. Missing access to V$DATABASE yields `unavailable` without losing group/member rows; unavailable supporting evidence makes the overall report partial. NOARCHIVELOG produces an informational finding about point-in-time recovery. ARCHIVELOG produces a high finding only when successful, complete reads confirm both no FRA and no nonblank `log_archive_dest_n`. These checks also run for redo-only requests. Unknown configuration never produces that high finding.
 
-These smokes used only the configured read-only accounts and SELECTs; no LLM calls. Independent checks below are separately written queries, not the module SQL. Static figures were asserted equal; current temp, undo and FRA counters were observed separately and may change between reads.
+Section headings have one blank line before their content. Empty sections with an explanatory note display that note without a redundant “No rows” block.
 
-### d1-19c-lab — 2026-11-06T07:10:21.082Z
+## Live verification — WP-24E, 2026-11-06
 
-All six sections: `ok`.
+Only the configured HARNESS_LAB and HARNESS_RO accounts were used, via the existing 19c-gated read-only session provider. No Strata calls or database writes. Before implementation, `SELECT log_mode FROM v$database` succeeded on both targets and returned `NOARCHIVELOG`.
 
-**Independent files**
-
-```sql
-SELECT tablespace_name,SUM(bytes),SUM(CASE WHEN autoextensible='YES' THEN GREATEST(bytes,maxbytes) ELSE bytes END) FROM (SELECT tablespace_name,bytes,maxbytes,autoextensible FROM dba_data_files UNION ALL SELECT tablespace_name,bytes,maxbytes,autoextensible FROM dba_temp_files) GROUP BY tablespace_name ORDER BY tablespace_name
-```
-
-```json
-[["SYSAUX",1300234240,34359721984],["SYSTEM",1038090240,34359721984],["TEMP",480247808,34359721984],["UNDOTBS1",618659840,34359721984],["USERS",382730240,34359721984]]
-```
-
-**Independent used**
+Fresh full-report smokes (top 3) returned all six sections `ok` on both targets. Independent SELECTs repeated the mode check and cross-checked redo and recovery configuration:
 
 ```sql
-SELECT m.tablespace_name,m.used_space*t.block_size FROM dba_tablespace_usage_metrics m,dba_tablespaces t WHERE t.tablespace_name=m.tablespace_name ORDER BY m.tablespace_name
-```
-
-```json
-[["SYSAUX",1222443008],["SYSTEM",1034158080],["TEMP",8388608],["UNDOTBS1",14942208],["USERS",328466432]]
-```
-
-**Independent redo**
-
-```sql
+SELECT log_mode FROM v$database
 SELECT COUNT(*),MIN(bytes),MAX(bytes),SUM(members) FROM v$log
-```
-
-```json
-[[3,209715200,209715200,3]]
-```
-
-**Independent recovery**
-
-```sql
 SELECT space_limit,space_used-space_reclaimable,number_of_files FROM v$recovery_file_dest
 ```
 
-```json
-[]
-```
+| Target | Captured at UTC | Log mode | Redo groups | Min/max group bytes | Total members | FRA rows |
+| --- | --- | --- | --- | --- | --- | --- |
+| d1-19c-lab | 2026-11-06T07:32:43.947Z | NOARCHIVELOG | 3 | 209715200 / 209715200 | 3 | 0 |
+| p1-19c-prod | 2026-11-06T07:32:44.516Z | NOARCHIVELOG | 3 | 209715200 / 209715200 | 3 | 0 |
 
-**Independent temp**
+Each report includes the NOARCHIVELOG info finding and the single-member info finding. The live Markdown passed checks for one blank line after headings and no redundant empty recovery block. ARCHIVELOG and missing-grant paths are covered by unit fixtures; neither live target was reconfigured.
 
-```sql
-SELECT tablespace_name,total_blocks,used_blocks,free_blocks FROM v$sort_segment ORDER BY tablespace_name
-```
+<details><summary>Fresh d1-19c-lab smoke</summary>
 
-```json
-[["TEMP",58496,1024,57472]]
-```
+### Space — d1-19c-lab
 
-**Independent undo**
-
-```sql
-SELECT SUM(ssolderrcnt),SUM(nospaceerrcnt),MAX(maxquerylen) FROM v$undostat WHERE begin_time>SYSDATE-1
-```
-
-```json
-[[0,0,1575]]
-```
-
-**Independent segments**
-
-```sql
-SELECT owner,segment_name,segment_type,bytes FROM dba_segments WHERE owner IN (SELECT username FROM dba_users WHERE oracle_maintained='N') ORDER BY bytes DESC,owner,segment_name,partition_name FETCH FIRST 3 ROWS ONLY
-```
-
-```json
-[["SH","CUSTOMERS","TABLE",13631488],["SH","COSTS","TABLE PARTITION",8388608],["SH","COSTS","TABLE PARTITION",8388608]]
-```
-
-<details><summary>Live CLI-format smoke (top 3)</summary>
-
-#### Space — d1-19c-lab
-
-Captured at 2026-11-06T07:10:21.082Z (UTC). Binary units (KiB, MiB, GiB, TiB).
+Captured at 2026-11-06T07:32:43.947Z (UTC). Binary units (KiB, MiB, GiB, TiB).
 Snapshot is a short sequence of queries, not one consistent read.
 
 ## Findings
 
+- **info: Redo** — Database is in NOARCHIVELOG mode: online redo is not archived, so point-in-time recovery is not possible. Review recovery requirements and backup strategy with the DBA.
 - **info: Redo** — A single member per redo group. Review redo multiplexing and storage failure protection.
 
 ## Tablespaces
@@ -102,17 +48,17 @@ Snapshot is a short sequence of queries, not one consistent read.
 | SYSAUX | 1.21 GiB | 1.14 GiB | 32 GiB | █████████░ 94.0% | ░░░░░░░░░░ 3.6% | 30.86 GiB |
 | SYSTEM | 990 MiB | 986.25 MiB | 32 GiB | ██████████ 99.6% | ░░░░░░░░░░ 3.0% | 31.04 GiB |
 | TEMP | 458 MiB | 8 MiB | 32 GiB | ░░░░░░░░░░ 1.7% | ░░░░░░░░░░ 0.0% | 31.99 GiB |
-| UNDOTBS1 | 590 MiB | 14.25 MiB | 32 GiB | ░░░░░░░░░░ 2.4% | ░░░░░░░░░░ 0.0% | 31.99 GiB |
+| UNDOTBS1 | 590 MiB | 15.31 MiB | 32 GiB | ░░░░░░░░░░ 2.6% | ░░░░░░░░░░ 0.0% | 31.99 GiB |
 | USERS | 365 MiB | 313.25 MiB | 32 GiB | █████████░ 85.8% | ░░░░░░░░░░ 1.0% | 31.69 GiB |
 
 <details><summary>Tablespace configuration and files</summary>
 
 | Name | Contents | Bigfile | File Count | Free |
 | --- | --- | --- | --- | --- |
-| SYSAUX | PERMANENT | false | 1 | 74.19 MiB |
+| SYSAUX | PERMANENT | false | 1 | 74.13 MiB |
 | SYSTEM | PERMANENT | false | 1 | 3.75 MiB |
 | TEMP | TEMPORARY | false | 1 | 450 MiB |
-| UNDOTBS1 | UNDO | false | 1 | 575.75 MiB |
+| UNDOTBS1 | UNDO | false | 1 | 574.69 MiB |
 | USERS | PERMANENT | false | 1 | 51.75 MiB |
 
 | Tablespace | Path | Bytes | Maximum | Autoextend |
@@ -135,7 +81,6 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 ## Temp
 
-
 **File**
 
 | Tablespace | Path | Allocated | Maximum |
@@ -152,17 +97,16 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 | SID | SQL_ID | Segment Type | Tablespace | Bytes |
 | --- | --- | --- | --- | --- |
-| 123 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
+| 123 | csnp95dz2r8ss | DATA | TEMP | 1 MiB |
 | 969 | gjaap3w3qbf8c | LOB_INDEX | TEMP | 1 MiB |
 | 969 | gjaap3w3qbf8c | LOB_DATA | TEMP | 1 MiB |
 | 969 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
-| 970 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
-| 973 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
-| 1091 | f5yv529g61agb | DATA | TEMP | 1 MiB |
-| 1459 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
+| 970 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
+| 973 | 5cu0x10yu88sw | DATA | TEMP | 1 MiB |
+| 1091 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
+| 1459 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
 
 ## Undo (last 24 h)
-
 
 **File**
 
@@ -174,17 +118,18 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 | Tablespace | Status | Bytes |
 | --- | --- | --- |
-| UNDOTBS1 | EXPIRED | 3 MiB |
-| UNDOTBS1 | UNEXPIRED | 10.25 MiB |
+| UNDOTBS1 | EXPIRED | 896 KiB |
+| UNDOTBS1 | UNEXPIRED | 13.44 MiB |
 
 **Last 24 h**
 
 | Max Query Seconds | Snapshot Too Old Count | No Space Count | Min Tuned Retention Seconds | Max Tuned Retention Seconds | Retention Seconds |
 | --- | --- | --- | --- | --- | --- |
-| 1575 | 0 | 0 | 900 | 2289 | 900 |
+| 1575 | 0 | 0 | 900 | 2294 | 900 |
 
 ## Online redo
 
+Log mode: NOARCHIVELOG.
 
 **Group**
 
@@ -205,98 +150,19 @@ Snapshot is a short sequence of queries, not one consistent read.
 ## Recovery area
 
 no recovery area configured
-<details><summary>No rows</summary>
-
-No rows in this snapshot.
 
 </details>
 
+<details><summary>Fresh p1-19c-prod smoke</summary>
 
-</details>
+### Space — p1-19c-prod
 
-### p1-19c-prod — 2026-11-06T07:10:21.768Z
-
-All six sections: `ok`.
-
-**Independent files**
-
-```sql
-SELECT tablespace_name,SUM(bytes),SUM(CASE WHEN autoextensible='YES' THEN GREATEST(bytes,maxbytes) ELSE bytes END) FROM (SELECT tablespace_name,bytes,maxbytes,autoextensible FROM dba_data_files UNION ALL SELECT tablespace_name,bytes,maxbytes,autoextensible FROM dba_temp_files) GROUP BY tablespace_name ORDER BY tablespace_name
-```
-
-```json
-[["SHOP_DATA",536870912,4294967296],["SYSAUX",1121976320,34359721984],["SYSTEM",1027604480,34359721984],["TEMP",449839104,34359721984],["UNDOTBS1",613416960,34359721984],["USERS",5242880,34359721984]]
-```
-
-**Independent used**
-
-```sql
-SELECT m.tablespace_name,m.used_space*t.block_size FROM dba_tablespace_usage_metrics m,dba_tablespaces t WHERE t.tablespace_name=m.tablespace_name ORDER BY m.tablespace_name
-```
-
-```json
-[["SHOP_DATA",168296448],["SYSAUX",1068367872],["SYSTEM",1019150336],["TEMP",5242880],["UNDOTBS1",18087936],["USERS",2818048]]
-```
-
-**Independent redo**
-
-```sql
-SELECT COUNT(*),MIN(bytes),MAX(bytes),SUM(members) FROM v$log
-```
-
-```json
-[[3,209715200,209715200,3]]
-```
-
-**Independent recovery**
-
-```sql
-SELECT space_limit,space_used-space_reclaimable,number_of_files FROM v$recovery_file_dest
-```
-
-```json
-[]
-```
-
-**Independent temp**
-
-```sql
-SELECT tablespace_name,total_blocks,used_blocks,free_blocks FROM v$sort_segment ORDER BY tablespace_name
-```
-
-```json
-[["TEMP",54784,640,54144]]
-```
-
-**Independent undo**
-
-```sql
-SELECT SUM(ssolderrcnt),SUM(nospaceerrcnt),MAX(maxquerylen) FROM v$undostat WHERE begin_time>SYSDATE-1
-```
-
-```json
-[[0,0,1485]]
-```
-
-**Independent segments**
-
-```sql
-SELECT owner,segment_name,segment_type,bytes FROM dba_segments WHERE owner IN (SELECT username FROM dba_users WHERE oracle_maintained='N') ORDER BY bytes DESC,owner,segment_name,partition_name FETCH FIRST 3 ROWS ONLY
-```
-
-```json
-[["SHOPAPP","ORDER_LINES","TABLE",41943040],["SHOPAPP","ORDER_LINES_PROD_IX","INDEX",34603008],["SHOPAPP","ORDER_LINES_PK","INDEX",28311552]]
-```
-
-<details><summary>Live CLI-format smoke (top 3)</summary>
-
-#### Space — p1-19c-prod
-
-Captured at 2026-11-06T07:10:21.768Z (UTC). Binary units (KiB, MiB, GiB, TiB).
+Captured at 2026-11-06T07:32:44.516Z (UTC). Binary units (KiB, MiB, GiB, TiB).
 Snapshot is a short sequence of queries, not one consistent read.
 
 ## Findings
 
+- **info: Redo** — Database is in NOARCHIVELOG mode: online redo is not archived, so point-in-time recovery is not possible. Review recovery requirements and backup strategy with the DBA.
 - **info: Redo** — A single member per redo group. Review redo multiplexing and storage failure protection.
 
 ## Tablespaces
@@ -307,7 +173,7 @@ Snapshot is a short sequence of queries, not one consistent read.
 | SYSAUX | 1.04 GiB | 1018.88 MiB | 32 GiB | ██████████ 95.2% | ░░░░░░░░░░ 3.1% | 31 GiB |
 | SYSTEM | 980 MiB | 971.94 MiB | 32 GiB | ██████████ 99.2% | ░░░░░░░░░░ 3.0% | 31.05 GiB |
 | TEMP | 429 MiB | 5 MiB | 32 GiB | ░░░░░░░░░░ 1.2% | ░░░░░░░░░░ 0.0% | 32 GiB |
-| UNDOTBS1 | 585 MiB | 17.25 MiB | 32 GiB | ░░░░░░░░░░ 2.9% | ░░░░░░░░░░ 0.1% | 31.98 GiB |
+| UNDOTBS1 | 585 MiB | 16.25 MiB | 32 GiB | ░░░░░░░░░░ 2.8% | ░░░░░░░░░░ 0.0% | 31.98 GiB |
 | USERS | 5 MiB | 2.69 MiB | 32 GiB | █████░░░░░ 53.8% | ░░░░░░░░░░ 0.0% | 32 GiB |
 
 <details><summary>Tablespace configuration and files</summary>
@@ -318,7 +184,7 @@ Snapshot is a short sequence of queries, not one consistent read.
 | SYSAUX | PERMANENT | false | 1 | 51.13 MiB |
 | SYSTEM | PERMANENT | false | 1 | 8.06 MiB |
 | TEMP | TEMPORARY | false | 1 | 424 MiB |
-| UNDOTBS1 | UNDO | false | 1 | 567.75 MiB |
+| UNDOTBS1 | UNDO | false | 1 | 568.75 MiB |
 | USERS | PERMANENT | false | 1 | 2.31 MiB |
 
 | Tablespace | Path | Bytes | Maximum | Autoextend |
@@ -342,7 +208,6 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 ## Temp
 
-
 **File**
 
 | Tablespace | Path | Allocated | Maximum |
@@ -359,14 +224,13 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 | SID | SQL_ID | Segment Type | Tablespace | Bytes |
 | --- | --- | --- | --- | --- |
-| 49 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
-| 93 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
+| 49 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
+| 93 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
 | 123 | gjaap3w3qbf8c | DATA | TEMP | 1 MiB |
 | 242 | c9umxngkc3byq | DATA | TEMP | 1 MiB |
-| 274 | f5yv529g61agb | DATA | TEMP | 1 MiB |
+| 274 | 5cu0x10yu88sw | DATA | TEMP | 1 MiB |
 
 ## Undo (last 24 h)
-
 
 **File**
 
@@ -378,8 +242,8 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 | Tablespace | Status | Bytes |
 | --- | --- | --- |
-| UNDOTBS1 | EXPIRED | 3.25 MiB |
-| UNDOTBS1 | UNEXPIRED | 13 MiB |
+| UNDOTBS1 | EXPIRED | 3 MiB |
+| UNDOTBS1 | UNEXPIRED | 12.25 MiB |
 
 **Last 24 h**
 
@@ -389,6 +253,7 @@ Snapshot is a short sequence of queries, not one consistent read.
 
 ## Online redo
 
+Log mode: NOARCHIVELOG.
 
 **Group**
 
@@ -409,11 +274,5 @@ Snapshot is a short sequence of queries, not one consistent read.
 ## Recovery area
 
 no recovery area configured
-<details><summary>No rows</summary>
-
-No rows in this snapshot.
-
-</details>
-
 
 </details>

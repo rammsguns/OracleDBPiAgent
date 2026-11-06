@@ -167,3 +167,8 @@ it('renders the -1 row-wait object sentinel blank in blocking details', async ()
 	expect(renderSessionsMarkdown(a).split('## Blocking tree')[1]!.split('## Waits')[0]).not.toContain('-1');
 	expect(a.sections.active.rows[1]?.objectId).toBe(-1);
 });
+
+it('does not append a trailing space to a skipped section without a note',async()=>{
+	const a=await readSessionActivity(fixture(),{sections:['active']});
+	const md=renderSessionsMarkdown(a);expect(md).toContain('Status: skipped.\n');expect(md).not.toMatch(/^Status:.* +$/m);
+});

@@ -186,7 +186,7 @@ export function renderSessionsMarkdown(a: SessionActivity): string {
 	for (const id of SECTION_IDS) {
 		const s = a.sections[id], title = ({ active:'Active sessions', blocking:'Blocking tree', waits:'Waits since instance startup (cumulative, not current)', timeModel:'Time model since instance startup (cumulative, not current)', transactions:'Long transactions (UTC)' })[id];
 		lines.push('', '## ' + title, '');
-		if (s.status !== 'ok') lines.push('Status: ' + s.status + '. ' + escape(s.note ?? ''));
+		if (s.status !== 'ok') lines.push('Status: ' + s.status + '.' + (s.note ? ' ' + escape(s.note) : ''));
 		else if (s.note) lines.push(escape(s.note));
 		if (!s.rows.length) { lines.push('<details><summary>No rows</summary>', '', 'No rows in this snapshot.', '', '</details>'); continue; }
 		if (id === 'blocking') {
