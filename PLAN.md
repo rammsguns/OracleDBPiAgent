@@ -3549,6 +3549,7 @@ drift, as for the other scopes.
 No new SQL: it reuses `readSpaceUsage`.
 
 ### WP-24C: web Space tab (branch `wp-24c-space-web`, after WP-23C merges)
+Also fix the WP-23C review minor: the arrow-key `tabs` array in `src/web/static/app.js` must match the DOM tab order in `index.html`, Space included. Add a browser test for this.
 `/api/space`:
 - same auth, loopback, single-flight and 1 MiB rules as the other tabs.
 
