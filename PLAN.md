@@ -3607,6 +3607,30 @@ The coordinator's live smoke on p1 and the WP-23F review found:
 4. **Sessions trailing space.** `Status: skipped. ` ends with a trailing
    space when there is no note (WP-23F review minor).
 
+### WP-24F: eval scorer and case fixes from the phase 23 gate (branch `wp-24f-eval-fixes`)
+Owns `evals/` scoring, cases and tests, plus `docs/`.
+
+The gate's first challenge run (archived in `eval-archive/phase23/gate-23`)
+turned up two eval defects:
+1. **Slash values never match.** `rowMatches` never matches a truth cell
+   that contains `/`, such as `System I/O` or `User I/O`. The coordinator
+   re-scored a clean table, `| System I/O | 40 |`, and it still fails, while
+   `Idle` passes.
+   - Find the root cause, which is probably cell tokenizing or normalization
+     around `/`, and fix it generally. Slash-containing values must match
+     exactly and must not match partial text: `I/O` alone must not match
+     `User I/O`.
+   - Run the archive replay over `eval-archive` and
+     `needlefish/evals/results`, list every flip, and justify each one.
+2. **`hard-p24-d1-redo-layout` truth.** Every truth row includes
+   `COUNT(*) OVER ()`, so a correct per-group table plus a separate stated
+   total can never match. Remove the total from the row truth and check it
+   another way, for example a scoped required fact naming the total of 3.
+   Update the validator record.
+
+Then re-score the gate's p23 and p24 records with the fixed scorer, and
+report the before and after results.
+
 ### Gate
 - Single side on merged master: p24 ×2, p23 ×2, the full suites, p18 and
   p16.
