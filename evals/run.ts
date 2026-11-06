@@ -77,12 +77,12 @@ export function toolErrorsMarkdown(summary: ReturnType<typeof summarizeToolError
 		+ Object.entries(summary.byTool).flatMap(([tool, counts]) => Object.entries(counts.byCode).map(([code, count]) => `| ${escape(tool)} | ${escape(code)} | ${count} |`)).join('\n') + '\n';
 }
 export async function loadSelectedCases(options: RunOptions): Promise<EvalCase[]> {
-	const suiteDirectory = options.suite === 'p23' ? 'evals/cases-hard' : options.suite;
+	const suiteDirectory = ['p23', 'p24'].includes(options.suite) ? 'evals/cases-hard' : options.suite;
 	const cases: EvalCase[] = [];
 	for (const file of (await readdir(suiteDirectory)).filter(file => file.endsWith('.json')).sort()) {
 		cases.push(...JSON.parse(await readFile(`${suiteDirectory}/${file}`, 'utf8')));
 	}
-	const selected = cases.filter(test => (options.suite !== 'p23' || test.id.startsWith('hard-p23-')) && (!options.split || test.split === options.split) && (!options.ids.length || options.ids.includes(test.id)));
+	const selected = cases.filter(test => (!['p23', 'p24'].includes(options.suite) || test.id.startsWith(`hard-${options.suite}-`)) && (!options.split || test.split === options.split) && (!options.ids.length || options.ids.includes(test.id)));
 	if (!selected.length) throw new Error('No eval cases selected');
 	if (new Set(selected.map(test => test.id)).size !== selected.length) throw new Error('Duplicate eval case id');
 	return selected;
