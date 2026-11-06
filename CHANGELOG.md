@@ -4,6 +4,78 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-06
+
+### Added
+
+- `piagent sessions --target T` is a read-only live view of who is blocking
+  whom. It shows:
+  - active user sessions (sessions waiting on an Idle event are hidden
+    unless `--all`, but a blocker is always shown);
+  - the blocking tree from `V$WAIT_CHAINS`, falling back to
+    `BLOCKING_SESSION`, with the locked objects and deadlock-cycle
+    detection;
+  - non-idle waits by class since instance startup, and the time model;
+  - long transactions.
+
+  Findings cover long blocking, idle-in-transaction blockers, deadlocks,
+  old transactions and a dominant wait class. Each finding comes with prose
+  advice for a human DBA, and each blocker's SQL_ID links to `piagent sql`.
+  It never uses ASH or AWR, never reads MODULE, ACTION, CLIENT_INFO, SQL
+  text or bind values, and never kills or alters a session. See
+  [sessions](docs/sessions.md).
+- `piagent space --target T` is a read-only capacity report covering:
+  - tablespaces with autoextend-aware headroom and usage bars;
+  - the top segments, with LOB segments mapped to their table and column;
+  - temp usage and its consumers;
+  - undo (extent status and 24 h ORA-01555 and no-space counts);
+  - online redo, with archive log mode;
+  - recovery-area usage.
+
+  Findings cover tablespace, temp, undo and FRA thresholds, plus redo
+  layout and NOARCHIVELOG. It never uses DBA_EXTENTS. See
+  [space](docs/space.md).
+- Triage adds session evidence when an issue describes hangs, lock waits,
+  blocking or deadlocks. Real blocking ranks first. Account-lock and login
+  wording does not trigger it, and wait-class context never outranks a
+  concrete error.
+- Two opt-in report sections:
+  - `--sections sessions`, with wait-class trends that reset on instance
+    restart;
+  - `--sections space`, with growth trends and a days-to-full forecast
+    (least squares over at least 3 points spanning 24 h, against the
+    autoextend maximum).
+
+  `report --out DIR` reads its forecast history from DIR. The default
+  report output is unchanged.
+- `drift --scope space` compares tablespace configuration, redo layout and
+  recovery-area configuration across targets. It does not compare usage.
+- Two web tabs:
+  - **Sessions**, with a blocking-tree graph, wait-class bars and filters;
+  - **Space**, with stacked usage bars and threshold markers.
+
+  Both have Markdown export and work in light and dark themes and at phone
+  width. Wide tables scroll inside their container and show a hint only
+  when they overflow.
+- Evals: suites `p23` (sessions and waits) and `p24` (space), with
+  two-sample truth-stability validation.
+- Grant requests for p1:
+  - [`grants-request-2026-11-05-sessions.sql`](docs/grants-request-2026-11-05-sessions.sql),
+    8 views;
+  - [`grants-request-2026-11-06-space.sql`](docs/grants-request-2026-11-06-space.sql),
+    12 views.
+
+  Both are SELECT only. See [grants](docs/grants.md).
+
+### Fixed
+
+- Eval scorer: Markdown table cells containing `/` (such as `User I/O`) now
+  bind correctly. An archive replay changed only 4 records, all justified
+  fail-to-pass.
+- The web tab arrow-key order now matches the visual tab order.
+- The live purge-triage integration test now derives its window from the
+  age of the retained alert, instead of a fixed 2-day window.
+
 ## [1.2.1] - 2026-11-05
 
 ### Fixed
