@@ -1,3 +1,4 @@
+import { updateTableHints } from './tableHints.js';
 import { setupPanel, execute } from './panel.js';
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); if (cls) n.className = cls; return n; };
 const bytes = n => { const units = ['B','KiB','MiB','GiB','TiB','PiB']; let i=0; while(Math.abs(n)>=1024 && i<5) { n/=1024; i++; } return `${Number(n.toFixed(2))} ${units[i]}`; };
@@ -37,6 +38,7 @@ export function renderSpace(content, result) {
 			for(const kind of kinds) { if(kind) card.append(el('h5',kind)); table(card,s.rows.filter(r=>r.kind===kind).map(({kind:_,...r})=>r),`${title}${kind?' '+kind:''}`); }
 		}
 	}
+	updateTableHints(content, '.space-scroll-hint');
 }
 export function initSpace(api, targets) {
 	const view=setupPanel('space','Refresh Space',targets); view.form.className='space-toolbar';

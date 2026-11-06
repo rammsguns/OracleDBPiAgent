@@ -30,3 +30,21 @@ Contract changes needed: none. The only additive web interface is the local opti
 Limitations: screenshots capture a sequence of SELECTs rather than a consistent point-in-time snapshot. Live targets currently have no FRA configured; the populated FRA path uses the same generic record table renderer as the other capacity cards. The Strata end-to-end integration case is deliberately excluded as requested.
 
 Commits: `5f0c586` contains the implementation and fixture coverage; a following documentation commit contains the SELECT-only live capture harness, screenshots and this report.
+
+## Coordinator review follow-up: conditional scroll hints
+
+Space and Sessions now show their horizontal-scroll hint only when the table container's `scrollWidth > clientWidth`. The shared `src/web/static/tableHints.js` helper measures after render and uses `ResizeObserver` on containers and tables to update after resizing or tab visibility changes. A fresh render disconnects the previous observer. Sessions changes are limited to this hint behavior, including hints for two-column tables when they overflow.
+
+Changed `src/web/static/space.js`, `src/web/static/dbsessions.js`, added `src/web/static/tableHints.js`, and extended `tests/browser/space.spec.ts`. The two new browser cases cover both tabs: a fitting table at 1280 px has no visible hint, a wide table at 390 px has a visible hint, and resizing back and forth updates the hint without another request.
+
+Retook all eight Space screenshots on d1 and p1 at 1280 and 390 px, light and dark, using the SELECT-only capture harness. Viewed every replacement screenshot individually. Hints disappear from fitting desktop tables and remain on genuinely overflowing tables (including the wide undo statistics table at desktop width). Phone tables retain hints and stay contained without page-level horizontal scroll.
+
+Follow-up validation (all exit 0):
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=2`: 97 files passed; 1,479 tests passed.
+- `npm run test:browser`: 71 passed, 6 opt-in live tests skipped.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets PIAGENT_SPACE_LIVE=1 npm run test:browser -- tests/browser/space-live.spec.ts`: 1 passed; eight fresh screenshots.
+- `git diff --check`: passed.
+
+No contract changes needed. The prior integration result above remains the last integration run; this follow-up changes browser presentation only. No Strata calls were made.

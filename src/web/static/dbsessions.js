@@ -1,3 +1,4 @@
+import { updateTableHints } from './tableHints.js';
 import { setupPanel, execute } from './panel.js';
 import { layoutGraph } from './graphLayout.js';
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); if (cls) n.className = cls; return n; };
@@ -13,7 +14,7 @@ function table(parent, labels, rows, name) {
 	const body = el('tbody'); for (const values of rows) { const row = el('tr'); for (const value of values) { const td = el('td'); td.append(value instanceof Node ? value : document.createTextNode(String(value ?? '—'))); row.append(td); } body.append(row); }
 	table.append(body); box.append(table);
 	if (labels.length === 2) box.classList.add('dbsessions-narrow-table');
-	else { const hint = el('p', 'Scroll the table horizontally to see all columns.', 'dbsessions-scroll-hint'); box.append(hint); } box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', name); parent.append(box);
+	const hint = el('p', 'Scroll the table horizontally to see all columns.', 'dbsessions-scroll-hint'); box.append(hint); box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', name); parent.append(box);
 }
 export function blockingGraph(roots) {
 	const nodes = new Map(), edges = [];
@@ -59,6 +60,7 @@ export function renderDbSessions(content, result, filters = { status: 'all', wai
 	const activeRows = section('active', 'Active Sessions');
 	if (controls) { controls.hidden = false; content.append(controls); }
 	const active = activeRows.filter(r => (filters.status === 'all' || r.status === filters.status) && (filters.waitClass === 'all' || r.waitClass === filters.waitClass)); table(content, ['SID', 'User', 'Status', 'SQL_ID', 'Event', 'Wait Class', 'Wait (s)', 'Blocker'], active.map(r => [r.sid,r.username,r.status,sqlLink(r.sqlId,result.target),r.event,r.waitClass,r.secondsInWait,r.blockerSid]), 'Active sessions');
+	updateTableHints(content, '.dbsessions-scroll-hint');
 }
 export function initDbSessions(api, targets) {
 	const view = setupPanel('dbsessions', 'Refresh Sessions', targets);
