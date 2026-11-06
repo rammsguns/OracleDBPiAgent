@@ -23,6 +23,7 @@ Work is on branch wp-27a-top.
 - `src/cli/index.ts`
 - `src/preflight/views.ts`
 - `tests/unit/top.test.ts`
+- `tests/unit/top-cli.test.ts`
 - `tests/unit/preflight-catalog.test.ts`
 - `tests/unit/release-help.test.ts`
 - `tests/integration/top.test.ts`
@@ -64,8 +65,8 @@ no newly blocked names. No fixed source query or eval case needed modification.
 No remaining coordinator policy change or shared contract change is required.
 
 The p1 grant request is proposed only, not applied. It requests SELECT on
-V_$SYSSTAT, V_$OSSTAT and the phase's follow-on V_$SESSTAT/V_$STATNAME.
-The latter two are not used by top. The preflight top group contains exactly
+V_$SYSSTAT and V_$OSSTAT only. The review removed the unused follow-on
+V_$SESSTAT/V_$STATNAME grants. The preflight top group contains exactly
 the three queried views. The PDB template includes all requested SELECTs.
 
 ## Verification
@@ -369,3 +370,79 @@ The final focused policy/triage/top/preflight suite passes 345 tests.
 
 Follow-up integration passed: 67 tests, 29 files; one Strata e2e excluded.
 No LLM calls or database changes were made.
+
+## Review REQUEST CHANGES follow-up
+
+Read ../review-wp-27a-top/docs/review-wp-27a-top.md and addressed every finding.
+
+- Critical: refused ALL_ACTIVE_SESSION_HISTORY, CDB_HIST_/ADVISOR_/ADDM_,
+  AWR_CDB_/PDB_/ROOT_ families and AWR/advisor underlying table families.
+  Re-read Oracle 19c licensing Diagnostics/Tuning lists; added listed Streams
+  diagnostics, MGMT$ repository views, SQL Monitor views and the remaining
+  listed APIs. Conditional licensed objects are conservatively blocked whole.
+  Each family has quoted/unquoted, SYS/PUBLIC-qualified and nested/CTE/join
+  bypass tests. ASH and SQL Monitor cover V$/GV$/V_$/GV_$ forms.
+- Major: TopUsageError plus the sessions-style CLI handler prints specific
+  validation guidance with exit 2; commander errors/help match sessions too.
+  Five subprocess tests prove invalid intervals, unknown target, missing target
+  and unknown option behavior without database connections or LLM calls.
+- Minor: reset summary counts unique SQL_IDs across all five counter metrics.
+  Regression tests force a reset in each metric while checking the text output.
+- Info: removed unused SESSTAT/STATNAME grants from request and PDB template;
+  preflight top already contained only the three queried views.
+
+No contract changes, grants applied, database changes, or LLM calls.
+The source relation scan and all eval ground-truth queries remain policy-valid.
+No live PDB was available; the refusal bypass tests are local classifier tests
+and never query licensed data.
+
+```text
+
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  6 passed (6)
+      Tests  416 passed (416)
+   Start at  15:34:46
+   Duration  4.19s (tests 81%, import 12%, transform 6%, worker 1%)
+
+
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  110 passed (110)
+      Tests  2061 passed (2061)
+   Start at  15:34:15
+   Duration  65.26s (tests 77%, import 21%, worker 1%, transform 1%)
+
+    Isolate  110 workers spawned · ~254ms startup each (spawn + environment, per file)
+             at least ~13.70s faster with isolate: false — reuses workers across files instead of one per file
+
+```
+
+```text
+
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  29 passed (29)
+      Tests  67 passed | 1 skipped (68)
+   Start at  15:33:40
+   Duration  244.28s (tests 97%, import 3%)
+
+```
+
+All review-fix checks passed: typecheck, 416 focused tests, 2,061 unit tests,
+and 67 filtered integration tests (one Strata e2e excluded).
