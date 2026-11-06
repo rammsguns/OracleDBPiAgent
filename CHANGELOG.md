@@ -4,6 +4,26 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-05
+
+### Fixed
+
+- Configuration mistakes now print their fixed, reviewed guidance through the
+  CLI instead of the generic failure message. Examples are a private home that
+  is not mode 0700, a bad environment file, a non-loopback Strata URL, an
+  unapproved target and out-of-range limits. Messages never include
+  configuration input. Unexpected errors stay generic.
+- The agent now looks in Oracle's alert log and ADR views (`V$DIAG_ALERT_EXT`,
+  `V$DIAG_INCIDENT`, `V$DIAG_PROBLEM`) for questions about alert messages,
+  ORA- errors, incidents or problems. It no longer searches user tables or
+  says that problem keys are visible only in adrci.
+
+### Changed
+
+- Evals: two holdout case defects are fixed with case-scoped scoring. The two
+  cases exposed while tuning are moved to dev, and two fresh blind holdout
+  cases replace them. See [WP-22A](docs/wp-22a-holdout-fixes.md).
+
 ## [1.2.0] - 2026-11-05
 
 ### Added
