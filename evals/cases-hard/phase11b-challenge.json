@@ -173,15 +173,15 @@
 		"target": "p1-19c-prod",
 		"category": "partial-grants",
 		"split": "challenge",
-		"question": "On p1, report database name and open mode, then the latest completed RMAN backup end time and status. Give the accessible part even if backup history cannot be read, and name that access gap. Explain why an open database does not establish backup health.",
+		"question": "On p1, report database name and open mode, then the current size in bytes of the large pool from V$SGA_DYNAMIC_COMPONENTS. Give the accessible part and name any access gap. Explain why an open database does not establish a memory component allocation.",
 		"groundTruth": {
 			"sql": "SELECT name FROM v$database UNION ALL SELECT open_mode FROM v$database",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
-				"(backup|RMAN)",
-				"V\\$RMAN_BACKUP_JOB_DETAILS",
+				"large pool",
+				"V\\$SGA_DYNAMIC_COMPONENTS",
 				"(unavailable|inaccessible|cannot|denied|lack|missing)",
 				"(does not|doesn.t|cannot|not.*(?:prove|establish|guarantee))"
 			],

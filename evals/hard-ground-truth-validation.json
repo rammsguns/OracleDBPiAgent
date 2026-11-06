@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-06T16:06:57.273Z",
-	"caseCount": 135,
+	"validatedAt": "2026-11-06T20:50:37.056Z",
+	"caseCount": 136,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -1971,6 +1971,19 @@
 			]
 		},
 		{
+			"id": "hard-p25-grant-component-inventory",
+			"target": "p1-19c-prod",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"V$SGA_DYNAMIC_COMPONENTS",
+					"unavailable"
+				]
+			]
+		},
+		{
 			"id": "hard-grant-p1-parameters",
 			"target": "p1-19c-prod",
 			"sql": "SELECT UPPER(name), value FROM v$parameter WHERE name IN ('sga_target','pga_aggregate_target') ORDER BY name",
@@ -1990,12 +2003,12 @@
 		{
 			"id": "hard-grant-p1-backups",
 			"target": "p1-19c-prod",
-			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual) v ORDER BY v.view_name",
 			"mode": "allCells",
 			"rowCount": 1,
 			"rows": [
 				[
-					"V$RMAN_BACKUP_JOB_DETAILS",
+					"V$SGASTAT",
 					"unavailable"
 				]
 			]
@@ -2217,16 +2230,16 @@
 		{
 			"id": "hard-p8-archive-access",
 			"target": "p1-19c-prod",
-			"sql": "SELECT v.view_name,CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$ARCHIVED_LOG' view_name FROM dual UNION ALL SELECT 'V$LOG_HISTORY' FROM dual) v ORDER BY v.view_name",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual UNION ALL SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
 			"mode": "allCells",
 			"rowCount": 2,
 			"rows": [
 				[
-					"V$ARCHIVED_LOG",
+					"V$SGASTAT",
 					"unavailable"
 				],
 				[
-					"V$LOG_HISTORY",
+					"V$SGA_DYNAMIC_COMPONENTS",
 					"unavailable"
 				]
 			]
