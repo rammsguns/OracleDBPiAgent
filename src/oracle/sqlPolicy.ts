@@ -96,11 +96,18 @@ function checkFunctionCalls(clean: string): void {
  * distinction between the 19c licensing guide and Database Reference.
  */
 function rejectDiagnosticsPack(sql: string): void {
+	const listedViews = new Set(`DBA_STREAMS_TP_PATH_BOTTLENECK DBA_STREAMS_TP_COMPONENT_STAT
+CDB_STREAMS_TP_PATH_BOTTLENECK CDB_STREAMS_TP_COMPONENT_STAT
+MGMT$ALERT_ANNOTATIONS MGMT$ALERT_CURRENT MGMT$ALERT_HISTORY MGMT$ALERT_NOTIF_LOG
+MGMT$AVAILABILITY_CURRENT MGMT$AVAILABILITY_HISTORY MGMT$BLACKOUT_HISTORY MGMT$BLACKOUTS
+MGMT$METRIC_COLLECTIONS MGMT$METRIC_DAILY MGMT$METRIC_DETAILS MGMT$METRIC_HOURLY
+MGMT$TARGET_METRIC_COLLECTIONS MGMT$TARGET_METRIC_SETTINGS MGMT$TEMPLATES
+MGMT$TEMPLATE_METRIC_COLLECTION MGMT$TEMPLATE_METRIC_SETTINGS MGMT$TEMPLATE_POLICY_SETTINGS`.split(/\s+/));
 	const tokens = sql.match(/"(?:[^"]|"")*"|[\p{L}_][\p{L}\p{N}\p{M}_$#]*/gu) ?? [];
 	for (const token of tokens) {
 		const name = (token.startsWith('"') ? token.slice(1, -1).replaceAll('""', '"') : token).toUpperCase();
-		if (/^(?:G?V(?:\$|_\$)(?:ACTIVE_SESSION_HISTORY|[A-Z0-9_$#]*METRIC[A-Z0-9_$#]*)|DBA_(?:HIST|ADVISOR|ADDM)_[A-Z0-9_$#]+|X\$ASH|DBMS_WORKLOAD_REPOSITORY|DBMS_ADDM)$/.test(name)) {
-			throw new StatementRejectedError("Diagnostics Pack access is out of scope; use piagent top for current SQL and load sampling");
+		if (listedViews.has(name) || /^(?:G?V(?:\$|_\$)(?:(?:ALL_)?ACTIVE_SESSION_HISTORY|SQL_(?:PLAN_)?MONITOR|[A-Z0-9_$#]*METRIC[A-Z0-9_$#]*)|(?:DBA|CDB)_(?:HIST|ADVISOR|ADDM)_[A-Z0-9_$#]+|AWR_(?:CDB|PDB|ROOT)_[A-Z0-9_$#]+|WR[HM]\$_[A-Z0-9_$#]+|WRI\$_ADV_[A-Z0-9_$#]+|X\$ASH|DBMS_(?:WORKLOAD_REPOSITORY|ADDM|PERF|UMF|ADVISOR|WORKLOAD_REPLAY|AWRHUB|AUTO_SQLTUNE|SQL_MONITOR|SQLTUNE))$/.test(name)) {
+			throw new StatementRejectedError("Diagnostics Pack / Tuning Pack access is out of scope; use piagent top for current SQL and load sampling");
 		}
 	}
 }

@@ -121,18 +121,23 @@ METRIC METRICGROUP METRICNAME METRIC_HISTORY RSRCMGRMETRIC RSRCMGRMETRIC_HISTORY
 RSRCPDBMETRIC RSRCPDBMETRIC_HISTORY SERVICEMETRIC SERVICEMETRIC_HISTORY SERVICE_REGION_METRIC
 SESSMETRIC SYSMETRIC SYSMETRIC_HISTORY SYSMETRIC_SUMMARY WAITCLASSMETRIC WAITCLASSMETRIC_HISTORY`.split(/\s+/);
 const packViews = [...metricViews.flatMap(name => ['V$', 'GV$', 'V_$', 'GV_$'].map(prefix => prefix + name)),
-	...['V$', 'GV$', 'V_$', 'GV_$'].map(prefix => prefix + 'ACTIVE_SESSION_HISTORY'),
+	...['V$', 'GV$', 'V_$', 'GV_$'].flatMap(prefix => ['ACTIVE_SESSION_HISTORY','ALL_ACTIVE_SESSION_HISTORY','SQL_MONITOR','SQL_PLAN_MONITOR'].map(name => prefix + name)),
+	...['WRH$_ACTIVE_SESSION_HISTORY','WRM$_SNAPSHOT','WRI$_ADV_TASKS',
+		...['CDB','PDB','ROOT'].flatMap(scope => ['SNAPSHOT','ACTIVE_SESS_HISTORY','SQLSTAT'].map(suffix => `AWR_${scope}_${suffix}`)),
+		'CDB_HIST_SNAPSHOT','CDB_HIST_ACTIVE_SESS_HISTORY','CDB_ADVISOR_TASKS','CDB_ADDM_TASKS','AWR_CDB_ACTIVE_SESS_HISTORY','AWR_PDB_SNAPSHOT','AWR_ROOT_SQLSTAT',
+		'DBA_STREAMS_TP_PATH_BOTTLENECK','DBA_STREAMS_TP_COMPONENT_STAT','CDB_STREAMS_TP_PATH_BOTTLENECK','CDB_STREAMS_TP_COMPONENT_STAT',
+		...`MGMT$ALERT_ANNOTATIONS MGMT$ALERT_CURRENT MGMT$ALERT_HISTORY MGMT$ALERT_NOTIF_LOG MGMT$AVAILABILITY_CURRENT MGMT$AVAILABILITY_HISTORY MGMT$BLACKOUT_HISTORY MGMT$BLACKOUTS MGMT$METRIC_COLLECTIONS MGMT$METRIC_DAILY MGMT$METRIC_DETAILS MGMT$METRIC_HOURLY MGMT$TARGET_METRIC_COLLECTIONS MGMT$TARGET_METRIC_SETTINGS MGMT$TEMPLATES MGMT$TEMPLATE_METRIC_COLLECTION MGMT$TEMPLATE_METRIC_SETTINGS MGMT$TEMPLATE_POLICY_SETTINGS`.split(' ')],
 	'DBA_HIST_SNAPSHOT', 'DBA_HIST_SQLSTAT', 'DBA_ADVISOR_TASKS', 'DBA_ADVISOR_FINDINGS', 'DBA_ADDM_TASKS', 'X$ASH'];
 const packMessage = /Diagnostics Pack.*piagent top/;
 it.each(packViews)('refuses every qualified and nested form of %s', name => {
-	for (const qualified of [name.toLowerCase(), `"${name}"`, `SYS.${name}`, `PUBLIC.${name}`, `"SYS"."${name}"`, `"PUBLIC" /* separator */ . "${name}"`]) {
+	for (const qualified of [name.toLowerCase(), `"${name.toLowerCase()}"`, `"${name}"`, `SYS.${name}`, `PUBLIC.${name}`, `"SYS"."${name}"`, `"PUBLIC" /* separator */ . "${name}"`]) {
 		for (const sql of [`SELECT * FROM ${qualified}`, `WITH x AS (SELECT * FROM ${qualified}) SELECT * FROM x`,
 			`SELECT * FROM (SELECT * FROM ${qualified})`, `SELECT * FROM dual JOIN ${qualified} x ON 1=1`, `SELECT * FROM dual, ${qualified} x`]) {
 			expect(() => classifySql(sql), sql).toThrow(packMessage);
 		}
 	}
 });
-it.each(['DBMS_WORKLOAD_REPOSITORY', 'DBMS_ADDM'])('names the pack and alternative for %s', name => {
+it.each(['DBMS_WORKLOAD_REPOSITORY', 'DBMS_ADDM', 'DBMS_PERF', 'DBMS_UMF', 'DBMS_ADVISOR', 'DBMS_WORKLOAD_REPLAY', 'DBMS_AWRHUB', 'DBMS_AUTO_SQLTUNE', 'DBMS_SQL_MONITOR', 'DBMS_SQLTUNE'])('names the pack and alternative for %s', name => {
 	for (const pkg of [name, `SYS.${name}`, `PUBLIC.${name}`, `"SYS"."${name}"`, `"PUBLIC"."${name}"`]) {
 		expect(() => classifySql(`SELECT ${pkg}.REPORT(1) FROM dual`)).toThrow(packMessage);
 		expect(() => classifySql(`BEGIN ${pkg}.REPORT(1); END`)).toThrow(packMessage);
