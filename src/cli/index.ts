@@ -118,6 +118,9 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
 		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
 	});
+	program.command("backup").description("Read-only backup and recoverability metadata; no LLM").requiredOption("--target <target>").option("--json").action(async options => {
+		const { runBackup } = await import("../backup/cli.js"); await runBackup(options);
+	});
 	program.command("space").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Read-only space and capacity; no LLM").requiredOption("--target <target>").option("--section <ids>", "Comma-separated sections").option("--all", "Include Oracle-maintained owners").option("--owner <owner>", "Segment owner").option("--top <N>", "Top segments, 1–100").option("--json").option("--markdown").action(async options => {
 		const { runSpace } = await import("../space/cli.js");
 		const { SpaceUsageError } = await import("../space/index.js");
