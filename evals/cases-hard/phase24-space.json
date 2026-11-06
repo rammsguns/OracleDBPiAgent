@@ -44,11 +44,13 @@
 		"split": "challenge",
 		"question": "On d1, inventory every online redo group: thread number, group number, exact size in bytes and member count together in each row. Also state the total group count. Omit current status and archive state, which can change during the answer.",
 		"groundTruth": {
-			"sql": "SELECT thread# AS thread_number, group# AS group_number, bytes AS size_bytes, members AS member_count, COUNT(*) OVER () AS total_groups FROM v$log ORDER BY thread#, group#",
+			"sql": "SELECT thread# AS thread_number, group# AS group_number, bytes AS size_bytes, members AS member_count FROM v$log ORDER BY thread#, group#",
 			"mode": "rowCells"
 		},
 		"expect": {
-			"requiredFacts": [],
+			"requiredFacts": [
+				"\\b(?:total(?:\\s+(?:online\\s+)?redo)?\\s+groups?(?:\\s+count)?\\s*[:=|]?\\s*3|(?:total(?:\\s+(?:online\\s+)?redo)?\\s+group\\s+count)\\s*[:=|]?\\s*3|3\\s+(?:(?:online\\s+)?redo\\s+)?groups?\\s+(?:in\\s+)?total)\\b"
+			],
 			"requiredTools": [
 				"run_query"
 			],

@@ -45,7 +45,7 @@ it('records two stable live samples at least 60 seconds apart and scores every r
 	checkP24Stability(report.first.records, report.second.records);
 	for (const test of cases) {
 		const rows: unknown[][] = report.first.records.find((record: { id: string }) => record.id === test.id).rows;
-		const result = { answer: rows.map(row => row.join(' | ')).join('\n'), toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
+		const result = { answer: rows.map(row => row.join(' | ')).join('\n') + (test.id === 'hard-p24-d1-redo-layout' ? '\nTotal groups: 3' : ''), toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
 		expect(score(test as EvalCase, result, rows).pass, test.id).toBe(true);
 		expect(score(test as EvalCase, { ...result, answer: rows.slice(1).map(row => row.join(' | ')).join('\n') }, rows).pass, test.id).toBe(false);
 	}
