@@ -82,12 +82,25 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const jobs = cases.filter(test => test.id.startsWith('hard-p26-'));
+	if (jobs.length) checkP26Cases(jobs);
+
 	const backup = cases.filter(test => test.category === 'backup');
 	if (backup.length) checkP25Cases(backup);
 
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+export function checkP26Cases(cases: EvalCase[]): void {
+	if (cases.length !== 4 || new Set(cases.map(test => test.id)).size !== 4) throw new Error('Expected four distinct p26 jobs cases');
+	for (const test of cases) {
+		if (test.target !== 'p1-19c-prod' || test.category !== 'jobs' || test.split !== 'challenge' || test.groundTruth?.mode !== 'rowCells') throw new Error('p26 requires p1 challenge rowCells truth');
+		classifySql(test.groundTruth.sql);
+		if (/\b(?:run_query|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question ?? '')) throw new Error('p26 questions must not name tools or views');
+		if (/\b(?:ADDITIONAL_INFO|ERRORS|JOB_ACTION|RUN_COUNT|FAILURE_COUNT)\b/i.test(test.groundTruth.sql)) throw new Error('p26 truth must exclude free text and moving counters');
+	}
 }
 
 export function checkP25Cases(cases: EvalCase[]): void {
