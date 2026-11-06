@@ -1,7 +1,11 @@
 {
 	"target": "p1-19c-prod",
-	"validatedAt": "2026-11-06T20:57:54.281Z",
+	"validatedAt": "2026-11-06T21:34:55.552Z",
 	"scope": "CDB-wide (shared by all PDBs)",
+	"container": {
+		"id": 0,
+		"name": "PRODCDB"
+	},
 	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
 	"views": [
 		{

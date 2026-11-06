@@ -18,6 +18,13 @@ function accessCode(error: unknown): string | undefined {
 /** Missing views are evidence gaps, never zero backup/gap counts. Unexpected errors fail. */
 export async function inspectP25(session: Pick<OracleSession, 'query' | 'identity'>, cases: EvalCase[]) {
 	checkP25Cases(cases);
+	const containerResult = await session.query("SELECT SYS_CONTEXT('USERENV','CON_ID'), SYS_CONTEXT('USERENV','CON_NAME') FROM dual", {}, { maxRows: 1 });
+	const [rawId, rawName] = containerResult.rows[0] ?? [];
+	const containerId = Number(rawId);
+	if (rawId == null || String(rawId).trim() === '' || !Number.isSafeInteger(containerId) || containerId < 0 || typeof rawName !== 'string' || !rawName.trim()) throw new Error('Invalid session container metadata');
+	const container = { id: containerId, name: rawName };
+	// CON_ID 0 is a non-CDB, 1 is CDB$ROOT, and >1 identifies a PDB (including seed).
+	const isPdb = container.id > 1;
 	const views = [];
 	for (const view of BACKUP_VIEWS) {
 		try {
@@ -31,7 +38,7 @@ export async function inspectP25(session: Pick<OracleSession, 'query' | 'identit
 	}
 	const records = [];
 	for (const test of cases) {
-		if (session.identity.isCdb) {
+		if (isPdb) {
 			records.push({ id: test.id, status: 'not verifiable from this database', code: 'PDB_VISIBILITY_UNVERIFIED' });
 			continue;
 		}
@@ -47,7 +54,8 @@ export async function inspectP25(session: Pick<OracleSession, 'query' | 'identit
 	}
 	return {
 		scope: 'CDB-wide (shared by all PDBs)',
-		note: session.identity.isCdb ? 'PDB visibility may hide control-file records; empty rows do not establish absence.' : 'Readable empty control-file history does not prove external backups absent or restoration impossible.',
+		container,
+		note: isPdb ? 'PDB visibility may hide control-file records; empty rows do not establish absence.' : 'Readable empty control-file history does not prove external backups absent or restoration impossible.',
 		views, records,
 	};
 }

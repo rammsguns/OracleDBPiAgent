@@ -9,8 +9,9 @@ import type { EvalCase } from '../../evals/types.js';
 
 const live = JSON.parse(readFileSync('docs/wp-25d-live-d1-19c-lab.json', 'utf8'));
 const backupCases = async () => (await loadHardCases()).filter(test => test.category === 'backup');
-function session(error?: string, isCdb = false) {
+function session(error?: string, containerId = 0, containerName = 'ORCL', isCdb = false) {
 	const query = vi.fn(async (sql: string) => {
+		if (sql.includes("SYS_CONTEXT('USERENV','CON_ID')")) return { columns: [], rows: [[String(containerId), containerName]], truncated: false, elapsedMs: 0 };
 		if (error) throw { code: error };
 		const cases = await backupCases();
 		const test = cases.find(test => test.groundTruth!.sql === sql);
@@ -63,8 +64,8 @@ it('preserves readable evidence when another view is missing and propagates unex
 	await expect(inspectP25(session('NJS-511'), await backupCases())).rejects.toMatchObject({ code: 'NJS-511' });
 });
 
-it('does not infer backup absence from empty PDB-visible rows', async () => {
-	const fake = session(undefined, true);
+it.each([[3, 'APPPDB', false], [3, 'APPPDB', true], [2, 'PDB$SEED', false]] as const)('does not infer backup absence in container %s/%s with isCdb=%s', async (id, name, flag) => {
+	const fake = session(undefined, id, name, flag);
 	const report = await inspectP25(fake, await backupCases());
 	expect(report.note).toContain('empty rows do not establish absence');
 	expect(report.scope).toBe('CDB-wide (shared by all PDBs)');
@@ -72,5 +73,23 @@ it('does not infer backup absence from empty PDB-visible rows', async () => {
 		expect(record).not.toHaveProperty('rows');
 		expect(record.status).toBe('not verifiable from this database');
 	}
-	expect(fake.query).toHaveBeenCalledTimes(BACKUP_VIEWS.length);
+	expect(fake.query).toHaveBeenCalledTimes(BACKUP_VIEWS.length + 1);
+});
+
+
+it.each([[0, 'ORCL', false], [0, 'ORCL', true], [1, 'CDB$ROOT', true]] as const)('uses the container rather than isCdb for %s/%s with flag=%s', async (id, name, flag) => {
+	const report = await inspectP25(session(undefined, id, name, flag), await backupCases());
+	expect(report.container).toEqual({ id, name });
+	expect(report.records.every(record => record.status === 'readable')).toBe(true);
+});
+
+it('requires retention terminology even when rowCells scoring is omitted', async () => {
+	const test = (await backupCases()).find(test => test.id.endsWith('retention-setting'))!;
+	const withoutTruth = { ...test, groundTruth: undefined };
+	const response = { answer: 'RETENTION POLICY | NOT EXPLICITLY CONFIGURED | REDUNDANCY 1', toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
+	expect(test.expect.requiredFacts).toHaveLength(3);
+	expect(score(withoutTruth, response).pass).toBe(true);
+	for (const omitted of ['RETENTION POLICY', 'NOT EXPLICITLY CONFIGURED', 'REDUNDANCY 1']) {
+		expect(score(withoutTruth, { ...response, answer: response.answer.replace(omitted, '') }).pass, omitted).toBe(false);
+	}
 });

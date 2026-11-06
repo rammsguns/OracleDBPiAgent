@@ -52,7 +52,11 @@
 			"mode": "rowCells"
 		},
 		"expect": {
-			"requiredFacts": [],
+			"requiredFacts": [
+				"RETENTION\\s+POLICY",
+				"NOT\\s+EXPLICITLY\\s+CONFIGURED",
+				"REDUNDANCY\\s+1\\b"
+			],
 			"requiredTools": [
 				"run_query"
 			],

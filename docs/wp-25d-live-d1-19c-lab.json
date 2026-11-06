@@ -1,7 +1,11 @@
 {
 	"target": "d1-19c-lab",
-	"validatedAt": "2026-11-06T20:57:53.274Z",
+	"validatedAt": "2026-11-06T21:34:54.637Z",
 	"scope": "CDB-wide (shared by all PDBs)",
+	"container": {
+		"id": 0,
+		"name": "ORCL"
+	},
 	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
 	"views": [
 		{

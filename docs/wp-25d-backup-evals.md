@@ -19,7 +19,7 @@ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/va
 PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-p25.ts --target p1-19c-prod
 ```
 
-It probes all ten proposed backup views independently and runs the four truth queries. ORA-00942 / ORA-01031 / ORA-65040 become per-source "not verifiable from this database" results, with no inferred zero counts. Unexpected failures propagate. It labels the evidence CDB-wide (shared by all PDBs). For PDB identity it withholds control-file absence conclusions because visibility can hide rows; this path is unit-tested only.
+It probes all ten proposed backup views independently and runs the four truth queries. ORA-00942 / ORA-01031 / ORA-65040 become per-source "not verifiable from this database" results, with no inferred zero counts. Unexpected failures propagate. It labels the evidence CDB-wide (shared by all PDBs). It reads session CON_ID and CON_NAME from SYS_CONTEXT; CON_ID greater than 1 identifies a PDB, including the seed. For those containers it withholds control-file absence conclusions because visibility can hide rows, independently of the CDB-level identity flag; this path is unit-tested only.
 
 Ownership cleanup requested by the coordinator: WP-25A owns the product backup grant request, backup preflight catalog and PDB grant template. This branch deletes its proposed grants-request-2026-11-06-backup.sql and restores src/preflight/views.ts and docs/grants-template-pdb.sql to master. No grants were applied. All eval work remains intact. No command was wired in src/cli: the product `backup` command belongs to WP-25A and is absent from this branch; this WP's command is the eval validator above.
 
@@ -161,8 +161,12 @@ d1-19c-lab
 ```json
 {
 	"target": "d1-19c-lab",
-	"validatedAt": "2026-11-06T20:57:53.274Z",
+	"validatedAt": "2026-11-06T21:34:54.637Z",
 	"scope": "CDB-wide (shared by all PDBs)",
+	"container": {
+		"id": 0,
+		"name": "ORCL"
+	},
 	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
 	"views": [
 		{
@@ -259,8 +263,12 @@ p1-19c-prod
 ```json
 {
 	"target": "p1-19c-prod",
-	"validatedAt": "2026-11-06T20:57:54.281Z",
+	"validatedAt": "2026-11-06T21:34:55.552Z",
 	"scope": "CDB-wide (shared by all PDBs)",
+	"container": {
+		"id": 0,
+		"name": "PRODCDB"
+	},
 	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
 	"views": [
 		{
@@ -367,4 +375,84 @@ Unit rerun
 
     Isolate  110 workers spawned · ~279ms startup each (spawn + environment, per file)
              at least ~15.08s faster with isolate: false — reuses workers across files instead of one per file
+```
+
+Review minors addressed
+
+Review: ../review-wp-25d-backup-evals/docs/review-wp-25d-backup-evals.md (APPROVE).
+
+- hard-p25-d1-retention-setting now requires RETENTION POLICY, NOT EXPLICITLY CONFIGURED and REDUNDANCY 1 via meaningful regexes in addition to rowCells. A unit test omits each phrase with truth scoring disabled, proving the fixed-fact checks independently reject incomplete answers. These are the live d1 empty-override premises; if its retention override changes, revise these fixed facts alongside live truth.
+- inspectP25 now reads session CON_ID and CON_NAME via SELECT SYS_CONTEXT from DUAL. PDB detection uses CON_ID > 1 and never uses identity.isCdb. It records the container name and ID in output. Tests cover non-CDB, root (mock only), ordinary PDB and seed containers, including deliberately contradictory isCdb flags. Missing/invalid container metadata fails rather than assuming a non-CDB. No contract or product source changes are needed; DUAL is already readable on both labs.
+
+Live PDB behavior remains unverified; all live reruns connect only to the two labs. No grants are applied, and no Strata calls are made. The integration command again excludes the Strata e2e test. Product grant request/preflight/template ownership stays with WP-25A.
+
+Review-fix verification output
+
+The first full unit invocation ended with `context canceled` before a test summary; the clean rerun below passed. No test assertion failures were reported.
+
+Typecheck
+
+```text
+$ npm run typecheck
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+```
+
+Unit suite rerun
+
+```text
+$ npm test -- --maxWorkers=2
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25d-backup-evals
+
+
+ Test Files  110 passed (110)
+      Tests  1848 passed (1848)
+   Start at  15:35:39
+   Duration  68.86s (tests 75%, import 23%, worker 1%, transform 1%)
+
+    Isolate  110 workers spawned · ~283ms startup each (spawn + environment, per file)
+             at least ~15.27s faster with isolate: false — reuses workers across files instead of one per file
+```
+
+Live hard truth
+
+```text
+$ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-hard.ts
+Validated 118 ground-truth queries for 140 hard cases; row counts recorded.
+```
+
+Focused retention/container tests
+
+```text
+$ npx vitest run tests/unit/phase25-evals.test.ts
+RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25d-backup-evals
+
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  15:34:25
+   Duration  4.24s (tests 81%, import 13%, transform 5%)
+```
+
+The additional strict eval/test typecheck also passed with no output. Both live validate-p25 commands passed; their refreshed output, including container IDs and names, is pasted above and saved in docs/wp-25d-live-*.json. Container IDs were 0 for both labs. The backup prerequisites and values are unchanged.
+
+Review-fix DB-only integration rerun
+
+```text
+$ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25d-backup-evals
+
+
+ Test Files  29 passed (29)
+      Tests  66 passed | 1 skipped (67)
+   Start at  15:34:28
+   Duration  211.03s (tests 96%, import 4%)
 ```
