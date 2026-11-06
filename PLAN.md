@@ -3668,6 +3668,71 @@ the intended changes.
 - Phases 23 and 24 together make 1.3.0. Bump the version and tag only when
   the owner asks.
 
+## Phases 23 and 24 results (2026-11-06, shipped as 1.3.0)
+
+**Merges.** Antigravity approved every WP:
+- WP-23A, 23D and 23E;
+- WP-23F, then WP-24A and 24D;
+- WP-24E;
+- WP-23C, after coordinator screenshot fixes for phone-width tables and the
+  toolbar;
+- WP-23B, after a REQUEST CHANGES for keyword over-triggering on "locked
+  account" and wait-context ranking; fixed and re-reviewed;
+- WP-24C, with the overflow-only scroll hint;
+- WP-24B, with the `--out` history directory;
+- WP-24F;
+- WP-24G.
+
+**Grants on p1.** The sessions grants (8 views) and the space grants
+(12 views) were applied as sysdba. `validate-hard` passed after each.
+
+**Gate.** Archived in `eval-archive/phase23/gate-23`, single side on
+dd5d3df. No agent prompt or tool changed in either phase.
+
+| Suite | Result | v1.2.0 release |
+|---|---|---|
+| dev | 30/30 and 30/30 | |
+| holdout ×3 | 66/69 | 57/69 |
+| regression | 21/21 | |
+| MVP | 39/39 | |
+| challenge | 53/60 and 52/60 as scored; 55/60 and 54/60 after WP-24F | |
+
+Every refusal passed.
+
+- **WP-24F eval fixes.**
+  - A scorer bug: `rowMatches` split named bindings on every `/`, so
+    `System I/O` and `User I/O` could never match.
+  - A case defect: `hard-p24-d1-redo-layout` put the total count in every
+    truth row.
+  - The replay over 14,227 records changed 4 records, all justified
+    fail-to-pass.
+- **Remaining p24 miss.** `hard-p24-p1-autoextend-max` is a genuine agent
+  error: it multiplied MAXBYTES by the block size.
+- **Older challenge misses.** These rose from 5 to 10 over 96 runs, mostly
+  in p19. An A/B of the 4 p19 cases, 3 alternating pairs (archived in
+  `eval-archive/phase23/gate-p19ab`), gave v1.2.1 6/12 and master 7/12.
+  So this is live shared-pool and statistics drift seen by both versions,
+  not a regression.
+
+**Release tests on cdeeac9.**
+- Typecheck clean; 1,606 unit tests and 71 browser tests pass.
+- Integration: 62/62 with Strata.
+- Package smoke from the tarball, with a fresh prefix and a 0700 home:
+  - doctor ok on Strata and both targets;
+  - sessions, space, `report --sections sessions,space`,
+    `drift --scope space` (exit 3), triage (headings nested) and ask
+    (correct redo answer) all work;
+  - every `--help` page has a description.
+
+**Follow-ups.**
+- When `PIAGENT_SECRET_DIR` in `.env` still holds the `init` placeholder,
+  commands fail with the generic message, because the password-file read is
+  a native ENOENT. Detect the placeholder in `loadConfig` and raise a
+  `SafeConfigError`, as WP-21D does for the LLM key file.
+- `hard-p24-p1-autoextend-max`: the agent misreads MAXBYTES.
+- Make the p19 case truths robust to the agent's own V$SQL pollution and to
+  nightly statistics times.
+
 ## Phase 25: backup and recoverability (proposed 2026-11-06; needs owner approval and p1 grants)
 
 ### Goal
