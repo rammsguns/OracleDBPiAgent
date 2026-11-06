@@ -1,0 +1,116 @@
+[
+	{
+		"id": "hard-p23-d1-dominant-wait-class",
+		"target": "d1-19c-lab",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On d1, which non-idle wait class accounts for the most total wait time since instance startup? Aggregate all events within each class. Report only the class name, not the changing counters, and distinguish cumulative waits from sessions waiting right now. Break a tie by class name.",
+		"groundTruth": {
+			"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p23-p1-dominant-wait-class",
+		"target": "p1-19c-prod",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On p1, identify the leading non-idle wait class by cumulative wait time since startup, combining all events per class. Give the class name without volatile timing values. Explain why this does not establish that a session is blocked now. Break a tie alphabetically.",
+		"groundTruth": {
+			"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p23-d1-commit-events",
+		"target": "d1-19c-lab",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On d1, classify the defined events log file sync and log file parallel write. Return one row per event with its exact name and wait class. Explain the difference between a foreground commit wait and the redo writer wait; use the event definitions even if an event has never occurred.",
+		"groundTruth": {
+			"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('log file sync','log file parallel write') ORDER BY name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p23-p1-lock-idle-events",
+		"target": "p1-19c-prod",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On p1, give the defined wait class for each of enq: TX - row lock contention, enq: TM - contention, and SQL*Net message from client. Put the exact event name and class together in each row. Explain why the last event alone does not prove lock contention. Include definitions even if the events have not occurred.",
+		"groundTruth": {
+			"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('enq: TX - row lock contention','enq: TM - contention','SQL*Net message from client') ORDER BY name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p23-d1-event-definition-counts",
+		"target": "d1-19c-lab",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On d1, how many wait-event definitions belong to each of Application, Commit, and Concurrency? Return one row per class with its exact name and event count. Count definitions, including events with no recorded waits, rather than observed waits or sessions.",
+		"groundTruth": {
+			"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('Application','Commit','Concurrency') GROUP BY wait_class ORDER BY wait_class",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p23-p1-event-definition-counts",
+		"target": "p1-19c-prod",
+		"category": "sessions",
+		"split": "challenge",
+		"question": "On p1, count the wait-event definitions in each of User I/O, System I/O, and Idle. Report each exact class name with its count in one row. These are counts of defined events, not waits accumulated or sessions currently waiting; include unused definitions.",
+		"groundTruth": {
+			"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('User I/O','System I/O','Idle') GROUP BY wait_class ORDER BY wait_class",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]

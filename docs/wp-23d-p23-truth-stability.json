@@ -1,0 +1,225 @@
+{
+	"caseCount": 6,
+	"stable": true,
+	"minimumGapMs": 60000,
+	"first": {
+		"startedAt": "2026-11-06T05:56:49.667Z",
+		"completedAt": "2026-11-06T05:57:07.138Z",
+		"records": [
+			{
+				"id": "hard-p23-d1-dominant-wait-class",
+				"target": "d1-19c-lab",
+				"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"System I/O"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-dominant-wait-class",
+				"target": "p1-19c-prod",
+				"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"System I/O"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-d1-commit-events",
+				"target": "d1-19c-lab",
+				"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('log file sync','log file parallel write') ORDER BY name",
+				"mode": "rowCells",
+				"rowCount": 2,
+				"rows": [
+					[
+						"log file parallel write",
+						"System I/O"
+					],
+					[
+						"log file sync",
+						"Commit"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-lock-idle-events",
+				"target": "p1-19c-prod",
+				"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('enq: TX - row lock contention','enq: TM - contention','SQL*Net message from client') ORDER BY name",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"SQL*Net message from client",
+						"Idle"
+					],
+					[
+						"enq: TM - contention",
+						"Application"
+					],
+					[
+						"enq: TX - row lock contention",
+						"Application"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-d1-event-definition-counts",
+				"target": "d1-19c-lab",
+				"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('Application','Commit','Concurrency') GROUP BY wait_class ORDER BY wait_class",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"Application",
+						17
+					],
+					[
+						"Commit",
+						5
+					],
+					[
+						"Concurrency",
+						56
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-event-definition-counts",
+				"target": "p1-19c-prod",
+				"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('User I/O','System I/O','Idle') GROUP BY wait_class ORDER BY wait_class",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"Idle",
+						140
+					],
+					[
+						"System I/O",
+						40
+					],
+					[
+						"User I/O",
+						59
+					]
+				]
+			}
+		]
+	},
+	"second": {
+		"startedAt": "2026-11-06T05:58:07.144Z",
+		"completedAt": "2026-11-06T05:58:23.822Z",
+		"records": [
+			{
+				"id": "hard-p23-d1-dominant-wait-class",
+				"target": "d1-19c-lab",
+				"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"System I/O"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-dominant-wait-class",
+				"target": "p1-19c-prod",
+				"sql": "SELECT wait_class AS wait_class FROM v$system_event WHERE wait_class <> 'Idle' GROUP BY wait_class ORDER BY SUM(time_waited_micro) DESC, wait_class FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"System I/O"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-d1-commit-events",
+				"target": "d1-19c-lab",
+				"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('log file sync','log file parallel write') ORDER BY name",
+				"mode": "rowCells",
+				"rowCount": 2,
+				"rows": [
+					[
+						"log file parallel write",
+						"System I/O"
+					],
+					[
+						"log file sync",
+						"Commit"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-lock-idle-events",
+				"target": "p1-19c-prod",
+				"sql": "SELECT name AS event_name, wait_class AS wait_class FROM v$event_name WHERE name IN ('enq: TX - row lock contention','enq: TM - contention','SQL*Net message from client') ORDER BY name",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"SQL*Net message from client",
+						"Idle"
+					],
+					[
+						"enq: TM - contention",
+						"Application"
+					],
+					[
+						"enq: TX - row lock contention",
+						"Application"
+					]
+				]
+			},
+			{
+				"id": "hard-p23-d1-event-definition-counts",
+				"target": "d1-19c-lab",
+				"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('Application','Commit','Concurrency') GROUP BY wait_class ORDER BY wait_class",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"Application",
+						17
+					],
+					[
+						"Commit",
+						5
+					],
+					[
+						"Concurrency",
+						56
+					]
+				]
+			},
+			{
+				"id": "hard-p23-p1-event-definition-counts",
+				"target": "p1-19c-prod",
+				"sql": "SELECT wait_class AS wait_class, COUNT(*) AS event_count FROM v$event_name WHERE wait_class IN ('User I/O','System I/O','Idle') GROUP BY wait_class ORDER BY wait_class",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						"Idle",
+						140
+					],
+					[
+						"System I/O",
+						40
+					],
+					[
+						"User I/O",
+						59
+					]
+				]
+			}
+		]
+	}
+}

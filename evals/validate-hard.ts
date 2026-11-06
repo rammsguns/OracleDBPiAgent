@@ -63,6 +63,15 @@ export function checkHardCases(cases: EvalCase[]): void {
 		const exposed = ['hard-p21-alert-levels', 'hard-p21-problem-identity'].includes(test.id);
 		if (test.split !== (exposed ? 'dev' : 'holdout') || !test.groundTruth) throw new Error('Phase 21 requires holdout truth');
 	}
+	const p23 = cases.filter(test => test.id.startsWith('hard-p23-'));
+	if (p23.length) {
+		if (p23.length !== 6 || ['d1-19c-lab', 'p1-19c-prod'].some(target => p23.filter(test => test.target === target).length !== 3)) throw new Error('Phase 23 needs six cases, three per target');
+		for (const test of p23) {
+			if (test.split !== 'challenge' || test.category !== 'sessions' || test.groundTruth?.mode !== 'rowCells') throw new Error('Phase 23 requires challenge rowCells truth');
+			if (/\b(?:MODULE|ACTION|CLIENT_INFO|CLIENT_IDENTIFIER|P1TEXT|SQL_TEXT|VALUE_STRING|V\$ACTIVE_SESSION_HISTORY|DBA_HIST_\w*)\b/i.test(test.groundTruth.sql)) throw new Error('Forbidden Phase 23 truth column or view');
+		}
+	}
+
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
