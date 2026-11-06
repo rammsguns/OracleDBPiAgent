@@ -45,7 +45,14 @@ export const SAFE_CONFIG_MESSAGES = Object.freeze([
 	"Invalid PIAGENT_MAX_ROWS",
 	"Invalid PIAGENT_STATEMENT_TIMEOUT_SECONDS",
 	"Invalid PIAGENT_MAX_TOOL_CALLS",
-	"Invalid PIAGENT_MAX_WALL_SECONDS"
+	"Invalid PIAGENT_MAX_WALL_SECONDS",
+	"Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.",
+	"Account is not approved",
+	"Invalid schema",
+	"Invalid password file",
+	"Target endpoint is not approved",
+	"Only thin mode is supported",
+	"Invalid query limits"
 ] as const);
 export type SafeConfigMessage = typeof SAFE_CONFIG_MESSAGES[number];
 

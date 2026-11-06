@@ -73,15 +73,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	if (argv.slice(2, 5).join(" ") !== "report schedule run") loadEnvironment();
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
-	program.command("init").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
-	program.command("web").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
+	program.command("init").description("Create private local configuration").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
+	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
 		const port = Number(options.port);
 		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new SafeConfigError("Invalid port");
 		const { createWebServer } = await import("../web/server.js");
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
 	});
-	program.command("report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
+	program.command("report").description("Collect a read-only database health report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
 		if (!options.target) throw new SafeConfigError("Report requires --target");
 		if (options.json && options.md) throw new SafeConfigError("Choose --json or --md");
 		if (options.diffOnly && options.summarize) throw new SafeConfigError("--diff-only cannot summarize");
@@ -167,31 +167,31 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		}
 	});
 	const plsql = program.command("plsql").description("Read-only PL/SQL documentation and dependency diagrams; no LLM");
-	plsql.command("list").requiredOption("--target <target>").option("--owner <owner>").option("--json").action(async options => {
+	plsql.command("list").description("List visible PL/SQL objects").requiredOption("--target <target>").option("--owner <owner>").option("--json").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("list", options);
 	});
-	plsql.command("doc").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
+	plsql.command("doc").description("Document a PL/SQL object").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
 	});
-	program.command("drift").description("Compare two approved targets (parameters, schema, objects or security); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security or space); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
 	});
-	const schedule = program.commands.find(command => command.name() === "report")!.command("schedule").enablePositionalOptions().option("--target <target>").option("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
+	const schedule = program.commands.find(command => command.name() === "report")!.command("schedule").description("Schedule saved database reports").enablePositionalOptions().option("--target <target>").option("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
 		if (!options.target || !options.every) throw new SafeConfigError("Schedule requires --target and --every");
 		const { generateSchedule, renderSchedule } = await import("../report/schedule.js");
 		const { agentHome } = await import("../config/paths.js");
 		console.log(renderSchedule(generateSchedule({ target: options.target, every: options.every, home: agentHome(), out: options.out ? (await import("node:path")).resolve(options.out) : reportDirectory(), node: process.execPath, cli: join(PACKAGE_ROOT, "dist/cli/index.js") }, loadConfig().targets)));
 	});
-	schedule.command("run").requiredOption("--target <target>").option("--home <dir>").option("--out <dir>").action(async (options: { target: string; home?: string; out?: string }) => {
+	schedule.command("run").description("Run a scheduled database report").requiredOption("--target <target>").option("--home <dir>").option("--out <dir>").action(async (options: { target: string; home?: string; out?: string }) => {
 		const { runSchedule } = await import("../report/schedule.js");
 		process.exitCode = runSchedule({ ...options, cli: join(PACKAGE_ROOT, "dist/cli/index.js") });
 	});
-	program.command("targets").action(() => {
+	program.command("targets").description("List the approved Oracle 19c targets").action(() => {
 		const cfg = loadConfig();
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
 	});
-	program.command("doctor").action(async () => { if (!await doctor(loadConfig(), dependencies)) process.exitCode = 1; });
+	program.command("doctor").description("Check local configuration and service availability").action(async () => { if (!await doctor(loadConfig(), dependencies)) process.exitCode = 1; });
 	async function run(question: string | undefined, options: { target?: string; json?: boolean }) {
 		const config = loadConfig();
 		let pinnedTarget: string | undefined;
@@ -248,8 +248,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			}
 		} finally { await sessions.closeAll(); }
 	}
-	program.command("ask <question>").option("--target <target>").option("--json").action(run);
-	program.command("chat").option("--target <target>").action(options => run(undefined, options));
+	program.command("ask <question>").description("Ask the local Strata assistant about a database").option("--target <target>").option("--json").action(run);
+	program.command("chat").description("Start an interactive local Strata conversation").option("--target <target>").action(options => run(undefined, options));
 	await program.parseAsync(argv);
 }
 export function handleCliError(error: unknown): void {

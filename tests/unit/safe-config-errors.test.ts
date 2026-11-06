@@ -48,7 +48,14 @@ const expected = [
 	"Invalid PIAGENT_MAX_ROWS",
 	"Invalid PIAGENT_STATEMENT_TIMEOUT_SECONDS",
 	"Invalid PIAGENT_MAX_TOOL_CALLS",
-	"Invalid PIAGENT_MAX_WALL_SECONDS"
+	"Invalid PIAGENT_MAX_WALL_SECONDS",
+	"Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.",
+	"Account is not approved",
+	"Invalid schema",
+	"Invalid password file",
+	"Target endpoint is not approved",
+	"Only thin mode is supported",
+	"Invalid query limits"
 ];
 
 it("lists every reviewed safe configuration message", () => {
@@ -85,4 +92,37 @@ it("keeps native errors generic even when their messages contain private input",
 			expect(output).toHaveBeenLastCalledWith("piagent failed; check local configuration and service availability");
 		}
 	} finally { output.mockRestore(); process.exitCode = previous; }
+});
+
+it('reports provider configuration failures using fixed safe guidance before connecting', async () => {
+	const { loadConfig } = await import('../../src/config/index.js');
+	const { createSessionProvider } = await import('../../src/oracle/index.js');
+	const original = process.env.PIAGENT_SECRET_DIR;
+	process.env.PIAGENT_SECRET_DIR = '/private-runtime-secret-directory';
+	try {
+		for (const kind of ['unknown', 'account', 'schema', 'directory', 'file', 'endpoint']) {
+			const config = loadConfig({});
+			const target = config.targets[0]!;
+			config.secretDir = kind === 'directory' ? '/different-private-directory' : process.env.PIAGENT_SECRET_DIR;
+			if (kind === 'account') target.username = 'private-account';
+			if (kind === 'schema') target.defaultSchema = 'private/schema';
+			if (kind === 'file') target.passwordFile = '../private-file';
+			if (kind === 'endpoint') target.host = 'private-host';
+			const provider = createSessionProvider(config);
+			let failure: unknown;
+			try { await provider.get(kind === 'unknown' ? 'private-target' : target.name); } catch (error) { failure = error; }
+			expect(failure).toBeInstanceOf(SafeConfigError);
+			expect(String(failure)).not.toContain('private-');
+			const previous = process.exitCode;
+			const output = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				handleCliError(failure);
+				expect(output).toHaveBeenCalledWith((failure as Error).message);
+				expect(output).not.toHaveBeenCalledWith(expect.stringContaining('piagent failed'));
+			} finally { output.mockRestore(); process.exitCode = previous; }
+		}
+	} finally {
+		if (original === undefined) delete process.env.PIAGENT_SECRET_DIR;
+		else process.env.PIAGENT_SECRET_DIR = original;
+	}
 });

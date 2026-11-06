@@ -1,3 +1,4 @@
+import { SafeConfigError } from "../config/safeErrors.js";
 import { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 export { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 import oracledb from "oracledb";
@@ -23,14 +24,14 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 	return {
 		async get(targetName = config.defaultTarget) {
 			const target = config.targets.find(t => t.name === targetName);
-			if (!target) throw new Error(`Unknown target: ${targetName}`);
-			if (!/^(HARNESS_LAB|HARNESS_RO)$/.test(target.username)) throw new Error("Account is not approved");
-			if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(target.defaultSchema)) throw new Error("Invalid schema");
+			if (!target) throw new SafeConfigError("Unknown target");
+			if (!/^(HARNESS_LAB|HARNESS_RO)$/.test(target.username)) throw new SafeConfigError("Account is not approved");
+			if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(target.defaultSchema)) throw new SafeConfigError("Invalid schema");
 			const secretDir = process.env.PIAGENT_SECRET_DIR;
-			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw new Error("PIAGENT_SECRET_DIR must match config.secretDir");
-			if (basename(target.passwordFile) !== target.passwordFile) throw new Error("Invalid password file");
-			if (!approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new Error("Target endpoint is not approved");
-			if (!oracledb.thin) throw new Error("Only thin mode is supported");
+			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw new SafeConfigError("Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.");
+			if (basename(target.passwordFile) !== target.passwordFile) throw new SafeConfigError("Invalid password file");
+			if (!approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new SafeConfigError("Target endpoint is not approved");
+			if (!oracledb.thin) throw new SafeConfigError("Only thin mode is supported");
 			const password = (await readFile(resolve(secretDir, target.passwordFile), "utf8")).trim();
 			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` });
 			let closed = false; let busy = false;
@@ -51,7 +52,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 						if (closed || busy) throw new Error("Session is closed or busy");
 						const maxRows = options.maxRows ?? config.limits.maxRows;
 						const timeout = options.timeoutSeconds ?? config.limits.statementTimeoutSeconds;
-						if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > config.limits.maxRows || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new Error("Invalid query limits");
+						if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > config.limits.maxRows || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new SafeConfigError("Invalid query limits");
 						busy = true; const start = performance.now(); let resultSet: any;
 						try {
 							connection.callTimeout = timeout * 1000;
