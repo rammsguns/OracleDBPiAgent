@@ -86,3 +86,10 @@ it('aliases only exact known timing header cells', () => {
 	const markdown = liveReport.replace('ELAPSED_TIME | CPU_TIME', 'OTHER_ELAPSED_TIME | CPU_TIME_TOTAL');
 	expect(checkReportSummary('Elapsed ~1,421 s; CPU ~1,402 s.', markdown, config)).toEqual(['1,421', '1,402']);
 });
+
+it.each(['legacy', 'contiguous'])('checks timing facts in %s saved report tables', layout => {
+	const markdown = layout === 'legacy' ? liveReport : liveReport.replace(/\|\n\n(?=\|)/g, '|\n');
+	expect(checkReportSummary('Control file parallel write waited ~1,106 s.', markdown, config)).toEqual([]);
+	expect(checkReportSummary('SQL 4xm1ruvkx3awx used ~1,421 s elapsed and ~1,402 s CPU.', markdown, config)).toEqual([]);
+	expect(checkReportSummary('Control file parallel write waited ~1,206 s.', markdown, config)).toEqual(['1,206']);
+});

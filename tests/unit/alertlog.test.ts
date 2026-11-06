@@ -120,3 +120,17 @@ it.each([[1, 'Inflight'], [2, 'Ready'], [3, 'Tracked'], [4, 'Closed'], [5, 'Data
 	expect(result.rows[0]).toMatchObject({ status, statusName: name });
 	expect(renderAlertLogMarkdown(result)).toContain(`${name} (${status ?? 'null'})`);
 });
+
+it.each(['alerts', 'incidents'] as const)('renders empty %s as a separated paragraph without a table', async kind => {
+	const result = await (kind === 'alerts' ? readAlertLog : readIncidents)(fixture().ctx, 'd1-19c-lab');
+	for (const note of ['', 'No visible evidence.']) {
+		const markdown = renderAlertLogMarkdown({ ...result, note });
+		expect(markdown).toMatch(/\n\nNo rows returned\.\n$/);
+		expect(markdown.split('\n').some(line => line.startsWith('|'))).toBe(false);
+		if (note) expect(markdown).toContain(note + '\n\nNo rows returned.');
+	}
+	const unavailable = renderAlertLogMarkdown({ ...result, status: 'unavailable', note: 'Needs SELECT.', grants: ['GRANT SELECT ON SYS.V_$DIAG_ALERT_EXT TO HARNESS_LAB;'] });
+	expect(unavailable).toContain('`GRANT SELECT ON SYS.V_$DIAG_ALERT_EXT TO HARNESS_LAB;`\n\nNo rows returned.');
+	const partial = renderAlertLogMarkdown({ ...result, truncated: true });
+	expect(partial).toContain('No rows returned.\n\nRow cap reached;');
+});

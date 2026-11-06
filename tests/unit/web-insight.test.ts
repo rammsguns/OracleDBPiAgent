@@ -153,3 +153,18 @@ it('Space forwards validated options, strips SQL and binds, caps output and clea
 	mode='fail';for(let i=0;i<2;i++){const r=await f.call('/api/space');expect(r.status).toBe(500);expect(r.text).not.toContain('credential');}
 	mode='ok';expect((await f.call('/api/space')).status).toBe(200);expect(f.closeAll).toHaveBeenCalledTimes(5);
 });
+
+it('exports empty alert and incident sections as paragraphs without empty Markdown tables', async () => {
+	const f = await fixture({
+		readAlertLog: async (_ctx, target) => ({ ...alertResult(target, []), truncated: false }),
+		readIncidents: async (_ctx, target) => ({ ...alertResult(target, []), view: 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM', truncated: false }),
+	});
+	const response = await f.call('/api/alertlog');
+	expect(response.status).toBe(200);
+	const body = JSON.parse(response.text);
+	expect(body.entries.rows).toEqual([]);
+	expect(body.incidents.rows).toEqual([]);
+	expect(body.markdown.match(/\n\nNo rows returned\./g)).toHaveLength(2);
+	expect(body.markdown).not.toMatch(/^\|/m);
+	expect(body.markdown).toContain('No rows returned.\n\n# ADR incidents:');
+});

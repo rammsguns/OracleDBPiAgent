@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { mkdtemp, readdir, readFile, rm, stat, symlink } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadLatestReport, saveReport } from '../../src/report/history.js';
+import { loadLatestReport, loadReportHistory, saveReport } from '../../src/report/history.js';
 const targets = [{ name: 'lab' }];
 const dirs: string[] = [];
 async function temp() { const p = await mkdtemp(join(tmpdir(), 'report-history-')); dirs.push(p); return p; }
@@ -28,4 +28,13 @@ it('rejects symlinked target directories', async () => {
 it('failed serialization leaves no JSON commit marker or temporary file', async () => {
 	const dir = await temp(); const bad = { ...report(), sections: [], extra: 1n };
 	await expect(saveReport(dir, bad, targets)).rejects.toThrow(); expect(await readdir(join(dir, 'lab'))).toEqual([]);
+});
+
+it('loads older saved history with blank lines between Markdown table rows', async () => {
+	const dir = await temp();
+	const saved = { ...report(), sections: [{ name: 'identity', status: 'ok' as const, source: 'test', columns: ['N'], rows: [[1]], note: '' }] };
+	const files = await saveReport(dir, saved, targets);
+	await writeFile(files.markdown, '# Oracle 19c report: lab\n\n## identity\n\n| N |\n\n| --- |\n\n| 1 |\n');
+	expect(await loadLatestReport(dir, 'lab', targets)).toEqual(saved);
+	expect((await loadReportHistory(dir, 'lab', targets)).reports).toEqual([saved]);
 });
