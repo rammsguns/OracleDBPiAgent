@@ -4109,6 +4109,34 @@ Licensing:
 Gate: A/B if the triage or chat changes alter the agent path; otherwise
 single side plus the full suites.
 
+### Progress and second wave (2026-11-06)
+**Merged** (each approved by Antigravity, review fixes applied):
+- **WP-25A** `backup`.
+- **WP-25D** backup re-premise plus p25 cases. Replay: 188 justified
+  expectation flips and no unrelated flips. No case touches the views
+  phases 26 and 27 grant.
+- **WP-26A** `jobs`, with a second redaction pass on job error text.
+- **WP-27A** `top`. sqlPolicy now refuses the Diagnostics and Tuning Pack
+  sources: ASH, including `V$ALL_ACTIVE_SESSION_HISTORY`; AWR, including
+  the `DBA_/CDB_HIST`, `AWR_CDB/PDB/ROOT` and `*METRIC*` families; and
+  DBMS_WORKLOAD_REPOSITORY and DBMS_ADDM. It needed one re-review.
+
+**Grants.** The p1 grants were applied as sysdba on 2026-11-06 after
+verifying PRODCDB, version 19.9.1.0.0 and HARNESS_RO: backup 13, jobs 8,
+top 2, for 23 in total. Afterwards `validate-hard` passed (118 queries for
+140 cases), and `validate-p25` passed on both labs.
+
+**Second wave.** The B, C and E WPs are combined to avoid conflicting edits
+of triage routing and the web shell.
+
+| WP | Branch | Owns |
+|---|---|---|
+| WP-25B/26B/27B integration | `wp-2527b-integration` | Triage routing for backup, failed-job and "slow right now" questions; report `backup` and `jobs` sections; `drift --scope backup`; chat `/top` |
+| WP-25C/26C/27C web | `wp-2527c-web` | Backup, Jobs and Top tabs |
+| WP-25E/26E polish | `wp-2526e-polish` | `src/backup` and `src/jobs` output polish from the coordinator smoke |
+| WP-26D | `wp-26d-p26-evals` | p26 evals, as planned |
+| WP-27D | `wp-27d-p27-evals` | p27 evals, as planned |
+
 ### After phases 25 to 27
 Release them as 1.5.0 (1.4.0 shipped phase 28), after a full release gate
 (dev, holdout, regression, MVP, and p23 to p27) and a package smoke.
