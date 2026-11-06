@@ -11,7 +11,7 @@ export async function checkAccount(connection: AccountConnection, username: stri
 		const system = await connection.execute('SELECT PRIVILEGE FROM SESSION_PRIVS', {}, options);
 		const objects = await connection.execute("SELECT p.privilege, p.owner, u.oracle_maintained FROM (SELECT privilege, owner FROM user_tab_privs WHERE grantee = SYS_CONTEXT('USERENV','SESSION_USER') UNION ALL SELECT privilege, owner FROM role_tab_privs WHERE role IN (SELECT role FROM session_roles)) p LEFT JOIN all_users u ON u.username=p.owner", {}, options);
 		if (!Array.isArray(system.rows) || !Array.isArray(objects.rows)) throw new Error();
-		const bad = [...system.rows.filter((r: any[]) => !SYSTEM_PRIVILEGES.has(r[0])).map((r: any[]) => String(r[0])), ...objects.rows.filter((r: any[]) => !['SELECT','READ'].includes(r[0]) && !(r[0] === 'EXECUTE' && r[2] === 'Y')).map((r: any[]) => `${r[0]} on ${r[1]}`)];
+		const bad = [...system.rows.filter((r: any[]) => !SYSTEM_PRIVILEGES.has(r[0])).map((r: any[]) => String(r[0])), ...objects.rows.filter((r: any[]) => !['SELECT','READ'].includes(r[0]) && !(['EXECUTE','FLASHBACK'].includes(r[0]) && r[2] === 'Y')).map((r: any[]) => `${r[0]} on ${r[1]}`)];
 		if (bad.length) throw new AccountCheckError(`Account check failed: ${[...new Set(bad)].sort().join(', ')}`);
 	} catch (error) {
 		if (error instanceof AccountCheckError) throw error;
