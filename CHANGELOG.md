@@ -44,6 +44,21 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   (ORA-00942, ORA-01031 or ORA-65040) gives a per-section note. It no
   longer fails the whole command.
 
+- Target-file and connection problems give specific guidance. The common
+  Oracle login and network errors (ORA-01017, ORA-28000, ORA-28001,
+  ORA-01045, ORA-12514/12505, ORA-12541/12170 and NJS-503) each get a fixed
+  hint. No secret, host or path is echoed.
+- `targets check` prints one summary line per feature by default. `--all`
+  lists every view.
+
+### Fixed
+
+- Markdown tables in `report` output are contiguous, so they render as
+  tables. Before, each row was separated by a blank line.
+- An alert-log query with no rows no longer prints an empty table header.
+- `--grants-sql` maps `V$TEMPSEG_USAGE` to its real base object,
+  `SYS.V_$SORT_USAGE`.
+
 ### Not yet verified
 
 - Live behaviour inside a 19c PDB: the development labs are non-CDB.

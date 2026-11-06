@@ -3895,6 +3895,79 @@ Owns `src/report/`, `src/sessions/`, `src/space/`, `src/security/`,
   account (simulated in unit tests only), and a bad file mode.
 - Ship as 1.4.0 after owner confirmation.
 
+## Phase 28 results (2026-11-06, shipped as 1.4.0)
+
+**Merges.** Antigravity approved every WP.
+- **WP-28B** (owner guide and PDB grant template): the minor fixes were
+  made, covering the FLASHBACK wording and DEFINE placeholders.
+- **WP-28A** (private targets, account check, preflight): the first live
+  run found that d1 `HARNESS_LAB` holds FLASHBACK on SYS objects through
+  `SELECT_CATALOG_ROLE`. The coordinator decision allows FLASHBACK on
+  Oracle-maintained owners. Review minors were then fixed: case-insensitive
+  root check, stderr, `C##` deny list, doctor naming.
+- **WP-28C** (PDB audit): the coordinator sent it back so CDB-wide facts are
+  labelled, not withheld. That covers `db_overview`, redo and the recovery
+  area, and undo through `LOCAL_UNDO_ENABLED`. All five review minors were
+  fixed.
+- **WP-28D** (preflight catalog): `V$TEMPSEG_USAGE` now maps to
+  `SYS.V_$SORT_USAGE`, and an `ask` group was added. The first review asked
+  for changes: `DATABASE_PROPERTIES` was missing and the coverage test was
+  limited to some prefixes. The fix captures every FROM/JOIN identifier,
+  checks coverage per feature, and covers the template for every grantable
+  object. Re-review approved.
+- **WP-28E**, from the coordinator smoke: report Markdown tables joined
+  every row with a blank line, which predates this phase. They are now
+  contiguous, and an empty alert-log result prints no table header.
+- **WP-28A owner usability**, from the coordinator smoke:
+  - specific refusal messages for the targets file;
+  - fixed guidance for ORA and NJS connection errors;
+  - a per-feature summary in `targets check`;
+  - interactive commands isolated from retained connection failures.
+
+  Re-review approved.
+
+**Gate.** Single side, archived in `eval-archive/phase28`. The agent path
+changed only in tool error guidance and in PDB-only branches.
+
+| Run | Commit | dev | regression | MVP |
+|---|---|---|---|---|
+| `gate-28` | d943b1d | 29/30 | 21/21 | 39/39 |
+| `gate-28-final` | 1455219 | 29/30 | 20/21; rerun 21/21 | 39/39 |
+
+Every refusal passed. Each miss was checked against its answer:
+- `hard-p21-alert-levels`: the counts were correct, but the scorer rejected
+  "1 (Critical)" and "1,082". This is the known noisy case.
+- `hard-units-sales-gb`: 0.125 is correct, but the scorer wants the literal
+  `0.125000`.
+- `hard-sh-fks`: the model wrote PROMO instead of PROMOTIONS, a genuine
+  model slip on an unchanged non-CDB path.
+
+**Release tests on 1455219.**
+- Typecheck clean; 1,832 unit tests and 71 browser tests pass.
+- Integration: 66/66, including the Strata e2e.
+- Package smoke from the 1.4.0 tarball, with a fresh prefix and a 0700 home,
+  using a private `targets.json` that renames both labs as `production`
+  targets:
+  - `targets` shows its source;
+  - doctor passes the account check on both;
+  - `targets check` summary, `--all`, `--json` and `--grants-sql` work;
+  - sessions, space, report (contiguous tables) and ask (correct) all work.
+- Refusal smokes all give a specific message: group-writable file, SYS,
+  `C##SYSTEM`, bad host, a `password` property, and a wrong account
+  (ORA-01017, exit 1).
+- Secret scan of v1.3.0..HEAD is clean.
+
+**Not verified.** Live 19c PDB behaviour, root refusal on a real CDB,
+RAC, Data Guard and TCPS. No 19c CDB is available to agents. The owner's
+first run is the first live PDB check.
+
+**Follow-ups.**
+- Scorer: accept equivalent numeric formatting (0.125 = 0.125000,
+  thousands separators, level labels).
+- The preflight test scanner misses comma joins, quoted identifiers,
+  hints and interpolated names. No current code uses them.
+- Phases 25–27 are still proposed.
+
 ## Phase 25: backup and recoverability (proposed 2026-11-06; needs owner approval and p1 grants)
 
 ### Goal
