@@ -57,7 +57,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature') });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature', test.id.startsWith('hard-p23-')) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -99,9 +99,14 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false): boolean {
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false, p23 = false): boolean {
 	if (!row.length || row.some(value => value == null)) return false;
-	const clean = (text: string) => normalizeHyphens(text).replace(/[`*]/g, '').replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	const clean = (text: string) => {
+		// p23 event names contain a literal SQL*Net; remove boundary Markdown
+		// stars while preserving embedded stars. Historical cases stay unchanged.
+		const plain = p23 ? text.replace(/`/g, '').replace(/(?<!\w)\*+|\*+(?!\w)/g, '') : text.replace(/[`*]/g, '');
+		return normalizeHyphens(plain).replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
+	};
 	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
 	const decimal = (text: string) => {
 		const negative = text.startsWith('-');

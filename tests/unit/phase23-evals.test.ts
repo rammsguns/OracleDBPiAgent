@@ -65,3 +65,12 @@ it('scores every recorded live truth and rejects a missing row', async () => {
 		expect(score(test as EvalCase, { ...result, answer: rows.slice(1).map(row => row.join(' | ')).join('\n') }, rows).pass, test.id).toBe(false);
 	}
 });
+
+it('preserves literal SQL*Net only in p23 without accepting a misspelled event', () => {
+	const test = cases.find(test => test.id === 'hard-p23-p1-lock-idle-events')! as EvalCase;
+	const rows = [['SQL*Net message from client', 'Idle']];
+	const result = { answer: '| **SQL*Net message from client** | `Idle` |', toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
+	expect(score(test, result, rows).pass).toBe(true);
+	expect(score(test, { ...result, answer: '| SQLNet message from client | Idle |' }, rows).pass).toBe(false);
+	expect(score({ ...test, id: 'hard-historical-event' }, result, rows).pass).toBe(false);
+});
