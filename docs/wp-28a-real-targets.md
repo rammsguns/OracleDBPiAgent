@@ -154,3 +154,47 @@ Test Files  27 passed (27)
 ```
 
 Exit 0. Both approved labs pass account/preflight checks and all d1 tests pass. The only skipped test remains the explicitly excluded local-Strata e2e. `git diff --check` also passes. All four requested review findings are resolved; no new verification limitations beyond the live-PDB restriction noted above.
+
+## Coordinator owner-usability follow-up
+
+Implemented on wp-28a-real-targets after the merged review fixes. src/preflight/views.ts and src/report/ were left untouched.
+
+Target-file errors now use structured SafeConfigError templates with a one-based target index and a valid target name when available. They distinguish file permissions/type/ownership/open failures, file size, JSON syntax, top-level shape/version/count, unknown properties, duplicate names, denied usernames, and invalid name/host/port/serviceName/username/passwordFile/defaultSchema/environment/description/logTables fields. Unknown properties explicitly direct passwords into PIAGENT_SECRET_DIR files. Diagnostics do not echo field values, JSON parse text, paths, password contents, hosts or connection descriptors; the denied username is the sole permitted value exception. Property names are JSON-escaped, and malformed target names are omitted.
+
+Common Oracle connection errors map to fixed guidance with their ORA/NJS code: ORA-01017 (credentials/password file), ORA-28000 (locked), ORA-12514/12505 (PDB service), ORA-12541/12170/NJS-503 (listener/network/timeout), ORA-01045 (CREATE SESSION), and ORA-28001 (expired password). Other failures remain generic. Mapping is shared by targets check, doctor console/report callbacks, and the common CLI error handler. The session provider sanitizes rejected connection errors before they reach features. A command-scoped AsyncLocalStorage record preserves terminal guidance and failure status when a feature converts a connection refusal into unavailable sections, without changing any report reader. Doctor and targets check acknowledge failures they already report, avoiding duplicate output. Targets check keeps exit 1 and stderr for text failures; JSON retains its existing single-object stdout failure shape.
+
+Default targets check text now prints the identity/account line, one summary per feature (ok or missing count/list, plus inapplicable count), and a --grants-sql hint. --all retains the previous per-view listing. JSON output is unchanged, including when --all is also specified. Grant SQL remains printed suggestions only.
+
+New files: src/config/targetErrors.ts, src/oracle/connectionErrors.ts, src/preflight/render.ts, tests/unit/target-usability.test.ts. Updated files: src/config/targets.ts, src/config/safeErrors.ts, src/oracle/index.ts, src/cli/index.ts, tests/unit/session.test.ts, tests/unit/safe-config-errors.test.ts, and this report. No shared contract or package changes are needed.
+
+Tests exercise every requested connection code through targets check, doctor (console and report callback), and the shared handler; generic unknown failures; swallowed connection refusals; all requested target refusal categories and value redaction; default/--all/--json combinations; feature summary counts; and provider rejection sanitization. Connection-failure tests use mocks rather than bad live login attempts, avoiding account-lock risk.
+
+Live default-output smokes on only the two packaged labs pass: HARNESS_LAB shows all features ok; HARNESS_RO shows the known V$ARCHIVED_LOG, V$LOG_HISTORY and V$RMAN_BACKUP_JOB_DETAILS gaps in relevant report/triage summaries, with other features ok. Both print identity/container/account status and the grants hint. No grants, database state, containers or Strata configuration were changed, and no LLM/Strata calls were made. Live PDB behavior and deliberate real login failures remain unverified under the worker restrictions.
+
+Owner-usability verification:
+
+`npm run typecheck`: exit 0, no TypeScript diagnostics.
+
+`npm test -- --maxWorkers=2`:
+
+```text
+Test Files  105 passed (105)
+     Tests  1784 passed (1784)
+  Duration  66.96s
+```
+
+Exit 0, including 32 new usability/provider cases. Existing safe-error expectations were updated to the specific file refusal template.
+
+The first filtered integration run completed with 62 passed, 1 failed and 1 skipped (207.69s). The sole failure was the existing p1 report free-space equality assertion at tests/integration/report.test.ts:36: the report observed 592183296 free bytes, while a later independent query observed 591134720 (1 MiB less). All account/preflight checks passed. This is consistent with the live SHOPAPP workload changing free space between separate reads, not a target-validation or connection-guidance failure. No report code, report test, workload or database state was changed; the exact filtered suite was rerun to verify.
+
+Final filtered integration rerun (same command, unchanged code and tests):
+
+`PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`
+
+```text
+Test Files  27 passed (27)
+     Tests  63 passed | 1 skipped (64)
+  Duration  208.57s
+```
+
+Exit 0. Both lab account/preflight checks and all d1 tests pass; the p1 report check passes on the rerun. Only the explicitly excluded local-Strata e2e is skipped. `git diff --check` passes. Implementation commit: 86ae888; this final verification report is committed separately.
