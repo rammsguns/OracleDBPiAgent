@@ -1,0 +1,241 @@
+{
+	"caseCount": 6,
+	"stable": true,
+	"minimumGapMs": 60000,
+	"first": {
+		"startedAt": "2026-11-06T07:03:45.330Z",
+		"completedAt": "2026-11-06T07:04:04.914Z",
+		"records": [
+			{
+				"id": "hard-p24-p1-largest-segment",
+				"target": "p1-19c-prod",
+				"sql": "SELECT owner AS owner, segment_name AS segment_name, segment_type AS segment_type, NVL(partition_name, 'NONE') AS partition_name FROM dba_segments WHERE owner = 'SHOPAPP' ORDER BY bytes DESC, segment_name, partition_name NULLS FIRST, segment_type FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"SHOPAPP",
+						"ORDER_LINES",
+						"TABLE",
+						"NONE"
+					]
+				]
+			},
+			{
+				"id": "hard-p24-p1-autoextend-max",
+				"target": "p1-19c-prod",
+				"sql": "SELECT t.tablespace_name AS tablespace_name, SUM(CASE WHEN f.autoextensible = 'YES' THEN GREATEST(f.bytes, f.maxbytes) ELSE f.bytes END) AS maximum_bytes FROM dba_tablespaces t JOIN dba_data_files f ON f.tablespace_name = t.tablespace_name WHERE t.contents = 'PERMANENT' GROUP BY t.tablespace_name ORDER BY t.tablespace_name",
+				"mode": "rowCells",
+				"rowCount": 4,
+				"rows": [
+					[
+						"SHOP_DATA",
+						4294967296
+					],
+					[
+						"SYSAUX",
+						34359721984
+					],
+					[
+						"SYSTEM",
+						34359721984
+					],
+					[
+						"USERS",
+						34359721984
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-redo-layout",
+				"target": "d1-19c-lab",
+				"sql": "SELECT thread# AS thread_number, group# AS group_number, bytes AS size_bytes, members AS member_count, COUNT(*) OVER () AS total_groups FROM v$log ORDER BY thread#, group#",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						1,
+						1,
+						209715200,
+						1,
+						3
+					],
+					[
+						1,
+						2,
+						209715200,
+						1,
+						3
+					],
+					[
+						1,
+						3,
+						209715200,
+						1,
+						3
+					]
+				]
+			},
+			{
+				"id": "hard-p24-p1-recovery-limit",
+				"target": "p1-19c-prod",
+				"sql": "SELECT CASE WHEN COUNT(*) = 0 OR NVL(MAX(space_limit), 0) = 0 THEN 'NOT CONFIGURED' ELSE 'CONFIGURED' END AS configuration, NVL(MAX(space_limit), 0) AS limit_bytes FROM v$recovery_file_dest",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"NOT CONFIGURED",
+						0
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-undo-settings",
+				"target": "d1-19c-lab",
+				"sql": "SELECT t.tablespace_name AS tablespace_name, r.value AS retention_seconds, t.retention AS retention_guarantee FROM v$parameter u JOIN dba_tablespaces t ON t.tablespace_name = u.value CROSS JOIN v$parameter r WHERE u.name = 'undo_tablespace' AND r.name = 'undo_retention'",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"UNDOTBS1",
+						"900",
+						"NOGUARANTEE"
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-largest-lob-owner",
+				"target": "d1-19c-lab",
+				"sql": "SELECT s.owner AS owner, s.segment_name AS segment_name, l.table_name AS table_name, l.column_name AS column_name FROM dba_segments s JOIN dba_lobs l ON l.owner = s.owner AND l.segment_name = s.segment_name JOIN dba_users u ON u.username = s.owner WHERE s.segment_type = 'LOBSEGMENT' AND u.oracle_maintained = 'N' ORDER BY s.bytes DESC, s.owner, s.segment_name FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"CO",
+						"SYS_LOB0000074050C00004$$",
+						"PRODUCTS",
+						"PRODUCT_DETAILS"
+					]
+				]
+			}
+		]
+	},
+	"second": {
+		"startedAt": "2026-11-06T07:05:04.920Z",
+		"completedAt": "2026-11-06T07:05:22.033Z",
+		"records": [
+			{
+				"id": "hard-p24-p1-largest-segment",
+				"target": "p1-19c-prod",
+				"sql": "SELECT owner AS owner, segment_name AS segment_name, segment_type AS segment_type, NVL(partition_name, 'NONE') AS partition_name FROM dba_segments WHERE owner = 'SHOPAPP' ORDER BY bytes DESC, segment_name, partition_name NULLS FIRST, segment_type FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"SHOPAPP",
+						"ORDER_LINES",
+						"TABLE",
+						"NONE"
+					]
+				]
+			},
+			{
+				"id": "hard-p24-p1-autoextend-max",
+				"target": "p1-19c-prod",
+				"sql": "SELECT t.tablespace_name AS tablespace_name, SUM(CASE WHEN f.autoextensible = 'YES' THEN GREATEST(f.bytes, f.maxbytes) ELSE f.bytes END) AS maximum_bytes FROM dba_tablespaces t JOIN dba_data_files f ON f.tablespace_name = t.tablespace_name WHERE t.contents = 'PERMANENT' GROUP BY t.tablespace_name ORDER BY t.tablespace_name",
+				"mode": "rowCells",
+				"rowCount": 4,
+				"rows": [
+					[
+						"SHOP_DATA",
+						4294967296
+					],
+					[
+						"SYSAUX",
+						34359721984
+					],
+					[
+						"SYSTEM",
+						34359721984
+					],
+					[
+						"USERS",
+						34359721984
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-redo-layout",
+				"target": "d1-19c-lab",
+				"sql": "SELECT thread# AS thread_number, group# AS group_number, bytes AS size_bytes, members AS member_count, COUNT(*) OVER () AS total_groups FROM v$log ORDER BY thread#, group#",
+				"mode": "rowCells",
+				"rowCount": 3,
+				"rows": [
+					[
+						1,
+						1,
+						209715200,
+						1,
+						3
+					],
+					[
+						1,
+						2,
+						209715200,
+						1,
+						3
+					],
+					[
+						1,
+						3,
+						209715200,
+						1,
+						3
+					]
+				]
+			},
+			{
+				"id": "hard-p24-p1-recovery-limit",
+				"target": "p1-19c-prod",
+				"sql": "SELECT CASE WHEN COUNT(*) = 0 OR NVL(MAX(space_limit), 0) = 0 THEN 'NOT CONFIGURED' ELSE 'CONFIGURED' END AS configuration, NVL(MAX(space_limit), 0) AS limit_bytes FROM v$recovery_file_dest",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"NOT CONFIGURED",
+						0
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-undo-settings",
+				"target": "d1-19c-lab",
+				"sql": "SELECT t.tablespace_name AS tablespace_name, r.value AS retention_seconds, t.retention AS retention_guarantee FROM v$parameter u JOIN dba_tablespaces t ON t.tablespace_name = u.value CROSS JOIN v$parameter r WHERE u.name = 'undo_tablespace' AND r.name = 'undo_retention'",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"UNDOTBS1",
+						"900",
+						"NOGUARANTEE"
+					]
+				]
+			},
+			{
+				"id": "hard-p24-d1-largest-lob-owner",
+				"target": "d1-19c-lab",
+				"sql": "SELECT s.owner AS owner, s.segment_name AS segment_name, l.table_name AS table_name, l.column_name AS column_name FROM dba_segments s JOIN dba_lobs l ON l.owner = s.owner AND l.segment_name = s.segment_name JOIN dba_users u ON u.username = s.owner WHERE s.segment_type = 'LOBSEGMENT' AND u.oracle_maintained = 'N' ORDER BY s.bytes DESC, s.owner, s.segment_name FETCH FIRST 1 ROW ONLY",
+				"mode": "rowCells",
+				"rowCount": 1,
+				"rows": [
+					[
+						"CO",
+						"SYS_LOB0000074050C00004$$",
+						"PRODUCTS",
+						"PRODUCT_DETAILS"
+					]
+				]
+			}
+		]
+	}
+}

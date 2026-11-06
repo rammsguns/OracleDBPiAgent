@@ -3379,51 +3379,239 @@ The coordinator's live smoke on p1 found four problems:
 - Phase 23 ships with phase 24 as 1.3.0. Push main after phase 23 only if
   the gate is clean. Tag only when the owner asks.
 
-## Phase 24: space and capacity (proposed 2026-11-05; needs owner approval and p1 grants)
+## Phase 24: space and capacity (approved 2026-11-06: "continue with phase 24 and apply the grants")
 
 ### Goal
-`piagent space` reports:
-- tablespace usage (used, free, autoextend headroom);
-- top segments;
-- temp and undo usage;
-- online redo log size;
-- recovery area usage;
-- growth from report history.
+`piagent space --target T` is a read-only capacity report. It covers:
+- tablespace usage with autoextend-aware headroom;
+- top segments, with LOB segments mapped to their table and column;
+- temp, undo and online redo;
+- recovery area (FRA) usage;
+- growth trends and days-to-full from report history.
 
-### Access (probed read-only on 2026-11-05)
-- d1 can read everything needed:
-  - DBA_TABLESPACES, DBA_DATA_FILES, DBA_TEMP_FILES, DBA_FREE_SPACE;
-  - DBA_TABLESPACE_USAGE_METRICS, DBA_SEGMENTS, DBA_LOBS, DBA_UNDO_EXTENTS;
-  - V$TEMPSEG_USAGE, V$SORT_SEGMENT, V$UNDOSTAT;
-  - V$RECOVERY_FILE_DEST, V$FLASH_RECOVERY_AREA_USAGE;
-  - V$DATAFILE, V$TEMPFILE, V$LOG.
-- p1 can read only DBA_TABLESPACES, DBA_DATA_FILES, DBA_FREE_SPACE,
-  DBA_TABLESPACE_USAGE_METRICS and DBA_SEGMENTS.
-- A grant request (`docs/grants-request-<date>-space.sql`) would add the rest
-  on p1: DBA_TEMP_FILES, DBA_LOBS, DBA_UNDO_EXTENTS, V_$TEMPSEG_USAGE,
-  V_$UNDOSTAT, V_$RECOVERY_FILE_DEST, V_$FLASH_RECOVERY_AREA_USAGE, V_$LOG
-  and V_$TEMPFILE.
-- DBA_EXTENTS is not needed and is slow.
+It reports and advises only. Every example statement (such as `ALTER
+TABLESPACE … ADD DATAFILE`) is prose, prefixed "For a human DBA:", and is
+never executed.
 
-### WPs
-- **WP-24A, core and CLI** (`src/space/`): tablespaces with autoextend-aware
-  headroom, top N segments (LOB segments mapped to their table), temp,
-  undo, redo, FRA, JSON and Markdown.
-- **WP-24B:**
-  - a report section;
-  - history growth trends with days-to-full when there are at least three
-    points;
-  - `drift --scope space` for tablespace sets and sizes.
-- **WP-24C, web:** a Space tab with usage bars. Screenshots at 1280 and 390,
-  light and dark.
-- **WP-24D, evals (p24):**
-  - the largest segment in a schema;
-  - tablespace autoextend headroom;
-  - redo log group sizes;
-  - FRA usage.
+### Access
+- d1 (HARNESS_LAB) already reads every view below through its roles.
+- `docs/grants-request-2026-11-06-space.sql` was applied on p1 as
+  `/ as sysdba` after checking DB name, version and grantee (PRODCDB 19c,
+  HARNESS_RO): 12 × "Grant succeeded", and `DBA_TAB_PRIVS` shows 12/12.
+  - The views are DBA_TEMP_FILES, DBA_LOBS, DBA_UNDO_EXTENTS,
+    V_$SORT_USAGE, V_$SORT_SEGMENT, V_$UNDOSTAT, V_$RECOVERY_FILE_DEST,
+    V_$FLASH_RECOVERY_AREA_USAGE, V_$LOG, V_$LOGFILE, V_$TEMPFILE and
+    V_$DATAFILE.
+  - V$TEMPSEG_USAGE is a public synonym for V_$SORT_USAGE.
+  - V$SORT_SEGMENT, V$DATAFILE and V$LOGFILE were added to the proposal
+    after the probe found p1 lacked them.
+  - p1 already read DBA_TABLESPACES, DBA_DATA_FILES, DBA_FREE_SPACE,
+    DBA_TABLESPACE_USAGE_METRICS, DBA_SEGMENTS and V$PARAMETER.
+- No hard eval case referenced these views. `validate-hard` passed live after
+  the grants (107 truth queries for 129 cases).
+- Not granted and never used: DBA_EXTENTS (slow and unnecessary), ASH/AWR
+  and `DBA_HIST_*`.
+  - V$LOG_HISTORY is not granted on p1. If a log-switch rate is shown, it is
+    `unavailable` there.
 
-Gate: single side plus the full suites. If both phases are approved, phases
-23 and 24 ship together as 1.3.0.
+### Ordering
+Phase 23's WP-23B owns `src/report/` and `src/triage/`, and WP-23C owns the
+web files. So:
+- WP-24A and WP-24D start now;
+- WP-24B starts after WP-23B merges, and WP-24C after WP-23C merges.
+
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-24A core and CLI | `wp-24a-space` | codex | new `src/space/`, the `space` command registration in `src/cli/index.ts`, tests, `docs/space.md` |
+| WP-24B report and drift | `wp-24b-space-report` | codex | opt-in `space` section, growth trends and days-to-full in `src/report/`, the `drift --scope space` in `src/drift/`, tests, docs |
+| WP-24C web Space tab | `wp-24c-space-web` | codex | `src/web/space.ts`, the `/api/space` route, `src/web/static/space.js` plus tab wiring, browser tests, `docs/img/` |
+| WP-24D p24 evals | `wp-24d-p24-evals` | codex | `evals/cases-hard/phase24-space.json`, the p24 selector, scoped scorer changes, eval tests, `docs/` |
+| Review | `review-wp-24x` | antigravity | each WP |
+
+### WP-24A: space core and CLI (branch `wp-24a-space`)
+API (`src/space/index.ts`):
+- `readSpaceUsage(session, { sections?, top?, owner?, includeOracleMaintained? })`
+  returns `SpaceReport`:
+  `{ status: 'ok'|'partial'|'failed'; target; capturedAt (UTC ISO);
+  sections: { tablespaces; segments; temp; undo; redo; recovery };
+  findings: SpaceFinding[] }`.
+- Each section is `{ status: 'ok'|'unavailable'|'skipped'; rows; evidence: Check; note? }`.
+  ORA-00942 or ORA-01031 makes that section `unavailable` and never fails
+  the run.
+- `SpaceFinding = { id; severity: 'high'|'medium'|'low'|'info'; subject; detail; advice }`.
+- `renderSpaceMarkdown(report)` and `SpaceUsageError` (exit 2).
+- Pure helpers exported for WP-24B and WP-24C: `tablespaceHeadroom(files)`
+  and `formatBytes(n)`.
+- JSON always carries raw bytes. Markdown uses binary units (KiB, MiB, GiB,
+  TiB), labelled.
+
+Sections:
+1. **Tablespaces.** Permanent, undo and temp, from DBA_TABLESPACES,
+   DBA_DATA_FILES, DBA_TEMP_FILES, DBA_FREE_SPACE and
+   DBA_TABLESPACE_USAGE_METRICS (blocks × block size). For each tablespace:
+   - contents, bigfile, file count;
+   - allocated, used and free bytes;
+   - autoextend max (the sum per file of `MAXBYTES` when autoextensible,
+     else `BYTES`);
+   - used % of allocated and used % of max;
+   - headroom in bytes.
+2. **Top segments.** Top N by bytes from DBA_SEGMENTS (default 20, range
+   1–100), sorted with `FETCH FIRST`.
+   - Oracle-maintained owners are excluded unless `--owner` names one or
+     `--all` is given.
+   - LOBSEGMENT and LOBINDEX rows are mapped through DBA_LOBS to
+     `owner.table.column`. Partitions keep their partition name.
+3. **Temp.**
+   - tempfile size and max, plus V$SORT_SEGMENT total, used and free;
+   - current consumers from V$TEMPSEG_USAGE joined to V$SESSION: SID, user,
+     SQL_ID, segment type and bytes. Never SQL text.
+4. **Undo.**
+   - undo tablespace size and max;
+   - DBA_UNDO_EXTENTS bytes by status (ACTIVE, UNEXPIRED, EXPIRED);
+   - V$UNDOSTAT over the last 24 h: max query length, ORA-01555
+     (`SSOLDERRCNT`) and no-space (`NOSPACEERRCNT`) counts, and tuned undo
+     retention against the `undo_retention` parameter.
+5. **Redo.** V$LOG groups with thread, size, members, status and archived,
+   plus V$LOGFILE members with type and status.
+6. **Recovery area.**
+   - V$RECOVERY_FILE_DEST: limit, used, reclaimable and file count;
+   - V$FLASH_RECOVERY_AREA_USAGE per file type;
+   - if no recovery area is configured, the section is `ok` with the note
+     "no recovery area configured".
+
+Findings:
+
+| Finding | Severity |
+|---|---|
+| Permanent tablespace above 95% of max | high |
+| Permanent tablespace above 85% of max | medium |
+| Non-autoextend tablespace above 85% of allocated | medium |
+| Temp above 80% used right now | medium |
+| ORA-01555 in the last 24 h | medium |
+| Undo no-space errors | high |
+| FRA (used − reclaimable) above 90% of limit | high |
+| FRA (used − reclaimable) above 80% of limit | medium |
+| Fewer than 3 redo groups, or unequal group sizes | low |
+| A single member per redo group | info |
+
+Each finding carries prose advice, and any example statement is prefixed
+"For a human DBA:".
+
+Data rules:
+- SELECT only, under the same parser-based scan test as `src/sessions/`.
+  It must reject DBA_EXTENTS, ASH/AWR, `DBA_HIST_` and any non-SELECT.
+- File paths from DBA_DATA_FILES, V$LOGFILE and V$RECOVERY_FILE_DEST are
+  shown. They are not secrets.
+
+CLI:
+- `piagent space --target T [--section a,b] [--top N] [--owner X] [--all] [--json | --markdown]`.
+- Markdown is the default, styled like `sessions` after WP-23F:
+  - findings first;
+  - readable labels and compact tables;
+  - usage shown as a percentage with a text bar (for example
+    `███████░░░ 72%`);
+  - no "Status: ok" noise;
+  - empty sections collapsed.
+- Exit 0 even with findings, 2 for usage errors, and 1 for a connection
+  failure or every section being unavailable.
+
+Tests:
+- unit fixtures:
+  - autoextend headroom (mixed autoextend files, `MAXBYTES` below `BYTES`,
+    bigfile);
+  - LOB mapping;
+  - no FRA configured;
+  - a missing grant per section;
+  - each finding threshold at its exact boundary.
+- integration on d1 and p1, with every section `ok` on both;
+- live smokes in `docs/space.md`, numbers cross-checked against independent
+  SELECTs.
+
+### WP-24B: report and drift (branch `wp-24b-space-report`, after WP-23B merges)
+Report:
+- an opt-in `space` section (`--sections space`). The default checks stay
+  byte-identical.
+- history trends: per-tablespace used bytes, temp and FRA usage.
+- days-to-full: a linear fit over at least 3 points spanning at least
+  24 hours, against the autoextend max. It shows "not enough history"
+  otherwise, and "not growing" for a flat or negative slope.
+- The report diff marks tablespaces whose growth rate changed.
+
+Drift: `drift --scope space` compares:
+- tablespace sets with contents and bigfile;
+- autoextend max;
+- redo group count and size;
+- whether FRA is configured, and its limit.
+
+Usage percentages are not compared, because they always differ. Exit 3 on
+drift, as for the other scopes.
+
+No new SQL: it reuses `readSpaceUsage`.
+
+### WP-24C: web Space tab (branch `wp-24c-space-web`, after WP-23C merges)
+`/api/space`:
+- same auth, loopback, single-flight and 1 MiB rules as the other tabs.
+
+The tab:
+- a findings summary;
+- tablespace usage bars (used, allocated and max as stacked segments, with
+  thresholds marked);
+- top segments, filterable by owner;
+- temp, undo, redo and FRA cards;
+- Markdown export.
+
+No new dependencies. Light and dark themes, at 1280 px and at 390 px with no
+horizontal page scroll. Fresh live screenshots on d1 and p1, which the worker
+views itself.
+
+### WP-24D: p24 evals (branch `wp-24d-p24-evals`)
+`evals/cases-hard/phase24-space.json`, suite `p24`, with 5 or 6 challenge
+cases. Truth must be stable over the gate window, so prefer configuration
+and identity over live usage. For example:
+- the largest segment in SHOPAPP and its type;
+- a tablespace's autoextend maximum;
+- redo group count and size per group;
+- the recovery area limit, or the fact that none is configured;
+- the undo tablespace and its retention setting;
+- the table and column that own the largest LOB segment.
+
+Rules:
+- If a byte value can drift, score it with a tolerance scoped to
+  `hard-p24-`.
+- Questions name no tools or views. Truth is SELECT only.
+- Validate each truth twice, 60 s apart.
+- Any scorer change is scoped to `hard-p24-`, with an archive replay
+  showing zero flips elsewhere.
+- The worker does not run the agent.
+
+### WP-24E: space and sessions output polish (branch `wp-24e-space-polish`)
+Owns rendering and findings in `src/space/` and the one-line fix in
+`src/sessions/`, plus tests and docs. Exported types and signatures stay
+unchanged.
+
+The coordinator's live smoke on p1 and the WP-23F review found:
+1. **Blank lines.** Each section heading in `space` Markdown is followed by
+   a double blank line. Use one.
+2. **Recovery area.** The note "no recovery area configured" is followed by
+   a redundant "No rows" `<details>` block. When a section has a note and no
+   rows, show the note only. Apply this to every section.
+3. **Archive log mode.** `V$DATABASE.LOG_MODE` (readable on both targets;
+   verify) appears in the Redo section. It carries:
+   - an info finding when the database is in NOARCHIVELOG mode: online
+     redo is not archived, so point-in-time recovery is not possible;
+   - a high finding when the database is in ARCHIVELOG mode with no
+     recovery area and no `log_archive_dest_n` set.
+
+   The JSON gains an additive field, `redo.logMode`.
+4. **Sessions trailing space.** `Status: skipped. ` ends with a trailing
+   space when there is no note (WP-23F review minor).
+
+### Gate
+- Single side on merged master: p24 ×2, p23 ×2, the full suites, p18 and
+  p16.
+- A/B if any agent prompt changes.
+- Phases 23 and 24 together make 1.3.0. Bump the version and tag only when
+  the owner asks.
 
 ## MVP exit criteria
 
