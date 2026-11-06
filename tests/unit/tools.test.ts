@@ -163,3 +163,10 @@ it('fixed tools explain PDB-inapplicable errors while preserving thrown PI failu
 	await expect(tools.find(t => t.name === 'top_sql')!.execute('pdb', {})).rejects.toThrow('not available in this container / not granted');
 	expect(close).toHaveBeenCalledOnce();
 });
+it('degrades mixed-scope db_overview in a PDB before exposing unlabeled CDB facts', async () => {
+	const { tools, get, query, close } = setup();
+	get.mockResolvedValue({ query, close, identity: { isCdb: true, containerName: 'SALES' } });
+	await expect(tools.find(t => t.name === 'db_overview')!.execute('pdb', {})).rejects.toThrow('memory facts are CDB-wide');
+	expect(query).not.toHaveBeenCalled();
+	expect(close).toHaveBeenCalledOnce();
+});

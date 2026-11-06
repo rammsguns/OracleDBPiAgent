@@ -87,6 +87,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					if (!sql) throw new Error("Unknown tool");
 					const session = await ctx.sessions.get(target);
 					try {
+						if (name === "db_overview" && session.identity?.isCdb) throw new Error("db_overview not available in a PDB: database, instance and memory facts are CDB-wide; use the identity report for current PDB identity");
 						if (name === "explain_plan" && p.sql) {
 							const statement = classifySql(p.sql);
 							if (statement.length > 1000) throw new Error("For SQL longer than 1000 characters provide sql_id only");
