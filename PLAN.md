@@ -3097,6 +3097,43 @@ is `PIAGENT_HOME must be private (mode 0700)`.
 - Then push to `main` with a 1.2.1 patch version. The `v1.2.1` tag is pushed
   only if the owner says so.
 
+### Results (2026-11-05, shipped as 1.2.1)
+- **WP-22A** (`9d9d3ab`), approved by antigravity with no findings:
+  - case-scoped fixes for history-signature and products-stats;
+  - alert-levels and problem-identity moved to dev;
+  - two new blind holdout cases, `hard-p21-alert-levels-d1` and
+    `hard-p21-problem-last-incident-p1`;
+  - the replay covered 561 files and 12,858 records: 6 justified flips
+    (fail to pass) and 0 elsewhere;
+  - suite counts: 123 cases (30 dev, 24 holdout, 21 regression, 48 challenge).
+- **WP-22C** (`045947b`), approved: an audited, literal-only catalog of
+  `SafeConfigError` messages across `src/config/` and the CLI preflight.
+  Native and unexpected errors stay generic.
+- **WP-22B** (`6fbeef7`), approved: a one-line ADR and alert-log prompt
+  hint of 166 characters (about 56 tokens), with no `run_query` hint.
+- **Gate:** archived in `eval-archive/phase22/gate-22b`. A was master at
+  `045947b`; B was master plus WP-22B. The table shows the B-minus-A change.
+
+  | Suite | Pass rate | Tokens per case |
+  |---|---|---|
+  | p18 ×4 | -0.04 (CI -0.25 to 0.17) | -5,011 |
+  | p16 ×4 | 0.00 | -1,710 |
+  | dev ×4 | +0.01 | -1,963 |
+  | holdout ×3 | 0.00 | +141 |
+  | regression | 21/21 on both sides | |
+  | MVP | +1 case (chat-target-pin) | |
+
+  - The moved cases improved: problem-identity went from 3/4 to 4/4 and
+    alert-levels from 1/4 to 2/4. Tokens on them dropped by about half.
+  - The only per-case dip was p18 failed-job, from 4/4 to 2/4. It is a scorer
+    false negative: both answers named the right job and constraint, but
+    quoted the raw alert text `SHOPAPP"."NIGHTLY_PURGE_JOB` or split the row.
+    It is a follow-up for the next eval WP.
+- **Release tests:** typecheck clean, 1,320 unit, 52 browser and 55/55
+  integration with Strata.
+- **Remaining follow-up:** alert-levels on p1 is still 2/4.
+- The v1.2.1 tag waits for the owner.
+
 ## Phase 23: sessions, blocking and waits (proposed 2026-11-05; needs owner approval and p1 grants)
 
 ### Goal
