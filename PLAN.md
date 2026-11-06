@@ -3805,6 +3805,11 @@ New:
    - If the check itself cannot run, the connection is refused.
    - Both lab accounts must pass. If one does not, report it; do not widen
      the allowlist without coordinator approval.
+   - **Coordinator decision (2026-11-06).** WP-28A found that d1
+     `HARNESS_LAB` holds FLASHBACK on 14 SYS objects through
+     `SELECT_CATALOG_ROLE`. FLASHBACK is read-only (flashback query), so it
+     is allowed under the same rule as EXECUTE: only on objects owned by
+     Oracle-maintained users. FLASHBACK on any other owner is still refused.
 3. **CDB/PDB.**
    - Connect through the PDB service name with Easy Connect. Report
      `containerName`.
