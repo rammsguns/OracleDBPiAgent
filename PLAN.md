@@ -3134,7 +3134,7 @@ is `PIAGENT_HOME must be private (mode 0700)`.
 - **Remaining follow-up:** alert-levels on p1 is still 2/4.
 - The v1.2.1 tag waits for the owner.
 
-## Phase 23: sessions, blocking and waits (proposed 2026-11-05; needs owner approval and p1 grants)
+## Phase 23: sessions, blocking and waits (approved 2026-11-05: "tag v1.2.1 and apply the grants and start phase 23")
 
 ### Goal
 `piagent sessions`: a read-only live view of who is blocking whom. It shows:
@@ -3147,46 +3147,210 @@ is `PIAGENT_HOME must be private (mode 0700)`.
 It never uses ASH or AWR (Diagnostics Pack licence). The SQL policy already
 rejects them.
 
-### Access (probed read-only on 2026-11-05)
-- d1 (HARNESS_LAB) can read everything needed:
-  - V$SESSION, V$LOCK, V$SESSION_WAIT, V$SESSION_EVENT;
-  - V$WAIT_CHAINS, V$TRANSACTION, V$PROCESS, V$LOCKED_OBJECT;
-  - V$SYSTEM_EVENT, V$SYS_TIME_MODEL, V$EVENT_NAME;
-  - DBA_BLOCKERS, DBA_WAITERS.
-- p1 (HARNESS_RO) can read only V$SESSION, V$LOCK and V$SYSTEM_EVENT.
-- A grant request
-  (`docs/grants-request-<date>-sessions.sql`, SELECT only, to HARNESS_RO)
-  would add:
-  - V_$SESSION_WAIT, V_$WAIT_CHAINS, V_$TRANSACTION and V_$LOCKED_OBJECT;
-  - V_$SYS_TIME_MODEL and V_$EVENT_NAME;
-  - DBA_BLOCKERS and DBA_WAITERS.
+### Access
+- d1 (HARNESS_LAB) already reads every view below.
+- `docs/grants-request-2026-11-05-sessions.sql` was applied on p1 as
+  `/ as sysdba` after checking DB name, version and grantee (PRODCDB 19c,
+  HARNESS_RO): 8 × "Grant succeeded". `DBA_TAB_PRIVS` shows all eight.
+  The views are V_$SESSION_WAIT, V_$WAIT_CHAINS, V_$TRANSACTION,
+  V_$LOCKED_OBJECT, V_$SYS_TIME_MODEL, V_$EVENT_NAME, DBA_BLOCKERS and
+  DBA_WAITERS. p1 already read V$SESSION, V$LOCK and V$SYSTEM_EVENT.
+- No hard eval case referenced these views. `validate-hard` passed live
+  after the grants (101 truth queries for 123 cases).
+- Never: ASH, AWR or `DBA_HIST_*` (Diagnostics Pack licence),
+  `V$SQL_BIND_CAPTURE.VALUE_STRING`, or any statement that kills,
+  disconnects or alters a session. Advice such as `ALTER SYSTEM KILL SESSION`
+  is prose, prefixed "For a human DBA:", and is never executed.
 
-Never select V$SESSION columns that could hold secrets beyond identity,
-state, wait and SQL_ID: no `CLIENT_INFO` or `MODULE` free text without
-redaction.
+### Naming
+`src/web/sessions.ts` already holds web *chat* conversations. The new
+database view is called "sessions" in the CLI and docs, but its web files are
+named `dbSessions` (`src/web/dbSessions.ts`, `/api/db-sessions`,
+`src/web/static/dbsessions.js`), so the two never collide.
 
-### WPs
-- **WP-23A, core and CLI** (`src/sessions/`):
-  - a blocking tree from `V$WAIT_CHAINS` or `BLOCKING_SESSION`;
-  - top waits by class, excluding Idle;
-  - long transactions;
-  - JSON and Markdown output;
-  - per-section status;
-  - exit codes as in `sql` and `security`.
-- **WP-23B, integration:**
-  - triage uses the blocking tree when the issue mentions hangs, locks or
-    slowness;
-  - a report section with history trends, covering waits by class.
-- **WP-23C, web:** a Sessions tab with a blocking-tree graph that reuses
-  `graphLayout.js`. Ship fresh screenshots.
-- **WP-23D, evals (p23):** blocking itself is transient, so truth must be
-  stable or use `skipWhenTruthEmpty`. Cases:
-  - top non-idle wait class since startup;
-  - sessions per user;
-  - and so on.
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-23A core and CLI | `wp-23a-sessions` | codex | new `src/sessions/`, the `sessions` command registration in `src/cli/index.ts`, tests, `docs/sessions.md` |
+| WP-23B triage and report | `wp-23b-sessions-integration` | codex | `src/triage/` (new `sessions.ts` plus wiring), opt-in `sessions` section and trends in `src/report/`, tests, docs |
+| WP-23C web Sessions tab | `wp-23c-sessions-web` | codex | `src/web/dbSessions.ts`, the `/api/db-sessions` route in `src/web/server.ts`, `src/web/static/dbsessions.js` plus tab wiring in `index.html`/`app.js`/`app.css`, browser tests, `docs/img/` |
+| WP-23D p23 evals | `wp-23d-p23-evals` | codex | `evals/cases-hard/phase23-sessions.json`, scoped scorer changes, eval tests, `docs/` |
+| Review | `review-wp-23x` | antigravity | each WP |
 
-Gate: A/B if the agent prompt changes, otherwise single side plus the full
-suites.
+Order: WP-23A and WP-23D run first, in parallel. WP-23B and WP-23C start
+from master after WP-23A merges, and code only against its exported API.
+
+### WP-23A: sessions core and CLI (branch `wp-23a-sessions`)
+API (`src/sessions/index.ts`):
+- `readSessionActivity(session, { sections?, includeBackground?, minTxSeconds?, topWaits? })`
+  returns `SessionActivity`:
+  `{ status: 'ok'|'partial'|'failed'; target; capturedAt (UTC ISO); self: { sid };
+  sections: { active; blocking; waits; timeModel; transactions };
+  findings: SessionFinding[] }`.
+- Each section is `{ status: 'ok'|'unavailable'|'skipped'; rows; evidence: Check; note? }`.
+  A missing grant (ORA-00942 or ORA-01031) makes that section `unavailable`
+  and never fails the whole run.
+- `SessionFinding = { id; severity: 'high'|'medium'|'low'|'info'; subject; detail; sqlId?; advice }`.
+- `renderSessionsMarkdown(activity)` and `SessionsUsageError` (CLI exit 2).
+- Export pure helpers for B and C: `buildBlockingTree(rows)` and
+  `classifyWaits(rows)`.
+
+Sections:
+1. **Active sessions.** Read from `V$SESSION`, with user sessions only
+   (`--all` adds background sessions). The agent's own session is excluded
+   via `SYS_CONTEXT('USERENV','SID')`. Show status, `SQL_ID` or
+   `PREV_SQL_ID`, event, wait class, state, seconds in wait, last call time,
+   logon time and blocker.
+2. **Blocking tree.**
+   - Read `V$WAIT_CHAINS` first, falling back to `V$SESSION.BLOCKING_SESSION`
+     and `FINAL_BLOCKING_SESSION`.
+   - Each waiter shows the locked object through `V$LOCKED_OBJECT` and
+     `ROW_WAIT_OBJ#` → `DBA_OBJECTS`, falling back to `ALL_OBJECTS`, plus
+     the lock type and mode decoded to names.
+   - Roots are the final blockers.
+   - Cycles mean a deadlock in progress: guard against them, mark them, and
+     cap the depth at 10.
+3. **Waits since startup.**
+   - Read `V$SYSTEM_EVENT`, excluding wait class Idle.
+   - Group by wait class with the top N events (default 10, at most 50),
+     each with its % of non-idle wait time and average ms.
+   - Add DB time, DB CPU and background time from `V$SYS_TIME_MODEL`.
+   - Label clearly that these are cumulative since instance startup, not
+     current.
+4. **Long transactions.**
+   - Read `V$TRANSACTION` joined to `V$SESSION` (`TADDR = ADDR`).
+   - Show start time in UTC, age, used undo blocks and records, SID, user
+     and SQL_ID.
+   - Threshold `--min-tx-seconds` (default 300, range 0–86400).
+
+Findings:
+- a blocker whose waiters waited more than 60 s (high);
+- an INACTIVE blocker holding locks, i.e. idle in transaction (high);
+- a transaction older than the threshold (medium);
+- a non-idle wait class that takes over 50% of non-idle time since startup
+  (info);
+- a deadlock cycle (high).
+
+Every finding with a SQL_ID suggests `piagent sql --target T --sql-id X`.
+
+Data rules:
+- Allowlist the V$SESSION columns:
+  - identity: SID, SERIAL#, USERNAME, OSUSER, MACHINE, PROGRAM, TYPE,
+    LOGON_TIME;
+  - state: STATUS, STATE, EVENT, WAIT_CLASS, SECONDS_IN_WAIT,
+    WAIT_TIME_MICRO, LAST_CALL_ET;
+  - SQL: SQL_ID, PREV_SQL_ID, SQL_CHILD_NUMBER;
+  - blocking: BLOCKING_SESSION, BLOCKING_SESSION_STATUS,
+    FINAL_BLOCKING_SESSION, ROW_WAIT_OBJ#, TADDR, PADDR.
+- Never select MODULE, ACTION, CLIENT_INFO, CLIENT_IDENTIFIER, P1TEXT
+  values, SQL text or bind values.
+- A parser-based unit test scans every SQL string in `src/sessions/`, as in
+  WP-20A. It must reject ASH, AWR, `DBA_HIST_`, the forbidden columns, and
+  any non-SELECT.
+- A snapshot is a short sequence of queries, not one consistent read. Say
+  so in the output, and tolerate a blocker that vanished between queries.
+
+CLI:
+- `piagent sessions --target T [--section a,b] [--all] [--min-tx-seconds N] [--top N] [--json | --markdown]`.
+- Markdown is the default. Findings come first, then sections in the
+  sqlperf and security style: readable labels, a blocking tree as an indented
+  list, and collapsed empty sections.
+- Exit 0 even when there are findings. Exit 2 for usage errors. Exit 1 for a
+  failed connection or for every section being unavailable.
+
+Tests:
+- unit fixtures for:
+  - no blocking;
+  - a chain of 3;
+  - two roots;
+  - a deadlock cycle;
+  - a vanished blocker;
+  - an idle-in-transaction blocker;
+  - a missing grant per section;
+  - the V$WAIT_CHAINS fallback.
+- integration on d1 and p1 (likely no blocking; assert the structure and
+  that every section is `ok` on both);
+- live smokes in `docs/sessions.md`.
+- No test may create locks or transactions: no DML, ever.
+
+### WP-23B: triage and report integration (branch `wp-23b-sessions-integration`)
+Triage:
+- When an issue mentions hang, hung, lock, locked, blocked, blocking,
+  waiting, enqueue, deadlock, "stuck", or slowness with no named SQL_ID,
+  `triage` adds a sessions evidence block.
+- The block holds the blocking tree, top waits and long transactions, via
+  `readSessionActivity`.
+- It ranks:
+  - a blocking chain or deadlock above other causes;
+  - an idle-in-transaction blocker as a named likely cause;
+  - otherwise the dominant non-idle wait class as context.
+- Blocker SQL_IDs feed the existing SQL evidence path, capped at 2.
+- Keep existing triage outputs byte-identical when no keyword matches.
+  Snapshot tests check this.
+
+Report:
+- an opt-in `sessions` section (`--sections sessions`). The default
+  checks stay byte-identical.
+- history trends: non-idle wait seconds per class (deltas between reports
+  when the instance startup time is unchanged), the blocker count and the
+  long-transaction count.
+- The diff marks wait-class shifts.
+
+Chat:
+- `/triage` inherits the triage change.
+
+Out of scope:
+- No agent prompt change in this WP. If the coordinator later adds one, it
+  is gated A/B.
+
+### WP-23C: web Sessions tab (branch `wp-23c-sessions-web`)
+`/api/db-sessions`:
+- same auth, loopback, single-flight and 1 MiB rules as `/api/security`;
+- target and options validated server-side.
+
+The tab:
+- a findings summary;
+- the blocking tree drawn as a graph with `graphLayout.js`, roots on the
+  left and edges labelled by lock or event, with a list fallback;
+- a top-waits bar view by class (no new dependencies) and an events table;
+- a long-transactions table;
+- an active-sessions table, filterable by status and wait class;
+- a manual refresh button and a "captured at" UTC time. There is no
+  auto-refresh polling.
+- Each blocker's SQL_ID links to the SQL tab.
+- Markdown export, light and dark themes, and phone width with no
+  horizontal page scroll.
+- Fresh live screenshots on d1 and p1.
+- Browser tests use fixtures with a chain and a cycle.
+
+### WP-23D: p23 evals (branch `wp-23d-p23-evals`)
+`evals/cases-hard/phase23-sessions.json`, suite `p23`, with 5 or 6
+challenge cases. Truth must be stable between a validation run and a gate
+run minutes later. For example:
+- the top non-idle wait class since startup;
+- the wait class of a named event;
+- how many events Oracle defines in a given wait class;
+- whether any session is blocked right now (empty truth means "none"; use
+  `skipWhenTruthEmpty` or an explicit empty-answer contract);
+- the user and SQL_ID of the oldest open transaction, with
+  `skipWhenTruthEmpty`.
+
+Rules:
+- Avoid truth that counts the agent's own sessions or the harness's own
+  connections.
+- Questions name no tools or views. Truth SQL never selects the forbidden
+  columns.
+- The validator runs each truth twice, 60 s apart, and flags unstable
+  cases.
+- Any scorer change is scoped to `hard-p23-`, with an archive replay showing
+  zero flips elsewhere.
+- The worker does not run the agent; the coordinator measures in the gate.
+
+### Gate
+- If no agent prompt changes: single side on merged master, with p23 ×2,
+  the full suites (dev, holdout ×3, regression, MVP), p18 and p16.
+- Any prompt change gets A/B 4×4.
+- Phase 23 ships with phase 24 as 1.3.0. Push main after phase 23 only if
+  the gate is clean. Tag only when the owner asks.
 
 ## Phase 24: space and capacity (proposed 2026-11-05; needs owner approval and p1 grants)
 
