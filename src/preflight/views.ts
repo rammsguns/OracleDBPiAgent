@@ -37,6 +37,7 @@ export const FEATURE_VIEWS: Record<string, readonly string[]> = {
 		"V$WAIT_CHAINS"
 	],
 	"space": [
+		"DATABASE_PROPERTIES",
 		"DBA_DATA_FILES",
 		"DBA_FREE_SPACE",
 		"DBA_LOBS",
@@ -151,7 +152,7 @@ FEATURE_VIEWS.sql = [...FEATURE_VIEWS.sql!, 'DBA_SQL_PLAN_BASELINES', 'DBA_SQL_P
 
 // Report adapters reuse the deterministic feature readers. Triage composes the same evidence.
 FEATURE_VIEWS.report = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.sessions!, ...FEATURE_VIEWS.space!, ...FEATURE_VIEWS.security!, ...FEATURE_VIEWS.sql!, ...FEATURE_VIEWS.alertlog!])];
-FEATURE_VIEWS.triage = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.plsql!])];
+FEATURE_VIEWS.triage = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.plsql!, 'DBA_TABLES', 'DBA_CONSTRAINTS', 'DBA_CONS_COLUMNS', 'ALL_TABLES', 'ALL_CONSTRAINTS', 'ALL_CONS_COLUMNS'])];
 
 for (const query of reportQueries) {
 	const sources = [query.source, query.fallback?.source ?? ''].join(' ');
@@ -186,6 +187,12 @@ FEATURE_VIEWS.ask = [
 	'DBA_INDEXES', 'DBA_IND_COLUMNS', 'DBA_VIEWS', 'DBA_SOURCE',
 	'DBA_TAB_COL_STATISTICS', 'DBA_IND_STATISTICS',
 	'DBA_SQL_PLAN_BASELINES', 'DBA_SQL_PROFILES',
+	'DBA_TRIGGERS', 'DBA_SCHEDULER_JOB_LOG', 'DBA_SCHEDULER_PROGRAMS',
+	'DBA_SCHEDULER_PROGRAM_ARGS', 'DBA_SCHEDULER_SCHEDULES',
+	'DBA_ARGUMENTS', 'DBA_ERRORS', 'DBA_DEPENDENCIES', 'DBA_PROCEDURES',
+	'DBA_SCHEDULER_JOBS', 'DBA_SCHEDULER_JOB_RUN_DETAILS',
 ];
 // These queries run before feature probes as part of the connection gate.
-FEATURE_VIEWS.connection = ['PRODUCT_COMPONENT_VERSION', 'ROLE_TAB_PRIVS'];
+FEATURE_VIEWS.connection = ['PRODUCT_COMPONENT_VERSION', 'ROLE_TAB_PRIVS', 'SESSION_PRIVS', 'SESSION_ROLES', 'USER_TAB_PRIVS', 'ALL_USERS', 'DUAL'];
+
+FEATURE_VIEWS.drift = ['V$PARAMETER', 'ALL_CONSTRAINTS', 'ALL_CONS_COLUMNS', 'ALL_INDEXES', 'ALL_IND_COLUMNS', 'ALL_IND_EXPRESSIONS', 'ALL_OBJECTS', 'ALL_TABLES', 'ALL_TAB_COLUMNS'];

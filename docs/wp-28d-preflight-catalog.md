@@ -14,7 +14,9 @@ Implemented on `wp-28d-preflight-catalog`, 2026-11-06.
   and deduplication, and grant-template reconciliation.
 - `tests/integration/preflight-catalog.test.ts`: all catalog V$ public synonyms
   on both packaged lab targets, with listener-unavailable skips.
-- This report is the only documentation change. No contract changes needed.
+- Following review, also updated `docs/grants-template-pdb.sql` and the
+  enumerated inventory in `docs/grants.md` under coordinator authorization.
+  No contract changes needed.
 
 ## Oracle 19c references and live verification
 
@@ -81,15 +83,34 @@ Live PDB behavior remains unverified: both permitted labs are non-CDB.
 
 ## Source and template reconciliation
 
-Audited fixed FROM/JOIN references throughout `src/` with `rg`, including nested
-queries, schema qualification and case differences. The regression test walks
-all TypeScript and JavaScript source files and checks those references plus
-standalone dictionary-view literals used as query arguments. It excludes the
-catalog itself so declarations cannot conceal missing source references.
-Known composed queries are checked separately: PL/SQL dictionary `this.read`
-suffixes, ask's ALL-to-DBA fallback views, and SQL insight TAB/IND statistics.
-Arbitrary user SQL and runtime user-selected objects cannot be pre-cataloged.
-`V$DIAG` is a routing prefix, not a queried view, and is explicitly excluded.
+Following the REQUEST CHANGES review, the regression test captures **any**
+identifier after FROM/JOIN, optionally schema-qualified, without a dictionary
+prefix filter. SYS qualification is normalized. It conservatively scans all
+TypeScript/JavaScript source (including fragments/examples), ignoring import
+module paths. Each capture must be cataloged, explicitly NO_GRANT, or explicitly
+classified as a non-view. Unknown names fail the test, including unfamiliar
+non-prefixed dictionary names. A fixture proves this for SYS.NEW_DICTIONARY_VIEW
+and ANOTHER_VIEW.
+
+The file-scoped `NON_VIEWS` list in the test documents the current non-view
+captures: prose/comment words, regex fragments, TABLE(...) function syntax and
+the triage V$DIAG routing prefix. No current fixed CTE requires an exclusion;
+future CTE names or aliases must be explicitly classified there. Configured
+application tables are accepted only from the packaged targets' `logTables`
+entries (currently none). Runtime `${log.table}` identifiers are not fixed SQL
+and remain subject to the configuration validator.
+
+A second test uses the same references against module-to-feature mappings:
+report, sessions, space, security, sqlperf -> sql, alertlog, plsql, triage,
+tools -> ask, oracle -> connection, and drift. Other supporting modules still
+receive the global classification check. The source catalog is excluded from
+the scan so declarations cannot satisfy their own coverage.
+
+Known composed SQL is additionally expanded: PL/SQL dictionary `this.read`
+suffixes, triage `reader.read` suffixes, ask ALL-to-DBA fallbacks, all
+`emptyHintViews` DBA counterparts, and SQL insight TAB/IND statistics. Arbitrary
+user SQL cannot be pre-cataloged. Public no-extra-grant views can be explicitly
+excluded from per-feature requirements; the exclusion is not prefix-wide.
 
 The explicit no-additional-grant exclusion list in the unit test is:
 
@@ -107,14 +128,35 @@ object grants. Existing probes of ALL_ views remain useful for feature visibilit
 exclusion from the source-coverage requirement does not remove those probes.
 New USER_/SESSION_/ALL_ names require explicit review; there is no wildcard waiver.
 
-Compared all 69 unique probed DBA_/V$ views, resolved to base grant objects,
-against `docs/grants-template-pdb.sql`: **no missing grants**. In particular the
-template already grants `SYS.V_$SORT_USAGE`. No coordinator template changes
-are required. The unit test now enforces this comparison on future catalog edits.
+The review found the original 69-view DBA_/V$ comparison too narrow. The test
+now compares **every catalog view outside NO_GRANT**, resolved to its base object,
+against the template, including PRODUCT_COMPONENT_VERSION, ROLE_TAB_PRIVS,
+AUDIT_UNIFIED_* and DATABASE_PROPERTIES.
+
+Review corrections:
+
+1. Added DATABASE_PROPERTIES to space (inherited by report/triage) and the
+   template for the PDB local-undo check.
+2. Added triage's DBA_TABLES, DBA_CONSTRAINTS, DBA_CONS_COLUMNS and ALL
+   counterparts. The per-module check also exposed drift's V$PARAMETER; added
+   a drift group with its fixed views, and included the connection-gate views.
+3. Added every DBA counterpart in emptyHintViews to ask. Five were new to the
+   template: DBA_TRIGGERS, DBA_SCHEDULER_JOB_LOG, DBA_SCHEDULER_PROGRAMS,
+   DBA_SCHEDULER_PROGRAM_ARGS, DBA_SCHEDULER_SCHEDULES. The composed-name test
+   derives requirements from the actual hint list so later additions cannot
+   bypass coverage.
+4. Added six SELECT grants in total and updated docs/grants.md's enumerated
+   inventory to 104 fixed/support views, 54 additions over the historical union,
+   and 113 template SELECT grants including the nine retained prerequisites.
+   The existing CREATE SESSION setup grant is unchanged. No excluded source,
+   write grant, EXECUTE grant, ANY privilege or grant option was added.
+
+No coordinator contract changes remain needed. The coordinator-authorized
+template and inventory changes are included in this branch.
 
 ## Validation outputs
 
-Commands and captured outputs (all exit 0):
+Commands and captured outputs for the review corrections (all exit 0):
 
 ```text
 $ npm run typecheck
@@ -123,8 +165,8 @@ $ npm run typecheck
 
 $ npm test -- --maxWorkers=2
  Test Files  106 passed (106)
-      Tests  1788 passed (1788)
-   Duration  30.80s
+      Tests  1790 passed (1790)
+   Duration  67.04s
 
 $ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
   PIAGENT_TARGETS_FILE="$PWD/config/targets.json" \
@@ -132,17 +174,19 @@ $ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
   --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'
  Test Files  28 passed (28)
       Tests  65 passed | 1 skipped (66)
-   Duration  118.35s
+   Duration  210.56s
 ```
 
 The one skipped test is the explicitly excluded end-to-end Strata ask.
-The synonym integration tests passed on both labs. A final focused rerun after
-catalog edits also passed: 3 unit tests and 2 lab integration tests.
+The synonym integration tests passed on both labs. The focused run after
+the regression-test changes also passed: 5 unit tests. The full integration
+run includes both lab synonym checks and both expanded target preflight checks.
 `git diff --check` passed. `node_modules` was absent and was symlinked to
 `../needlefish/node_modules` as authorized; no dependency files were changed.
 
 Initial source-coverage test failure exposed the missing unified-audit views
 and non-view strings matched by the first scanner version; the final scanner
 and catalog resolve those findings. Nothing remains unverified beyond live
-PDB behavior and the deliberately excluded Strata test. No contract changes,
-coordinator edits, or grant-template additions are needed.
+PDB behavior and the deliberately excluded Strata test. No contract changes or
+further coordinator edits are needed. Six grant-template additions are included
+under the coordinator authorization; they were never applied to a database.
