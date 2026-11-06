@@ -21,7 +21,7 @@ export interface TablespaceRow { name:string; contents:string; bigfile:boolean; 
 export type SpaceRow=Record<string,string|number|boolean|null>;
 export interface SpaceFinding { id:string; severity:'high'|'medium'|'low'|'info'; subject:string; detail:string; advice:string }
 export interface SpaceSection<T> { status:'ok'|'unavailable'|'skipped'; rows:T[]; evidence:Check; supportingEvidence:Check[]; note?:string }
-export interface SpaceReport { status:'ok'|'partial'|'failed'; target:string; capturedAt:string; sections:{tablespaces:SpaceSection<TablespaceRow>;segments:SpaceSection<SpaceRow>;temp:SpaceSection<SpaceRow>;undo:SpaceSection<SpaceRow>;redo:SpaceSection<SpaceRow>;recovery:SpaceSection<SpaceRow>}; findings:SpaceFinding[] }
+export interface SpaceReport { status:'ok'|'partial'|'failed'; target:string; capturedAt:string; sections:{tablespaces:SpaceSection<TablespaceRow>;segments:SpaceSection<SpaceRow>;temp:SpaceSection<SpaceRow>;undo:SpaceSection<SpaceRow>;redo:SpaceSection<SpaceRow> & { logMode?:string };recovery:SpaceSection<SpaceRow>}; findings:SpaceFinding[] }
 export function validateSpaceOptions(o:SpaceOptions) {
 	if(o.sections&&(!o.sections.length||o.sections.some(s=>!SECTION_IDS.includes(s as SectionId)))) throw new SpaceUsageError('section must be tablespaces, segments, temp, undo, redo or recovery');
 	if(o.top!==undefined&&(!Number.isInteger(o.top)||o.top<1||o.top>100)) throw new SpaceUsageError('top must be an integer from 1 to 100');
@@ -33,7 +33,7 @@ function section<T>(label:string):SpaceSection<T> { return {status:'skipped',row
 export async function readSpaceUsage(session:OracleSession,options:SpaceOptions={}):Promise<SpaceReport> {
 	validateSpaceOptions(options);
 	const report:SpaceReport={status:'ok',target:session.target.name,capturedAt:new Date().toISOString(),sections:{tablespaces:section('tablespaces'),segments:section('segments'),temp:section('temp'),undo:section('undo'),redo:section('redo'),recovery:section('recovery')},findings:[]};
-	async function read(id:SectionId,key:keyof typeof SQL,binds:Record<string,unknown>={}) {
+	async function read(id:SectionId,key:keyof typeof SQL,binds:Record<string,unknown>={},optional=false) {
 		const s=report.sections[id], c=check(key); c.sql=SQL[key]; c.binds=binds; c.view=[...c.sql.matchAll(/(?:FROM|JOIN)\s+([a-z][a-z0-9_$]*)/gi)].map(m=>m[1]).join(', ');
 		if(s.status==='skipped') {s.status='ok';s.evidence=c;} else s.supportingEvidence.push(c);
 		try {
@@ -44,7 +44,7 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 				if(!page.rows.length) break;
 			}
 		} 
-		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});s.status='unavailable';s.note='Missing view access ('+code+').';}
+		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';s.note='Missing view access ('+code+').';}}
 		if(c.truncated) s.note='Row cap reached; snapshot is incomplete.';
 		return c.rows;
 	}
@@ -73,6 +73,11 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 	if(selected('redo')) {
 		const s=report.sections.redo;s.rows.push(...(await read('redo','redo')).map(r=>({kind:'Group',group:num(r[0]),thread:num(r[1]),bytes:num(r[2]),members:num(r[3]),status:str(r[4]),archived:str(r[5])})));
 		s.rows.push(...(await read('redo','members')).map(r=>({kind:'Member',group:num(r[0]),path:str(r[1]),type:str(r[2]),status:str(r[3])})));
+		s.logMode=str((await read('redo','logMode',{},true))[0]?.[0])||'unavailable';
+		if(s.logMode==='ARCHIVELOG') {
+			await read('redo','recovery',{},true);
+			await read('redo','archiveDestinations',{},true);
+		}
 	}
 	if(selected('recovery')) {
 		const s=report.sections.recovery,rs=await read('recovery','recovery');
@@ -81,7 +86,7 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 		s.rows.push(...(await read('recovery','recoveryTypes')).filter(r=>num(r[3])>0).map(r=>({kind:'File type',type:str(r[0]),usedPercent:num(r[1]),reclaimablePercent:num(r[2]),fileCount:num(r[3])})));
 	}
 	report.findings=spaceFindings(report);
-	const ss=Object.values(report.sections).filter(s=>s.status!=='skipped');report.status=ss.every(s=>s.status==='unavailable')?'failed':ss.some(s=>s.status==='unavailable'||[s.evidence,...s.supportingEvidence].some(c=>c.truncated))?'partial':'ok';return report;
+	const ss=Object.values(report.sections).filter(s=>s.status!=='skipped');report.status=ss.every(s=>s.status==='unavailable')?'failed':ss.some(s=>s.status==='unavailable'||[s.evidence,...s.supportingEvidence].some(c=>c.truncated||c.status==='unavailable'))?'partial':'ok';return report;
 }
 export function spaceFindings(r:SpaceReport):SpaceFinding[] {
 	const out:SpaceFinding[]=[];
@@ -97,6 +102,10 @@ export function spaceFindings(r:SpaceReport):SpaceFinding[] {
 	}
 	if(r.sections.recovery.status==='ok') for(const f of r.sections.recovery.rows) if(f.kind==='Area'&&num(f.usedPercent)>80) add('fra',num(f.usedPercent)>90?'high':'medium','Recovery area',num(f.usedPercent).toFixed(2)+'% used after reclaimable space.','Review recovery retention and storage with the backup owner.');
 	if(r.sections.redo.status==='ok') {
+		const redo=r.sections.redo;
+		if(redo.logMode==='NOARCHIVELOG') add('redo-noarchivelog','info','Redo','Database is in NOARCHIVELOG mode: online redo is not archived, so point-in-time recovery is not possible.','Review recovery requirements and backup strategy with the DBA.');
+		const recovery=redo.supportingEvidence.find(c=>c.label==='recovery'),destinations=redo.supportingEvidence.find(c=>c.label==='archiveDestinations');
+		if(redo.logMode==='ARCHIVELOG'&&recovery?.status==='ok'&&!recovery.truncated&&destinations?.status==='ok'&&!destinations.truncated&&!recovery.rows.some(row=>num(row[1])>0)&&!destinations.rows.some(row=>str(row[1]).trim())) add('redo-no-archive-destination','high','Redo','Database is in ARCHIVELOG mode with no recovery area and no log_archive_dest_n set.','For a human DBA: configure and verify an archive destination to protect recovery and avoid archiving stalls.');
 		const gs=r.sections.redo.rows.filter(x=>x.kind==='Group');
 		if(gs.length<3||new Set(gs.map(g=>g.bytes)).size>1) add('redo-groups','low','Redo','Fewer than 3 groups or unequal group sizes.','Review redo sizing and group configuration with the DBA.');
 		if(gs.length&&gs.every(g=>g.members===1)) add('redo-members','info','Redo','A single member per redo group.','Review redo multiplexing and storage failure protection.');
@@ -120,6 +129,8 @@ export function renderSpaceMarkdown(r:SpaceReport):string {
 		const s=r.sections[id];if(s.status==='skipped') continue;
 		lines.push('','## '+({tablespaces:'Tablespaces',segments:'Top segments',temp:'Temp',undo:'Undo (last 24 h)',redo:'Online redo',recovery:'Recovery area'})[id],'');
 		if(s.status==='unavailable') lines.push('Unavailable. '+escape(s.note));else if(s.note) lines.push(escape(s.note));
+		if(!s.rows.length&&s.note) continue;
+		if(id==='redo'&&r.sections.redo.logMode) lines.push('Log mode: '+escape(r.sections.redo.logMode)+'.','');
 		if(!s.rows.length) {lines.push('<details><summary>No rows</summary>','','No rows in this snapshot.','','</details>');continue;}
 		if(id==='tablespaces') {
 			table(r.sections.tablespaces.rows.map(t=>({name:t.name,allocatedBytes:t.allocatedBytes,usedBytes:t.usedBytes,maxBytes:t.maxBytes,usedPercentAllocated:t.usedPercentAllocated,usedPercentMax:t.usedPercentMax,headroomBytes:t.headroomBytes})));
@@ -127,7 +138,7 @@ export function renderSpaceMarkdown(r:SpaceReport):string {
 			table(r.sections.tablespaces.rows.map(t=>({name:t.name,contents:t.contents,bigfile:t.bigfile,fileCount:t.fileCount,freeBytes:t.freeBytes})));lines.push('');table(r.sections.tablespaces.rows.flatMap(t=>t.files.map(f=>({tablespace:t.name,path:f.path,bytes:f.bytes,maxBytes:f.maxBytes,autoextend:f.autoextensible}))));lines.push('','</details>');
 		} else {
 			const rows=s.rows as SpaceRow[], kinds=[...new Set(rows.map(x=>x.kind))];
-			for(const kind of kinds) {if(kind) lines.push('','**'+escape(kind)+'**','');table(rows.filter(x=>x.kind===kind).map(({kind:_,...rest})=>rest));}
+			for(const kind of kinds) {if(kind) {if(lines.at(-1)!=='') lines.push('');lines.push('**'+escape(kind)+'**','');}table(rows.filter(x=>x.kind===kind).map(({kind:_,...rest})=>rest));}
 		}
 	}
 	return lines.join('\n')+'\n';

@@ -8,6 +8,8 @@ export const SQL = {
 	undoExtents: 'SELECT tablespace_name,status,SUM(bytes) FROM dba_undo_extents GROUP BY tablespace_name,status ORDER BY tablespace_name,status',
 	undo: 'SELECT MAX(maxquerylen),SUM(ssolderrcnt),SUM(nospaceerrcnt),MIN(tuned_undoretention),MAX(tuned_undoretention) FROM v$undostat WHERE begin_time>=SYSDATE-1',
 	retention: "SELECT value FROM v$parameter WHERE name='undo_retention'",
+	logMode: 'SELECT log_mode FROM v$database',
+	archiveDestinations: "SELECT name,value FROM v$parameter WHERE REGEXP_LIKE(name,'^log_archive_dest_[0-9]+$') ORDER BY name",
 	redo: 'SELECT group#,thread#,bytes,members,status,archived FROM v$log ORDER BY thread#,group#',
 	members: 'SELECT group#,member,type,status FROM v$logfile ORDER BY group#,member',
 	recovery: 'SELECT name,space_limit,space_used,space_reclaimable,number_of_files FROM v$recovery_file_dest',

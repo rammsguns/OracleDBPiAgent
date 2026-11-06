@@ -60,3 +60,40 @@ it('pages catalog evidence before aggregating tablespace files',async()=>{
 	s.query=async(sql,binds)=>{calls++;expect(sql).toContain(SQL.tablespaces);if(calls===1) return {rows:[ts(50)],columns:['T'],truncated:true,elapsedMs:0};expect(binds).toEqual({spaceOffset:1});return {rows:[['T','PERMANENT','NO','/other',100,'NO',0,50,50]],columns:['T'],truncated:false,elapsedMs:0};};
 	const r=await readSpaceUsage(s,{sections:['tablespaces']});expect(calls).toBe(2);expect(r.status).toBe('ok');expect(r.sections.tablespaces.rows[0]?.fileCount).toBe(2);
 });
+
+it('uses exactly one blank line after every section heading, including grouped rows',async()=>{
+	const r=await readSpaceUsage(fixture({tempFiles:[['TEMP','/temp',100,'NO',100]],undoFiles:[['UNDO','/undo',100,'NO',100]],redo:[[1,1,100,1,'CURRENT','NO']]}));
+	const md=renderSpaceMarkdown(r);
+	for(const match of md.matchAll(/^## .+\n(\n*)/gm)) expect(match[1]).toBe('\n');
+});
+it.each(SECTION_IDS)('renders only the note for empty %s',async id=>{
+	const r=await readSpaceUsage(fixture(),{sections:[id]});
+	r.sections[id].note='An explanatory note.';
+	if(id==='redo') r.sections.redo.logMode='unavailable';
+	const md=renderSpaceMarkdown(r);expect(md).toContain('An explanatory note.');expect(md).not.toContain('No rows');expect(md).not.toContain('Log mode:');
+});
+it('shows NOARCHIVELOG in JSON and Markdown with recovery advice',async()=>{
+	const r=await readSpaceUsage(fixture({logMode:[['NOARCHIVELOG']]}),{sections:['redo']});
+	expect(JSON.parse(JSON.stringify(r)).sections.redo.logMode).toBe('NOARCHIVELOG');
+	expect(renderSpaceMarkdown(r)).toContain('Log mode: NOARCHIVELOG.');
+	expect(r.findings.find(f=>f.id==='redo-noarchivelog')).toMatchObject({severity:'info',detail:expect.stringContaining('point-in-time recovery is not possible')});
+});
+it.each(['ORA-00942','ORA-01031'])('keeps redo rows when log mode is unavailable: %s',async code=>{
+	const r=await readSpaceUsage(fixture({redo:[[1,1,100,1,'CURRENT','NO']]},['logMode'],code),{sections:['redo']});
+	expect(r.sections.redo).toMatchObject({status:'ok',logMode:'unavailable'});expect(r.status).toBe('partial');
+	expect(r.sections.redo.rows).toHaveLength(1);expect(r.findings.some(f=>f.id==='redo-noarchivelog')).toBe(false);
+	expect(renderSpaceMarkdown(r)).toContain('Log mode: unavailable.');
+});
+it.each([
+	[[],[],[],true],
+	[[['/fra',100,0,0,0]],[],[],false],
+	[[],[['log_archive_dest_1','LOCATION=/archive']],[],false],
+	[[],[['log_archive_dest_31','SERVICE=standby']],[],false],
+	[[],[['log_archive_dest_1','   ']],[],true],
+	[[],[],['recovery'],false],
+	[[],[],['archiveDestinations'],false],
+] as [unknown[][],unknown[][],string[],boolean][])('checks archive configuration independently for redo-only output %#',async(recovery,archiveDestinations,missing,high)=>{
+	const r=await readSpaceUsage(fixture({logMode:[['ARCHIVELOG']],recovery,archiveDestinations},missing),{sections:['redo']});
+	expect(r.sections.recovery.status).toBe('skipped');
+	expect(r.findings.find(f=>f.id==='redo-no-archive-destination')?.severity).toBe(high?'high':undefined);
+});
