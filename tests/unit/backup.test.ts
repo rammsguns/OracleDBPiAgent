@@ -43,6 +43,10 @@ describe('backup evidence',()=>{
 	it('never asserts whole-CDB coverage from PDB-visible rows',async()=>{
 		expect((await readBackup(session(base,true),now)).restoreEstimate.status).toBe('not-verifiable');
 	});
+	it('withholds missing-file backup claims under PDB visibility',async()=>{
+		const r=await readBackup(session({...base,datafiles:[...base.datafiles,{'FILE#':2,'CREATION_CHANGE#':5}]},true),now);
+		expect(r.findings.some(f=>f.id==='level0-2')).toBe(false);
+	});
 	it('reports incremental inventory and reclaimable balance separately',async()=>{
 		const r=await readBackup(session({...base,backups:[...base.backups,{...base.backups[0],INCREMENTAL_LEVEL:1,COMPLETION_TIME:'2026-11-06T00:00:00Z'}],recoveryArea:[{SPACE_LIMIT:100,SPACE_USED:90,SPACE_RECLAIMABLE:30}]}),now);
 		expect(r.files[0]?.incremental).toBe('2026-11-06T00:00:00.000Z');

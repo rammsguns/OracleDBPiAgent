@@ -58,7 +58,7 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 	const core: EvidenceId[] = ['database','datafiles','backups','sets','pieces'];
 	if (!good(...core) || !good('jobs')) add('no-backups', 'high', 'Backup history is not verifiable from ' + 'this database: required views are unreadable or incomplete.', [...core,'jobs']);
 	else if (!rows('backups').length && !rows('jobs').length && !rows('sets').length) add('no-backups', 'high', pdb ? 'Backups are not verifiable from ' + 'this database: no rows visible in this PDB.' : 'No backups recorded at all in the visible control-file history; external catalogs and aged-out records are not checked.', ['backups','jobs','sets']);
-	if (good(...core) && files.length && (!pdb || rows('backups').length)) for (const f of files) if (!f.level0 || now.getTime()-Date.parse(f.level0)>7*86400000) add(`level0-${f.file}`, 'high', `Datafile ${f.file}: no available full / level 0 backup completed in 7 days.`, core);
+	if (good(...core) && files.length && (!pdb || rows('backups').length)) for (const f of files) if ((!pdb && !f.level0) || (f.level0 && now.getTime()-Date.parse(f.level0)>7*86400000)) add(`level0-${f.file}`, 'high', `Datafile ${f.file}: no available full / level 0 backup completed in 7 days.`, core);
 	const checkpoint = files.length && files.every(f => f.checkpointScn != null) ? Math.min(...files.map(f => f.checkpointScn!)) : null;
 	const gaps: ArchiveGap[] = [];
 	if (checkpoint !== null && good('archives','history','database')) {
