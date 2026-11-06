@@ -94,3 +94,8 @@ it.each(['C##SYS','c##system'])('denies common administrative user %s before rea
 	await expect(createSessionProvider(changed).get()).rejects.toThrow();
 	expect(mocks.read).not.toHaveBeenCalled();expect(mocks.connect).not.toHaveBeenCalled();
 });
+it('sanitizes connection rejection before exposing it to any feature',async()=>{
+	mocks.connect.mockRejectedValueOnce(new Error('ORA-01017: private-password private-host'));
+	await expect(createSessionProvider(config).get()).rejects.toThrow('ORA-01017: invalid username/password');
+	try{mocks.connect.mockRejectedValueOnce(new Error('private-password'));await createSessionProvider(config).get();}catch(error){expect(String(error)).not.toContain('private-password');expect(String(error)).toContain('Database connection failed');}
+});

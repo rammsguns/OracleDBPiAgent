@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { connectionGuidance, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
+import { renderFeatureSummary } from '../preflight/render.js';
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
 import { AccountCheckError } from '../oracle/account.js';
@@ -54,7 +56,8 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				ok = false;
 				if (error instanceof UnsupportedVersionError) check = "19c gate";
 				if (error instanceof AccountCheckError) check = "account check";
-				if (report) report(`${target.name}: ${check}`, false); else console.error(`${target.name}: ${error instanceof AccountCheckError ? error.message : `${check} check failed`}`);
+				clearConnectionFailure();
+				if (report) report(`${target.name}: ${connectionGuidance(error) ?? check}`, false); else console.error(`${target.name}: ${error instanceof AccountCheckError ? error.message : connectionGuidance(error) ?? `${check} check failed`}`);
 			}
 		}
 	} finally {
@@ -68,13 +71,13 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
 	program.command("init").description("Create private local configuration").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
-	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
+	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => withoutConnectionFailures(async () => {
 		const port = Number(options.port);
 		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new SafeConfigError("Invalid port");
 		const { createWebServer } = await import("../web/server.js");
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
-	});
+	}));
 	program.command("report").description("Collect a read-only database health report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
 		if (!options.target) throw new SafeConfigError("Report requires --target");
 		if (options.json && options.md) throw new SafeConfigError("Choose --json or --md");
@@ -186,18 +189,21 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		console.log(`Source: ${targetsSource()}`);
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
 	});
-	targets.command("check").description("Check account safety and feature view access; no LLM").requiredOption("--target <target>").option("--json").option("--grants-sql").action(async options => {
+	targets.command("check").description("Check account safety and feature view access; no LLM").requiredOption("--target <target>").option("--json").option("--all", "List every feature view").option("--grants-sql").action(async options => {
 		const sessions = await (dependencies.createSessions ?? createSessions)(loadConfig());
 		try {
 			const result = await checkTarget(sessions, options.target);
 			if (options.json) console.log(JSON.stringify(options.grantsSql ? result : { ...result, grantsSql: undefined }));
 			else {
 				console.log(`${result.identity.target}: Oracle ${result.identity.versionFull}; ${result.identity.isCdb ? 'CDB/PDB' : 'non-CDB'}; container ${result.identity.containerName}; user ${result.identity.currentUser}; account check passed`);
-				for (const view of result.views) console.log(`${view.feature}\t${view.view}\t${view.status}`);
+				if (options.all) for (const view of result.views) console.log(`${view.feature}\t${view.view}\t${view.status}`);
+				else console.log(renderFeatureSummary(result.views));
+				console.log("Use --grants-sql for suggested SELECT grants; --all lists every view.");
 				if (options.grantsSql) console.log(result.grantsSql.join('\n'));
 			}
 		} catch (error) {
-			const message = error instanceof AccountCheckError ? error.message : 'Target check failed; check local configuration and service availability';
+			clearConnectionFailure();
+			const message = error instanceof AccountCheckError || error instanceof SafeConfigError ? error.message : connectionGuidance(error) ?? 'Target check failed; check local configuration and service availability';
 			if (options.json) console.log(JSON.stringify({ target: options.target, accountCheck: 'failed', error: message }));
 			else console.error(message);
 			process.exitCode = 1;
@@ -261,11 +267,11 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		} finally { await sessions.closeAll(); }
 	}
 	program.command("ask <question>").description("Ask the local Strata assistant about a database").option("--target <target>").option("--json").action(run);
-	program.command("chat").description("Start an interactive local Strata conversation").option("--target <target>").action(options => run(undefined, options));
-	await program.parseAsync(argv);
+	program.command("chat").description("Start an interactive local Strata conversation").option("--target <target>").action(options => withoutConnectionFailures(() => run(undefined, options)));
+	await withConnectionFailures(async () => { await program.parseAsync(argv); });
 }
 export function handleCliError(error: unknown): void {
-	console.error(error instanceof SafeConfigError ? error.message : "piagent failed; check local configuration and service availability");
+	console.error(error instanceof SafeConfigError ? error.message : connectionGuidance(error) ?? "piagent failed; check local configuration and service availability");
 	process.exitCode = 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(handleCliError);

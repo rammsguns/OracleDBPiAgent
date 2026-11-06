@@ -1,3 +1,4 @@
+import { recordConnectionFailure } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
 import { checkAccount } from './account.js';
 import { SafeConfigError } from "../config/safeErrors.js";
@@ -36,7 +37,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 			if (approvedEndpoints && !approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new SafeConfigError("Target endpoint is not approved");
 			if (!oracledb.thin) throw new SafeConfigError("Only thin mode is supported");
 			const password = (await readFile(resolve(secretDir, target.passwordFile), "utf8")).trim();
-			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` });
+			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` }).catch((error: unknown) => { throw recordConnectionFailure(error); });
 			let closed = false; let busy = false;
 			try {
 				connection.callTimeout = config.limits.statementTimeoutSeconds * 1000;
