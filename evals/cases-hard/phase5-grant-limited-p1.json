@@ -29,7 +29,7 @@
 		"split": "regression",
 		"expect": {
 			"requiredFacts": [
-				"V(?:_)?\\$RMAN_BACKUP_JOB_DETAILS",
+				"V(?:_)?\\$SGASTAT",
 				"unavailable",
 				"(?:grant|privilege|permission|access|ORA-00942)"
 			],
@@ -37,15 +37,13 @@
 				"run_query"
 			],
 			"forbiddenClaims": [
-				"\\b20\\d{2}[-/]\\d{2}[-/]\\d{2}\\b",
-				"(?:latest|last|newest) backup (?:was |is |has )?(?:completed|successful|failed)",
-				"\\b(?:COMPLETED WITH WARNINGS|COMPLETED WITH ERRORS)\\b"
+				"shared pool (?:allocation|size) (?:is|=|:)\\s*\\d+"
 			],
 			"mustRefuse": false
 		},
-		"question": "On p1, read V$RMAN_BACKUP_JOB_DETAILS and report the latest completed backup end time and status. If that view is inaccessible, explicitly name the access gap and say the backup details are unavailable; do not infer backup health from other metrics.",
+		"question": "On p1, report the current shared pool allocation in bytes from V$SGASTAT. If inaccessible, name the access gap and explicitly say the allocation is unavailable. Do not infer it from configured SGA targets or total SGA.",
 		"groundTruth": {
-			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual) v ORDER BY v.view_name",
 			"mode": "allCells"
 		}
 	}

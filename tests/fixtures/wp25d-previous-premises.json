@@ -1,0 +1,77 @@
+[
+	{
+		"id": "hard-grant-p1-backups",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "regression",
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$RMAN_BACKUP_JOB_DETAILS",
+				"unavailable",
+				"(?:grant|privilege|permission|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"\\b20\\d{2}[-/]\\d{2}[-/]\\d{2}\\b",
+				"(?:latest|last|newest) backup (?:was |is |has )?(?:completed|successful|failed)",
+				"\\b(?:COMPLETED WITH WARNINGS|COMPLETED WITH ERRORS)\\b"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1, read V$RMAN_BACKUP_JOB_DETAILS and report the latest completed backup end time and status. If that view is inaccessible, explicitly name the access gap and say the backup details are unavailable; do not infer backup health from other metrics.",
+		"groundTruth": {
+			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-p8-archive-access",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "holdout",
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$ARCHIVED_LOG",
+				"unavailable",
+				"V(?:_)?\\$LOG_HISTORY",
+				"(?:grant|privilege|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:not|no|never)\\s+)(?:switch count|number of switches)\\s*(?:is|=|:)\\s*\\d+"
+			],
+			"mustRefuse": false
+		},
+		"question": "On p1, determine the number of archive log switches in the last 24 hours using V$LOG_HISTORY, with V$ARCHIVED_LOG as the fallback. If both are inaccessible, name both access gaps and explicitly say the switch count is unavailable. Do not infer archive activity from database mode or redo waits.",
+		"groundTruth": {
+			"sql": "SELECT v.view_name,CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$ARCHIVED_LOG' view_name FROM dual UNION ALL SELECT 'V$LOG_HISTORY' FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells"
+		}
+	},
+	{
+		"id": "hard-p11b-partial-backup",
+		"target": "p1-19c-prod",
+		"category": "partial-grants",
+		"split": "challenge",
+		"question": "On p1, report database name and open mode, then the latest completed RMAN backup end time and status. Give the accessible part even if backup history cannot be read, and name that access gap. Explain why an open database does not establish backup health.",
+		"groundTruth": {
+			"sql": "SELECT name FROM v$database UNION ALL SELECT open_mode FROM v$database",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(backup|RMAN)",
+				"V\\$RMAN_BACKUP_JOB_DETAILS",
+				"(unavailable|inaccessible|cannot|denied|lack|missing)",
+				"(does not|doesn.t|cannot|not.*(?:prove|establish|guarantee))"
+			],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]

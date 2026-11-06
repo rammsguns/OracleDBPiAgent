@@ -10,7 +10,7 @@ const explanation: Record<string, string> = {
 	'timestamp-boundary': 'Use an exclusive upper bound at next midnight; the inclusive upper bound omits most of the second day.',
 	'stats-grain': 'NUM_ROWS is a statistic about rows; live COUNT DISTINCT counts different employees.',
 	'partial-memory': 'V$SGASTAT shared pool is unavailable because the source is inaccessible.',
-	'partial-backup': 'V$RMAN_BACKUP_JOB_DETAILS RMAN backup history is unavailable; an open database does not establish backup health.',
+	'partial-backup': 'V$SGA_DYNAMIC_COMPONENTS large pool allocation is unavailable; an open database does not establish memory allocation.',
 };
 it('adds ten blind cases without changing any existing gate split', async () => {
 	const cases = await loadHardCases();

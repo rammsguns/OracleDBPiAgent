@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-06T16:06:57.273Z",
-	"caseCount": 135,
+	"validatedAt": "2026-11-06T21:34:53.270Z",
+	"caseCount": 140,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -1971,6 +1971,74 @@
 			]
 		},
 		{
+			"id": "hard-p25-d1-last-level0",
+			"target": "d1-19c-lab",
+			"sql": "SELECT NVL(TO_CHAR(MAX(completion_time), 'YYYY-MM-DD HH24:MI:SS'), 'NONE RECORDED') AS last_level_0 FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"NONE RECORDED"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-archive-gaps",
+			"target": "d1-19c-lab",
+			"sql": "SELECT CASE WHEN b.last_l0 IS NULL THEN 'NO LEVEL 0 RECORDED' ELSE 'RECORDED INTERIOR GAPS ONLY' END AS coverage, CASE WHEN b.last_l0 IS NULL THEN 'NOT VERIFIABLE' ELSE TO_CHAR(NVL(g.missing_sequences, 0), 'FM99999999999999999990') END AS gap_count FROM (SELECT MAX(completion_time) AS last_l0 FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0 AND resetlogs_change# = (SELECT resetlogs_change# FROM v$database)) b CROSS JOIN (SELECT SUM(GREATEST(sequence# - previous_sequence - 1, 0)) AS missing_sequences FROM (SELECT thread#, sequence#, LAG(sequence#) OVER (PARTITION BY thread# ORDER BY sequence#) AS previous_sequence FROM (SELECT DISTINCT a.thread#, a.sequence# FROM v$archived_log a CROSS JOIN v$database d WHERE a.resetlogs_change# = d.resetlogs_change# AND a.archived = 'YES' AND a.next_time > (SELECT MAX(completion_time) FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0 AND resetlogs_change# = (SELECT resetlogs_change# FROM v$database))))) g",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"NO LEVEL 0 RECORDED",
+					"NOT VERIFIABLE"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-retention-setting",
+			"target": "d1-19c-lab",
+			"sql": "SELECT 'RETENTION POLICY' AS setting_name, NVL(MAX(value), 'NOT EXPLICITLY CONFIGURED') AS stored_setting, NVL(MAX(value), 'REDUNDANCY 1') AS policy FROM v$rman_configuration WHERE name = 'RETENTION POLICY'",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"RETENTION POLICY",
+					"NOT EXPLICITLY CONFIGURED",
+					"REDUNDANCY 1"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-no-backups-recorded",
+			"target": "d1-19c-lab",
+			"sql": "SELECT CASE WHEN j.job_count = 0 AND f.file_count = 0 AND s.set_count = 0 AND p.piece_count = 0 THEN 'NO BACKUPS RECORDED' ELSE 'BACKUP RECORDS PRESENT' END AS record_state, j.job_count AS rman_job_count, f.file_count AS datafile_backup_count, s.set_count AS backup_set_count, p.piece_count AS backup_piece_count FROM (SELECT COUNT(*) AS job_count FROM v$rman_backup_job_details) j CROSS JOIN (SELECT COUNT(*) AS file_count FROM v$backup_datafile) f CROSS JOIN (SELECT COUNT(*) AS set_count FROM v$backup_set) s CROSS JOIN (SELECT COUNT(*) AS piece_count FROM v$backup_piece) p",
+			"mode": "rowCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"NO BACKUPS RECORDED",
+					0,
+					0,
+					0,
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p25-grant-component-inventory",
+			"target": "p1-19c-prod",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"V$SGA_DYNAMIC_COMPONENTS",
+					"unavailable"
+				]
+			]
+		},
+		{
 			"id": "hard-grant-p1-parameters",
 			"target": "p1-19c-prod",
 			"sql": "SELECT UPPER(name), value FROM v$parameter WHERE name IN ('sga_target','pga_aggregate_target') ORDER BY name",
@@ -1990,12 +2058,12 @@
 		{
 			"id": "hard-grant-p1-backups",
 			"target": "p1-19c-prod",
-			"sql": "SELECT 'V$RMAN_BACKUP_JOB_DETAILS', CASE WHEN COUNT(*)=0 THEN 'unavailable' ELSE 'available' END FROM all_tab_privs WHERE table_schema='SYS' AND table_name='V_$RMAN_BACKUP_JOB_DETAILS' AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual)",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual) v ORDER BY v.view_name",
 			"mode": "allCells",
 			"rowCount": 1,
 			"rows": [
 				[
-					"V$RMAN_BACKUP_JOB_DETAILS",
+					"V$SGASTAT",
 					"unavailable"
 				]
 			]
@@ -2217,16 +2285,16 @@
 		{
 			"id": "hard-p8-archive-access",
 			"target": "p1-19c-prod",
-			"sql": "SELECT v.view_name,CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$ARCHIVED_LOG' view_name FROM dual UNION ALL SELECT 'V$LOG_HISTORY' FROM dual) v ORDER BY v.view_name",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual UNION ALL SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
 			"mode": "allCells",
 			"rowCount": 2,
 			"rows": [
 				[
-					"V$ARCHIVED_LOG",
+					"V$SGASTAT",
 					"unavailable"
 				],
 				[
-					"V$LOG_HISTORY",
+					"V$SGA_DYNAMIC_COMPONENTS",
 					"unavailable"
 				]
 			]

@@ -1,0 +1,25 @@
+[
+	{
+		"id": "hard-p25-grant-component-inventory",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "holdout",
+		"question": "On p1, can this account verify the runtime memory component inventory, including each component name and current byte size? Identify the dictionary source you attempted and any access limitation. Do not substitute initialization settings for the runtime inventory.",
+		"groundTruth": {
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+				"unavailable",
+				"(?:grant|privilege|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]

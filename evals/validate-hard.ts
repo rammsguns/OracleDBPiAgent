@@ -44,7 +44,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
 	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
-		// Phase 20 made the former grant-limited dev case positive; backup regression and archive-log holdout retain coverage.
+		// Phase 25 re-premises access gaps to memory views outside the phase 25–27 grants.
 		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
 	const challenge = cases.filter(test => test.split === 'challenge');
@@ -82,9 +82,20 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const backup = cases.filter(test => test.category === 'backup');
+	if (backup.length) checkP25Cases(backup);
+
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+export function checkP25Cases(cases: EvalCase[]): void {
+	if (cases.length !== 4 || new Set(cases.map(test => test.id)).size !== 4) throw new Error('Expected four distinct p25 backup cases');
+	for (const test of cases) {
+		if (test.target !== 'd1-19c-lab' || test.category !== 'backup' || test.split !== 'challenge' || test.groundTruth?.mode !== 'rowCells') throw new Error('p25 backup cases require d1 challenge rowCells truth');
+		if (/\b(?:run_query|V\$\w+|DBA_\w+)\b/i.test(test.question ?? '')) throw new Error('p25 questions must not name tools or views');
+	}
 }
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
@@ -124,7 +135,7 @@ export async function verifyUnavailable(probe: () => Promise<unknown>): Promise<
 export async function validateHardCases(input?: EvalCase[]) {
 	const cases = input ?? await loadHardCases();
 	checkHardCases(cases);
-	const config = loadConfig();
+	const config = loadConfig({ ...process.env, PIAGENT_TARGETS_FILE: fileURLToPath(new URL('../config/targets.json', import.meta.url)) });
 	const records = [];
 	const skipped: { id: string; reason: string }[] = [];
 	const sessions = createSessionProvider(config);
@@ -144,13 +155,13 @@ export async function validateHardCases(input?: EvalCase[]) {
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
 				if (test.category === 'partial-grants') {
-					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$SGASTAT' : 'V_$RMAN_BACKUP_JOB_DETAILS';
+					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$SGASTAT' : 'V_$SGA_DYNAMIC_COMPONENTS';
 					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${view} WHERE ROWNUM=1`));
 				}
 				if (test.category === 'grant-limited-p1') {
 					for (const row of rows) {
 						const view = row[0];
-						if (test.target !== 'p1-19c-prod' || !['V$PARAMETER', 'V$RMAN_BACKUP_JOB_DETAILS', 'V$ARCHIVED_LOG', 'V$LOG_HISTORY'].includes(String(view)) || row[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
+						if (test.target !== 'p1-19c-prod' || !['V$SGASTAT', 'V$SGA_DYNAMIC_COMPONENTS'].includes(String(view)) || row[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
 						await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${String(view).replace('V$', 'V_$')} WHERE ROWNUM=1`));
 					}
 				}

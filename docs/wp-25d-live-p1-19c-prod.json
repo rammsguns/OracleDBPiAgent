@@ -1,0 +1,84 @@
+{
+	"target": "p1-19c-prod",
+	"validatedAt": "2026-11-06T21:34:55.552Z",
+	"scope": "CDB-wide (shared by all PDBs)",
+	"container": {
+		"id": 0,
+		"name": "PRODCDB"
+	},
+	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
+	"views": [
+		{
+			"view": "V$RMAN_BACKUP_JOB_DETAILS",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$BACKUP_SET",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$BACKUP_PIECE",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$BACKUP_DATAFILE",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$ARCHIVED_LOG",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$LOG_HISTORY",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$CONTROLFILE",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$RMAN_CONFIGURATION",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$DATABASE_BLOCK_CORRUPTION",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"view": "V$RECOVER_FILE",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		}
+	],
+	"records": [
+		{
+			"id": "hard-p25-d1-last-level0",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"id": "hard-p25-d1-archive-gaps",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"id": "hard-p25-d1-retention-setting",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		},
+		{
+			"id": "hard-p25-d1-no-backups-recorded",
+			"status": "not verifiable from this database",
+			"code": "ORA-00942"
+		}
+	]
+}
