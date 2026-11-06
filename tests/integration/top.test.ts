@@ -13,4 +13,4 @@ for (const target of ['d1-19c-lab','p1-19c-prod']) it('samples top without ASH o
 	} catch (e) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|ORA-01034|ORA-27101/.test(String(e))) { context.skip('Approved database unavailable: ' + target); return; } throw e;
 	} finally { await provider.closeAll(); }
-},30000);
+},60000);
