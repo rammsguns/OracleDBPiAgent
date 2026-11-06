@@ -67,3 +67,8 @@ it('fails closed on missing identity or unknown privilege result',async()=>{
 it('cleans up after an unexpected preflight probe error',async()=>{
 	const close=vi.fn();await expect(checkTarget({get:async()=>({target,identity:{},query:async()=>{throw new Error('private details');},close})} as any,'real-db')).rejects.toThrow('Preflight probe failed:');expect(close).toHaveBeenCalledOnce();
 });
+it.each([
+	['READER','FALSE'],['READER','FALSE',null,null,'DB'],['READER','FALSE',null,'unknown','DB'],['READER','FALSE',null,'0',null],
+])('fails closed for incomplete container identity %j',async(...identity)=>{
+	await expect(checkAccount(account(identity),'READER',{})).rejects.toThrow();
+});
