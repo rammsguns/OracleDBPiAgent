@@ -48,10 +48,36 @@ and [OSSTAT reference](https://docs.oracle.com/en/database/oracle/oracle-databas
 for counter semantics. This command never accesses ASH, DBA_HIST_*, metric
 history, DBMS_WORKLOAD_REPOSITORY, DBMS_SCHEDULER or DBMS_LOCK.
 
-Unit tests prove the existing global ASH/AWR/package refusals. The global policy
-currently does not refuse V$METRIC* history: extending that denylist is a
-coordinator prerequisite outside WP-27A ownership, recorded in the branch report.
-The top reader accepts only fixed queries and exposes no ad hoc SQL interface.
+The global SQL policy refuses these identifiers wherever they occur in executable
+SQL, including nested queries, CTEs, joins, quoted names and SYS/PUBLIC qualification.
+V$, GV$, V_$ and GV_$ forms are covered. Refusals name the Diagnostics Pack
+and suggest `piagent top`. Literal strings and comments remain inert.
+
+The [Oracle 19c licensing guide, Diagnostics Pack section](https://docs.oracle.com/en/database/oracle/oracle-database/19/dblic/Licensing-Information.html)
+explicitly names ASH (including X$ASH), DBMS_WORKLOAD_REPOSITORY, DBMS_ADDM,
+DBA_ADDM_* and DBA_HIST_* (with six documented licensing exceptions). It also
+lists DBA_ADVISOR_* **conditionally** when results contain ADDM-related advisor,
+task or task-ID data. This project's conservative policy blocks all DBA_HIST_*
+and DBA_ADVISOR_* access: it cannot determine future result contents, and keeps
+its existing blanket AWR refusal even for the documented licensing exceptions.
+
+The licensing guide lists metric history as a feature, but its current 19c text
+**does not enumerate V$ metric view names**. The owner explicitly requires a
+broader block on every V$*METRIC* identifier, including current values and name
+metadata. This is a project restriction, not a claim that Oracle individually
+lists every such view as licensed. [V$METRIC](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-METRIC.html)
+and [V$METRIC_HISTORY](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-METRIC_HISTORY.html)
+are described as AWR infrastructure by the Database Reference. The exact matching
+names in the [19c Database Reference contents](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/toc.htm)
+are V$CHUNK_METRIC, V$CON_SYSMETRIC, V$CON_SYSMETRIC_HISTORY,
+V$CON_SYSMETRIC_SUMMARY, V$EVENTMETRIC, V$FILEMETRIC, V$FILEMETRIC_HISTORY,
+V$GCR_METRICS, V$IOFUNCMETRIC, V$IOFUNCMETRIC_HISTORY, V$METRIC,
+V$METRICGROUP, V$METRICNAME, V$METRIC_HISTORY, V$RSRCMGRMETRIC,
+V$RSRCMGRMETRIC_HISTORY, V$RSRCPDBMETRIC, V$RSRCPDBMETRIC_HISTORY,
+V$SERVICEMETRIC, V$SERVICEMETRIC_HISTORY, V$SERVICE_REGION_METRIC,
+V$SESSMETRIC, V$SYSMETRIC, V$SYSMETRIC_HISTORY, V$SYSMETRIC_SUMMARY,
+V$WAITCLASSMETRIC and V$WAITCLASSMETRIC_HISTORY. The family rule also refuses
+future matching names. DBA_TABLESPACE_USAGE_METRICS remains allowed.
 
 p1 currently has V$SQLSTATS only. The proposed SELECT-only request is
 `docs/grants-request-2026-11-06-top.sql`; it has not been applied. The PDB template

@@ -113,3 +113,58 @@ it('accepts every MVP and hard-suite groundTruth.sql, including conversation tur
 	}
 	expect(checked).toBeGreaterThan(0);
 });
+
+// Names enumerated by the Oracle 19c Database Reference table of contents.
+const metricViews = `CHUNK_METRIC CON_SYSMETRIC CON_SYSMETRIC_HISTORY CON_SYSMETRIC_SUMMARY
+EVENTMETRIC FILEMETRIC FILEMETRIC_HISTORY GCR_METRICS IOFUNCMETRIC IOFUNCMETRIC_HISTORY
+METRIC METRICGROUP METRICNAME METRIC_HISTORY RSRCMGRMETRIC RSRCMGRMETRIC_HISTORY
+RSRCPDBMETRIC RSRCPDBMETRIC_HISTORY SERVICEMETRIC SERVICEMETRIC_HISTORY SERVICE_REGION_METRIC
+SESSMETRIC SYSMETRIC SYSMETRIC_HISTORY SYSMETRIC_SUMMARY WAITCLASSMETRIC WAITCLASSMETRIC_HISTORY`.split(/\s+/);
+const packViews = [...metricViews.flatMap(name => ['V$', 'GV$', 'V_$', 'GV_$'].map(prefix => prefix + name)),
+	...['V$', 'GV$', 'V_$', 'GV_$'].map(prefix => prefix + 'ACTIVE_SESSION_HISTORY'),
+	'DBA_HIST_SNAPSHOT', 'DBA_HIST_SQLSTAT', 'DBA_ADVISOR_TASKS', 'DBA_ADVISOR_FINDINGS', 'DBA_ADDM_TASKS', 'X$ASH'];
+const packMessage = /Diagnostics Pack.*piagent top/;
+it.each(packViews)('refuses every qualified and nested form of %s', name => {
+	for (const qualified of [name.toLowerCase(), `"${name}"`, `SYS.${name}`, `PUBLIC.${name}`, `"SYS"."${name}"`, `"PUBLIC" /* separator */ . "${name}"`]) {
+		for (const sql of [`SELECT * FROM ${qualified}`, `WITH x AS (SELECT * FROM ${qualified}) SELECT * FROM x`,
+			`SELECT * FROM (SELECT * FROM ${qualified})`, `SELECT * FROM dual JOIN ${qualified} x ON 1=1`, `SELECT * FROM dual, ${qualified} x`]) {
+			expect(() => classifySql(sql), sql).toThrow(packMessage);
+		}
+	}
+});
+it.each(['DBMS_WORKLOAD_REPOSITORY', 'DBMS_ADDM'])('names the pack and alternative for %s', name => {
+	for (const pkg of [name, `SYS.${name}`, `PUBLIC.${name}`, `"SYS"."${name}"`, `"PUBLIC"."${name}"`]) {
+		expect(() => classifySql(`SELECT ${pkg}.REPORT(1) FROM dual`)).toThrow(packMessage);
+		expect(() => classifySql(`BEGIN ${pkg}.REPORT(1); END`)).toThrow(packMessage);
+	}
+});
+it.each([
+	"SELECT 'V$METRIC DBA_ADVISOR_TASKS DBMS_ADDM' FROM dual",
+	"SELECT q'[SYS.V_$METRIC_HISTORY]' FROM dual",
+	'SELECT 1 FROM dual /* V$ACTIVE_SESSION_HISTORY DBA_HIST_SQLSTAT */',
+	'SELECT 1 FROM dual -- DBMS_WORKLOAD_REPOSITORY\n',
+	'SELECT * FROM DBA_TABLESPACE_USAGE_METRICS',
+	'SELECT * FROM V$SQLSTATS', 'SELECT * FROM V$SYSSTAT', 'SELECT * FROM V$OSSTAT', 'SELECT * FROM V$SESSTAT',
+	'SELECT * FROM V$STATNAME', 'SELECT * FROM V$SQL', 'SELECT * FROM V$SYSTEM_EVENT',
+	'SELECT * FROM GV$SQLSTATS', 'SELECT * FROM SYS.V_$SYSSTAT',
+	"SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('abc', 0, 'TYPICAL'))",
+])('keeps safe counters and inert pack names allowed: %s', sql => expect(() => classifySql(sql)).not.toThrow());
+it('keeps every fixed source relation outside the pack guard', async () => {
+	const { readdir, readFile } = await import('node:fs/promises');
+	let checked = 0;
+	async function walk(dir: URL): Promise<void> {
+		for (const entry of await readdir(dir, { withFileTypes:true })) {
+			const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+			if (entry.isDirectory()) await walk(url);
+			else if (entry.name.endsWith('.ts') || entry.name.endsWith('.js')) {
+				const source = await readFile(url, 'utf8');
+				for (const m of source.matchAll(/\b(?:FROM|JOIN)\s+((?:(?:"(?:[^"]|"")*"|[A-Z_][A-Z0-9_$#]*)\s*\.\s*)?(?:"(?:[^"]|"")*"|[A-Z_][A-Z0-9_$#]*))/gi)) {
+					try { classifySql('SELECT 1 FROM ' + m[1]); }
+					catch (e) { expect(String(e), `${url.pathname}: ${m[1]}`).not.toContain('Diagnostics Pack'); }
+					checked++;
+				}
+			}
+		}
+	}
+	await walk(new URL('../../src/', import.meta.url)); expect(checked).toBeGreaterThan(100);
+});

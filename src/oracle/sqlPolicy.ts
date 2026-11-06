@@ -91,6 +91,20 @@ function checkFunctionCalls(clean: string): void {
 	}
 }
 
+/** Conservative Diagnostics Pack guard; the lexer has already removed literals and comments.
+ * Metric-family scope is the owner's explicit policy; see docs/top.md for the
+ * distinction between the 19c licensing guide and Database Reference.
+ */
+function rejectDiagnosticsPack(sql: string): void {
+	const tokens = sql.match(/"(?:[^"]|"")*"|[\p{L}_][\p{L}\p{N}\p{M}_$#]*/gu) ?? [];
+	for (const token of tokens) {
+		const name = (token.startsWith('"') ? token.slice(1, -1).replaceAll('""', '"') : token).toUpperCase();
+		if (/^(?:G?V(?:\$|_\$)(?:ACTIVE_SESSION_HISTORY|[A-Z0-9_$#]*METRIC[A-Z0-9_$#]*)|DBA_(?:HIST|ADVISOR|ADDM)_[A-Z0-9_$#]+|X\$ASH|DBMS_WORKLOAD_REPOSITORY|DBMS_ADDM)$/.test(name)) {
+			throw new StatementRejectedError("Diagnostics Pack access is out of scope; use piagent top for current SQL and load sampling");
+		}
+	}
+}
+
 /** Lex SQL before checking tokens: quoted text must never hide executable tokens. */
 export function classifySql(sql: string): string {
 	const reject = (reason: string): never => { throw new StatementRejectedError(reason); };
@@ -115,6 +129,7 @@ export function classifySql(sql: string): string {
 	}
 	clean = clean.trim();
 	if (clean.endsWith(";")) clean = clean.slice(0, -1).trim();
+	rejectDiagnosticsPack(callClean);
 	if (clean.includes(";")) reject("Only one statement is allowed");
 	if (!/^(SELECT|WITH)\b/i.test(clean)) reject("Only SELECT or WITH is allowed");
 	if (/\bNEXTVAL\b/i.test(clean)) reject("Sequence advancement is forbidden");
@@ -132,7 +147,6 @@ export function classifySql(sql: string): string {
 	if (/\bDBMS_XPLAN\s*\.\s*(?!DISPLAY_CURSOR\b)\w+/i.test(clean)) reject("Only DISPLAY_CURSOR is allowed from DBMS_XPLAN");
 	// Even when DISPLAY_CURSOR is present, no other DBMS/UTL package may piggyback.
 	if (/\b(?:DBMS_(?!XPLAN\b)\w+|UTL_\w+)\b/i.test(clean)) reject("Package calls are forbidden");
-	if (/\b(V\$ACTIVE_SESSION_HISTORY|DBA_HIST_\w+)\b/i.test(clean)) reject("Diagnostics Pack views are out of scope");
 	return (terminators.length ? sql.slice(0, terminators[0]) + sql.slice(terminators[0]! + 1) : sql).trim();
 }
 export const assertReadOnlySql = classifySql;
