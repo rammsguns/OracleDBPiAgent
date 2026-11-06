@@ -157,3 +157,9 @@ it('rejects invalid source ranges before opening sessions', async () => {
 		expect(get).not.toHaveBeenCalled();
 	}
 });
+it('fixed tools explain PDB-inapplicable errors while preserving thrown PI failures', async () => {
+	const { tools, query, close } = setup();
+	query.mockRejectedValueOnce(new Error('ORA-65040'));
+	await expect(tools.find(t => t.name === 'top_sql')!.execute('pdb', {})).rejects.toThrow('not available in this container / not granted');
+	expect(close).toHaveBeenCalledOnce();
+});
