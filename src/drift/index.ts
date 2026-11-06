@@ -73,7 +73,7 @@ export async function compareTargets(ctx: ToolContext, options: DriftOptions): P
 				await ctx.audit.record({ ...base, kind: 'tool_error', detail: 'DriftQueryError' });
 				if (error instanceof UnsupportedVersionError) throw error;
 				section.status = 'unavailable';
-				section.notes.push(`${target}: ${/ORA-00942|ORA-01031/.test(String(error)) ? `needs SELECT on ${definition.source}` : 'query failed; check local service availability'}`);
+				section.notes.push(`${target}: ${/ORA-65040/.test(String(error)) ? 'not available in a PDB; comparison withheld' : /ORA-00942|ORA-01031/.test(String(error)) ? `needs SELECT on ${definition.source}` : 'query failed; check local service availability'}`);
 			} finally { await session?.close(); }
 		}
 		if (section.status === 'ok') Object.assign(section, compareEntries(sides[0]!, sides[1]!));

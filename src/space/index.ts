@@ -44,11 +44,13 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 				if(!page.rows.length) break;
 			}
 		} 
-		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';s.note='Missing view access ('+code+').';}}
+		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031','ORA-65040'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';if(!session.identity?.isCdb) s.note=code==='ORA-65040'?'Not available in a PDB (ORA-65040).':'Missing view access ('+code+').';}}
+		if(session.identity?.isCdb && c.status==='unavailable') s.note=[s.note, `${c.view}: not available in this PDB / not granted (${c.attempts[0]?.code}).`].filter(Boolean).join(' ');
 		if(c.truncated) s.note='Row cap reached; snapshot is incomplete.';
 		return c.rows;
 	}
 	const selected=(id:SectionId)=>!options.sections||options.sections.includes(id);
+	let undoScope: string | undefined;
 	if(selected('tablespaces')) {
 		const rows=await read('tablespaces','tablespaces'), grouped=new Map<string,unknown[][]>();
 		for(const r of rows) grouped.set(str(r[0]),[...(grouped.get(str(r[0]))??[]),r]);
@@ -65,7 +67,13 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 		s.rows.push(...(await read('temp','consumers')).map(r=>({kind:'Consumer',sid:num(r[0]),username:str(r[1]),sqlId:str(r[2]),segmentType:str(r[3]),tablespace:str(r[4]),bytes:num(r[5])})));
 	}
 	if(selected('undo')) {
-		const s=report.sections.undo;s.rows.push(...files(await read('undo','undoFiles')));
+		const s=report.sections.undo;
+		if(session.identity?.isCdb) {
+			const mode=str((await read('undo','localUndo'))[0]?.[0]).toUpperCase();
+			undoScope=mode==='TRUE'?'PDB-local (local undo)':mode==='FALSE'?'CDB-wide (shared undo; shared by all PDBs in this CDB)':'Undo scope unknown: LOCAL_UNDO_ENABLED unavailable / not granted or no visible property; findings withheld';
+			if(!['TRUE','FALSE'].includes(mode)) s.status='unavailable';
+		}
+		s.rows.push(...files(await read('undo','undoFiles')));
 		s.rows.push(...(await read('undo','undoExtents')).map(r=>({kind:'Extent status',tablespace:str(r[0]),status:str(r[1]),bytes:num(r[2])})));
 		const rs=await read('undo','undo'),p=await read('undo','retention');
 		s.rows.push(...rs.map(r=>({kind:'Last 24 h',maxQuerySeconds:num(r[0]),snapshotTooOldCount:num(r[1]),noSpaceCount:num(r[2]),minTunedRetentionSeconds:num(r[3]),maxTunedRetentionSeconds:num(r[4]),retentionSeconds:num(p[0]?.[0])})));
@@ -82,10 +90,24 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 	if(selected('recovery')) {
 		const s=report.sections.recovery,rs=await read('recovery','recovery');
 		s.rows=rs.filter(r=>num(r[1])>0).map(r=>({kind:'Area',path:str(r[0]),limitBytes:num(r[1]),usedBytes:num(r[2]),reclaimableBytes:num(r[3]),fileCount:num(r[4]),usedPercent:Math.max(0,num(r[2])-num(r[3]))/num(r[1])*100}));
-		if(!s.rows.length&&s.status==='ok') s.note='no recovery area configured';
+		if(!s.rows.length&&s.status==='ok') s.note=session.identity?.isCdb?'No recovery-area rows visible; configuration cannot be inferred from this PDB.':'no recovery area configured';
 		s.rows.push(...(await read('recovery','recoveryTypes')).filter(r=>num(r[3])>0).map(r=>({kind:'File type',type:str(r[0]),usedPercent:num(r[1]),reclaimablePercent:num(r[2]),fileCount:num(r[3])})));
 	}
+	if(session.identity?.isCdb) for(const id of ['tablespaces','segments','temp'] as const) {
+		const s=report.sections[id]; if(s.status!=='skipped') s.note=[s.note, 'Current PDB visibility only; file visibility and temporary/undo allocation depend on container configuration.'].filter(Boolean).join(' ');
+	}
+
+	if(session.identity?.isCdb) for(const id of ['undo','redo','recovery'] as const) {
+		const s=report.sections[id]; if(s.status==='skipped') continue;
+		const scope=id==='undo'?undoScope:'CDB-wide (shared by all PDBs in this CDB)';
+		s.note=[s.note, `Container: ${session.identity.containerName ?? 'unknown'}. ${scope}. Empty rows do not establish absence.`].filter(Boolean).join(' ');
+	}
 	report.findings=spaceFindings(report);
+	if(session.identity?.isCdb) report.findings=report.findings.filter(f=> {
+		if(f.id==='redo-groups'&&!report.sections.redo.rows.some(r=>r.kind==='Group')) return false;
+		if(f.id==='redo-no-archive-destination') return false;
+		return true;
+	}).map(f=>({...f,detail: (f.id.startsWith('redo-')||f.id==='fra'?'CDB-wide (shared by all PDBs in this CDB). ':f.id.startsWith('undo-')?`${undoScope}. `:'')+f.detail}));
 	const ss=Object.values(report.sections).filter(s=>s.status!=='skipped');report.status=ss.every(s=>s.status==='unavailable')?'failed':ss.some(s=>s.status==='unavailable'||[s.evidence,...s.supportingEvidence].some(c=>c.truncated||c.status==='unavailable'))?'partial':'ok';return report;
 }
 export function spaceFindings(r:SpaceReport):SpaceFinding[] {

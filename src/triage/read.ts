@@ -25,7 +25,7 @@ export class TriageReader {
 				const code = /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED';
 				check.attempts.push({ view: candidate.view, code });
 				await this.ctx.audit.record({ ...audit, kind: 'tool_error', detail: code });
-				if (!['ORA-00942', 'ORA-01031'].includes(code)) break;
+				if (!['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) break;
 			} finally { await session.close(); }
 		}
 		return check;

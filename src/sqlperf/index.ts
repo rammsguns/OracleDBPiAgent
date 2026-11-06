@@ -45,7 +45,7 @@ export async function readSqlInsight(session: OracleSession, options: { sqlId: s
 		try { const data = await session.query(sql, args); section.status = 'ok'; section.truncated ||= data.truncated; return data; }
 		catch (error) {
 			const code = /ORA-\d{5}/.exec(String(error))?.[0];
-			if (!code || !['ORA-00942', 'ORA-01031'].includes(code)) throw error;
+			if (!code || !['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) throw error;
 			section.status = 'unavailable'; section.attempts.push({ view, code }); return undefined;
 		}
 	}

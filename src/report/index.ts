@@ -22,6 +22,7 @@ const groups: Record<string, string[]> = { backups: ['backups', 'archive_switche
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
 	const text = String(error);
+	if (/ORA-65040/.test(text)) return `operation not supported in a PDB (${grant})`;
 	if (/ORA-00942|ORA-01031/.test(text)) return `needs SELECT on ${grant}`;
 	if (/NJS-040|NJS-560|DPI-1067|ORA-01013|call timeout|callTimeout/i.test(text)) return `query timed out (${grant})`;
 	return `query failed (${grant}); check local service availability`;
@@ -42,6 +43,10 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 		const deadline = performance.now() + Math.min(2, ctx.config.limits.statementTimeoutSeconds) * 1000;
 		try {
 			session = await ctx.sessions.get(target);
+			if (session.identity?.isCdb) {
+				const container = session.identity.containerName ?? 'current PDB';
+				query.note = [query.note, `Container: ${container}.`, /V\$(?:RMAN|ARCHIVED_LOG|LOG_HISTORY)/i.test(query.source) ? 'CDB-wide backup/redo metadata; not evidence of PDB recoverability. Empty rows do not establish absence.' : 'Evidence visible in the current PDB; does not describe other containers.'].filter(Boolean).join(' ');
+			}
 			const execute = async () => {
 				const sql = classifySql(query.sql);
 				const base = { at: new Date().toISOString(), runId: ctx.runId, target, tool: `report:${definition.name}`, sqlSha256: createHash('sha256').update(sql).digest('hex') };
@@ -60,8 +65,8 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 			let result;
 			try { result = await execute(); }
 			catch (error) {
-				if (!/ORA-00942/.test(String(error)) || !definition.fallback) throw error;
-				query = { ...definition.fallback, note: definition.fallback.note };
+				if (!/ORA-00942|ORA-01031/.test(String(error)) || !definition.fallback) throw error;
+				query = { ...definition.fallback, note: [definition.fallback.note, session!.identity?.isCdb ? 'Current PDB visibility; backup/redo metadata is CDB-wide where available; empty rows do not establish absence.' : ''].filter(Boolean).join(' ') };
 				result = await execute();
 			}
 			Object.assign(section, { status: 'ok', source: query.source, columns: result.columns, rows: result.rows, note: [query.note, definition.owner ? `Owner: ${owner.toUpperCase()}.` : '', result.truncated ? 'Row limit reached; more rows exist.' : result.rows.length >= Math.min(definition.limit ?? 100, ctx.config.limits.maxRows) && definition.name !== 'identity' ? 'Row limit reached; additional matching rows may exist.' : ''].filter(Boolean).join(' ') });

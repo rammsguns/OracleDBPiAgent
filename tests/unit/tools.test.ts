@@ -5,7 +5,7 @@ function setup() {
 	const query = vi.fn().mockResolvedValue({columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const close = vi.fn();const get = vi.fn().mockResolvedValue({query,close});const record=vi.fn();
 	const ctx = {config:{defaultTarget:'lab',targets:[{name:'lab',defaultSchema:'HR',environment:'development',description:'Lab'}],limits:{maxRows:10,maxToolResultBytes:1000}},sessions:{get},audit:{record},runId:'test'} as unknown as ToolContext;
-	return {tools:createDbTools(ctx),get,query,close,record};
+	return {tools:createDbTools(ctx),get,query,close,record,ctx};
 }
 it('registers every MVP tool and lists targets without database access',async()=>{
 	const {tools,get,record}=setup();expect(tools).toHaveLength(12);expect(new Set(tools.map(t=>t.name)).size).toBe(12);
@@ -51,8 +51,9 @@ for (const [name, source, limitation] of fallbacks) {
 	});
 	it(`${name} does not retry other database failures`, async () => {
 		const { tools, query, close } = setup();
-		query.mockRejectedValueOnce(new Error('ORA-01031: insufficient privileges'));
-		await expect(tools.find(t => t.name === name)!.execute('1', {})).rejects.toThrow('ORA-01031');
+		const code = name === 'top_sql' ? 'ORA-00600' : 'ORA-01031';
+		query.mockRejectedValueOnce(new Error(code));
+		await expect(tools.find(t => t.name === name)!.execute('1', {})).rejects.toThrow(code);
 		expect(query).toHaveBeenCalledOnce();
 		expect(close).toHaveBeenCalledOnce();
 	});
@@ -156,4 +157,52 @@ it('rejects invalid source ranges before opening sessions', async () => {
 		await expect(tools.find(t => t.name === 'get_source')!.execute('1', {name:'V', type:'VIEW', ...params})).rejects.toThrow('Invalid source range');
 		expect(get).not.toHaveBeenCalled();
 	}
+});
+it('fixed tools explain PDB-inapplicable errors while preserving thrown PI failures', async () => {
+	const { tools, query, close } = setup();
+	query.mockRejectedValueOnce(new Error('ORA-65040'));
+	await expect(tools.find(t => t.name === 'top_sql')!.execute('pdb', {})).rejects.toThrow('not available in this container / not granted');
+	expect(close).toHaveBeenCalledOnce();
+});
+it('returns labeled PDB overview facts and container with independent view reads', async () => {
+	const { tools, get, query, close, ctx } = setup();
+	ctx.config.limits.maxToolResultBytes = 10000;
+	get.mockResolvedValue({ query, close, target: { name: 'lab' }, identity: { isCdb: true, containerName: 'SALES' } });
+	const result = await tools.find(t => t.name === 'db_overview')!.execute('pdb', {});
+	expect(query).toHaveBeenCalledTimes(6);
+	expect(result.details.columns).toContain('CONTAINER_NAME');
+	expect(result.content[0]).toMatchObject({ text: expect.stringContaining('CDB-wide (shared by all PDBs in this CDB)') });
+	expect(close).toHaveBeenCalledOnce();
+});
+it('keeps non-CDB overview output byte-identical to legacy sessions', async ()=> {
+	const legacy=setup(),current=setup();
+	current.get.mockResolvedValue({query:current.query,close:current.close,identity:{isCdb:false,containerName:'ORCL'}});
+	const before=await legacy.tools.find(t=>t.name==='db_overview')!.execute('a',{});
+	const after=await current.tools.find(t=>t.name==='db_overview')!.execute('a',{});
+	expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+	expect(current.query.mock.calls).toEqual(legacy.query.mock.calls);
+});
+
+import { createHash } from 'node:crypto';
+it.each([true,false])('top_sql retries ORA-01031 using the disclosed V$SQL fallback (isCdb=%s)', async isCdb=> {
+	const {tools,get,query,close}=setup();
+	get.mockResolvedValue({query,close,identity:{isCdb}});
+	query.mockRejectedValueOnce(new Error('ORA-01031'));
+	const result=await tools.find(t=>t.name==='top_sql')!.execute('fallback',{});
+	expect(query).toHaveBeenCalledTimes(2);
+	expect(query.mock.calls[1]?.[0]).toContain('FROM v$sql GROUP BY sql_id');
+	expect(result.details.sourceNote).toContain('V$SQLSTATS unavailable');
+	expect(close).toHaveBeenCalledOnce();
+});
+it.each([undefined,'ORA-01031','ORA-00600'])('PDB overview audits only executed SQL hashes, including %s failures',async failure=> {
+	const {tools,get,query,close,record,ctx}=setup();
+	ctx.config.limits.maxToolResultBytes=10000;
+	get.mockResolvedValue({query,close,target:{name:'lab'},identity:{isCdb:true,containerName:'SALES'}});
+	if(failure) query.mockRejectedValueOnce(new Error(failure));
+	const run=tools.find(t=>t.name==='db_overview')!.execute('audit',{});
+	if(failure==='ORA-00600') await expect(run).rejects.toThrow(); else await run;
+	const executed=query.mock.calls.map(([sql])=>createHash('sha256').update(sql).digest('hex'));
+	const audited=record.mock.calls.map(([event])=>event.sqlSha256).filter(Boolean);
+	expect(audited).toEqual(executed);
+	if(failure!=='ORA-00600') expect(record).toHaveBeenCalledTimes(6);
 });

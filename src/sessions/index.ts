@@ -99,11 +99,12 @@ export async function readSessionActivity(session: OracleSession, options: Sessi
 				if (!page.rows.length) break;
 			}
 		}
-		catch (e) { const code = /ORA-\d{5}/.exec(String(e))?.[0]; if (!code || !['ORA-00942','ORA-01031'].includes(code)) throw e; c.status = 'unavailable'; c.attempts.push({ view: c.view, code }); }
+		catch (e) { const code = /ORA-\d{5}/.exec(String(e))?.[0]; if (!code || !['ORA-00942','ORA-01031','ORA-65040'].includes(code)) throw e; c.status = 'unavailable'; c.attempts.push({ view: c.view, code }); }
 		return c;
 	}
 	function use<T>(s: SessionSection<T>, c: Check) {
 		s.evidence = c; s.status = c.status;
+		if (c.attempts.some(a => a.code === 'ORA-65040')) s.note = 'Not available in a PDB (ORA-65040).';
 		if (c.truncated) s.note = 'Row cap reached; snapshot is incomplete.';
 	}
 	const selected = (id: SectionId) => !options.sections || options.sections.includes(id);
@@ -176,6 +177,7 @@ export async function readSessionActivity(session: OracleSession, options: Sessi
 	for (const g of result.sections.waits.rows) if (g.percent > 50) finding('wait-class-' + g.waitClass, 'info', g.waitClass, g.percent.toFixed(1) + '% of non-idle wait time since startup.', undefined, (waitAdvice[g.waitClass] ?? 'Investigate the leading events in this wait class.') + ' This figure is cumulative since startup, not current activity.');
 	const sections = Object.values(result.sections).filter(s => s.status !== 'skipped');
 	result.status = sections.every(s => s.status === 'unavailable') ? 'failed' : sections.some(s => s.status === 'unavailable' || s.evidence.truncated || s.supportingEvidence.some(e => e.truncated)) ? 'partial' : 'ok';
+	if (session.identity?.isCdb) for (const s of Object.values(result.sections)) if (s.status !== 'skipped') s.note = [s.note, 'Current PDB visibility only; instance background activity and blockers in other containers may be unavailable.'].filter(Boolean).join(' ');
 	return result;
 }
 const escape = (v: unknown): string => String(v ?? '').replace(/[&<>"|\r\n]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', '|':'&#124;', '\r':' ', '\n':' ' })[c]!);

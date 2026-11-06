@@ -69,7 +69,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 		}
 		catch (error) {
 			const code = /ORA-\d{5}/.exec(String(error))?.[0];
-			if (!code || !['ORA-00942', 'ORA-01031'].includes(code)) throw error;
+			if (!code || !['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) throw error;
 			check.status = 'unavailable'; check.attempts.push({ view, code });
 		}
 		cache.set(key, check); return check;
@@ -81,6 +81,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 		async function use(key: keyof typeof SQL, binds?: Record<string, unknown>): Promise<Check> {
 			const e = await read(key, binds); c.evidence.push(e);
 			if (e.status === 'unavailable' || e.truncated) { c.status = 'unavailable'; result.status = 'unavailable'; }
+			if (e.attempts.some(a => a.code === 'ORA-65040')) c.notes.push(`${e.view}: not available in a PDB (ORA-65040).`);
 			if (e.truncated) c.notes.push(`${e.view}: row cap reached; evidence is partial.`);
 			return e;
 		}
@@ -175,6 +176,7 @@ export async function readSecurityPosture(session: OracleSession, options: Secur
 			if (!e.rows.some(r => r[0] === 'o7_dictionary_accessibility') && e.status === 'ok') c.notes.push('O7_DICTIONARY_ACCESSIBILITY: N/A (not exposed on this Oracle 19c target).');
 		}
 	}
+	if (session.identity?.isCdb) for (const c of result.checks) c.notes.push('Current PDB grants and policies only; inherited common grants may appear. Password-file administration and instance parameters are CDB-wide where visible; absence does not establish CDB security posture.');
 	return result;
 }
 const escape = (value: unknown) => s(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]/g, ' ');
