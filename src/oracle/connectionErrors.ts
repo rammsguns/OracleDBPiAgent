@@ -32,3 +32,8 @@ export async function withConnectionFailures(action: () => Promise<void>): Promi
 		if (error) throw error;
 	});
 }
+
+/** Long-running handlers must not retain failures beyond the operation that handled them. */
+export function withoutConnectionFailures<T>(action: () => T): T {
+	return failures.exit(action);
+}

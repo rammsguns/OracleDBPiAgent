@@ -198,3 +198,24 @@ Test Files  27 passed (27)
 ```
 
 Exit 0. Both lab account/preflight checks and all d1 tests pass; the p1 report check passes on the rerun. Only the explicitly excluded local-Strata e2e is skipped. `git diff --check` passes. Implementation commit: 86ae888; this final verification report is committed separately.
+
+## Review2 interactive connection-failure lifetime fix
+
+Resolved the first Review2 Info finding. Chat/REPL execution and the web command now explicitly exit the AsyncLocalStorage connection-failure scope for the entire long-running action. Their asynchronous operations and web handlers therefore do not retain handled failures in the enclosing command record. One-shot commands continue to surface swallowed connection failures as before; immediate unhandled errors still use the normal CLI error handler.
+
+Files changed: src/cli/index.ts, src/oracle/connectionErrors.ts, tests/unit/interactive-connection-errors.test.ts (new), and this report. No shared contract changes are needed. src/preflight/views.ts and src/report/ remain untouched.
+
+The regression drives the real CLI chat loop with mocked input `/triage connection unavailable`, then `/exit`. The mocked triage operation records and throws a listener failure; the CLI prints its handled triage error exactly once, closes readline and sessions, and exits 0 with no trailing error. Additional tests cover web isolation and preservation of one-shot failure propagation. DB/LLM/health services, input and web startup are mocked; no live DB, Strata or listener calls are made in this follow-up. The requested verification is typecheck and unit tests; live integration results from the previous follow-up remain recorded above.
+
+Review2 follow-up verification:
+
+- `npm run typecheck`: exit 0, no TypeScript diagnostics.
+- `npm test -- --maxWorkers=2`:
+
+```text
+Test Files  106 passed (106)
+     Tests  1787 passed (1787)
+  Duration  69.11s
+```
+
+Exit 0, including the three new lifecycle regressions. `git diff --check` also passes. Live PDB and actual service outage behavior remain unverified; no DB or LLM query logic changed.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { connectionGuidance, withConnectionFailures, clearConnectionFailure } from '../oracle/connectionErrors.js';
+import { connectionGuidance, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
 import { renderFeatureSummary } from '../preflight/render.js';
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
@@ -71,13 +71,13 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
 	program.command("init").description("Create private local configuration").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
-	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => {
+	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => withoutConnectionFailures(async () => {
 		const port = Number(options.port);
 		if (!Number.isInteger(port) || port < 1 || port > 65535) throw new SafeConfigError("Invalid port");
 		const { createWebServer } = await import("../web/server.js");
 		const web = createWebServer({ port });
 		try { console.log(await web.listen()); } catch (error) { await web.close(); throw error; }
-	});
+	}));
 	program.command("report").description("Collect a read-only database health report").enablePositionalOptions().option("--target <target>").option("--json").option("--md").option("--sections <sections>").option("--owner <owner>").option("--summarize").option("--out <dir>").option("--diff").option("--diff-only").action(async (options: { target: string; json?: boolean; md?: boolean; sections?: string; owner?: string; summarize?: boolean; out?: string; diff?: boolean; diffOnly?: boolean }) => {
 		if (!options.target) throw new SafeConfigError("Report requires --target");
 		if (options.json && options.md) throw new SafeConfigError("Choose --json or --md");
@@ -267,7 +267,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		} finally { await sessions.closeAll(); }
 	}
 	program.command("ask <question>").description("Ask the local Strata assistant about a database").option("--target <target>").option("--json").action(run);
-	program.command("chat").description("Start an interactive local Strata conversation").option("--target <target>").action(options => run(undefined, options));
+	program.command("chat").description("Start an interactive local Strata conversation").option("--target <target>").action(options => withoutConnectionFailures(() => run(undefined, options)));
 	await withConnectionFailures(async () => { await program.parseAsync(argv); });
 }
 export function handleCliError(error: unknown): void {
