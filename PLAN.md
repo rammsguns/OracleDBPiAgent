@@ -3631,6 +3631,36 @@ turned up two eval defects:
 Then re-score the gate's p23 and p24 records with the fixed scorer, and
 report the before and after results.
 
+### WP-24G: release-smoke polish (branch `wp-24g-release-polish`)
+The coordinator ran a package smoke of 1.3.0 from the tarball, in a fresh
+prefix and home. Fix the following:
+1. **Triage embedding** (`src/triage/`): embedded sessions (and space, if
+   used) Markdown must nest under the triage heading. That means no `#` H1
+   inside triage output: headings are demoted and the duplicate title is
+   dropped. Sections that triage did not request are omitted rather than
+   shown as "Status: skipped. No rows".
+2. **Empty sections** (`src/sessions/`, `src/space/`): an empty section is a
+   single plain line, "None in this snapshot.", instead of a `<details>`
+   block. Single blank lines everywhere: the sessions waits section still
+   has a double blank line.
+3. **Command help** (`src/cli/index.ts`):
+   - the `drift` description lists `space` among the scopes;
+   - `init`, `targets`, `doctor`, `ask` and `chat` get one-line
+     descriptions.
+
+   Add a test that every command has a non-empty description and that the
+   drift description names every supported scope.
+4. **Secret-directory mismatch** (`src/config/` or the session provider's
+   config check): "PIAGENT_SECRET_DIR must match config.secretDir" becomes a
+   fixed-literal `SafeConfigError` from the WP-22C catalog, worded so it
+   names no path. The CLI then prints guidance instead of "piagent failed".
+   Audit the session provider's other config-derived throws in the same
+   way.
+
+Byte-identical guarantees still hold. Default report and triage output for
+issues without session keywords stays unchanged; update snapshots only for
+the intended changes.
+
 ### Gate
 - Single side on merged master: p24 ×2, p23 ×2, the full suites, p18 and
   p16.
