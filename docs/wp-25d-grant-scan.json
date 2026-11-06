@@ -1,5 +1,5 @@
 {
-	"scope": "All cases-hard JSON, every field; phase 26\u201327 requested views including DBA_AUTOTASK_* prefix",
+	"scope": "All evals/cases and evals/cases-hard JSON, every field; phase 26\u201327 requested views including DBA_AUTOTASK_* prefix",
 	"views": [
 		"DBA_SCHEDULER_JOB_LOG",
 		"DBA_SCHEDULER_WINDOWS",
@@ -12,6 +12,6 @@
 		"V$SESSTAT",
 		"V$STATNAME"
 	],
-	"casesScanned": 136,
+	"casesScanned": 179,
 	"hits": []
 }

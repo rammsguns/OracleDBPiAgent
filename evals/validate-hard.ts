@@ -82,9 +82,20 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const backup = cases.filter(test => test.category === 'backup');
+	if (backup.length) checkP25Cases(backup);
+
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+export function checkP25Cases(cases: EvalCase[]): void {
+	if (cases.length !== 4 || new Set(cases.map(test => test.id)).size !== 4) throw new Error('Expected four distinct p25 backup cases');
+	for (const test of cases) {
+		if (test.target !== 'd1-19c-lab' || test.category !== 'backup' || test.split !== 'challenge' || test.groundTruth?.mode !== 'rowCells') throw new Error('p25 backup cases require d1 challenge rowCells truth');
+		if (/\b(?:run_query|V\$\w+|DBA_\w+)\b/i.test(test.question ?? '')) throw new Error('p25 questions must not name tools or views');
+	}
 }
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
@@ -124,7 +135,7 @@ export async function verifyUnavailable(probe: () => Promise<unknown>): Promise<
 export async function validateHardCases(input?: EvalCase[]) {
 	const cases = input ?? await loadHardCases();
 	checkHardCases(cases);
-	const config = loadConfig();
+	const config = loadConfig({ ...process.env, PIAGENT_TARGETS_FILE: fileURLToPath(new URL('../config/targets.json', import.meta.url)) });
 	const records = [];
 	const skipped: { id: string; reason: string }[] = [];
 	const sessions = createSessionProvider(config);

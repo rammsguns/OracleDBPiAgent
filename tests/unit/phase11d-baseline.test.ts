@@ -5,7 +5,8 @@ import { score } from '../../evals/scoring.js';
 import type { AskResult, EvalCase } from '../../evals/types.js';
 const records: (AskResult & { id: string; iteration: number; baselinePass: boolean; truth: unknown[][] })[] = JSON.parse(readFileSync('tests/fixtures/phase11c-baseline-answers.json', 'utf8'));
 it('replays all 66 real 11C answers against stored truth: nine fixes, three genuine failures, no regressions', async () => {
-	const cases = await loadHardCases();
+	const previous: EvalCase[] = JSON.parse(readFileSync('tests/fixtures/wp25d-previous-premises.json', 'utf8'));
+	const cases = (await loadHardCases()).map(test => previous.find(old => old.id === test.id) ?? test);
 	cases.find(test => test.id === 'hard-p11b-partial-memory')!.expect.requiredFacts = ['SGA_TARGET', 'V\\$PARAMETER', '(unavailable|inaccessible|cannot|denied|lack|missing)'];
 	expect(records).toHaveLength(66);
 	expect(records.filter(record => record.baselinePass)).toHaveLength(54);
@@ -40,11 +41,14 @@ it('requires every accessible value and the named grant gap independently', asyn
 	for (const test of (await loadHardCases()).filter(test => test.category === 'partial-grants')) {
 		const record = records.find(record => record.id === test.id)!;
 		const truth = record.truth[0]!.slice(0, 2).map(value => [value]);
+		const gap = test.id.endsWith('partial-memory') ? 'V$SGASTAT shared pool is unavailable.' : 'V$SGA_DYNAMIC_COMPONENTS large pool is unavailable; open mode does not establish allocation.';
+		const current = { ...record, answer: truth.map(row => row.join(' | ')).join('\n') + '\n' + gap };
+		expect(score(test, current, truth).pass).toBe(true);
 		for (const row of truth) {
-			const answer = record.answer.replaceAll(new RegExp(String(row[0]), 'gi'), 'WRONG');
-			expect(score(test, { ...record, answer }, truth).pass).toBe(false);
+			const answer = current.answer.replaceAll(new RegExp(String(row[0]), 'gi'), 'WRONG');
+			expect(score(test, { ...current, answer }, truth).pass).toBe(false);
 		}
-		const answer = record.answer.replaceAll(/V\$PARAMETER|V\$RMAN_BACKUP_JOB_DETAILS/gi, 'OTHER_VIEW');
-		expect(score(test, { ...record, answer }, truth).pass).toBe(false);
+		const answer = current.answer.replaceAll(/V\$SGASTAT|V\$SGA_DYNAMIC_COMPONENTS/gi, 'OTHER_VIEW');
+		expect(score(test, { ...current, answer }, truth).pass).toBe(false);
 	}
 });

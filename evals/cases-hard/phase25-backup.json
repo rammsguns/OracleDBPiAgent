@@ -1,0 +1,84 @@
+[
+	{
+		"id": "hard-p25-d1-last-level0",
+		"target": "d1-19c-lab",
+		"category": "backup",
+		"split": "challenge",
+		"question": "On d1, report the latest recorded datafile incremental level-0 completion time, excluding control-file rows, as YYYY-MM-DD HH24:MI:SS in the session time zone. Say NONE RECORDED if there are no such rows. Distinguish a control-file record from proof that a backup is usable. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
+		"groundTruth": {
+			"sql": "SELECT NVL(TO_CHAR(MAX(completion_time), 'YYYY-MM-DD HH24:MI:SS'), 'NONE RECORDED') AS last_level_0 FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(?:not|does not|cannot|isn.t)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p25-d1-archive-gaps",
+		"target": "d1-19c-lab",
+		"category": "backup",
+		"split": "challenge",
+		"question": "On d1, count missing archived-log sequence numbers strictly between recorded sequences since the latest recorded datafile level 0 in the current resetlogs incarnation. Deduplicate destinations and count separately per thread. If there is no level-0 baseline, say NO LEVEL 0 RECORDED and NOT VERIFIABLE instead of zero gaps. State that interior continuity alone does not prove recoverability; a missing prefix, tail or backup media is not established by this count. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
+		"groundTruth": {
+			"sql": "SELECT CASE WHEN b.last_l0 IS NULL THEN 'NO LEVEL 0 RECORDED' ELSE 'RECORDED INTERIOR GAPS ONLY' END AS coverage, CASE WHEN b.last_l0 IS NULL THEN 'NOT VERIFIABLE' ELSE TO_CHAR(NVL(g.missing_sequences, 0), 'FM99999999999999999990') END AS gap_count FROM (SELECT MAX(completion_time) AS last_l0 FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0 AND resetlogs_change# = (SELECT resetlogs_change# FROM v$database)) b CROSS JOIN (SELECT SUM(GREATEST(sequence# - previous_sequence - 1, 0)) AS missing_sequences FROM (SELECT thread#, sequence#, LAG(sequence#) OVER (PARTITION BY thread# ORDER BY sequence#) AS previous_sequence FROM (SELECT DISTINCT a.thread#, a.sequence# FROM v$archived_log a CROSS JOIN v$database d WHERE a.resetlogs_change# = d.resetlogs_change# AND a.archived = 'YES' AND a.next_time > (SELECT MAX(completion_time) FROM v$backup_datafile WHERE incremental_level = 0 AND file# > 0 AND resetlogs_change# = (SELECT resetlogs_change# FROM v$database))))) g",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(?:not|does not|cannot)[^.\\n]{0,90}(?:prov|guarantee|establish|verif)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p25-d1-retention-setting",
+		"target": "d1-19c-lab",
+		"category": "backup",
+		"split": "challenge",
+		"question": "On d1, report the explicitly stored RMAN RETENTION POLICY setting. If there is no stored override, return NOT EXPLICITLY CONFIGURED. Also give the policy implied by the stored override, or the documented Oracle 19c default when there is no override. Distinguish that default from an explicit setting and from proof that backup files exist. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
+		"groundTruth": {
+			"sql": "SELECT 'RETENTION POLICY' AS setting_name, NVL(MAX(value), 'NOT EXPLICITLY CONFIGURED') AS stored_setting, NVL(MAX(value), 'REDUNDANCY 1') AS policy FROM v$rman_configuration WHERE name = 'RETENTION POLICY'",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p25-d1-no-backups-recorded",
+		"target": "d1-19c-lab",
+		"category": "backup",
+		"split": "challenge",
+		"question": "On d1, report the total row counts for RMAN job history, datafile backups, backup sets and backup pieces together, in that order. If all four are zero, say NO BACKUPS RECORDED in the readable control-file history, without claiming that no backups exist anywhere or that restoration is impossible. If any source cannot be read, say not verifiable from this database rather than inferring absence. Explain that control-file history alone cannot establish external media availability. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
+		"groundTruth": {
+			"sql": "SELECT CASE WHEN j.job_count = 0 AND f.file_count = 0 AND s.set_count = 0 AND p.piece_count = 0 THEN 'NO BACKUPS RECORDED' ELSE 'BACKUP RECORDS PRESENT' END AS record_state, j.job_count AS rman_job_count, f.file_count AS datafile_backup_count, s.set_count AS backup_set_count, p.piece_count AS backup_piece_count FROM (SELECT COUNT(*) AS job_count FROM v$rman_backup_job_details) j CROSS JOIN (SELECT COUNT(*) AS file_count FROM v$backup_datafile) f CROSS JOIN (SELECT COUNT(*) AS set_count FROM v$backup_set) s CROSS JOIN (SELECT COUNT(*) AS piece_count FROM v$backup_piece) p",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"(?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]

@@ -139,3 +139,12 @@ GRANT SELECT ON SYS.V_$WAIT_CHAINS TO &ro_user CONTAINER=CURRENT;
 -- No EXECUTE, write, ANY privilege, grant option, or role grant is included.
 -- SELECT_CATALOG_ROLE is a broader alternative discussed in docs/real-targets.md;
 -- it is deliberately not executable here because it exceeds this view inventory.
+
+-- Phase 25 backup evidence, CDB-wide; PDB visibility may be limited.
+GRANT SELECT ON SYS.V_$BACKUP_SET TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$BACKUP_PIECE TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$BACKUP_DATAFILE TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$CONTROLFILE TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$RMAN_CONFIGURATION TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$DATABASE_BLOCK_CORRUPTION TO &ro_user CONTAINER=CURRENT;
+GRANT SELECT ON SYS.V_$RECOVER_FILE TO &ro_user CONTAINER=CURRENT;

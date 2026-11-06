@@ -1,0 +1,93 @@
+{
+	"target": "d1-19c-lab",
+	"validatedAt": "2026-11-06T20:57:53.274Z",
+	"scope": "CDB-wide (shared by all PDBs)",
+	"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
+	"views": [
+		{
+			"view": "V$RMAN_BACKUP_JOB_DETAILS",
+			"status": "readable"
+		},
+		{
+			"view": "V$BACKUP_SET",
+			"status": "readable"
+		},
+		{
+			"view": "V$BACKUP_PIECE",
+			"status": "readable"
+		},
+		{
+			"view": "V$BACKUP_DATAFILE",
+			"status": "readable"
+		},
+		{
+			"view": "V$ARCHIVED_LOG",
+			"status": "readable"
+		},
+		{
+			"view": "V$LOG_HISTORY",
+			"status": "readable"
+		},
+		{
+			"view": "V$CONTROLFILE",
+			"status": "readable"
+		},
+		{
+			"view": "V$RMAN_CONFIGURATION",
+			"status": "readable"
+		},
+		{
+			"view": "V$DATABASE_BLOCK_CORRUPTION",
+			"status": "readable"
+		},
+		{
+			"view": "V$RECOVER_FILE",
+			"status": "readable"
+		}
+	],
+	"records": [
+		{
+			"id": "hard-p25-d1-last-level0",
+			"status": "readable",
+			"rows": [
+				[
+					"NONE RECORDED"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-archive-gaps",
+			"status": "readable",
+			"rows": [
+				[
+					"NO LEVEL 0 RECORDED",
+					"NOT VERIFIABLE"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-retention-setting",
+			"status": "readable",
+			"rows": [
+				[
+					"RETENTION POLICY",
+					"NOT EXPLICITLY CONFIGURED",
+					"REDUNDANCY 1"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-d1-no-backups-recorded",
+			"status": "readable",
+			"rows": [
+				[
+					"NO BACKUPS RECORDED",
+					0,
+					0,
+					0,
+					0
+				]
+			]
+		}
+	]
+}

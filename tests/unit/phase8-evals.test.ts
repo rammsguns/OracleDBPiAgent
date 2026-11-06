@@ -13,7 +13,7 @@ it('requires dev and fresh holdout in all categories, ignoring regression in the
 	const fresh = cases.filter(test => test.id.startsWith('hard-p8-'));
 	expect(fresh).toHaveLength(12);
 	expect(new Set(fresh.map(test => test.category)).size).toBe(11);
-	expect(fresh.every(test => test.split === 'holdout')).toBe(true);
+	expect(fresh.every(test => test.split === (test.id === 'hard-p8-archive-access' ? 'dev' : 'holdout'))).toBe(true);
 	const withoutRegression = cases.filter(test => test.split !== 'regression');
 	expect(() => checkHardCases(withoutRegression)).toThrow('Every category'); // Missing remaining backup prerequisite coverage.
 	const extraRegression = cases.filter(test => test.split === 'regression').map(test => ({ ...test, id: test.id + '-duplicate-regression' }));
@@ -28,7 +28,7 @@ it('requires dev and fresh holdout in all categories, ignoring regression in the
 
 it('retains old case counts in dev and regression', async () => {
 	// Keep the pre-Phase-8 population separate from both later additions.
-	const cases = (await loadHardCases()).filter(test => !test.id.startsWith('hard-p8-') && !test.id.startsWith('hard-p21-') && test.split !== 'challenge');
+	const cases = (await loadHardCases()).filter(test => !test.id.startsWith('hard-p8-') && !test.id.startsWith('hard-p21-') && !test.id.startsWith('hard-p25-') && test.split !== 'challenge');
 	expect(cases).toHaveLength(49);
 	expect(cases.filter(test => test.split === 'regression')).toHaveLength(21);
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(0);
@@ -40,7 +40,7 @@ it('pins fresh precision, units and exact dictionary spelling', async () => {
 		['line-extension', [['3668054.70']]],
 		['jobs-decimal-mb', [['0.065536']]],
 		['description-language', [['LANGUAGE_ID', 'VARCHAR2', 3]]],
-		['archive-access', [['V$ARCHIVED_LOG', 'unavailable'], ['V$LOG_HISTORY', 'unavailable']]],
+		['archive-access', [['V$SGASTAT', 'unavailable'], ['V$SGA_DYNAMIC_COMPONENTS', 'unavailable']]],
 	] as [string, unknown[][]][]) {
 		const test = cases.find(test => test.id === `hard-p8-${id}`)!;
 		expect(() => checkPinnedFacts(test, rows)).not.toThrow();

@@ -1,5 +1,18 @@
 import { reportQueries } from '../report/queries.js';
 export const FEATURE_VIEWS: Record<string, readonly string[]> = {
+	"backup": [
+		"V$DATABASE",
+		"V$RMAN_BACKUP_JOB_DETAILS",
+		"V$BACKUP_SET",
+		"V$BACKUP_PIECE",
+		"V$BACKUP_DATAFILE",
+		"V$ARCHIVED_LOG",
+		"V$LOG_HISTORY",
+		"V$CONTROLFILE",
+		"V$RMAN_CONFIGURATION",
+		"V$DATABASE_BLOCK_CORRUPTION",
+		"V$RECOVER_FILE",
+	],
 	"report": [
 		"PRODUCT_COMPONENT_VERSION",
 		"DBA_TAB_STATISTICS",
