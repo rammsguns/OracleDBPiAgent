@@ -3584,6 +3584,28 @@ Rules:
   showing zero flips elsewhere.
 - The worker does not run the agent.
 
+### WP-24E: space and sessions output polish (branch `wp-24e-space-polish`)
+Owns rendering and findings in `src/space/` and the one-line fix in
+`src/sessions/`, plus tests and docs. Exported types and signatures stay
+unchanged.
+
+The coordinator's live smoke on p1 and the WP-23F review found:
+1. **Blank lines.** Each section heading in `space` Markdown is followed by
+   a double blank line. Use one.
+2. **Recovery area.** The note "no recovery area configured" is followed by
+   a redundant "No rows" `<details>` block. When a section has a note and no
+   rows, show the note only. Apply this to every section.
+3. **Archive log mode.** `V$DATABASE.LOG_MODE` (readable on both targets;
+   verify) appears in the Redo section. It carries:
+   - an info finding when the database is in NOARCHIVELOG mode: online
+     redo is not archived, so point-in-time recovery is not possible;
+   - a high finding when the database is in ARCHIVELOG mode with no
+     recovery area and no `log_archive_dest_n` set.
+
+   The JSON gains an additive field, `redo.logMode`.
+4. **Sessions trailing space.** `Status: skipped. ` ends with a trailing
+   space when there is no note (WP-23F review minor).
+
 ### Gate
 - Single side on merged master: p24 ×2, p23 ×2, the full suites, p18 and
   p16.
