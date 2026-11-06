@@ -131,7 +131,7 @@ export function renderSpaceMarkdown(r:SpaceReport):string {
 		if(s.status==='unavailable') lines.push('Unavailable. '+escape(s.note));else if(s.note) lines.push(escape(s.note));
 		if(!s.rows.length&&s.note) continue;
 		if(id==='redo'&&r.sections.redo.logMode) lines.push('Log mode: '+escape(r.sections.redo.logMode)+'.','');
-		if(!s.rows.length) {lines.push('<details><summary>No rows</summary>','','No rows in this snapshot.','','</details>');continue;}
+		if(!s.rows.length) {lines.push('None in this snapshot.');continue;}
 		if(id==='tablespaces') {
 			table(r.sections.tablespaces.rows.map(t=>({name:t.name,allocatedBytes:t.allocatedBytes,usedBytes:t.usedBytes,maxBytes:t.maxBytes,usedPercentAllocated:t.usedPercentAllocated,usedPercentMax:t.usedPercentMax,headroomBytes:t.headroomBytes})));
 			lines.push('','<details><summary>Tablespace configuration and files</summary>','');
@@ -141,5 +141,5 @@ export function renderSpaceMarkdown(r:SpaceReport):string {
 			for(const kind of kinds) {if(kind) {if(lines.at(-1)!=='') lines.push('');lines.push('**'+escape(kind)+'**','');}table(rows.filter(x=>x.kind===kind).map(({kind:_,...rest})=>rest));}
 		}
 	}
-	return lines.join('\n')+'\n';
+	return lines.join('\n').replace(/\n{3,}/g, '\n\n')+'\n';
 }

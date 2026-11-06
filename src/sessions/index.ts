@@ -188,7 +188,7 @@ export function renderSessionsMarkdown(a: SessionActivity): string {
 		lines.push('', '## ' + title, '');
 		if (s.status !== 'ok') lines.push('Status: ' + s.status + '.' + (s.note ? ' ' + escape(s.note) : ''));
 		else if (s.note) lines.push(escape(s.note));
-		if (!s.rows.length) { lines.push('<details><summary>No rows</summary>', '', 'No rows in this snapshot.', '', '</details>'); continue; }
+		if (!s.rows.length) { lines.push('None in this snapshot.'); continue; }
 		if (id === 'blocking') {
 			const walk = (nodes: BlockingNode[], depth: number) => { for (const n of nodes) { lines.push('  '.repeat(depth) + '- SID ' + n.sid + (n.vanished ? ' (vanished blocker)' : ' ' + escape(n.session?.username) + ' SQL_ID=' + escape(n.session?.sqlId) + ' ' + escape(n.session?.object) + ' ' + escape(n.session?.lockType) + ' ' + escape(n.session?.lockMode) + ' ' + escape(n.session?.event) + (n.session?.sqlId ? ' — Run piagent sql --target ' + escape(a.target) + ' --sql-id ' + escape(n.session.sqlId) : '')) + (n.cycle ? ' [DEADLOCK CYCLE]' : '') + (n.depthLimited ? ' [depth limit 10]' : '')); walk(n.children, depth+1); } }; walk(a.sections.blocking.rows, 0);
 		} else if (id === 'waits') {
@@ -202,5 +202,5 @@ export function renderSessionsMarkdown(a: SessionActivity): string {
 		}
 		if (s.evidence.truncated || s.supportingEvidence.some(e => e.truncated)) lines.push('', 'Row cap reached; evidence is partial.');
 	}
-	return lines.join('\n') + '\n';
+	return lines.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
 }

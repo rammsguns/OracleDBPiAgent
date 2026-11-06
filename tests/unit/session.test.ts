@@ -57,3 +57,23 @@ it('sets UTC once on each new session before any tool query', async () => {
 	}
 	await provider.closeAll();
 });
+
+it('uses safe guidance for invalid config-derived query limits before executing SQL', async () => {
+	const { c } = connection();
+	const provider = createSessionProvider({ ...config, limits: { ...config.limits, maxRows: 0 } });
+	const session = await provider.get();
+	const before = c.execute.mock.calls.length;
+	await expect(session.query('SELECT 1 FROM dual')).rejects.toMatchObject({ name: 'SafeConfigError', message: 'Invalid query limits' });
+	expect(c.execute).toHaveBeenCalledTimes(before);
+	await provider.closeAll();
+});
+
+it('uses safe guidance when the secret directory is unset before reading secrets', async () => {
+	delete process.env.PIAGENT_SECRET_DIR;
+	await expect(createSessionProvider(config).get()).rejects.toMatchObject({
+		name: 'SafeConfigError',
+		message: 'Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.',
+	});
+	expect(mocks.read).not.toHaveBeenCalled();
+	expect(mocks.connect).not.toHaveBeenCalled();
+});
