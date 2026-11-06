@@ -21,7 +21,7 @@ Options:
 | --- | --- |
 | `--target T` | Required approved target |
 | `--section a,b` | Any of active, blocking, waits, timeModel, transactions; default all |
-| `--all` | Include background sessions; otherwise user sessions only |
+| `--all` | Include background and Idle-waiting active sessions; blockers always included |
 | `--min-tx-seconds N` | Integer 0–86400, default 300 |
 | `--top N` | Top N events across all non-idle classes, 1–50, default 10 |
 | `--json` / `--markdown` | Mutually exclusive formats |
@@ -43,8 +43,11 @@ still show their aggregate. Time-model seconds include DB time, DB CPU,
 background elapsed time and background CPU time.
 
 Active rows exclude the reader's SID and use SQL_ID, falling back to PREV_SQL_ID.
-The blocking snapshot also reads inactive sessions, so an idle-in-transaction
-blocker remains visible. Wait chains are queried first; missing access falls back
+By default, active rows must have STATUS ACTIVE and a non-Idle wait class.
+`--all` also includes Idle waits and background sessions. Blockers remain in the
+active table regardless of status, type or wait class, including when only the
+active section is requested. The blocking snapshot also reads inactive sessions,
+so an idle-in-transaction blocker remains visible. Wait chains are queried first; missing access falls back
 to V$SESSION blocking and final-blocking pointers. Object names fall back from
 DBA_OBJECTS to ALL_OBJECTS. TX, TM and UL locks and modes 0–6 have readable names;
 other lock types retain their Oracle code.
@@ -105,3 +108,67 @@ The integration tests independently verify the structure and all five section
 statuses on each target. Blocking chains, cycles, vanished blockers, idle
 transactions and missing grants are tested with unit fixtures; no workload or
 locks were created.
+
+## WP-23F live smokes — 2026-11-06 UTC
+
+Re-ran Markdown and JSON commands on both approved targets using the secret
+directory above. All commands exited 0. JSON snapshots had every section ok,
+no truncated evidence, no blockers and no long transactions.
+
+| Target | JSON captured at UTC | Active rows | Wait classes | Time-model rows |
+| --- | --- | --- | --- | --- |
+| d1-19c-lab | 2026-11-06T06:24:14.679Z | 0 | 9 | 4 |
+| p1-19c-prod | 2026-11-06T06:24:17.734Z | 0 | 9 | 4 |
+
+A p1 `--all --section active --json` smoke exited 0 at
+2026-11-06T06:24:20.278Z: 86 active rows, all waiting in Idle. Other sections
+were skipped. No LLM was called and no workload, locks or transactions were created.
+
+Markdown excerpts from final smokes follow. Activity can change between reads.
+
+```markdown
+# Sessions — d1-19c-lab
+
+Captured at 2026-11-06T06:25:28.719Z (UTC). Status: ok.
+
+Snapshot is a short sequence of queries, not one consistent read. Sessions may vanish between queries.
+
+## Findings
+
+- **info: System I/O** — 61.2% of non-idle wait time since startup. For a human DBA: Investigate redo/control file and DBWR storage latency. This figure is cumulative since startup, not current activity.
+
+## Active sessions
+
+<details><summary>No rows</summary>
+
+No rows in this snapshot.
+
+</details>
+```
+
+```markdown
+# Sessions — p1-19c-prod
+
+Captured at 2026-11-06T06:25:31.456Z (UTC). Status: ok.
+
+Snapshot is a short sequence of queries, not one consistent read. Sessions may vanish between queries.
+
+## Findings
+
+- **info: System I/O** — 67.8% of non-idle wait time since startup. For a human DBA: Investigate redo/control file and DBWR storage latency. This figure is cumulative since startup, not current activity.
+
+## Active sessions
+
+
+| SID | User | Status | SQL_ID | Event | Wait class | Seconds in wait |
+| --- | --- | --- | --- | --- | --- | --- |
+| 227 | HARNESS_RO | ACTIVE | c4mrqh3jtn0ns | PGA memory operation | Other | 0 |
+```
+
+The active table selects at most eight columns: SID, user, status, SQL_ID, event,
+wait class, seconds in wait and blocker. Columns empty in every row are hidden;
+zero remains a value. The ROW_WAIT_OBJ# sentinel -1 renders blank, and JSON retains
+all fields and the original sentinel. Ok section headers omit their status line;
+notes remain visible, as do unavailable/skipped statuses. Findings now have advice
+specific to their kind; dominant-wait advice is class-specific and explicitly
+cumulative since startup.

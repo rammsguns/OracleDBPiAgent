@@ -35,7 +35,7 @@ it('finds idle-in-transaction, long wait and transaction, and links SQL IDs', as
 	const a = await readSessionActivity(fixture({ active:[raw(b),raw(row(2,1))], transactions:[[1,'U',b.sqlId,'2026-11-05T00:00:00Z',601,2,4]] }));
 	expect(a.findings.map(f => f.id)).toEqual(expect.arrayContaining(['idle-in-transaction-1','blocking-over-60-1','long-transaction-1']));
 	for (const f of a.findings) expect(f.advice).toContain('piagent sql --target fixture --sql-id ' + b.sqlId);
-	expect(a.sections.active.rows.map(r => r.sid)).toEqual([2]);
+	expect(a.sections.active.rows.map(r => r.sid)).toEqual([1,2]);
 	expect(renderSessionsMarkdown(a)).toContain('not one consistent read');
 });
 it('finds cycles and tolerates vanished blockers', async () => {
@@ -120,4 +120,50 @@ it('preserves the final root across a vanished intermediate blocker', async () =
 	expect(tree[0]?.children[0]?.children[0]?.sid).toBe(3);
 	const a = await readSessionActivity(fixture({ active:[raw({ ...row(1),status:'INACTIVE' }),raw(waiter)] }));
 	expect(a.findings.some(f => f.id === 'idle-in-transaction-1')).toBe(true);
+});
+it('hides Idle waits by default, includes them with all, and always keeps blockers', async () => {
+	const rows = [raw({ ...row(1), waitClass:'Idle', event:'jobq slave wait' }), raw({ ...row(2), waitClass:'Idle', event:'SQL*Net message from client', status:'INACTIVE', type:'BACKGROUND' }), raw(row(3))];
+	const data = { active:rows, chains:[[3,2]] };
+	const a = await readSessionActivity(fixture(data), { sections:['active'] });
+	expect(a.sections.active.rows.map(r => r.sid)).toEqual([2,3]);
+	const all = await readSessionActivity(fixture(data), { includeBackground:true });
+	expect(all.sections.active.rows.map(r => r.sid)).toEqual([1,2,3]);
+});
+it('renders eight active columns at most, hiding empty columns while preserving JSON fields', async () => {
+	const a = await readSessionActivity(fixture({ active:[raw({ ...row(1), sqlId:'', objectId:-1 }), raw({ ...row(2), sqlId:'', objectId:42 })] }));
+	const md = renderSessionsMarkdown(a).split('## Active sessions')[1]!.split('## Blocking tree')[0]!;
+	expect(md).toContain('| SID | User | Status | Event | Wait class | Seconds in wait |');
+	expect(md).not.toContain('SQL_ID'); expect(md).not.toContain('Blocker'); expect(md).not.toContain('-1');
+	expect(a.sections.active.rows[0]).toMatchObject({ objectId:-1, sqlId:'', serial:1, osuser:'' });
+
+});
+it('omits ok section status, retains notes and shows unavailable and skipped status', async () => {
+	const a = await readSessionActivity(fixture({}, ['waits']), { sections:['active','waits'] });
+	a.sections.active.note = 'Snapshot note.';
+	const md = renderSessionsMarkdown(a);
+	expect(md).not.toContain('\nStatus: ok.'); expect(md).toContain('Snapshot note.');
+	expect(md).toContain('Status: unavailable.'); expect(md).toContain('Status: skipped.');
+});
+it.each([
+	['System I/O','redo/control file and DBWR storage latency'],
+	['User I/O','top SQL by physical reads via piagent sql'],
+	['Concurrency','library cache or latch contention and hard parsing'],
+	['Other','leading events in this wait class'],
+])('gives fitting cumulative advice for %s', async (waitClass, advice) => {
+	const a = await readSessionActivity(fixture({ waits:[['event',waitClass,1,1000000]] }));
+	expect(a.findings[0]?.advice).toContain(advice);
+	expect(a.findings[0]?.advice).toContain('cumulative since startup');
+});
+it('uses distinct advice for prolonged blocking, idle transactions, long transactions and cycles', async () => {
+	const a = await readSessionActivity(fixture({ active:[raw({ ...row(1,2),status:'INACTIVE' }),raw(row(2,1))], transactions:[[1,'U','abc1234567890','',601,2,4]] }));
+	for (const [prefix, text] of [['blocking-over','prolonged lock hold'],['idle-in','commit or rollback handling'],['long-transaction','undo consumption'],['deadlock','lock acquisition order']]) {
+		expect(a.findings.find(f => f.id.startsWith(prefix!))?.advice).toContain(text);
+	}
+});
+
+it('renders the -1 row-wait object sentinel blank in blocking details', async () => {
+	const a = await readSessionActivity(fixture({ active:[raw(row(1)),raw({ ...row(2,1),objectId:-1 })] }));
+	expect(a.sections.blocking.rows[0]?.children[0]?.session?.object).toBe('');
+	expect(renderSessionsMarkdown(a).split('## Blocking tree')[1]!.split('## Waits')[0]).not.toContain('-1');
+	expect(a.sections.active.rows[1]?.objectId).toBe(-1);
 });
