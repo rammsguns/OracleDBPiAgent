@@ -112,3 +112,45 @@ Test Files  27 passed (27)
 ```
 
 Exit 0. All d1 tests pass again, including account/preflight checks; both labs pass. The only skipped test is the explicitly excluded local-Strata e2e. These results supersede the initial FLASHBACK blocker and failed integration run documented above. `git diff --check` passes.
+
+## Approved review follow-up
+
+Addressed all four minor/info findings from the approved review at ../review-wp-28a-real-targets/docs/review-wp-28a-real-targets.md:
+
+1. CON_NAME is compared case-insensitively with CDB$ROOT, independently of the existing CON_ID=1 refusal. Regression cases cover lowercase and mixed-case names with non-root IDs.
+2. Non-JSON `targets check` failure text now goes to stderr and retains exit 1. JSON failure output remains a single object on stdout with exit 1. CLI tests verify the streams, status and cleanup.
+3. Username denial uppercases and strips one leading C## before matching the fixed deny list. Tests cover every denied name with upper/lowercase common-user prefixes at load time; connect tests prove C##SYS and c##system are refused before password reads or connections. Existing C##READER acceptance remains covered.
+4. Doctor's report callback now identifies AccountCheckError as `target: account check`, rather than `target: connection`. The regression verifies the callback, continued checks of the next target and provider cleanup.
+
+Files changed: src/oracle/account.ts, src/config/targets.ts, src/cli/index.ts; tests/unit/real-targets.test.ts, session.test.ts, doctor.test.ts; this report. No contract changes or dependencies are needed. No database state or grants changed, and no LLM/Strata calls were made. Live PDB behavior remains unverified; root variants use unit fakes under the lab-only connection rule.
+
+Review follow-up verification:
+
+`npm run typecheck`:
+
+```text
+> oracledb-pi-agent@1.3.0 typecheck
+> tsc -p tsconfig.json --noEmit
+```
+
+Exit 0, no diagnostics.
+
+`npm test -- --maxWorkers=2`:
+
+```text
+Test Files  104 passed (104)
+     Tests  1752 passed (1752)
+  Duration  67.60s
+```
+
+Exit 0. All 29 new regression cases pass.
+
+`PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`:
+
+```text
+Test Files  27 passed (27)
+     Tests  63 passed | 1 skipped (64)
+  Duration  205.18s
+```
+
+Exit 0. Both approved labs pass account/preflight checks and all d1 tests pass. The only skipped test remains the explicitly excluded local-Strata e2e. `git diff --check` also passes. All four requested review findings are resolved; no new verification limitations beyond the live-PDB restriction noted above.

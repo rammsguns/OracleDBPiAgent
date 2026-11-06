@@ -32,7 +32,7 @@ it.each(['CREATE TABLE','DBA','UPDATE ANY TABLE','EXECUTE ANY PROCEDURE','UNKNOW
 it.each(['SELECT','READ','EXECUTE','FLASHBACK'])('permits safe object privilege %s',async privilege=>{await expect(checkAccount(account(undefined,[],[[privilege,'SYS','Y']]),'READER',{})).resolves.toBeUndefined();});
 it.each([['EXECUTE','APP','N'],['EXECUTE','UNKNOWN',null],['FLASHBACK','APP','N'],['FLASHBACK','UNKNOWN',null],['REFERENCES','APP','N'],['INSERT','SYS','Y'],['UPDATE','APP','N'],['DELETE','APP','N'],['ALTER','SYS','Y']])('refuses object privilege %s',async (...row)=>{await expect(checkAccount(account(undefined,[],[row]),'READER',{})).rejects.toThrow(String(row[0]));});
 it.each([['OTHER','FALSE',null,'3','PDB'],['READER','TRUE',null,'3','PDB'],['READER','FALSE','PROXY','3','PDB']])('refuses identity %j',async(...identity)=>{await expect(checkAccount(account(identity),'READER',{})).rejects.toThrow('Account check failed');});
-it.each([['1','ROOT'],['3','CDB$ROOT']])('refuses root %s',async(id,name)=>{await expect(checkAccount(account(['READER','FALSE',null,id,name]),'READER',{})).rejects.toThrow('PDB service');});
+it.each([['1','ROOT'],['3','CDB$ROOT'],['0','cdb$root'],['3','CdB$RoOt']])('refuses root %s',async(id,name)=>{await expect(checkAccount(account(['READER','FALSE',null,id,name]),'READER',{})).rejects.toThrow('PDB service');});
 it.each([0,1,2])('fails closed at query %s',async n=>{const c=account();c.execute.mockReset();c.execute.mockImplementation(async()=>{if(n--===0)throw new Error('private details');return {rows:[['READER','FALSE',null,'0','DB']]};});await expect(checkAccount(c,'READER',{})).rejects.toThrow('connection refused');});
 it('uses direct and enabled role sources with Oracle ownership',async()=>{const c=account();await checkAccount(c,'READER',{});const sql=c.execute.mock.calls.map(c=>c[0]).join(' ');expect(sql).toContain('user_tab_privs');expect(sql).toContain('role_tab_privs');expect(sql).toContain('session_roles');expect(sql).toContain('oracle_maintained');});
 it('preflight probes bounded SELECTs and emits only missing grants',async()=>{const close=vi.fn();const query=vi.fn(async(sql:string)=>{expect(sql).toMatch(/^SELECT 1 FROM [A-Z0-9_$]+ WHERE ROWNUM = 0$/);if(sql.includes('DBA_USERS'))throw new Error('ORA-00942');return {} as any;});const result=await checkTarget({get:async()=>({target,identity:{isCdb:true},query,close}) as any,closeAll:async()=>{}} as any,'real-db');expect(result.grantsSql).toContain('GRANT SELECT ON SYS.DBA_USERS TO "READER";');expect(result.views.some(v=>v.status==='not-applicable')).toBe(true);expect(close).toHaveBeenCalledOnce();});
@@ -71,4 +71,13 @@ it.each([
 	['READER','FALSE'],['READER','FALSE',null,null,'DB'],['READER','FALSE',null,'unknown','DB'],['READER','FALSE',null,'0',null],
 ])('fails closed for incomplete container identity %j',async(...identity)=>{
 	await expect(checkAccount(account(identity),'READER',{})).rejects.toThrow();
+});
+
+it.each([...DENIED_USERS])('denies C##-prefixed %s at load time in either case', username => {
+	const f=fixture();
+	for(const common of [`C##${username}`, `c##${username.toLowerCase()}`]) {
+		expect(() => validateTarget({...target,username:common})).toThrow();
+		writeFileSync(f.file,JSON.stringify({version:1,targets:[{...target,username:common}]}));
+		expect(() => loadTargets(f.env)).toThrow();
+	}
 });

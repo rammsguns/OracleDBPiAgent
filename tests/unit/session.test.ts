@@ -88,3 +88,9 @@ it.each(['privilege','root','query'])('closes on account-check failure before se
 	await expect(createSessionProvider(config).get()).rejects.toThrow();
 	expect(c.close).toHaveBeenCalledOnce();expect(c.execute.mock.calls.some(call=>String(call[0]).startsWith('ALTER SESSION'))).toBe(false);
 });
+
+it.each(['C##SYS','c##system'])('denies common administrative user %s before reading secrets',async username=>{
+	const changed={...config,targets:config.targets.map(t=>({...t,username}))};
+	await expect(createSessionProvider(changed).get()).rejects.toThrow();
+	expect(mocks.read).not.toHaveBeenCalled();expect(mocks.connect).not.toHaveBeenCalled();
+});

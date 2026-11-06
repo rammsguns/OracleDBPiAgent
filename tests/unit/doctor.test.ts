@@ -1,3 +1,4 @@
+import { AccountCheckError } from "../../src/oracle/account.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { doctor, main, type DoctorDependencies } from "../../src/cli/index.js";
 import { loadConfig } from "../../src/config/index.js";
@@ -58,4 +59,34 @@ it("redacts unexpected object privileges", async () => {
 	expect(await doctor(config, test.dependencies)).toBe(false);
 	expect(test.output()).toContain("view code dependencies check failed");
 	expect(test.output()).not.toContain(sensitive);
+});
+
+it('names account-check refusals in the doctor report callback and continues to other targets',async()=>{
+	const test=setup();const report=vi.fn();
+	const healthyGet=test.get.getMockImplementation()!;
+	test.get.mockImplementation(async name=>{
+		if(name==='d1-19c-lab') throw new AccountCheckError('Account check failed: CREATE TABLE');
+		return healthyGet(name);
+	});
+	expect(await doctor(config,{...test.dependencies,report})).toBe(false);
+	expect(report).toHaveBeenCalledWith('d1-19c-lab: account check',false);
+	expect(report).not.toHaveBeenCalledWith('d1-19c-lab: connection',false);
+	expect(report).toHaveBeenCalledWith('p1-19c-prod',true);
+	expect(test.closeAll).toHaveBeenCalledOnce();
+});
+it.each([false,true])('routes targets check failure output correctly with json=%s',async json=>{
+	const log=vi.spyOn(console,'log').mockImplementation(()=>{});
+	const error=vi.spyOn(console,'error').mockImplementation(()=>{});
+	const closeAll=vi.fn(async()=>{});
+	const message='Account check failed: CREATE TABLE';
+	await main(['node','piagent','targets','check','--target','d1-19c-lab',...(json?['--json']:[])],{
+		createSessions:()=>({get:async()=>{throw new AccountCheckError(message);},closeAll}),
+	});
+	expect(process.exitCode).toBe(1);expect(closeAll).toHaveBeenCalledOnce();
+	if(json){
+		expect(error).not.toHaveBeenCalled();expect(log).toHaveBeenCalledOnce();
+		expect(JSON.parse(String(log.mock.calls[0]![0]))).toEqual({target:'d1-19c-lab',accountCheck:'failed',error:message});
+	}else{
+		expect(log).not.toHaveBeenCalled();expect(error).toHaveBeenCalledExactlyOnceWith(message);
+	}
 });

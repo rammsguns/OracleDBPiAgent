@@ -53,6 +53,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 			} catch (error) {
 				ok = false;
 				if (error instanceof UnsupportedVersionError) check = "19c gate";
+				if (error instanceof AccountCheckError) check = "account check";
 				if (report) report(`${target.name}: ${check}`, false); else console.error(`${target.name}: ${error instanceof AccountCheckError ? error.message : `${check} check failed`}`);
 			}
 		}
@@ -197,7 +198,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			}
 		} catch (error) {
 			const message = error instanceof AccountCheckError ? error.message : 'Target check failed; check local configuration and service availability';
-			console.log(options.json ? JSON.stringify({ target: options.target, accountCheck: 'failed', error: message }) : message);
+			if (options.json) console.log(JSON.stringify({ target: options.target, accountCheck: 'failed', error: message }));
+			else console.error(message);
 			process.exitCode = 1;
 		} finally { await sessions.closeAll(); }
 	});
