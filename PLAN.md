@@ -3345,6 +3345,33 @@ Rules:
   zero flips elsewhere.
 - The worker does not run the agent; the coordinator measures in the gate.
 
+### WP-23F: sessions output polish (branch `wp-23f-sessions-polish`)
+Owns `src/sessions/` rendering, findings advice and filters, plus tests and
+`docs/sessions.md`. The exported types and function signatures stay
+unchanged, because WP-23B and WP-23C code against them.
+
+The coordinator's live smoke on p1 found four problems:
+1. **Advice.** The wait-class finding reused the blocker advice ("inspect the
+   session and application transaction owner"). Each finding kind needs its
+   own fitting advice. A dominant wait class gets class-specific prose, for
+   example:
+   - System I/O: redo/control file and DBWR storage latency;
+   - User I/O: top SQL by physical reads via `piagent sql`;
+   - Concurrency: library cache or latch contention, hard parsing.
+
+   It must also state that the figure is cumulative since startup.
+2. **Idle sessions.** Sessions whose current wait class is Idle, such as
+   `jobq slave wait` and `SQL*Net message from client`, are excluded from
+   *active* by default even when STATUS is ACTIVE. `--all` includes them.
+   This filter must not drop a blocker: a session that blocks someone is
+   always shown.
+3. **Table width.** The default Markdown table shows about 8 columns: SID,
+   user, status, SQL_ID, event, wait class, seconds in wait and blocker.
+   Hide columns that are empty in every row. `ROW_WAIT_OBJ# = -1` renders
+   blank. JSON keeps every field.
+4. **Section headers.** Drop the "Status: ok." line for ok sections. Show the
+   status only when a section is unavailable or skipped, with its note.
+
 ### Gate
 - If no agent prompt changes: single side on merged master, with p23 ×2,
   the full suites (dev, holdout ×3, regression, MVP), p18 and p16.
