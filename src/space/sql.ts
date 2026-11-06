@@ -1,0 +1,15 @@
+export const SQL = {
+	tablespaces: 'SELECT t.tablespace_name,t.contents,t.bigfile,f.file_name,f.bytes,f.autoextensible,f.maxbytes,NVL(x.free_bytes,0),m.used_space*t.block_size FROM dba_tablespaces t JOIN (SELECT tablespace_name,file_name,bytes,autoextensible,maxbytes FROM dba_data_files UNION ALL SELECT tablespace_name,file_name,bytes,autoextensible,maxbytes FROM dba_temp_files) f ON f.tablespace_name=t.tablespace_name LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) x ON x.tablespace_name=t.tablespace_name LEFT JOIN dba_tablespace_usage_metrics m ON m.tablespace_name=t.tablespace_name ORDER BY t.tablespace_name,f.file_name',
+	segments: "SELECT s.owner,s.segment_name,s.partition_name,s.segment_type,s.tablespace_name,s.bytes,l.table_name,l.column_name FROM dba_segments s JOIN dba_users u ON u.username=s.owner LEFT JOIN dba_lobs l ON l.owner=s.owner AND (l.segment_name=s.segment_name OR l.index_name=s.segment_name) WHERE (:owner IS NULL OR s.owner=:owner) AND (:allOwners=1 OR :owner IS NOT NULL OR u.oracle_maintained='N') ORDER BY s.bytes DESC,s.owner,s.segment_name,s.partition_name FETCH FIRST :top ROWS ONLY",
+	tempFiles: 'SELECT tablespace_name,file_name,bytes,autoextensible,maxbytes FROM dba_temp_files ORDER BY file_id',
+	temp: 'SELECT s.tablespace_name,SUM(s.total_blocks*t.block_size),SUM(s.used_blocks*t.block_size),SUM(s.free_blocks*t.block_size) FROM v$sort_segment s JOIN dba_tablespaces t ON t.tablespace_name=s.tablespace_name GROUP BY s.tablespace_name ORDER BY s.tablespace_name',
+	consumers: 'SELECT s.sid,s.username,u.sql_id,u.segtype,u.tablespace,u.blocks*t.block_size FROM v$tempseg_usage u JOIN v$session s ON s.saddr=u.session_addr JOIN dba_tablespaces t ON t.tablespace_name=u.tablespace ORDER BY u.blocks DESC,s.sid',
+	undoFiles: "SELECT f.tablespace_name,f.file_name,f.bytes,f.autoextensible,f.maxbytes FROM dba_data_files f JOIN dba_tablespaces t ON t.tablespace_name=f.tablespace_name WHERE t.contents='UNDO' ORDER BY f.file_id",
+	undoExtents: 'SELECT tablespace_name,status,SUM(bytes) FROM dba_undo_extents GROUP BY tablespace_name,status ORDER BY tablespace_name,status',
+	undo: 'SELECT MAX(maxquerylen),SUM(ssolderrcnt),SUM(nospaceerrcnt),MIN(tuned_undoretention),MAX(tuned_undoretention) FROM v$undostat WHERE begin_time>=SYSDATE-1',
+	retention: "SELECT value FROM v$parameter WHERE name='undo_retention'",
+	redo: 'SELECT group#,thread#,bytes,members,status,archived FROM v$log ORDER BY thread#,group#',
+	members: 'SELECT group#,member,type,status FROM v$logfile ORDER BY group#,member',
+	recovery: 'SELECT name,space_limit,space_used,space_reclaimable,number_of_files FROM v$recovery_file_dest',
+	recoveryTypes: 'SELECT file_type,percent_space_used,percent_space_reclaimable,number_of_files FROM v$flash_recovery_area_usage ORDER BY file_type',
+} as const;
