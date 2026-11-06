@@ -102,7 +102,7 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 }
 export function renderBackupMarkdown(r: BackupReport): string {
 	const safe=(v:unknown)=>JSON.stringify(v).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-	return [`# Backup — ${r.target}`,r.scope,`Captured ${r.capturedAt}. Sequential bounded SELECT snapshots.`, `## Restore-to-time estimate\nStatus: ${r.restoreEstimate.status === 'candidate' ? 'Candidate recovery window' : 'Not verifiable from this database'}.\n\n- From: ${r.restoreEstimate.from ?? 'not established'}.\n- Through: ${r.restoreEstimate.through ?? 'not established'}.\n- Evidence: ${r.restoreEstimate.evidence.join(', ')}.\n\n${r.restoreEstimate.detail}`,
+	return [`# Backup — ${r.target}`,r.scope,`Captured ${r.capturedAt}. Sequential bounded SELECT snapshots.`, `## Restore-to-time estimate\nStatus: ${r.restoreEstimate.status === 'candidate' ? 'Candidate recovery window' : 'Not verifiable with the available evidence'}.\n\n- From: ${r.restoreEstimate.from ?? 'not established'}.\n- Through: ${r.restoreEstimate.through ?? 'not established'}.\n- Evidence: ${r.restoreEstimate.evidence.join(', ')}.\n\n${r.restoreEstimate.detail}`,
 		...r.findings.map(f=>`${f.severity}: ${f.detail} Evidence: ${f.evidence.join(', ')}. ${f.advice}`),
 		`Per-datafile backups: ${safe(r.files)}`,`Archive gaps: ${safe(r.gaps)}`,`Recovery-area balance (bytes): ${safe(r.recoveryArea)}`,
 		...Object.entries(r.evidence).map(([id,e])=>`Evidence ${id} (${e.view}): ${e.status}${e.note?' — '+e.note:''}\n${safe(e.rows)}`)].join('\n\n')+'\n';
