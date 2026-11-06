@@ -5,7 +5,7 @@ for (const cycle of [false, true]) for (const width of [1280, 390]) for (const c
 	await page.setViewportSize({ width, height: 900 }); await page.emulateMedia({ colorScheme });
 	await page.route('**/api/db-sessions?*', route => route.fulfill({ json: { result: dbSessionsFixture(cycle), markdown: '# Sessions' } }));
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#dbsessions-tab').click(); await page.locator('#dbsessions-run').click();
-	await expect(page.locator('#dbsessions-status')).toContainText('Loaded.');
+	await expect(page.locator('#dbsessions-status')).toHaveText('Loaded.');
 	await expect(page.locator('#dbsessions-content')).toContainText('Captured at 2026-11-06T12:00:00.000Z (UTC)');
 	await expect(page.locator('.dbsessions-tree')).toContainText('APP.ORDERS');
 	if(cycle) await expect(page.locator('.dbsessions-tree')).toContainText('DEADLOCK CYCLE');
@@ -23,6 +23,31 @@ test('Sessions errors, incomplete evidence, empty snapshot and stale response', 
 	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#dbsessions-tab').click();
 	for (const status of [500,413,429]) { await page.route('**/api/db-sessions?*', r => r.fulfill({status,json:{message:'Failed'}})); await page.locator('#dbsessions-run').click(); await expect(page.locator('#dbsessions-status')).toContainText(status===413?'size cap':status===429?'already running':'Request failed'); await expect(page.locator('#dbsessions-export')).toBeDisabled(); }
 	const fixture=dbSessionsFixture(); fixture.sections.blocking.rows=[]; fixture.findings=[]; fixture.sections.active.status='unavailable' as any; fixture.sections.active.evidence.truncated=true;
-	await page.route('**/api/db-sessions?*',r=>r.fulfill({json:{result:fixture,markdown:'empty'}})); await page.locator('#dbsessions-run').click(); await expect(page.locator('#dbsessions-content')).toContainText('No blocking'); await expect(page.locator('#dbsessions-content')).toContainText('Row cap reached'); await expect(page.locator('#dbsessions-content')).toContainText('unavailable');
+	await page.route('**/api/db-sessions?*',r=>r.fulfill({json:{result:fixture,markdown:'empty'}})); await page.locator('#dbsessions-run').click(); await expect(page.locator('#dbsessions-content')).toContainText('No blocking'); await expect(page.locator('#dbsessions-content')).toContainText('Row cap reached'); await expect(page.locator('#dbsessions-content')).toContainText('unavailable'); await expect(page.locator('#dbsessions-status')).toHaveText('Loaded. Some sections are unavailable.');
 	let release!:()=>void; const pending=new Promise<void>(r=>{release=r;}); await page.route('**/api/db-sessions?*',async r=>{await pending; await r.fulfill({json:{result:fixture,markdown:'stale'}});}); await page.locator('#dbsessions-run').click(); await page.locator('#dbsessions-target').selectOption('p1-19c-prod'); release(); await expect(page.locator('#dbsessions-run')).toBeEnabled(); await expect(page.locator('#dbsessions-content')).toBeEmpty();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) test(`Every Sessions table reaches its last column at 390px ${colorScheme}`, async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 }); await page.emulateMedia({ colorScheme });
+	await page.route('**/api/db-sessions?*', route => route.fulfill({ json: { result: dbSessionsFixture(), markdown: '# Sessions' } }));
+	await page.goto(process.env.PIAGENT_BROWSER_URL!); await page.locator('#dbsessions-tab').click(); await page.locator('#dbsessions-run').click();
+	await expect(page.locator('#dbsessions-status')).toHaveText('Loaded.');
+	for (const name of ['Wait events', 'Time model', 'Long transactions', 'Active sessions']) {
+		const box = page.getByRole('region', { name, exact: true });
+		const geometry = await box.evaluate(node => {
+			const container = node as HTMLElement;
+			const overflow = getComputedStyle(container).overflowX;
+			container.scrollLeft = container.scrollWidth;
+			const bounds = container.getBoundingClientRect();
+			const cells = [...container.querySelectorAll('tr')].map(row => row.lastElementChild!.getBoundingClientRect());
+			return { overflow, left: bounds.left, right: bounds.right, cells: cells.map(cell => ({left:cell.left,right:cell.right})), scroll:container.scrollLeft, wide:container.scrollWidth > container.clientWidth };
+		});
+		expect(geometry.overflow).toBe('auto');
+		if (geometry.wide) expect(geometry.scroll).toBeGreaterThan(0);
+		for (const cell of geometry.cells) { expect(cell.left).toBeGreaterThanOrEqual(geometry.left - 1); expect(cell.right).toBeLessThanOrEqual(geometry.right + 1); }
+	}
+	const toolbar = page.getByRole('group', { name: 'Active session filters and export' });
+	await expect(toolbar.locator('#dbsessions-filter-status')).toBeVisible(); await expect(toolbar.locator('#dbsessions-export')).toBeVisible();
+	expect(await toolbar.evaluate(n => n.previousElementSibling?.textContent)).toBe('Active Sessions');
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

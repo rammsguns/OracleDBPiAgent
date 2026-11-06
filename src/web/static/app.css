@@ -191,22 +191,29 @@ td:nth-child(2) { max-width: 24rem; }
 .security-table td:nth-child(2) { min-width: 16rem; }
 .security-table td:last-child { white-space: nowrap; }
 
-#dbsessions-panel { min-width: 0; }
-#dbsessions-content { overflow-wrap: anywhere; }
-#dbsessions-content .table-scroll { max-width: 100%; overflow-x: auto; }
-#dbsessions-content table { width: 100%; border-collapse: collapse; }
+#dbsessions-panel { min-width: 0; --graph-node-fill: #edf5f6; --graph-node-stroke: #235663; }
+#dbsessions-content { min-width: 0; overflow-wrap: anywhere; }
+#dbsessions-content .table-scroll { display: block; width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; }
+#dbsessions-content table { width: 100%; min-width: 38rem; border-collapse: collapse; overflow-wrap: normal; }
 #dbsessions-content th, #dbsessions-content td { padding: .55rem; text-align: left; border-bottom: 1px solid var(--graph-node-stroke); }
+#dbsessions-content td { min-width: 5rem; }
+#dbsessions-content td:first-child { min-width: 12rem; }
+#dbsessions-content th { white-space: nowrap; }
+#dbsessions-content .dbsessions-narrow-table table { min-width: 0; }
+#dbsessions-content .dbsessions-narrow-table td { min-width: 0; }
+#dbsessions-content .dbsessions-narrow-table td:last-child { white-space: nowrap; }
+.dbsessions-scroll-hint { position: sticky; left: 0; width: fit-content; max-width: 100%; margin: .3rem 0; font-size: .8rem; }
 .dbsessions-tree { padding-left: 1.3rem; }
 .dbsessions-tree ul { padding-left: 1rem; }
 .dbsessions-finding { padding: .7rem; border-left: 3px solid var(--graph-node-stroke); margin: .7rem 0; }
 .dbsessions-wait { display: grid; gap: .25rem; margin: .7rem 0; }
 .dbsessions-wait meter { width: 100%; height: 1rem; }
 .dbsessions-graph svg { display: block; max-width: none; }
-#dbsessions-panel input { display: block; width: 100%; max-width: 28rem; padding: .5rem; font: inherit; }
-#dbsessions-panel > label { display: block; margin: .75rem 0 .35rem; font-weight: 600; }
-#dbsessions-export { margin: .5rem; }
-#dbsessions-content table { min-width: 38rem; overflow-wrap: normal; }
-#dbsessions-content td { min-width: 5rem; }
-#dbsessions-content td:first-child { min-width: 12rem; }
-#dbsessions-content th { white-space: nowrap; }
+.dbsessions-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem .75rem; margin: .75rem 0; }
+.dbsessions-field { min-width: 0; max-width: 100%; }
+.dbsessions-field label { display: block; font-size: .85rem; font-weight: 600; margin: 0 0 .25rem; }
+.dbsessions-field input { width: 7rem; max-width: 100%; padding: .5rem; font: inherit; border: 1px solid #859ba5; border-radius: .35rem; }
+.dbsessions-field select { max-width: 100%; }
 @media (min-width: 801px) { main:has(#dbsessions-tab[aria-selected="true"]) { grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); } }
+@media (prefers-color-scheme: dark) { #dbsessions-panel { --graph-node-fill: #223b45; --graph-node-stroke: #b8dce7; } }
+.dbsessions-toolbar[hidden] { display: none; }
