@@ -87,6 +87,14 @@ export function buildReportTrends(history: ReportHistory): ReportTrends {
 			return row ? Number(row.VALUE) : null;
 		}, [['METRIC', 'NAME', 'VALUE', 'MAX_BYTES', 'STATUS']]);
 	}
+	for (const [section, metrics] of [['backup', ['findings', 'archive_gaps', 'oldest_full_age_hours']], ['jobs', ['failed_runs_24h']]] as const) {
+		if (!reports.some(r => r.sections.some(s => s.name === section))) continue;
+		for (const metric of metrics) add(`${section}:${metric}`, `${section} ${metric.replaceAll('_', ' ')}`, metric.endsWith('hours') ? 'hours' : 'count', [section], ([s]) => {
+			if (/row limit/i.test(s!.note)) return null;
+			const r = rows(s!).find(r => r.METRIC === metric && r.STATUS === 'ok');
+			return r ? number(r.VALUE) : null;
+		}, [['METRIC', 'VALUE', 'STATUS']]);
+	}
 	if (gaps) result.notes.push(`${gaps} series observation(s) missing, unavailable or incompatible; shown as gaps.`);
 	if (reports.some(r => r.sections.some(s => /row limit/i.test(s.note)))) result.notes.push('Row-limited snapshots: counts describe visible saved rows, not database totals.');
 	return result;

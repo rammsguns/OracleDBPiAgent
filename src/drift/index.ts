@@ -3,7 +3,7 @@ import { readReportSecurity } from '../report/security.js';
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError, type ToolContext } from '../contracts.js';
 import { classifySql } from '../oracle/sqlPolicy.js';
-import { parameterQuery, objectQueries, schemaQueries, type DriftQuery } from './queries.js';
+import { backupQueries, parameterQuery, objectQueries, schemaQueries, type DriftQuery } from './queries.js';
 export interface DriftOptions { left: string; right: string; scope: string }
 export interface DriftEntry { key: string; values: unknown[] }
 export interface DriftSection {
@@ -12,12 +12,13 @@ export interface DriftSection {
 	different: { key: string; left: unknown[]; right: unknown[] }[];
 }
 export interface DriftResult extends DriftOptions { generatedAt: string; complete: boolean; hasDrift: boolean; sections: DriftSection[] }
-export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects' | 'security' | 'space'; owner?: string } {
+export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects' | 'security' | 'space' | 'backup'; owner?: string } {
+	if (scope === 'backup') return { kind: 'backup' };
 	if (scope === 'space') return { kind: 'space' };
 	if (scope === 'security') return { kind: 'security' };
 	if (scope === 'parameters') return { kind: 'parameters' };
 	const match = /^(schema|objects):([A-Za-z][A-Za-z0-9_$#]{0,127})$/.exec(scope);
-	if (!match) throw new Error('Scope must be parameters, security, space, schema:OWNER or objects:OWNER');
+	if (!match) throw new Error('Scope must be parameters, security, space, backup, schema:OWNER or objects:OWNER');
 	return { kind: match[1] as 'schema' | 'objects', owner: match[2]!.toUpperCase() };
 }
 /** Collapse whitespace outside quoted SQL literals/identifiers only. Never erase literal differences. */
@@ -52,10 +53,11 @@ export async function compareTargets(ctx: ToolContext, options: DriftOptions): P
 	for (const target of [options.left, options.right]) if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned drift target');
 	if (scope.kind === 'space') return compareSpace(ctx, options);
 	if (scope.kind === 'security') return compareSecurity(ctx, options);
-	const definitions = scope.kind === 'parameters' ? [parameterQuery] : scope.kind === 'schema' ? schemaQueries : objectQueries;
+	const definitions = scope.kind === 'backup' ? backupQueries : scope.kind === 'parameters' ? [parameterQuery] : scope.kind === 'schema' ? schemaQueries : objectQueries;
 	const result: DriftResult = { ...options, scope: scope.owner ? `${scope.kind}:${scope.owner}` : scope.kind, generatedAt: new Date().toISOString(), complete: true, hasDrift: false, sections: [] };
 	for (const definition of definitions) {
 		const section: DriftSection = { name: definition.name, source: definition.source, status: 'ok', notes: [], onlyLeft: [], onlyRight: [], different: [] };
+		if (scope.kind === 'backup') section.notes.push('Explicit RMAN configuration only, including autobackup and retention when configured. Absent settings do not prove effective defaults; backup history and recoverability are not compared.');
 		const sides: DriftEntry[][] = [];
 		for (const target of [options.left, options.right]) {
 			let session;
@@ -63,9 +65,11 @@ export async function compareTargets(ctx: ToolContext, options: DriftOptions): P
 			const base = { at: new Date().toISOString(), runId: ctx.runId, target, tool: `drift:${definition.name}`, sqlSha256: createHash('sha256').update(sql).digest('hex') };
 			try {
 				session = await ctx.sessions.get(target);
+				if (scope.kind === 'backup' && session.identity?.isCdb) section.notes.push(`${target}: CDB-wide (shared by all PDBs). Empty rows do not establish absence.`);
 				const query = await session.query(sql, scope.owner ? { owner: scope.owner } : {}, { maxRows: ctx.config.limits.maxRows, timeoutSeconds: ctx.config.limits.statementTimeoutSeconds });
 				await ctx.audit.record({ ...base, kind: 'tool_call', rows: query.rows.length, truncated: query.truncated, elapsedMs: query.elapsedMs });
 				if (query.truncated) { section.status = 'unavailable'; section.notes.push(`${target}: row cap reached; comparison withheld`); }
+				if (scope.kind === 'backup' && session.identity?.isCdb && !query.rows.length) { section.status = 'unavailable'; section.notes.push(`${target}: no configuration rows visible in this PDB; comparison withheld`); }
 				// SEARCH_CONDITION_VC can silently truncate Oracle check expressions to 4000 bytes.
 				if (definition.name === 'constraints' && query.rows.some(r => typeof r[12] === 'string' && Buffer.byteLength(r[12]) >= 4000)) { section.status = 'unavailable'; section.notes.push(`${target}: check expression may be truncated; comparison withheld`); }
 				sides.push(entries(definition, query.rows));

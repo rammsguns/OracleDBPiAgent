@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseTopCommand, runChatTop } from './chatTop.js';
 import { connectionGuidance, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
 import { renderFeatureSummary } from '../preflight/render.js';
 import { targetsSource } from '../config/targets.js';
@@ -194,7 +195,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	plsql.command("doc").description("Document a PL/SQL object").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
 	});
-	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security or space); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security, space or backup); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
 	});
@@ -258,6 +259,16 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				const offset = agent.state.messages.length;
 				let prepared = q;
 				if (question === undefined) {
+					try {
+						if (parseTopCommand(q)) {
+							const controller = new AbortController();
+							const cancel = () => controller.abort();
+							process.once('SIGINT', cancel);
+							try { console.log(await runChatTop(ctx, q, controller.signal)); }
+							finally { process.removeListener('SIGINT', cancel); }
+							return;
+						}
+					} catch (error) { console.error(error instanceof Error && error.name === 'AbortError' ? 'Top sample cancelled.' : 'Top: ' + (error instanceof Error && error.name === 'TopUsageError' || error instanceof Error && error.message.startsWith('Usage:') ? error.message : 'failed; check local database availability')); return; }
 					let command: ReturnType<typeof parseTriageCommand>;
 					try {
 						command = parseTriageCommand(q);
