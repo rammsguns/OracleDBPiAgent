@@ -121,6 +121,15 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
 		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
 	});
+	program.command("sessions").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Read-only live sessions, blocking and cumulative waits; no LLM").requiredOption("--target <target>").option("--section <ids>", "Comma-separated sections").option("--all", "Include background sessions").option("--min-tx-seconds <N>", "Transaction age threshold, 0–86400").option("--top <N>", "Top wait events, 1–50").option("--json").option("--markdown").action(async options => {
+		const { runSessions } = await import("../sessions/cli.js");
+		const { SessionsUsageError } = await import("../sessions/index.js");
+		try { await runSessions(options); }
+		catch (error) {
+			if (!(error instanceof SessionsUsageError)) throw error;
+			console.error(error.message); process.exitCode = 2;
+		}
+	});
 	program.command("security").description("Read-only security and privilege review; no LLM").requiredOption("--target <target>").option("--check <ids>", "Comma-separated check IDs").option("--who-can <object>", "OWNER.OBJECT privilege paths").option("--json").option("--markdown").action(async options => {
 		const { runSecurity } = await import("../security/cli.js");
 		const { SecurityUsageError } = await import("../security/index.js");
