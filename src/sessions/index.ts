@@ -38,8 +38,17 @@ export function buildBlockingTree(rows: SessionRow[]): BlockingNode[] {
 	const children = new Map<number, Set<number>>();
 	for (const r of rows) {
 		const parent = r.blockerSid ?? r.finalBlockerSid;
-		if (parent != null) { if (!children.has(parent)) children.set(parent, new Set()); children.get(parent)!.add(r.sid); }
+		if (parent != null) {
+			if (!children.has(parent)) children.set(parent, new Set());
+			children.get(parent)!.add(r.sid);
+			// Preserve the final root even when an intermediate blocker disappeared.
+			if (!bySid.has(parent) && r.finalBlockerSid != null && r.finalBlockerSid !== parent && r.finalBlockerSid !== r.sid) {
+				if (!children.has(r.finalBlockerSid)) children.set(r.finalBlockerSid, new Set());
+				children.get(r.finalBlockerSid)!.add(parent);
+			}
+		}
 	}
+	const hasParent = new Set([...children.values()].flatMap(ids => [...ids]));
 	const visited = new Set<number>();
 	function node(sid: number, path: number[]): BlockingNode {
 		const cycle = path.includes(sid), depthLimited = path.length >= 10 && (children.get(sid)?.size ?? 0) > 0;
@@ -57,8 +66,7 @@ export function buildBlockingTree(rows: SessionRow[]): BlockingNode[] {
 	}
 	const roots: BlockingNode[] = [];
 	for (const sid of children.keys()) {
-		const r = bySid.get(sid);
-		if (!r || (r.blockerSid == null && r.finalBlockerSid == null)) roots.push(node(sid, []));
+		if (!hasParent.has(sid)) roots.push(node(sid, []));
 	}
 	for (const sid of children.keys()) if (!visited.has(sid)) roots.push(node(sid, []));
 	return roots;
@@ -141,9 +149,9 @@ export async function readSessionActivity(session: OracleSession, options: Sessi
 	function finding(id: string, severity: SessionFinding['severity'], subject: string, detail: string, sqlId?: string) {
 		result.findings.push({ id, severity, subject, detail, ...(sqlId ? { sqlId } : {}), advice: 'For a human DBA: inspect the session and application transaction owner.' + (sqlId ? ' Run piagent sql --target ' + result.target + ' --sql-id ' + sqlId : '') });
 	}
-	const blockers = new Set(sessions.flatMap(r => r.blockerSid == null ? [] : [r.blockerSid]));
+	const blockers = new Set(sessions.flatMap(r => [r.blockerSid, r.finalBlockerSid].filter((sid): sid is number => sid != null)));
 	for (const sid of blockers) {
-		const b = sessions.find(r => r.sid === sid), waiters = sessions.filter(r => r.blockerSid === sid);
+		const b = sessions.find(r => r.sid === sid), waiters = sessions.filter(r => r.blockerSid === sid || r.finalBlockerSid === sid);
 		if (waiters.some(w => w.secondsInWait > 60)) finding('blocking-over-60-' + sid, 'high', 'Blocker SID ' + sid, 'Waiters have waited more than 60 seconds.', b?.sqlId);
 		if (b?.status === 'INACTIVE') finding('idle-in-transaction-' + sid, 'high', 'Blocker SID ' + sid, 'Inactive blocker holding locks: idle in transaction.', b.sqlId);
 	}

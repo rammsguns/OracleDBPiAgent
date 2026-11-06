@@ -112,3 +112,12 @@ it('escapes dictionary and session strings in markdown', async () => {
 	const a = await readSessionActivity(fixture({ active:[raw({ ...row(1), username:'<script>|user' })] }));
 	const md = renderSessionsMarkdown(a); expect(md).toContain('&lt;script&gt;&#124;user'); expect(md).not.toContain('<script>');
 });
+it('preserves the final root across a vanished intermediate blocker', async () => {
+	const waiter = { ...row(3,2), finalBlockerSid:1 };
+	const tree = buildBlockingTree([row(1),waiter]);
+	expect(tree).toHaveLength(1); expect(tree[0]?.sid).toBe(1);
+	expect(tree[0]?.children[0]).toMatchObject({ sid:2, vanished:true });
+	expect(tree[0]?.children[0]?.children[0]?.sid).toBe(3);
+	const a = await readSessionActivity(fixture({ active:[raw({ ...row(1),status:'INACTIVE' }),raw(waiter)] }));
+	expect(a.findings.some(f => f.id === 'idle-in-transaction-1')).toBe(true);
+});
