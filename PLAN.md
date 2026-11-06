@@ -3968,7 +3968,7 @@ first run is the first live PDB check.
   hints and interpolated names. No current code uses them.
 - Phases 25–27 are still proposed.
 
-## Phase 25: backup and recoverability (approved 2026-11-06; p1 grants pending owner request)
+## Phase 25: backup and recoverability (approved 2026-11-06; owner approved the p1 grants: "Apply all", after the WP-25D re-premise)
 
 ### Goal
 `piagent backup --target T` is a read-only recoverability review. It covers:
@@ -4028,7 +4028,7 @@ Findings:
 Gate: single side plus the full suites, with a mandatory `validate-hard` run
 after the grants.
 
-## Phase 26: scheduler jobs and maintenance health (approved 2026-11-06; p1 grants pending owner request)
+## Phase 26: scheduler jobs and maintenance health (approved 2026-11-06; owner approved the p1 grants: "Apply all", after the WP-25D re-premise)
 
 ### Goal
 `piagent jobs --target T` gives a read-only view of:
@@ -4070,7 +4070,7 @@ truncated and redacted with the triage redactor.
 Gate: single side plus the full suites. Use A/B if the triage changes alter
 answers in the chat path.
 
-## Phase 27: live top-SQL and load sampler without ASH (approved 2026-11-06; p1 grants pending owner request)
+## Phase 27: live top-SQL and load sampler without ASH (approved 2026-11-06; owner approved the p1 grants: "Apply all", after the WP-25D re-premise)
 
 ### Goal
 `piagent top --target T [--seconds N]` measures what the database is doing
