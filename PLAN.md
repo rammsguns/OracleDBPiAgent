@@ -3968,7 +3968,7 @@ first run is the first live PDB check.
   hints and interpolated names. No current code uses them.
 - Phases 25–27 are still proposed.
 
-## Phase 25: backup and recoverability (proposed 2026-11-06; needs owner approval and p1 grants)
+## Phase 25: backup and recoverability (approved 2026-11-06; p1 grants pending owner request)
 
 ### Goal
 `piagent backup --target T` is a read-only recoverability review. It covers:
@@ -4028,7 +4028,7 @@ Findings:
 Gate: single side plus the full suites, with a mandatory `validate-hard` run
 after the grants.
 
-## Phase 26: scheduler jobs and maintenance health (proposed 2026-11-06; needs owner approval and p1 grants)
+## Phase 26: scheduler jobs and maintenance health (approved 2026-11-06; p1 grants pending owner request)
 
 ### Goal
 `piagent jobs --target T` gives a read-only view of:
@@ -4070,7 +4070,7 @@ truncated and redacted with the triage redactor.
 Gate: single side plus the full suites. Use A/B if the triage changes alter
 answers in the chat path.
 
-## Phase 27: live top-SQL and load sampler without ASH (proposed 2026-11-06; needs owner approval and p1 grants)
+## Phase 27: live top-SQL and load sampler without ASH (approved 2026-11-06; p1 grants pending owner request)
 
 ### Goal
 `piagent top --target T [--seconds N]` measures what the database is doing
@@ -4110,8 +4110,25 @@ Gate: A/B if the triage or chat changes alter the agent path; otherwise
 single side plus the full suites.
 
 ### After phases 25 to 27
-Release them as 1.4.0, after a full release gate (dev, holdout, regression,
-MVP, and p23 to p27) and a package smoke.
+Release them as 1.5.0 (1.4.0 shipped phase 28), after a full release gate
+(dev, holdout, regression, MVP, and p23 to p27) and a package smoke.
+
+### Rules from phase 28 for every WP in phases 25 to 27
+Owner approval: "continue with next phases" (2026-11-06).
+
+- **Real CDB/PDB targets.** Each new fixed query must be correct in a 19c
+  PDB.
+  - Label CDB-wide facts "CDB-wide (shared by all PDBs)". Examples are RMAN
+    and archived logs, V$SYSSTAT/V$OSSTAT, and the control file.
+  - Degrade per view on ORA-00942, ORA-01031 or ORA-65040 with a clear note.
+  - Never infer absence from empty rows that a PDB may hide.
+- **Preflight.** Add every new view to `src/preflight/views.ts` under the
+  new feature group. Add a SELECT grant for each to
+  `docs/grants-template-pdb.sql`. The WP-28D coverage tests must pass.
+- **Writes stay impossible.** Never run RMAN, DBMS_SCHEDULER,
+  DBMS_WORKLOAD_REPOSITORY or DBMS_LOCK, and never call
+  `DBMS_SCHEDULER.RUN_JOB`. The sqlPolicy blocks these, and a test proves
+  it.
 
 ## MVP exit criteria
 
