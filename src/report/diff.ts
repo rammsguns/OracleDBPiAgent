@@ -1,3 +1,4 @@
+import { spaceMetrics } from './space.js';
 import { sessionMetrics } from './sessions.js';
 import type { DatabaseReport, ReportSection } from './index.js';
 
@@ -45,6 +46,10 @@ export function diff(previous: DatabaseReport | null | undefined, current: Datab
 			if (!old) continue;
 			const a = percent(old), b = percent(row);
 			if (b - a >= DIFF_THRESHOLDS.tablespaceIncreasePoints || (a < DIFF_THRESHOLDS.tablespaceWarningPercent && b >= DIFF_THRESHOLDS.tablespaceWarningPercent)) add(name, 'tablespace_usage', String(row.TABLESPACE_NAME), `${row.TABLESPACE_NAME}: used ${a.toFixed(2)}% → ${b.toFixed(2)}%`);
+		}
+		if (name === 'space') for (const row of spaceMetrics(after).filter(r => r.METRIC === 'tablespace')) {
+			const old = spaceMetrics(before).find(r => r.METRIC === 'tablespace' && r.NAME === row.NAME);
+			if (old && old.MAX_BYTES === row.MAX_BYTES && typeof old.BYTES_PER_DAY === 'number' && typeof row.BYTES_PER_DAY === 'number' && Number.isFinite(old.BYTES_PER_DAY) && Number.isFinite(row.BYTES_PER_DAY) && Math.abs(row.BYTES_PER_DAY - old.BYTES_PER_DAY) > Math.max(1e-6, Math.abs(old.BYTES_PER_DAY) * 1e-9)) add(name, 'space_growth_rate', String(row.NAME), `${row.NAME}: growth rate ${old.BYTES_PER_DAY} → ${row.BYTES_PER_DAY} bytes/day`);
 		}
 		if (name === 'sessions') {
 			const a = sessionMetrics(before), b = sessionMetrics(after);

@@ -1,0 +1,343 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`keeps default report bytes unchanged 1`] = `
+"{"target":"left","generatedAt":"2026-11-01T00:00:00.000Z","sections":[{"name":"identity","status":"ok","source":"PRODUCT_COMPONENT_VERSION, SYS_CONTEXT","columns":[],"rows":[],"note":""},{"name":"tablespaces","status":"ok","source":"DBA_DATA_FILES, DBA_FREE_SPACE","columns":[],"rows":[],"note":"Permanent/undo allocated datafiles; bytes, not MB. Temporary files excluded."},{"name":"waits","status":"ok","source":"V$SYSTEM_EVENT","columns":[],"rows":[],"note":"Cumulative since instance startup; microseconds, not interval rates."},{"name":"top_sql","status":"ok","source":"V$SQLSTATS","columns":[],"rows":[],"note":"Cached cumulative statistics; elapsed and CPU time in microseconds."},{"name":"optimizer_stats","status":"ok","source":"DBA_TAB_STATISTICS","columns":[],"rows":[],"note":"Table-level estimates; stale, locked or never analyzed only. Owner: SH."},{"name":"index_health","status":"ok","source":"ALL_INDEXES","columns":[],"rows":[],"note":"Only indexes visible to this login. Owner: SH."},{"name":"index_partitions","status":"ok","source":"ALL_IND_PARTITIONS, ALL_INDEXES","columns":[],"rows":[],"note":"Only visible partitions; subpartitions reported separately. Owner: SH."},{"name":"index_subpartitions","status":"ok","source":"ALL_IND_SUBPARTITIONS, ALL_INDEXES","columns":[],"rows":[],"note":"Owner: SH."},{"name":"parameters","status":"ok","source":"V$PARAMETER","columns":[],"rows":[],"note":""},{"name":"scheduler_jobs","status":"ok","source":"DBA_SCHEDULER_JOBS","columns":[],"rows":[],"note":""},{"name":"scheduler_failures","status":"ok","source":"DBA_SCHEDULER_JOB_RUN_DETAILS","columns":[],"rows":[],"note":""},{"name":"long_operations","status":"ok","source":"V$SESSION_LONGOPS","columns":[],"rows":[],"note":"Running plus completions updated in the last hour."},{"name":"backups","status":"ok","source":"V$RMAN_BACKUP_JOB_DETAILS","columns":[],"rows":[],"note":""},{"name":"archive_switches","status":"ok","source":"V$ARCHIVED_LOG","columns":[],"rows":[],"note":"Last 24h; distinct thread/sequence/resetlogs; hours without switches omitted."}]}
+# Oracle 19c report: left
+
+Generated: 2026-11-01T00:00:00.000Z
+
+## identity
+
+Source: PRODUCT_COMPONENT_VERSION, SYS_CONTEXT
+
+No matching rows.
+
+## tablespaces
+
+Source: DBA_DATA_FILES, DBA_FREE_SPACE
+
+Permanent/undo allocated datafiles; bytes, not MB. Temporary files excluded.
+
+No matching rows.
+
+## waits
+
+Source: V$SYSTEM_EVENT
+
+Cumulative since instance startup; microseconds, not interval rates.
+
+No matching rows.
+
+## top_sql
+
+Source: V$SQLSTATS
+
+Cached cumulative statistics; elapsed and CPU time in microseconds.
+
+No matching rows.
+
+## optimizer_stats
+
+Source: DBA_TAB_STATISTICS
+
+Table-level estimates; stale, locked or never analyzed only. Owner: SH.
+
+No matching rows.
+
+## index_health
+
+Source: ALL_INDEXES
+
+Only indexes visible to this login. Owner: SH.
+
+No matching rows.
+
+## index_partitions
+
+Source: ALL_IND_PARTITIONS, ALL_INDEXES
+
+Only visible partitions; subpartitions reported separately. Owner: SH.
+
+No matching rows.
+
+## index_subpartitions
+
+Source: ALL_IND_SUBPARTITIONS, ALL_INDEXES
+
+Owner: SH.
+
+No matching rows.
+
+## parameters
+
+Source: V$PARAMETER
+
+No matching rows.
+
+## scheduler_jobs
+
+Source: DBA_SCHEDULER_JOBS
+
+No matching rows.
+
+## scheduler_failures
+
+Source: DBA_SCHEDULER_JOB_RUN_DETAILS
+
+No matching rows.
+
+## long_operations
+
+Source: V$SESSION_LONGOPS
+
+Running plus completions updated in the last hour.
+
+No matching rows.
+
+## backups
+
+Source: V$RMAN_BACKUP_JOB_DETAILS
+
+No matching rows.
+
+## archive_switches
+
+Source: V$ARCHIVED_LOG
+
+Last 24h; distinct thread/sequence/resetlogs; hours without switches omitted.
+
+No matching rows.
+"
+`;
+
+exports[`keeps objects:SH drift bytes unchanged 1`] = `
+"{"left":"left","right":"right","scope":"objects:SH","generatedAt":"2026-11-01T00:00:00.000Z","complete":true,"hasDrift":false,"sections":[{"name":"objects","source":"SYS.ALL_OBJECTS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"object_counts","source":"SYS.ALL_OBJECTS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"invalid_objects","source":"SYS.ALL_OBJECTS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]}]}
+# Drift: left → right
+
+Scope: objects:SH. Complete comparison.
+
+## objects
+
+Source: SYS.ALL_OBJECTS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## object_counts
+
+Source: SYS.ALL_OBJECTS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## invalid_objects
+
+Source: SYS.ALL_OBJECTS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+"
+`;
+
+exports[`keeps parameters drift bytes unchanged 1`] = `
+"{"left":"left","right":"right","scope":"parameters","generatedAt":"2026-11-01T00:00:00.000Z","complete":true,"hasDrift":false,"sections":[{"name":"parameters","source":"SYS.V_$PARAMETER","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]}]}
+# Drift: left → right
+
+Scope: parameters. Complete comparison.
+
+## parameters
+
+Source: SYS.V_$PARAMETER
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+"
+`;
+
+exports[`keeps schema:SH drift bytes unchanged 1`] = `
+"{"left":"left","right":"right","scope":"schema:SH","generatedAt":"2026-11-01T00:00:00.000Z","complete":true,"hasDrift":false,"sections":[{"name":"tables","source":"SYS.ALL_TABLES","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"columns","source":"SYS.ALL_TAB_COLUMNS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"constraints","source":"SYS.ALL_CONSTRAINTS, SYS.ALL_CONS_COLUMNS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"indexes","source":"SYS.ALL_INDEXES, SYS.ALL_IND_COLUMNS, SYS.ALL_IND_EXPRESSIONS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"object_counts","source":"SYS.ALL_OBJECTS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"invalid_objects","source":"SYS.ALL_OBJECTS","status":"ok","notes":[],"onlyLeft":[],"onlyRight":[],"different":[]}]}
+# Drift: left → right
+
+Scope: schema:SH. Complete comparison.
+
+## tables
+
+Source: SYS.ALL_TABLES
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## columns
+
+Source: SYS.ALL_TAB_COLUMNS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## constraints
+
+Source: SYS.ALL_CONSTRAINTS, SYS.ALL_CONS_COLUMNS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## indexes
+
+Source: SYS.ALL_INDEXES, SYS.ALL_IND_COLUMNS, SYS.ALL_IND_EXPRESSIONS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## object_counts
+
+Source: SYS.ALL_OBJECTS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## invalid_objects
+
+Source: SYS.ALL_OBJECTS
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+"
+`;
+
+exports[`keeps security drift bytes unchanged 1`] = `
+"{"left":"left","right":"right","scope":"security","generatedAt":"2026-11-01T00:00:00.000Z","complete":true,"hasDrift":false,"sections":[{"name":"powerful-privileges","source":"readSecurityPosture","status":"ok","notes":["left: 0 privilege findings; 0 distinct subjects.","right: 0 privilege findings; 0 distinct subjects."],"onlyLeft":[],"onlyRight":[],"different":[]},{"name":"public-grants","source":"readSecurityPosture","status":"ok","notes":["left: 0 privilege findings; 0 distinct subjects.","right: 0 privilege findings; 0 distinct subjects."],"onlyLeft":[],"onlyRight":[],"different":[]}]}
+# Drift: left → right
+
+Scope: security. Complete comparison.
+
+## powerful-privileges
+
+Source: readSecurityPosture
+
+left: 0 privilege findings; 0 distinct subjects.
+
+right: 0 privilege findings; 0 distinct subjects.
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+
+## public-grants
+
+Source: readSecurityPosture
+
+left: 0 privilege findings; 0 distinct subjects.
+
+right: 0 privilege findings; 0 distinct subjects.
+
+### onlyLeft
+
+None.
+
+### onlyRight
+
+None.
+
+### different
+
+None.
+"
+`;
