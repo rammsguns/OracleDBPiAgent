@@ -1,0 +1,23 @@
+# Backup and recoverability
+
+Run `piagent backup --target d1-19c-lab` or add `--json` for the complete structured report. This deterministic command uses only bounded SELECTs through the existing Oracle 19c/account/read-only gates. It never contacts Strata or executes RMAN. Findings do not change the exit code; unexpected connection/query failures do.
+
+`readBackup(session)` and `renderBackupMarkdown(report)` are exported from `src/backup/index.ts` for downstream integrations. Types are local; no shared contract changes are required. The result includes stable finding IDs, severity and evidence IDs, raw named-column evidence with SQL, per-view status and truncation, per-datafile full/level-0 and incremental completion times, archive gaps, FRA balance in bytes and a restore-to-time estimate. Partial reports remain useful and never equate missing privileges with missing backups.
+
+Each current datafile is matched by file number and creation SCN. Backup sets must have all expected pieces available and not deleted; backup datafile records must belong to the current resetlogs incarnation. Full backups include nonincremental fulls and level 0. Last incremental times are inventory facts, not proof of a valid incremental chain. Image copies and external recovery catalogs are outside this reader, so an absence refers only to the queried control-file history.
+
+Findings cover no full/level 0 in seven days (per file), sequence gaps after the oldest full checkpoint, explicit control-file autobackup OFF, recorded block corruption, files needing recovery and no backups recorded. When access is unavailable, the high finding says “not verifiable from this database.” An omitted configuration row does not assert OFF: effective defaults depend on database configuration. RMAN configuration, including explicit retention settings, and job outcomes are included as evidence without inventing defaults.
+
+Archive duplicates are deduplicated by incarnation, thread and sequence. Log history supplies expected sequences even when an archived log is missing at the ends. Deleted/unavailable archived logs cannot fill a gap. A candidate restore interval requires complete readable evidence, full backups for every visible datafile, ARCHIVELOG mode, no gaps/corruption/recovery rows, and continuous SCN coverage from the oldest backup checkpoint for every visible history thread. The latest full completion bounds the start; the earliest continuous archived-log end across threads bounds the end. A requested time X outside these bounds is not established. PDB snapshots never receive a positive candidate because whole-CDB completeness cannot be established. No candidate is a recovery guarantee: backup media, encryption keys, external catalogs, online redo and actual restore duration remain unverified. Empty gap lists without a full baseline do not mean gap-free recovery.
+
+FRA balance reports allocation, used, reclaimable, nonreclaimable and remaining capacity after potential reclaim. Reclaimable space is not free space and no deletion is requested.
+
+All backup, redo, control-file and FRA evidence is labelled **CDB-wide (shared by all PDBs)** when connected to a PDB. Current datafile inventory remains limited to PDB visibility. Empty PDB results cannot establish absence, whole-CDB completeness or a safe whole-CDB restore. ORA-00942, ORA-01031 and ORA-65040 degrade only their own view. Row caps remain explicit and prevent a positive estimate. Statements are sequential snapshots, not one atomic capture.
+
+For a human DBA: use RMAN's SHOW ALL and LIST BACKUP SUMMARY to compare the configured policy and backup inventory with the cited evidence in an approved DBA session.
+
+For a human DBA: design and validate the intended point-in-time restore in an approved recovery environment, checking every datafile, redo thread, control file, encryption key and backup medium. The application executes none of these operations.
+
+The proposed p1 SELECT-only grants are in `grants-request-2026-11-06-backup.sql`. They have not been applied. WP-25D must re-premise the affected eval cases before the coordinator considers grants.
+
+Oracle 19c references: [V$RMAN_CONFIGURATION](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-RMAN_CONFIGURATION.html), [RMAN configuration and defaults](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/configuring-rman-client-basic.html), [backup concepts](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/rman-backup-concepts.html). Live PDB, RAC and media recovery behaviour remain unverified; the labs are non-CDBs.
