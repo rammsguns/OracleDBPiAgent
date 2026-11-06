@@ -72,6 +72,16 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const p24 = cases.filter(test => test.id.startsWith('hard-p24-'));
+	if (p24.length) {
+		if (p24.length !== 6 || ['d1-19c-lab', 'p1-19c-prod'].some(target => p24.filter(test => test.target === target).length !== 3)) throw new Error('Phase 24 needs six cases, three per target');
+		for (const test of p24) {
+			if (test.split !== 'challenge' || test.category !== 'space' || test.groundTruth?.mode !== 'rowCells') throw new Error('Phase 24 requires challenge rowCells truth');
+			if (/\b(?:DBA_EXTENTS|DBA_HIST_\w*|V\$ACTIVE_SESSION_HISTORY|AWR\w*)\b/i.test(test.groundTruth.sql)) throw new Error('Forbidden Phase 24 truth view');
+			if (/\b(?:V\$\w+|DBA_\w+|ALL_\w+|run_query|tablespace_usage)\b/i.test(test.question ?? '')) throw new Error('Phase 24 questions must not name tools or views');
+		}
+	}
+
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
