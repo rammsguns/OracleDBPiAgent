@@ -97,3 +97,10 @@ it.each([
 	expect(r.sections.recovery.status).toBe('skipped');
 	expect(r.findings.find(f=>f.id==='redo-no-archive-destination')?.severity).toBe(high?'high':undefined);
 });
+
+it('renders empty sections plainly with single blank lines', async () => {
+	const md = renderSpaceMarkdown(await readSpaceUsage(fixture()));
+	expect(md).toContain('None in this snapshot.');
+	expect(md).not.toContain('<details><summary>No rows');
+	expect(md).not.toMatch(/\n{3,}/);
+});

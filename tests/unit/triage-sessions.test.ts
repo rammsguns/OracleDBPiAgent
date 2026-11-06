@@ -122,3 +122,15 @@ it('ranks an actual blocking chain ahead of error evidence', async () => {
 	expect(result.hypotheses[0]).toMatchObject({ rank: 1, title: 'A live blocking chain is a likely cause.' });
 	expect(result.hypotheses.slice(1).some(h => h.evidence.includes('ORA-02292'))).toBe(true);
 });
+
+it('nests session evidence without duplicate titles or unrequested sections', async () => {
+	const { ctx } = setup();
+	const md = renderTriageMarkdown(await triage(ctx, { target: 'd1-19c-lab', issue: 'sessions are blocked waiting on a row lock' }));
+	expect(md.match(/^# /gm)).toHaveLength(1);
+	expect(md).not.toContain('# Sessions —');
+	expect(md).toContain('#### Blocking tree');
+	expect(md).toContain('#### Waits since');
+	expect(md).not.toContain('## Active sessions');
+	expect(md).not.toContain('## Time model');
+	expect(md).not.toContain('Status: skipped');
+});

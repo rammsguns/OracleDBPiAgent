@@ -172,3 +172,11 @@ it('does not append a trailing space to a skipped section without a note',async(
 	const a=await readSessionActivity(fixture(),{sections:['active']});
 	const md=renderSessionsMarkdown(a);expect(md).toContain('Status: skipped.\n');expect(md).not.toMatch(/^Status:.* +$/m);
 });
+
+it('renders empty sections plainly and uses single blank lines with waits', async () => {
+	const activity = await readSessionActivity(fixture({ waits: [['read', 'User I/O', 1, 1000]] }));
+	const md = renderSessionsMarkdown(activity);
+	expect(md).toContain('None in this snapshot.');
+	expect(md).not.toContain('<details>');
+	expect(md).not.toMatch(/\n{3,}/);
+});
