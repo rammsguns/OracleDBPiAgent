@@ -4,6 +4,51 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-06
+
+### Added
+
+- **Your own Oracle 19c databases, including CDB/PDB.**
+  - List your targets in a private `~/.piagent/targets.json`, or point
+    `PIAGENT_TARGETS_FILE` at one. The file must be owned by you and not
+    group- or other-writable. It holds 1–20 strictly validated targets.
+  - Without that file, the packaged lab targets are used, pinned as before.
+  - See [real targets](docs/real-targets.md).
+- **Read-only account check on every connect.** The connection is refused
+  if:
+  - the account is not the configured user;
+  - the session is a proxy session or has DBA (`ISDBA`) status;
+  - it holds any system privilege beyond CREATE SESSION, ALTER SESSION,
+    SET CONTAINER and the SELECT/READ ANY family;
+  - it holds any object privilege other than SELECT or READ. EXECUTE and
+    FLASHBACK are accepted only on objects owned by Oracle-maintained
+    users.
+
+  `CDB$ROOT` is refused: connect through the PDB service. System accounts
+  such as SYS and SYSTEM are refused when the file is loaded.
+- `piagent targets check --target T [--json] [--grants-sql]` shows the
+  version, the container, the account-check result and which views each
+  feature can read. `--grants-sql` prints the SELECT grants a DBA would run.
+  It never applies them.
+- [`docs/grants-template-pdb.sql`](docs/grants-template-pdb.sql) is a
+  SELECT-only PDB grant template for a DBA.
+- `piagent init` writes a commented `targets.example.json`.
+- `doctor` checks every configured target.
+
+### Changed
+
+- In a PDB, container-wide facts are shown with a "CDB-wide" label instead
+  of being presented as PDB facts. This covers the instance, memory, redo,
+  recovery area, and undo when shared.
+- A view that is missing, not granted or unavailable in a PDB
+  (ORA-00942, ORA-01031 or ORA-65040) gives a per-section note. It no
+  longer fails the whole command.
+
+### Not yet verified
+
+- Live behaviour inside a 19c PDB: the development labs are non-CDB.
+- RAC, Data Guard standby and TCPS/wallets.
+
 ## [1.3.0] - 2026-11-06
 
 ### Added
