@@ -1,0 +1,73 @@
+{
+	"scope": "CDB-wide (shared by all PDBs)",
+	"records": [
+		{
+			"id": "hard-p27-d1-stat-classes",
+			"target": "d1-19c-lab",
+			"rows": [
+				[
+					"parse count (hard)",
+					64
+				],
+				[
+					"parse count (total)",
+					64
+				],
+				[
+					"physical reads",
+					8
+				],
+				[
+					"redo size",
+					2
+				],
+				[
+					"session logical reads",
+					1
+				],
+				[
+					"user calls",
+					1
+				],
+				[
+					"user commits",
+					1
+				]
+			]
+		},
+		{
+			"id": "hard-p27-p1-stat-classes",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"parse count (hard)",
+					64
+				],
+				[
+					"parse count (total)",
+					64
+				],
+				[
+					"physical reads",
+					8
+				],
+				[
+					"redo size",
+					2
+				],
+				[
+					"session logical reads",
+					1
+				],
+				[
+					"user calls",
+					1
+				],
+				[
+					"user commits",
+					1
+				]
+			]
+		}
+	]
+}
