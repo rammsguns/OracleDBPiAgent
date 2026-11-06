@@ -1,3 +1,4 @@
+import { spaceMetrics } from './space.js';
 import { sessionMetrics } from './sessions.js';
 import type { DatabaseReport, ReportSection } from './index.js';
 import type { ReportHistory } from './history.js';
@@ -77,6 +78,14 @@ export function buildReportTrends(history: ReportHistory): ReportTrends {
 			return a && b && typeof a.STARTUP_TIME === 'string' && a.STARTUP_TIME.length > 0 && a.STARTUP_TIME === b.STARTUP_TIME && Number(b.VALUE) >= Number(a.VALUE) ? Number(b.VALUE) - Number(a.VALUE) : null;
 		}, [['METRIC', 'WAIT_CLASS', 'VALUE', 'STATUS', 'STARTUP_TIME']]);
 		result.notes.push('Session wait points are deltas between adjacent reports with the same instance startup; missing snapshots, restarts and counter decreases are gaps. Counts describe visible snapshots.');
+	}
+	if (reports.some(r => r.sections.some(s => s.name === 'space'))) {
+		const metrics = new Map<string, { metric: string; name: string }>();
+		for (const report of reports) for (const row of spaceMetrics(report.sections.find(s => s.name === 'space'))) if (typeof row.NAME === 'string') metrics.set(JSON.stringify([row.METRIC, row.NAME]), { metric: String(row.METRIC), name: row.NAME });
+		for (const { metric, name } of [...metrics.values()].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))) add(`space:${metric}:${name}`, `Space ${metric} ${name}`, 'bytes', ['space'], ([section]) => {
+			const row = spaceMetrics(section).find(r => r.METRIC === metric && r.NAME === name);
+			return row ? Number(row.VALUE) : null;
+		}, [['METRIC', 'NAME', 'VALUE', 'MAX_BYTES', 'STATUS']]);
 	}
 	if (gaps) result.notes.push(`${gaps} series observation(s) missing, unavailable or incompatible; shown as gaps.`);
 	if (reports.some(r => r.sections.some(s => /row limit/i.test(s.note)))) result.notes.push('Row-limited snapshots: counts describe visible saved rows, not database totals.');

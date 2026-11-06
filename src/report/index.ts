@@ -1,3 +1,5 @@
+import { formatBytes } from '../space/index.js';
+import { readReportSpace } from './space.js';
 import { readReportSessions } from './sessions.js';
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError } from '../contracts.js';
@@ -14,8 +16,8 @@ export interface ReportSection {
 	note: string;
 }
 export interface DatabaseReport { target: string; generatedAt: string; sections: ReportSection[] }
-export interface ReportOptions { target?: string; owner?: string; sections?: string[] }
-export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions'];
+export interface ReportOptions { target?: string; owner?: string; sections?: string[]; historyDirectory?: string }
+export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions', 'space'];
 const groups: Record<string, string[]> = { backups: ['backups', 'archive_switches'], scheduler_jobs: ['scheduler_jobs', 'scheduler_failures'], index_health: ['index_health', 'index_partitions', 'index_subpartitions'] };
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
@@ -84,9 +86,19 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 			report.sections.push({ name: 'sessions', status: 'unavailable', source: 'readSessionActivity', columns: [], rows: [], note: `not available: ${safeReason(error, 'sessions metadata')}` });
 		}
 	}
+	if (selected?.has('space')) {
+		try {
+			const { loadReportHistory, reportDirectory } = await import('./history.js');
+			const history = await loadReportHistory(options.historyDirectory ?? reportDirectory(), target, ctx.config.targets);
+			report.sections.push(await readReportSpace(ctx, target, history.reports));
+		} catch (error) {
+			if (error instanceof UnsupportedVersionError) throw error;
+			report.sections.push({ name: 'space', status: 'unavailable', source: 'readSpaceUsage', columns: [], rows: [], note: `not available: ${safeReason(error, 'space metadata or saved history')}` });
+		}
+	}
 	return report;
 }
 const cell = (value: unknown): string => String(value === null || value === undefined ? 'NULL' : value instanceof Date ? value.toISOString() : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, ' ');
 export function renderMarkdown(report: DatabaseReport): string {
-	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...report.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, s.note, ...((s.status === 'ok' || s.name === 'security' && s.rows.length > 0) ? s.rows.length ? [`| ${s.columns.map(cell).join(' | ')} |`, `| ${s.columns.map(() => '---').join(' | ')} |`, ...s.rows.map(r => `| ${r.map(cell).join(' | ')} |`)] : ['No matching rows.'] : [])].filter(Boolean).join('\n\n'))].join('\n\n') + '\n';
+	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...report.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, s.note, ...((s.status === 'ok' || s.name === 'security' && s.rows.length > 0) ? s.rows.length ? [`| ${s.columns.map(cell).join(' | ')} |`, `| ${s.columns.map(() => '---').join(' | ')} |`, ...s.rows.map(r => `| ${r.map((v, i) => cell(s.name === 'space' && ['VALUE', 'MAX_BYTES', 'BYTES_PER_DAY'].includes(s.columns[i]!) && typeof v === 'number' ? formatBytes(v) + (s.columns[i] === 'BYTES_PER_DAY' ? '/day' : '') : v)).join(' | ')} |`)] : ['No matching rows.'] : [])].filter(Boolean).join('\n\n'))].join('\n\n') + '\n';
 }

@@ -1,3 +1,4 @@
+import { compareSpace } from './space.js';
 import { readReportSecurity } from '../report/security.js';
 import { createHash } from 'node:crypto';
 import { UnsupportedVersionError, type ToolContext } from '../contracts.js';
@@ -11,11 +12,12 @@ export interface DriftSection {
 	different: { key: string; left: unknown[]; right: unknown[] }[];
 }
 export interface DriftResult extends DriftOptions { generatedAt: string; complete: boolean; hasDrift: boolean; sections: DriftSection[] }
-export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects' | 'security'; owner?: string } {
+export function parseScope(scope: string): { kind: 'parameters' | 'schema' | 'objects' | 'security' | 'space'; owner?: string } {
+	if (scope === 'space') return { kind: 'space' };
 	if (scope === 'security') return { kind: 'security' };
 	if (scope === 'parameters') return { kind: 'parameters' };
 	const match = /^(schema|objects):([A-Za-z][A-Za-z0-9_$#]{0,127})$/.exec(scope);
-	if (!match) throw new Error('Scope must be parameters, security, schema:OWNER or objects:OWNER');
+	if (!match) throw new Error('Scope must be parameters, security, space, schema:OWNER or objects:OWNER');
 	return { kind: match[1] as 'schema' | 'objects', owner: match[2]!.toUpperCase() };
 }
 /** Collapse whitespace outside quoted SQL literals/identifiers only. Never erase literal differences. */
@@ -48,6 +50,7 @@ export function compareEntries(left: DriftEntry[], right: DriftEntry[]): Pick<Dr
 export async function compareTargets(ctx: ToolContext, options: DriftOptions): Promise<DriftResult> {
 	const scope = parseScope(options.scope);
 	for (const target of [options.left, options.right]) if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned drift target');
+	if (scope.kind === 'space') return compareSpace(ctx, options);
 	if (scope.kind === 'security') return compareSecurity(ctx, options);
 	const definitions = scope.kind === 'parameters' ? [parameterQuery] : scope.kind === 'schema' ? schemaQueries : objectQueries;
 	const result: DriftResult = { ...options, scope: scope.owner ? `${scope.kind}:${scope.owner}` : scope.kind, generatedAt: new Date().toISOString(), complete: true, hasDrift: false, sections: [] };
