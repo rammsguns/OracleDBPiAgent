@@ -67,11 +67,12 @@ Inspect query builders as well as literal FROM/JOIN matches: PL/SQL and triage
 expand fixed DBA/ALL suffixes; reports expand stats/jobs/runs; SQL insight expands
 TAB/IND statistics and baselines/profiles; tools
 replace ALL with DBA for fixed describe/source fallbacks.
-Do not treat policy denylists, arbitrary `run_query` text, or dictionary-hint name
-catalogs as fixed feature queries. This is a reviewed source inventory, not a SQL
+Do not treat policy denylists or arbitrary `run_query` text as fixed feature
+queries. The bounded dictionary-hint catalog is also included in readiness
+probes and grants. This is a reviewed source inventory, not a SQL
 parser or a claim that every view is visible inside every PDB.
 
-The resolved fixed-query set has **98 views**. Its **48 additions** over
+The resolved fixed-query set has **104 views**. Its **54 additions** over
 the historical SYS grant union are listed below (SYS owner; underlying names):
 
 - `ALL_ARGUMENTS`
@@ -96,6 +97,12 @@ the historical SYS grant union are listed below (SYS owner; underlying names):
 - `ALL_TAB_STATISTICS`
 - `ALL_USERS`
 - `ALL_VIEWS`
+- `DATABASE_PROPERTIES`
+- `DBA_TRIGGERS`
+- `DBA_SCHEDULER_JOB_LOG`
+- `DBA_SCHEDULER_PROGRAMS`
+- `DBA_SCHEDULER_PROGRAM_ARGS`
+- `DBA_SCHEDULER_SCHEDULES`
 - `DBA_CONSTRAINTS`
 - `DBA_CONS_COLUMNS`
 - `DBA_INDEXES`
@@ -139,7 +146,7 @@ this comparison does not claim the current fixed commands read every one:
 - `V_$SQL_PLAN_STATISTICS_ALL`
 - `V_$TEMPFILE`
 
-The template's **107 explicit SELECT grants** are exactly the union of those
+The template's **113 explicit SELECT grants** are exactly the union of those
 two sets; its ordered statements are the complete exact inventory. Publicly
 readable ALL/USER/SESSION views, DUAL, PRODUCT_COMPONENT_VERSION and
 NLS_DATABASE_PARAMETERS are included explicitly for review; normally no extra

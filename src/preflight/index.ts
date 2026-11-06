@@ -1,5 +1,5 @@
 import type { SessionProvider } from '../contracts.js';
-import { FEATURE_VIEWS } from './views.js';
+import { FEATURE_VIEWS, grantObject } from './views.js';
 export async function checkTarget(sessions: SessionProvider, target: string) {
 	const session = await sessions.get(target);
 	try {
@@ -18,7 +18,7 @@ export async function checkTarget(sessions: SessionProvider, target: string) {
 			probed.set(view, status);
 			views.push({ feature, view, status });
 		}
-		const grantsSql = [...new Set(views.filter(v => v.status === 'missing').map(v => `GRANT SELECT ON SYS.${v.view.replace(/^V\$/, 'V_$')} TO "${session.target.username.toUpperCase()}";`))];
+		const grantsSql = [...new Set(views.filter(v => v.status === 'missing').map(v => `GRANT SELECT ON SYS.${grantObject(v.view)} TO "${session.target.username.toUpperCase()}";`))];
 		return { identity: session.identity, accountCheck: 'passed', views, grantsSql };
 	} finally { await session.close(); }
 }

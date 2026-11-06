@@ -37,6 +37,7 @@ export const FEATURE_VIEWS: Record<string, readonly string[]> = {
 		"V$WAIT_CHAINS"
 	],
 	"space": [
+		"DATABASE_PROPERTIES",
 		"DBA_DATA_FILES",
 		"DBA_FREE_SPACE",
 		"DBA_LOBS",
@@ -146,12 +147,52 @@ export const FEATURE_VIEWS: Record<string, readonly string[]> = {
 	]
 };
 
+FEATURE_VIEWS.security = [...FEATURE_VIEWS.security!, 'AUDIT_UNIFIED_ENABLED_POLICIES', 'AUDIT_UNIFIED_POLICIES'];
+FEATURE_VIEWS.sql = [...FEATURE_VIEWS.sql!, 'DBA_SQL_PLAN_BASELINES', 'DBA_SQL_PROFILES', 'DBA_TAB_STATISTICS', 'DBA_IND_STATISTICS', 'ALL_IND_STATISTICS'];
+
 // Report adapters reuse the deterministic feature readers. Triage composes the same evidence.
 FEATURE_VIEWS.report = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.sessions!, ...FEATURE_VIEWS.space!, ...FEATURE_VIEWS.security!, ...FEATURE_VIEWS.sql!, ...FEATURE_VIEWS.alertlog!])];
-FEATURE_VIEWS.triage = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.plsql!])];
+FEATURE_VIEWS.triage = [...new Set([...FEATURE_VIEWS.report!, ...FEATURE_VIEWS.plsql!, 'DBA_TABLES', 'DBA_CONSTRAINTS', 'DBA_CONS_COLUMNS', 'ALL_TABLES', 'ALL_CONSTRAINTS', 'ALL_CONS_COLUMNS'])];
 
 for (const query of reportQueries) {
 	const sources = [query.source, query.fallback?.source ?? ''].join(' ');
 	FEATURE_VIEWS[`report:${query.name}`] = [...new Set(sources.match(/\b(?:V\$|DBA_|ALL_|PRODUCT_COMPONENT_)[A-Z0-9_$]+/g) ?? [])];
 }
 for (const feature of ['sessions', 'security', 'space']) FEATURE_VIEWS[`report:${feature}`] = FEATURE_VIEWS[feature]!;
+
+/** Exceptions to the usual V$ -> V_$ rule, verified on both 19c labs.
+ * Oracle's TEMPSEG_USAGE reference documents the public name; ALL_SYNONYMS
+ * supplies its actual grant object. See docs/wp-28d-preflight-catalog.md.
+ */
+export const V_SYNONYM_BASE_OBJECTS: Readonly<Record<string, string>> = {
+	'V$TEMPSEG_USAGE': 'V_$SORT_USAGE',
+};
+
+export function grantObject(view: string): string {
+	return V_SYNONYM_BASE_OBJECTS[view] ?? view.replace(/^V\$/, 'V_$');
+}
+
+// Includes dictionary fallbacks and cached-plan support used by ask tools.
+FEATURE_VIEWS.ask = [
+	'ALL_USERS', 'ALL_OBJECTS', 'ALL_TAB_COLUMNS', 'ALL_CONSTRAINTS',
+	'ALL_CONS_COLUMNS', 'ALL_INDEXES', 'ALL_IND_COLUMNS', 'ALL_TABLES',
+	'ALL_VIEWS', 'ALL_SOURCE',
+	'PRODUCT_COMPONENT_VERSION', 'NLS_DATABASE_PARAMETERS',
+	'V$DATABASE', 'V$INSTANCE', 'V$SGA', 'V$PGASTAT',
+	'V$SQL', 'V$SQLSTATS', 'V$SQL_PLAN', 'V$SQL_PLAN_STATISTICS_ALL',
+	'V$SESSION', 'V$LOCK', 'V$SYSTEM_EVENT',
+	'DBA_USERS', 'DBA_OBJECTS', 'DBA_SEGMENTS', 'DBA_DATA_FILES',
+	'DBA_FREE_SPACE', 'DBA_TABLESPACES', 'DBA_TABLESPACE_USAGE_METRICS',
+	'DBA_TABLES', 'DBA_TAB_COLUMNS', 'DBA_CONSTRAINTS', 'DBA_CONS_COLUMNS',
+	'DBA_INDEXES', 'DBA_IND_COLUMNS', 'DBA_VIEWS', 'DBA_SOURCE',
+	'DBA_TAB_COL_STATISTICS', 'DBA_IND_STATISTICS',
+	'DBA_SQL_PLAN_BASELINES', 'DBA_SQL_PROFILES',
+	'DBA_TRIGGERS', 'DBA_SCHEDULER_JOB_LOG', 'DBA_SCHEDULER_PROGRAMS',
+	'DBA_SCHEDULER_PROGRAM_ARGS', 'DBA_SCHEDULER_SCHEDULES',
+	'DBA_ARGUMENTS', 'DBA_ERRORS', 'DBA_DEPENDENCIES', 'DBA_PROCEDURES',
+	'DBA_SCHEDULER_JOBS', 'DBA_SCHEDULER_JOB_RUN_DETAILS',
+];
+// These queries run before feature probes as part of the connection gate.
+FEATURE_VIEWS.connection = ['PRODUCT_COMPONENT_VERSION', 'ROLE_TAB_PRIVS', 'SESSION_PRIVS', 'SESSION_ROLES', 'USER_TAB_PRIVS', 'ALL_USERS', 'DUAL'];
+
+FEATURE_VIEWS.drift = ['V$PARAMETER', 'ALL_CONSTRAINTS', 'ALL_CONS_COLUMNS', 'ALL_INDEXES', 'ALL_IND_COLUMNS', 'ALL_IND_EXPRESSIONS', 'ALL_OBJECTS', 'ALL_TABLES', 'ALL_TAB_COLUMNS'];
