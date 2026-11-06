@@ -57,6 +57,8 @@ export async function readReportSpace(ctx: ToolContext, target: string, history:
 		if (!complete || !section.rows.length) rows.push([id, null, null, null, status, null, null, section.note ?? null]);
 	}
 	const result: ReportSection = { name: 'space', status: data.status === 'failed' ? 'unavailable' : 'ok', source: 'readSpaceUsage', columns: ['METRIC', 'NAME', 'VALUE', 'MAX_BYTES', 'STATUS', 'BYTES_PER_DAY', 'DAYS_TO_FULL', 'FORECAST'], rows, note: 'JSON values are raw bytes; Markdown uses binary units (KiB, MiB, GiB, TiB). Days to autoextend maximum use a linear least-squares fit over at least 3 observations spanning 24 hours. Space gauges do not reset on instance restart. Snapshot is a sequence of reads. ' + data.findings.map(f => `${f.severity}: ${f.subject}: ${f.detail} ${f.advice}`).join(' ') };
+	const scopeNotes = Object.values(data.sections).map(s => s.note).filter((note): note is string => !!note && note.includes('Container:'));
+	if (scopeNotes.length) result.note += ' ' + scopeNotes.join(' ');
 	const current: DatabaseReport = { target, generatedAt: data.capturedAt, sections: [result] };
 	for (const row of rows) if (row[0] === 'tablespace' && row[4] === 'ok') {
 		const fit = fitSpaceGrowth(spaceHistoryPoints([...history.filter(r => Date.parse(r.generatedAt) < Date.parse(current.generatedAt)), current], 'tablespace', String(row[1]), Number(row[3])), Number(row[3]));

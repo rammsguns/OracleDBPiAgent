@@ -5,7 +5,7 @@ function setup() {
 	const query = vi.fn().mockResolvedValue({columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const close = vi.fn();const get = vi.fn().mockResolvedValue({query,close});const record=vi.fn();
 	const ctx = {config:{defaultTarget:'lab',targets:[{name:'lab',defaultSchema:'HR',environment:'development',description:'Lab'}],limits:{maxRows:10,maxToolResultBytes:1000}},sessions:{get},audit:{record},runId:'test'} as unknown as ToolContext;
-	return {tools:createDbTools(ctx),get,query,close,record};
+	return {tools:createDbTools(ctx),get,query,close,record,ctx};
 }
 it('registers every MVP tool and lists targets without database access',async()=>{
 	const {tools,get,record}=setup();expect(tools).toHaveLength(12);expect(new Set(tools.map(t=>t.name)).size).toBe(12);
@@ -163,10 +163,21 @@ it('fixed tools explain PDB-inapplicable errors while preserving thrown PI failu
 	await expect(tools.find(t => t.name === 'top_sql')!.execute('pdb', {})).rejects.toThrow('not available in this container / not granted');
 	expect(close).toHaveBeenCalledOnce();
 });
-it('degrades mixed-scope db_overview in a PDB before exposing unlabeled CDB facts', async () => {
-	const { tools, get, query, close } = setup();
-	get.mockResolvedValue({ query, close, identity: { isCdb: true, containerName: 'SALES' } });
-	await expect(tools.find(t => t.name === 'db_overview')!.execute('pdb', {})).rejects.toThrow('memory facts are CDB-wide');
-	expect(query).not.toHaveBeenCalled();
+it('returns labeled PDB overview facts and container with independent view reads', async () => {
+	const { tools, get, query, close, ctx } = setup();
+	ctx.config.limits.maxToolResultBytes = 10000;
+	get.mockResolvedValue({ query, close, target: { name: 'lab' }, identity: { isCdb: true, containerName: 'SALES' } });
+	const result = await tools.find(t => t.name === 'db_overview')!.execute('pdb', {});
+	expect(query).toHaveBeenCalledTimes(6);
+	expect(result.details.columns).toContain('CONTAINER_NAME');
+	expect(result.content[0]).toMatchObject({ text: expect.stringContaining('CDB-wide (shared by all PDBs in this CDB)') });
 	expect(close).toHaveBeenCalledOnce();
+});
+it('keeps non-CDB overview output byte-identical to legacy sessions', async ()=> {
+	const legacy=setup(),current=setup();
+	current.get.mockResolvedValue({query:current.query,close:current.close,identity:{isCdb:false,containerName:'ORCL'}});
+	const before=await legacy.tools.find(t=>t.name==='db_overview')!.execute('a',{});
+	const after=await current.tools.find(t=>t.name==='db_overview')!.execute('a',{});
+	expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+	expect(current.query.mock.calls).toEqual(legacy.query.mock.calls);
 });

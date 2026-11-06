@@ -4,6 +4,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolContext, QueryResult, OracleSession } from "../contracts.js";
 import { classifySql } from "../oracle/sqlPolicy.js";
 
+import { readPdbOverview } from "./overview.js";
+
 const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
 
 const str = () => Type.Optional(Type.String());
@@ -87,7 +89,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					if (!sql) throw new Error("Unknown tool");
 					const session = await ctx.sessions.get(target);
 					try {
-						if (name === "db_overview" && session.identity?.isCdb) throw new Error("db_overview not available in a PDB: database, instance and memory facts are CDB-wide; use the identity report for current PDB identity");
+
 						if (name === "explain_plan" && p.sql) {
 							const statement = classifySql(p.sql);
 							if (statement.length > 1000) throw new Error("For SQL longer than 1000 characters provide sql_id only");
@@ -110,7 +112,8 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 								dictionaryView = answer.view;
 								if (answer.view.startsWith("DBA_")) sql = sql.replace(/\ball_([a-z_]+)\b/gi, "dba_$1");
 								result = answer;
-							} else result = await session.query(sql, binds, { maxRows });
+							} else if (name === "db_overview" && session.identity?.isCdb) result = await readPdbOverview(session, ctx);
+							else result = await session.query(sql, binds, { maxRows });
 						}
 						catch (error) {
 							if (name === "run_query") throw await queryErrorHint(error, sql, session, ctx);
