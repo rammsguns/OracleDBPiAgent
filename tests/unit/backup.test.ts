@@ -25,6 +25,25 @@ describe('backup evidence',()=>{
 	for(const code of ['ORA-00942','ORA-01031','ORA-65040']) it('degrades per view '+code,async()=>{const r=await readBackup(session({},true,code),now);expect(r.status).toBe('partial');expect(r.findings[0]?.detail).toContain('not verifiable');expect(Object.values(r.evidence).every(e=>e.note?.includes(code))).toBe(true);});
 	it('does not infer absence in a PDB',async()=>{const r=await readBackup(session({},true),now);expect(r.scope).toContain('CDB-wide (shared by all PDBs)');expect(r.findings[0]?.detail).toContain('not verifiable');expect(r.findings.some(f=>f.id.startsWith('level0'))).toBe(false);});
 	it('retains a conservative candidate bound',async()=>{const r=await readBackup(session(base),now);expect(r.files[0]?.level0).toBe('2026-11-05T00:00:00.000Z');expect(r.restoreEstimate.status).toBe('candidate');});
+	it('matches backup-set and piece identifiers across numeric representations',async()=>{
+		const r=await readBackup(session({...base,sets:[{SET_STAMP:'3',SET_COUNT:4n,PIECES:1}],pieces:[{...base.pieces[0],SET_STAMP:3n,SET_COUNT:'4'}]}),now);
+		expect(r.files[0]?.level0).toBe('2026-11-05T00:00:00.000Z'); expect(r.restoreEstimate.status).toBe('candidate');
+	});
+	it('does not match different or missing set identifiers',async()=>{
+		for(const SET_STAMP of [null,undefined,'bad',5]) {
+			const r=await readBackup(session({...base,sets:[{SET_STAMP,SET_COUNT:4,PIECES:1}]}),now);
+			expect(r.files[0]?.level0).toBeNull();
+		}
+	});
+	it.each([null,'not-a-date'])('sorts unparseable completion time %s after valid fulls and incrementals',async bad=>{
+		const full=base.backups[0]!;
+		const r=await readBackup(session({...base,backups:[{...full,COMPLETION_TIME:bad},{...full,INCREMENTAL_LEVEL:1,COMPLETION_TIME:bad},full,{...full,INCREMENTAL_LEVEL:1,COMPLETION_TIME:'2026-11-06T00:00:00Z'},{...full,COMPLETION_TIME:'2026-11-04T00:00:00Z'}]}),now);
+		expect(r.files[0]).toMatchObject({level0:'2026-11-05T00:00:00.000Z',incremental:'2026-11-06T00:00:00.000Z'});
+	});
+	it('keeps wholly unparseable backup times unverifiable',async()=>{
+		const r=await readBackup(session({...base,backups:[{...base.backups[0],COMPLETION_TIME:null},{...base.backups[0],COMPLETION_TIME:'bad'}]}),now);
+		expect(r.files[0]?.level0).toBeNull(); expect(r.restoreEstimate.status).toBe('not-verifiable');
+	});
 	it('requires available pieces',async()=>{const r=await readBackup(session({...base,pieces:[]}),now);expect(r.files[0]?.level0).toBeNull();expect(r.restoreEstimate.status).toBe('not-verifiable');});
 	it('withholds a candidate on truncation',async()=>{expect((await readBackup(session(base,false,undefined,true),now)).restoreEstimate.status).toBe('not-verifiable');});
 	it('detects gaps, corruption, recovery, autobackup and stale fulls',async()=>{

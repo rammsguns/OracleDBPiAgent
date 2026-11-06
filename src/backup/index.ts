@@ -1,6 +1,7 @@
 import type { OracleSession } from '../contracts.js';
 import { SQL } from './sql.js';
 export { SQL } from './sql.js';
+export class BackupUsageError extends Error { constructor(message: string) { super(message); this.name = 'BackupUsageError'; } }
 export type EvidenceId = keyof typeof SQL;
 export interface Evidence {
 	view: string; sql: string; status: 'ok' | 'unavailable'; columns: string[];
@@ -17,7 +18,9 @@ export interface BackupReport {
 }
 const n = (v: unknown) => Number(v ?? 0);
 const date = (v: unknown): string | null => { if (v == null) return null; const d = v instanceof Date ? v : new Date(String(v)); return Number.isFinite(d.getTime()) ? d.toISOString() : null; };
-const time = (v: unknown) => { const d = date(v); return d ? Date.parse(d) : NaN; };
+// Invalid completion times sort after every valid Oracle date, without NaN comparators.
+const time = (v: unknown) => { const d = date(v); return d ? Date.parse(d) : Number.MIN_SAFE_INTEGER; };
+const sameIdentifier = (a: unknown, b: unknown) => a != null && b != null && Number.isSafeInteger(n(a)) && Number.isSafeInteger(n(b)) && n(a) === n(b);
 export async function readBackup(session: OracleSession, now = new Date()): Promise<BackupReport> {
 	const evidence = {} as BackupReport['evidence'];
 	for (const id of Object.keys(SQL) as EvidenceId[]) {
@@ -45,8 +48,8 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 	const add = (id: string, severity: Finding['severity'], detail: string, ids: EvidenceId[]) => findings.push({ id, severity, detail, evidence: ids, advice: 'For a human DBA: review the cited metadata and validate the restore plan and backup media using RMAN in an approved recovery environment.' });
 	const reset = n(rows('database')[0]?.['RESETLOGS_CHANGE#']);
 	const usable = rows('backups').filter(b => {
-		const set = rows('sets').find(s => s.SET_STAMP === b.SET_STAMP && s.SET_COUNT === b.SET_COUNT);
-		const pieces = rows('pieces').filter(p => p.SET_STAMP === b.SET_STAMP && p.SET_COUNT === b.SET_COUNT && p.STATUS === 'A' && p.DELETED === 'NO');
+		const set = rows('sets').find(s => sameIdentifier(s.SET_STAMP, b.SET_STAMP) && sameIdentifier(s.SET_COUNT, b.SET_COUNT));
+		const pieces = rows('pieces').filter(p => sameIdentifier(p.SET_STAMP, b.SET_STAMP) && sameIdentifier(p.SET_COUNT, b.SET_COUNT) && p.STATUS === 'A' && p.DELETED === 'NO');
 		return set && new Set(pieces.map(p => p['PIECE#'])).size >= n(set.PIECES) && n(set.PIECES) > 0 && n(b['RESETLOGS_CHANGE#']) === reset;
 	});
 	const files = rows('datafiles').map(f => {
