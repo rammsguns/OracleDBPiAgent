@@ -50,7 +50,8 @@ export async function readJobs(ctx: ToolContext, target: string, options: JobsOp
 			const clauses = [def.where, owner && def.owner ? `${def.owner} = :owner` : undefined, options.failedOnly ? def.failed : undefined].filter(Boolean);
 			const columns = def.columns.replace(/\b(LOG_DATE|ACTUAL_START_DATE|LAST_START_DATE|NEXT_RUN_DATE|NEXT_START_DATE|WINDOW_START_TIME|JOB_START_TIME|START_TIME|END_TIME)\b/g, column => `TO_CHAR(${column}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM') ${column}`);
 			const where = clauses.join(' AND ').replace(/:(fromTime|toTime)/g, bind => `TO_TIMESTAMP_TZ(${bind}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM')`);
-			const selectSql = `SELECT ${columns} FROM ${def.view}${clauses.length ? ' WHERE ' + where : ''}${def.group ? ' GROUP BY ' + def.group : ''} ORDER BY ${def.order}`;
+			const order = def.order.replace(/\b(LOG_DATE|WINDOW_START_TIME|START_TIME)\b/g, column => `${def.view}.${column}`);
+			const selectSql = `SELECT ${columns} FROM ${def.view}${clauses.length ? ' WHERE ' + where : ''}${def.group ? ' GROUP BY ' + def.group : ''} ORDER BY ${order}`;
 			const sql = def.latest ? `SELECT ${def.columns} FROM (SELECT ${columns}, ROW_NUMBER() OVER (PARTITION BY OWNER, JOB_NAME ORDER BY LOG_DATE DESC, LOG_ID DESC) RN FROM ${def.view} WHERE ${where}) WHERE RN = 1 ORDER BY ${def.order}` : selectSql;
 			const binds = { ...(def.where?.includes(':fromTime') ? { fromTime: from.toISOString().replace('Z', '+00:00'), toTime: to.toISOString().replace('Z', '+00:00') } : {}), ...(owner && def.owner ? { owner } : {}) };
 			const audit = { at: new Date().toISOString(), runId: ctx.runId, target, tool: `jobs:${name}`, sqlSha256: createHash('sha256').update(sql).digest('hex') };

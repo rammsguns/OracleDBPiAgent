@@ -24,6 +24,8 @@ describe('jobs read-only evidence', () => {
 		}
 		expect(result.sections.lastErrors!.sql).toContain('ROW_NUMBER()');
 		expect(result.sections.runs!.sql).toContain("STATUS <> 'SUCCEEDED'");
+		expect(result.sections.runs!.sql).toContain('ORDER BY DBA_SCHEDULER_JOB_RUN_DETAILS.LOG_DATE DESC');
+		expect(result.sections.runs!.sql).toContain('TO_TIMESTAMP_TZ(:fromTime');
 		expect(result.sections.jobs!.sql).not.toContain(':fromTime');
 		expect(result.sections.runs!.rows[0]!.ADDITIONAL_INFO_TRUNCATED).toBe(true);
 		expect(Buffer.byteLength(String(result.sections.runs!.rows[0]!.ADDITIONAL_INFO))).toBeLessThanOrEqual(2048);
