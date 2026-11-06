@@ -89,7 +89,7 @@ it("keeps native errors generic even when their messages contain private input",
 			expect(failure).toBeInstanceOf(Error);
 			if (!env.PIAGENT_TARGETS_FILE) expect(failure).not.toBeInstanceOf(SafeConfigError);
 			handleCliError(failure);
-			expect(output).toHaveBeenLastCalledWith(env.PIAGENT_TARGETS_FILE ? "Invalid or unapproved target configuration" : "piagent failed; check local configuration and service availability");
+			expect(output).toHaveBeenLastCalledWith(env.PIAGENT_TARGETS_FILE ? "targets.json must be a regular file owned by you and not group/other-writable (chmod 600 <path>); check the file exists and is not a symlink" : "piagent failed; check local configuration and service availability");
 		}
 	} finally { output.mockRestore(); process.exitCode = previous; }
 });

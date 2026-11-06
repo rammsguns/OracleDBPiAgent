@@ -1,4 +1,5 @@
-/** Reviewed fixed guidance only: never pass runtime input as a message. */
+import { targetErrorMessage, type TargetIssue } from './targetErrors.js';
+/** Reviewed fixed guidance or structured target templates; never accept arbitrary runtime messages. */
 export const SAFE_CONFIG_MESSAGES = Object.freeze([
 	"Set PIAGENT_LLM_API_KEY_FILE to your private Strata API-key file; the init placeholder is still configured. Edit your private .env or export PIAGENT_LLM_API_KEY_FILE.",
 	"LLM URL must be an HTTP loopback URL without credentials, query or fragment",
@@ -57,10 +58,10 @@ export const SAFE_CONFIG_MESSAGES = Object.freeze([
 export type SafeConfigMessage = typeof SAFE_CONFIG_MESSAGES[number];
 
 export class SafeConfigError extends Error {
-	constructor(message: SafeConfigMessage = SAFE_CONFIG_MESSAGES[0]) {
+	constructor(message: SafeConfigMessage | TargetIssue = SAFE_CONFIG_MESSAGES[0]) {
 		// Enforce the catalog even for untyped callers.
-		if (!SAFE_CONFIG_MESSAGES.includes(message)) throw new Error("Unreviewed configuration message");
-		super(message);
+		if (typeof message === "string" && !SAFE_CONFIG_MESSAGES.includes(message)) throw new Error("Unreviewed configuration message");
+		super(typeof message === "string" ? message : targetErrorMessage(message));
 		this.name = "SafeConfigError";
 	}
 }
