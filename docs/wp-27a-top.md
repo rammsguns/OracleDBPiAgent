@@ -15,6 +15,9 @@ Work is on branch wp-27a-top.
 
 ## Files
 
+- `src/oracle/sqlPolicy.ts`
+- `tests/unit/sqlPolicy.test.ts`
+- `tests/unit/triage-sqlperf.test.ts`
 - `src/top/index.ts`
 - `src/top/cli.ts`
 - `src/cli/index.ts`
@@ -35,16 +38,30 @@ The fixed reader and result types are exported from src/top/index.ts for
 WP-27B/WP-27C. JSON rankings use elapsedUs, cpuUs, bufferGets, physicalReads,
 executions; nullable delta/perSecond and state describe unmeasurable baselines.
 
-The existing global sqlPolicy refuses ASH, DBA_HIST_* and DBMS packages;
-unit tests prove ASH/AWR/DBMS_WORKLOAD_REPOSITORY/DBMS_LOCK and scheduler
-RUN_JOB refusals. It **does not refuse V$METRIC* history**. A coordinator
-must extend src/oracle/sqlPolicy.ts (outside this WP's owned paths), including
-metric-history aliases/qualified forms as appropriate, and add refusal tests.
-No metric history query was sent to a database. The local classifier probe:
+The coordinator authorized src/oracle/sqlPolicy.ts and policy test changes in
+this session. The metric-family gap is now closed. The guard examines complete
+executable identifier tokens after comments and literals are removed, before
+other refusal checks, and names the Diagnostics Pack with `piagent top` as the
+alternative. It covers V$/GV$/V_$/GV_$ forms, quotes, schema qualification,
+CTEs, subqueries, joins and comma joins. It also closes the underlying ASH
+name gaps, blocks X$ASH, DBA_HIST_*, DBA_ADVISOR_*, DBA_ADDM_*,
+DBMS_WORKLOAD_REPOSITORY and DBMS_ADDM.
 
-```text
-Coordinator policy gap (no DB query): SELECT * FROM V$METRIC_HISTORY
-```
+Oracle's current 19c licensing guide does not enumerate V$ metric names.
+The full metric family is an explicit coordinator restriction, documented
+separately from Oracle's licensing claims in docs/top.md. The 27 current
+matching view names were enumerated from the 19c Database Reference contents.
+DBA_ADVISOR_* appears conditionally in the licensing guide; the policy blocks
+it conservatively because row contents cannot be verified before execution.
+Existing blanket DBA_HIST_* refusal is retained even for Oracle's six exceptions.
+
+The policy suite exercises every enumerated metric name in all four prefixes,
+quoted/unquoted and SYS/PUBLIC-qualified, at every requested nesting position.
+It verifies inert comments/literals, normal counter views, tablespace usage
+metrics and DISPLAY_CURSOR stay allowed. A source relation scan and every
+MVP/hard-suite groundTruth.sql pass the classifier; an eval case text scan found
+no newly blocked names. No fixed source query or eval case needed modification.
+No remaining coordinator policy change or shared contract change is required.
 
 The p1 grant request is proposed only, not applied. It requests SELECT on
 V_$SYSSTAT, V_$OSSTAT and the phase's follow-on V_$SESSTAT/V_$STATNAME.
@@ -293,4 +310,62 @@ whose counters are larger than the old values is undetectable. Snapshot pages
 are not atomic and can move during capture. d1 exceeds 10,000 SQL rows, so its
 rankings cover only the sampled cache subset. Counters include observer overhead.
 Owner must review grant/eval premises before any p1 grants. The metric-history
-global policy gap above remains a coordinator prerequisite.
+global policy gap is closed by the coordinator-authorized follow-up.
+
+## Coordinator-authorized policy follow-up validation
+
+The first full unit run identified a historical phase 19 source-hash test.
+It now normalizes only the authorized Diagnostics Pack change and retains the
+original baseline SHA-256 for the rest of the policy, preserving its protection.
+The final focused policy/triage/top/preflight suite passes 345 tests.
+
+```text
+
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  5 passed (5)
+      Tests  345 passed (345)
+   Start at  15:14:15
+   Duration  1.51s (tests 42%, import 32%, transform 24%, worker 3%)
+
+
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  109 passed (109)
+      Tests  1990 passed (1990)
+   Start at  15:14:18
+   Duration  69.47s (tests 75%, import 22%, worker 1%, transform 1%)
+
+    Isolate  109 workers spawned · ~288ms startup each (spawn + environment, per file)
+             at least ~15.42s faster with isolate: false — reuses workers across files instead of one per file
+
+```
+
+```text
+
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-27a-top
+
+
+ Test Files  29 passed (29)
+      Tests  67 passed | 1 skipped (68)
+   Start at  15:12:51
+   Duration  253.73s (tests 97%, import 3%)
+
+```
+
+Follow-up integration passed: 67 tests, 29 files; one Strata e2e excluded.
+No LLM calls or database changes were made.
