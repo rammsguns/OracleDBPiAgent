@@ -100,7 +100,33 @@ it('correlates p1 purge alert evidence and d1 ORA-00800 without an LLM', async c
 it('discovers the live purge failure from natural language via the alert log', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR unset'); return; }
 	let result;
-	try { result = await live('p1-19c-prod', 'nightly purge job failed last night', '2d'); }
+	try {
+		const config = loadConfig(), sessions = createSessionProvider(config);
+		let ageHours: number;
+		try {
+			const session = await sessions.get('p1-19c-prod');
+			const prerequisite = await session.query(`SELECT
+				( CAST(SYS_EXTRACT_UTC(SYSTIMESTAMP) AS DATE)
+				- CAST(SYS_EXTRACT_UTC(ORIGINATING_TIMESTAMP) AS DATE) ) * 24 AS AGE_HOURS
+				FROM V$DIAG_ALERT_EXT
+				WHERE INSTR(UPPER(MESSAGE_TEXT), 'ORA-12012') > 0
+				AND INSTR(UPPER(MESSAGE_TEXT), 'SHOPAPP') > 0
+				AND INSTR(UPPER(MESSAGE_TEXT), 'NIGHTLY_PURGE_JOB') > 0
+				AND INSTR(UPPER(MESSAGE_TEXT), 'ORA-02292') > 0
+				ORDER BY ORIGINATING_TIMESTAMP DESC FETCH FIRST 1 ROW ONLY`, {}, { maxRows: 1 });
+			if (!prerequisite.rows.length) {
+				context.skip('Prerequisite p1 alert no longer exists: ORA-12012 for SHOPAPP.NIGHTLY_PURGE_JOB with ORA-02292 in V$DIAG_ALERT_EXT');
+				return;
+			}
+			ageHours = Number(prerequisite.rows[0]![0]);
+		} finally { await sessions.closeAll(); }
+		// Triage has no absolute window and caps --since at 30d. Include a full
+		// extra hour for fractional age and time elapsed between probe and triage.
+		expect(Number.isFinite(ageHours)).toBe(true);
+		const hours = Math.max(48, Math.ceil(ageHours) + 1);
+		expect(hours, 'Retained purge alert exceeds triage’s 30d maximum; absolute-window support is needed (do not skip retained evidence)').toBeLessThanOrEqual(720);
+		result = await live('p1-19c-prod', 'nightly purge job failed last night', `${hours}h`);
+	}
 	catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Approved p1 listener unavailable'); return; } throw error; }
 	const issue = result.issues[0]!;
 	expect(issue.issue.jobs).toContain('NIGHTLY_PURGE_JOB');
