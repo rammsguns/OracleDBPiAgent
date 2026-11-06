@@ -5,7 +5,7 @@ local Strata LLM at `http://127.0.0.1:8080/v1`.
 
 ## Rules
 
-- Use only the two approved targets in `config/targets.json`. Every session checks for Oracle 19c.
+- The product uses the owner's private target allowlist, or the packaged labs. Every session checks for Oracle 19c; CDB$ROOT is refused. Agents/workers use only the two labs (plus the dedicated version-refusal test).
 - No database writes, DDL or changing PL/SQL. No SYS, SYSTEM, HARNESS_APP or SHOPAPP credentials.
 - No cloud LLMs. Send Strata requests one at a time. Do not restart or reconfigure Strata; stop if it is unloaded.
 - Keep passwords and API keys outside the repo. Audit records omit bind values and credentials.
@@ -33,6 +33,11 @@ win. Set `PIAGENT_HOME` or `PIAGENT_ENV_FILE` to select another location.
 See [install details](docs/install.md) for permissions, defaults and overrides.
 
 ## Quick start
+
+For an owner-approved Oracle 19c PDB, follow the [real-target setup guide](docs/real-targets.md):
+DBA-local account and reviewed grants, private targets/password files, preflight,
+then deterministic commands and ask. This needs the merged phase 28 build;
+live PDB behaviour is unverified. The lab workflow below remains available.
 
 Use Node 24 and npm. Have the two approved Oracle 19c targets in
 [config/targets.json](config/targets.json) available: `d1-19c-lab` on
@@ -87,8 +92,9 @@ private `.env`. See the [documentation index](docs/README.md).
 |---|---|
 | `piagent --version` | Installed package version. |
 | `piagent init` | Create private configuration without overwriting it. |
-| `piagent targets` | List approved targets; no DB or LLM call. |
-| `piagent doctor` | Check Strata health, both 19c targets and account privileges. |
+| `piagent targets` | List configured targets and source file; no DB or LLM call. |
+| `piagent targets check --target X [--json] [--grants-sql]` | Phase 28: read-only identity/account/view preflight; print missing SELECT grant suggestions without applying them. |
+| `piagent doctor` | Check Strata health, every configured 19c target and account privileges. |
 | `piagent ask "question" --target d1-19c-lab --json` | One agent question; target and JSON are optional. Uses the LLM. |
 | `piagent chat --target d1-19c-lab` | Interactive agent conversation; optional target. Uses the LLM. |
 | `piagent web --port 8765` | Loopback web server; port is optional. |
@@ -158,7 +164,9 @@ See [web UI details](docs/web-ui.md) for the API and controls.
 
 ## Grants
 
-Setup creates no accounts and applies no grants. The [grant-request index](docs/grants.md)
+Setup creates no accounts and applies no grants. For new PDBs, a human DBA reviews
+the [PDB grant template](docs/grants-template-pdb.sql) using the
+[owner guide](docs/real-targets.md). The [grant-request index](docs/grants.md)
 records every historical request by date, target, grantee and enabled feature.
 Missing access produces availability notes rather than proof of an empty result.
 Security reads policy configuration, never `UNIFIED_AUDIT_TRAIL` or `SYS.USER$`.

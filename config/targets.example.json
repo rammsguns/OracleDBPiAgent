@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"targets": [
+		{
+			"name": "app-pdb",
+			"description": "Owner-approved Oracle 19c application PDB",
+			"host": "db.example.internal",
+			"port": 1521,
+			"serviceName": "apppdb.example.internal",
+			"username": "PIAGENT_RO",
+			"passwordFile": "app-pdb.pw",
+			"defaultSchema": "APP_OWNER",
+			"environment": "production"
+		}
+	]
+}
