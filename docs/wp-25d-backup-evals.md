@@ -21,7 +21,7 @@ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/va
 
 It probes all ten proposed backup views independently and runs the four truth queries. ORA-00942 / ORA-01031 / ORA-65040 become per-source "not verifiable from this database" results, with no inferred zero counts. Unexpected failures propagate. It labels the evidence CDB-wide (shared by all PDBs). For PDB identity it withholds control-file absence conclusions because visibility can hide rows; this path is unit-tested only.
 
-The proposed grants-request-2026-11-06-backup.sql contains ten SELECT grants to p1 HARNESS_RO, with explicit human DB-name/version/grantee verification instructions. It was not applied. The backup preflight group and PDB template cover the sources. No command was wired in src/cli: the product `backup` command belongs to WP-25A and is absent from this branch; this WP's command is the eval validator above.
+Ownership cleanup requested by the coordinator: WP-25A owns the product backup grant request, backup preflight catalog and PDB grant template. This branch deletes its proposed grants-request-2026-11-06-backup.sql and restores src/preflight/views.ts and docs/grants-template-pdb.sql to master. No grants were applied. All eval work remains intact. No command was wired in src/cli: the product `backup` command belongs to WP-25A and is absent from this branch; this WP's command is the eval validator above.
 
 Files
 
@@ -29,16 +29,31 @@ Files
 - evals/cases-hard/phase25-blind-holdout.json: blind replacement.
 - evals/cases-hard/phase25-backup.json: four new cases.
 - evals/validate-hard.ts, evals/validate-p25.ts, evals/run.ts, evals/hard-ground-truth-validation.json: validation, selection and recorded live truth.
-- src/preflight/views.ts: permitted backup feature group only.
 - tests/fixtures/wp25d-previous-premises.json; tests/unit/wp25d-premises.test.ts, phase25-evals.test.ts: frozen definitions, hashes, access semantics and scoring checks.
 - tests/unit/hard-evals.test.ts, phase11-challenge.test.ts, phase11b-challenge.test.ts, phase11d-baseline.test.ts, phase5-evals.test.ts, phase8-evals.test.ts: update population assertions and current-premise examples; archived baseline comparisons restore frozen originals.
 - tests/integration/phase25-evals.test.ts: DB-only lab validation, usable after grants too.
-- docs/grants-request-2026-11-06-backup.sql, docs/grants-template-pdb.sql; docs/wp-25d-* evidence, replay, scan, live output and reports.
+- docs/wp-25d-* evidence, replay, scan, live output and reports. The product grant request was deleted and shared preflight/template files restored to master at coordinator request.
 - node_modules: untracked/ignored symlink to ../needlefish/node_modules as instructed; no dependency changes.
 
 Contract changes
 
-None required in src/contracts.ts, package.json or PLAN.md. Optional coordinator convenience: add `validate:p25` pointing at `tsx evals/validate-p25.ts`; the direct command already works. WP-25A should reconcile its backup preflight group/grant request with this one at merge, keeping any additional product views (for example the recovery area) in the feature inventory.
+None required in src/contracts.ts, package.json or PLAN.md. Optional coordinator convenience: add `validate:p25` pointing at `tsx evals/validate-p25.ts`; the direct command already works. WP-25A owns all product backup grants and preflight/template entries; the eval requirements are listed below.
+
+
+Views WP-25A should cover on p1
+
+The four backup truth queries need SELECT access through HARNESS_RO on these sources (grant objects shown explicitly):
+
+| Truth case | Views | SYS grant objects |
+|---|---|---|
+| Last recorded level 0 | V$BACKUP_DATAFILE | SYS.V_$BACKUP_DATAFILE |
+| Archived-log gaps | V$BACKUP_DATAFILE, V$ARCHIVED_LOG, V$DATABASE | SYS.V_$BACKUP_DATAFILE, SYS.V_$ARCHIVED_LOG, SYS.V_$DATABASE |
+| Retention setting | V$RMAN_CONFIGURATION | SYS.V_$RMAN_CONFIGURATION |
+| No backups recorded | V$RMAN_BACKUP_JOB_DETAILS, V$BACKUP_DATAFILE, V$BACKUP_SET, V$BACKUP_PIECE | SYS.V_$RMAN_BACKUP_JOB_DETAILS, SYS.V_$BACKUP_DATAFILE, SYS.V_$BACKUP_SET, SYS.V_$BACKUP_PIECE |
+
+V$DATABASE is already readable on p1. The other six distinct sources were unreadable in the recorded live run. The eval validator also probes V$LOG_HISTORY, V$CONTROLFILE, V$DATABASE_BLOCK_CORRUPTION and V$RECOVER_FILE for product readiness; those are not referenced by the four truth queries but should remain in WP-25A's proposed product grant/preflight inventory.
+
+The re-premised grant-limited cases intentionally require V$SGASTAT and V$SGA_DYNAMIC_COMPONENTS to remain unreadable on p1. Do not include those in the backup grants. Their metadata truth uses already-readable ALL_TAB_PRIVS, SESSION_ROLES and DUAL; the partial-access challenge also reads already-readable V$DATABASE.
 
 Unverified
 
@@ -322,4 +337,34 @@ p1-19c-prod
 		}
 	]
 }
+```
+
+Coordinator ownership cleanup verification
+
+Restored src/preflight/views.ts and docs/grants-template-pdb.sql using `git checkout master -- <file>` and deleted this branch's new docs/grants-request-2026-11-06-backup.sql. `git diff master -- docs/grants-template-pdb.sql src/preflight/views.ts` is empty. No eval files changed in this cleanup. DB/LLM code was not changed and no live database or LLM calls were made; integration results above are from the original implementation run.
+
+Typecheck rerun
+
+```text
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+```
+
+Unit rerun
+
+```text
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25d-backup-evals
+
+
+ Test Files  110 passed (110)
+      Tests  1842 passed (1842)
+   Start at  15:11:08
+   Duration  70.21s (tests 75%, import 23%, worker 1%, transform 1%)
+
+    Isolate  110 workers spawned · ~279ms startup each (spawn + environment, per file)
+             at least ~15.08s faster with isolate: false — reuses workers across files instead of one per file
 ```
