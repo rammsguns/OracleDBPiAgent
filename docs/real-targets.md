@@ -159,9 +159,10 @@ no proxy and no ISDBA. Session system privileges are limited to CREATE SESSION,
 ALTER SESSION, SET CONTAINER, SELECT ANY DICTIONARY, SELECT ANY TABLE, READ ANY
 TABLE and SELECT ANY SEQUENCE. These are the validator's tolerated privileges,
 not provisioning recommendations: this recipe grants only CREATE SESSION.
-Direct/enabled-role object privileges must be SELECT/READ, or EXECUTE on objects
-owned by Oracle-maintained users. Failure to inspect privileges also refuses the
-connection. On refusal, have the DBA review the named privilege and remove excess
+Direct/enabled-role object privileges must be SELECT/READ, or EXECUTE/FLASHBACK
+only on objects owned by Oracle-maintained users. SELECT_CATALOG_ROLE carries
+FLASHBACK on SYS objects, which this rule permits. Failure to inspect privileges
+also refuses the connection. On refusal, have the DBA review the named privilege and remove excess
 access or provision a fresh account. Do not broaden grants or weaken the check.
 
 Cached plan formatting calls `DBMS_XPLAN.DISPLAY_CURSOR` through SELECT. The

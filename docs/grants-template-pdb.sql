@@ -2,9 +2,11 @@
 -- Never run from the application, an agent, or automated tests.
 -- Review docs/real-targets.md and the inventory comparison in docs/grants.md.
 -- Connect directly to the approved PDB service BEFORE running this file.
--- Define pdb_name and ro_user as trusted, unquoted Oracle identifiers in SQL*Plus.
--- Example (non-secret): DEFINE pdb_name = APPPDB
--- Example (non-secret): DEFINE ro_user = PIAGENT_RO
+-- Edit both values below to match the approved PDB and its local read-only user.
+-- Use trusted, unquoted Oracle identifiers; these definitions prevent repeated prompts.
+DEFINE ro_user = PIAGENT_RO
+DEFINE pdb_name = APPPDB
+
 -- This file creates no objects and never changes containers.
 -- The SELECT below is an inspection, not an automatic assertion: STOP if it
 -- does not report &pdb_name, a non-root PDB, and the expected database/user.
