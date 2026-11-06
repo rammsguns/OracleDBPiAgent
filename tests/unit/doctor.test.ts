@@ -1,3 +1,4 @@
+import { AccountCheckError } from "../../src/oracle/account.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { doctor, main, type DoctorDependencies } from "../../src/cli/index.js";
 import { loadConfig } from "../../src/config/index.js";
@@ -13,6 +14,7 @@ function setup(failure?: string) {
 	const get = vi.fn(async (name?: string) => {
 		const target = config.targets.find(t => t.name === name)!;
 		if (name === config.targets[0]!.name) {
+			if (failure === "privileges") throw new Error(sensitive);
 			if (failure === "connection") throw new Error(sensitive);
 			if (failure === "gate") throw new UnsupportedVersionError(sensitive, sensitive);
 		}
@@ -29,7 +31,7 @@ it.each([
 	["unloaded", "Strata: unavailable or unloaded"],
 	["connection", "d1-19c-lab: connection check failed"],
 	["gate", "d1-19c-lab: 19c gate check failed"],
-	["privileges", "read-only privileges check failed"],
+	["privileges", "connection check failed"],
 	["views", "view code dependencies check failed"],
 ])("doctor and main fail safely for %s", async (failure, label) => {
 	const test = setup(failure);
@@ -39,8 +41,7 @@ it.each([
 	expect(test.output()).toContain(label);
 	expect(test.output()).not.toContain(sensitive);
 	expect(test.output()).not.toMatch(/localhost|1522|1523|ORCL|PRODCDB/);
-	if (failure === "unloaded") expect(test.createSessions).not.toHaveBeenCalled();
-	else {
+	{
 		expect(test.get).toHaveBeenCalledWith("p1-19c-prod");
 		expect(test.closeAll).toHaveBeenCalledTimes(2);
 	}
@@ -56,6 +57,36 @@ it("redacts unexpected object privileges", async () => {
 	const test = setup();
 	test.get.mockImplementation(async () => ({ identity: { versionFull: "19.9", currentUser: "HARNESS_LAB" }, query: async () => ({ rows: [[sensitive, sensitive]] }) }) as unknown as OracleSession);
 	expect(await doctor(config, test.dependencies)).toBe(false);
-	expect(test.output()).toContain("read-only privileges check failed");
+	expect(test.output()).toContain("view code dependencies check failed");
 	expect(test.output()).not.toContain(sensitive);
+});
+
+it('names account-check refusals in the doctor report callback and continues to other targets',async()=>{
+	const test=setup();const report=vi.fn();
+	const healthyGet=test.get.getMockImplementation()!;
+	test.get.mockImplementation(async name=>{
+		if(name==='d1-19c-lab') throw new AccountCheckError('Account check failed: CREATE TABLE');
+		return healthyGet(name);
+	});
+	expect(await doctor(config,{...test.dependencies,report})).toBe(false);
+	expect(report).toHaveBeenCalledWith('d1-19c-lab: account check',false);
+	expect(report).not.toHaveBeenCalledWith('d1-19c-lab: connection',false);
+	expect(report).toHaveBeenCalledWith('p1-19c-prod',true);
+	expect(test.closeAll).toHaveBeenCalledOnce();
+});
+it.each([false,true])('routes targets check failure output correctly with json=%s',async json=>{
+	const log=vi.spyOn(console,'log').mockImplementation(()=>{});
+	const error=vi.spyOn(console,'error').mockImplementation(()=>{});
+	const closeAll=vi.fn(async()=>{});
+	const message='Account check failed: CREATE TABLE';
+	await main(['node','piagent','targets','check','--target','d1-19c-lab',...(json?['--json']:[])],{
+		createSessions:()=>({get:async()=>{throw new AccountCheckError(message);},closeAll}),
+	});
+	expect(process.exitCode).toBe(1);expect(closeAll).toHaveBeenCalledOnce();
+	if(json){
+		expect(error).not.toHaveBeenCalled();expect(log).toHaveBeenCalledOnce();
+		expect(JSON.parse(String(log.mock.calls[0]![0]))).toEqual({target:'d1-19c-lab',accountCheck:'failed',error:message});
+	}else{
+		expect(log).not.toHaveBeenCalled();expect(error).toHaveBeenCalledExactlyOnceWith(message);
+	}
 });

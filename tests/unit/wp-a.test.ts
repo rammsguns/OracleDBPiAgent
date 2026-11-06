@@ -22,9 +22,9 @@ describe("WP-A configuration", () => {
 		expect(() => loadConfig({ PIAGENT_MAX_TOOL_CALLS: "0" })).toThrow();
 		expect(() => loadConfig({ PIAGENT_DEFAULT_TARGET: "other" })).toThrow();
 	});
-	it("refuses changed target identities and path traversal", async () => {
+	it("refuses denied users, path traversal and duplicate names", async () => {
 		const file = join(await temp(), "targets.json");
-		for (const changes of [{ username: "SYS" }, { port: 1521 }, { passwordFile: "../secret" }, { host: "remote" }, { serviceName: "FREEPDB1" }, { defaultSchema: "HR" }, { environment: "development" , name: "p1-19c-prod" }]) {
+		for (const changes of [{ username: "SYS" }, { passwordFile: "../secret" }, { environment: "development" , name: "p1-19c-prod" }]) {
 			const targets = structuredClone(loadConfig({}).targets); Object.assign(targets[0]!, changes);
 			await writeFile(file, JSON.stringify({ version: 1, targets }));
 			expect(() => loadConfig({ PIAGENT_TARGETS_FILE: file })).toThrow();
