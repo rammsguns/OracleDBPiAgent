@@ -50,7 +50,16 @@ Env files must be private regular files: group/other permissions and symlinks
 are refused. No env values are printed. The working directory's `.env` is never
 automatically loaded.
 
-Default targets come from the installed package; audit records go to
+Phase 28 target selection uses `PIAGENT_TARGETS_FILE`, else an existing
+`$PIAGENT_HOME/targets.json`, else the installed package labs. The private file
+is the owner's allowlist (1–20 targets), with ownership and permission checks.
+`init` also writes a commented `targets.example.json` without overwriting it.
+Use strict JSON for the actual targets file. Follow the [PDB owner guide](real-targets.md)
+for account provisioning, grants, password files and
+`piagent targets check --target X [--json] [--grants-sql]`. This requires the merged
+phase 28 build; live PDB setup remains unverified.
+
+Audit records go to
 `$PIAGENT_HOME/audit.jsonl`, and report history to `$PIAGENT_HOME/reports`.
 `PIAGENT_TARGETS_FILE`, `PIAGENT_AUDIT_FILE`, and `PIAGENT_REPORT_DIRECTORY`
 override these paths; `report --out` overrides history for that command.
