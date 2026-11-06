@@ -4,17 +4,17 @@ vi.mock('oracledb',()=>({default:{thin:true,getConnection:mocks.connect,OUT_FORM
 vi.mock('node:fs/promises',()=>({readFile:mocks.read}));
 import { createSessionProvider, previewValue } from '../../src/oracle/index.js';
 import type { AppConfig } from '../../src/contracts.js';
-const config = {defaultTarget:'d1-19c-lab', secretDir:'/secrets',targets:[{name:'d1-19c-lab',host:'localhost',port:1522,serviceName:'ORCL',username:'HARNESS_LAB',passwordFile:'d1_lab.pw',defaultSchema:'HR'}],limits:{maxRows:2,statementTimeoutSeconds:3}} as AppConfig;
+const config = {defaultTarget:'d1-19c-lab', secretDir:'/secrets',targets:[{name:'d1-19c-lab',host:'localhost',port:1522,serviceName:'ORCL',username:'HARNESS_LAB',passwordFile:'d1_lab.pw',defaultSchema:'HR',environment:'development',description:'Test'}],limits:{maxRows:2,statementTimeoutSeconds:3}} as AppConfig;
 beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mocks.read.mockResolvedValue('test-only');});
 function connection(version='19.9.1.0.0') {
 	const rs = {getRows:vi.fn().mockResolvedValue([[1],[2],[3]]),close:vi.fn()};
 	const c = {callTimeout:0,execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
-	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR']]});
+	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({rows:[['HARNESS_LAB','FALSE',null,'0','ORCL']]}).mockResolvedValueOnce({rows:[['CREATE SESSION']]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR']]});
 	mocks.connect.mockResolvedValue(c); return {c,rs};
 }
 it('sets schema and timeout, fetches one extra row and rolls back',async()=>{
 	const {c,rs}=connection(); const provider=createSessionProvider(config); const s=await provider.get(); const r=await s.query('SELECT 1 FROM dual');
-	expect(c.callTimeout).toBe(3000); expect(c.execute.mock.calls[1]?.[0]).toContain('CURRENT_SCHEMA = "HR"');
+	expect(c.callTimeout).toBe(3000); expect(c.execute.mock.calls[4]?.[0]).toContain('CURRENT_SCHEMA = "HR"');
 	expect(c.execute.mock.calls.some(call=>call[0]==='SET TRANSACTION READ ONLY')).toBe(true);
 	expect(rs.getRows).toHaveBeenCalledWith(3);expect(r.rows).toEqual([[1],[2]]);expect(r.truncated).toBe(true);expect(c.rollback).toHaveBeenCalledTimes(2);
 	await provider.closeAll();expect(c.close).toHaveBeenCalledOnce();
@@ -30,7 +30,7 @@ it('closes a refused-version connection before setting schema',async()=>{
 it('bounds LOB reads and destroys locators',async()=>{const lob={getData:vi.fn().mockResolvedValue('x'.repeat(6000)),destroy:vi.fn()};const result=await previewValue(lob);expect(Buffer.byteLength(String(result))).toBeLessThanOrEqual(4096);expect(lob.getData).toHaveBeenCalledWith(1,1024);expect(lob.destroy).toHaveBeenCalledOnce();});
 it.each([{host:'remote'}, {port:1521}, {serviceName:'FREEPDB1'}, {username:'SYS'}, {name:'other'}])('rejects edited endpoint before reading a secret: %j', async changes => {
 	const changed = {...config, targets: config.targets.map(t => ({...t, ...changes}))};
-	await expect(createSessionProvider(changed).get(changed.targets[0]!.name)).rejects.toThrow();
+	await expect(createSessionProvider(changed, config.targets).get(changed.targets[0]!.name)).rejects.toThrow();
 	expect(mocks.connect).not.toHaveBeenCalled();
 	expect(mocks.read).not.toHaveBeenCalled();
 });
@@ -51,7 +51,7 @@ it('sets UTC once on each new session before any tool query', async () => {
 		const statements = c.execute.mock.calls.map(call => call[0]);
 		const utc = "ALTER SESSION SET TIME_ZONE = '+00:00'";
 		expect(statements.filter(sql => sql === utc)).toHaveLength(1);
-		expect(statements.indexOf(utc)).toBe(2);
+		expect(statements.indexOf(utc)).toBe(5);
 		expect(statements.indexOf(utc)).toBeLessThan(statements.indexOf('SELECT 1 FROM dual'));
 		expect(statements.indexOf(utc)).toBeLessThan(statements.indexOf('SET TRANSACTION READ ONLY'));
 	}

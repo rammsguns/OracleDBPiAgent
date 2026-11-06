@@ -1,5 +1,7 @@
+import { validateTarget, usesPackagedTargets } from '../config/targets.js';
+import { checkAccount } from './account.js';
 import { SafeConfigError } from "../config/safeErrors.js";
-import { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
+import { APPROVED_ENDPOINTS, APPROVED_TARGETS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 export { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 import oracledb from "oracledb";
 import { readFile } from "node:fs/promises";
@@ -19,18 +21,19 @@ export async function previewValue(value: any): Promise<unknown> {
 }
 
 /** approvedEndpoints is overridable only so the gate integration test can reach a non-19c DB. */
-export function createSessionProvider(config: AppConfig, approvedEndpoints: readonly ApprovedEndpoint[] = APPROVED_ENDPOINTS): SessionProvider {
+export function createSessionProvider(config: AppConfig, approvedEndpoints?: readonly ApprovedEndpoint[]): SessionProvider {
 	const sessions = new Set<OracleSession>();
 	return {
 		async get(targetName = config.defaultTarget) {
 			const target = config.targets.find(t => t.name === targetName);
 			if (!target) throw new SafeConfigError("Unknown target");
-			if (!/^(HARNESS_LAB|HARNESS_RO)$/.test(target.username)) throw new SafeConfigError("Account is not approved");
+			validateTarget(target);
+			if (usesPackagedTargets(config.targets) && !APPROVED_TARGETS.some(e => Object.entries(e).every(([k,v]) => (target as any)[k] === v))) throw new SafeConfigError("Target endpoint is not approved");
 			if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(target.defaultSchema)) throw new SafeConfigError("Invalid schema");
 			const secretDir = process.env.PIAGENT_SECRET_DIR;
 			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw new SafeConfigError("Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.");
 			if (basename(target.passwordFile) !== target.passwordFile) throw new SafeConfigError("Invalid password file");
-			if (!approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new SafeConfigError("Target endpoint is not approved");
+			if (approvedEndpoints && !approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new SafeConfigError("Target endpoint is not approved");
 			if (!oracledb.thin) throw new SafeConfigError("Only thin mode is supported");
 			const password = (await readFile(resolve(secretDir, target.passwordFile), "utf8")).trim();
 			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` });
@@ -39,11 +42,12 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints: read
 				connection.callTimeout = config.limits.statementTimeoutSeconds * 1000;
 				const v = await connection.execute("SELECT version_full FROM product_component_version WHERE product LIKE 'Oracle%Database%'", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const version = String(v.rows?.[0]?.[0] ?? "unknown"); gate19c(target.name, version);
+				await checkAccount(connection, target.username, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = "${target.defaultSchema}"`);
 				await connection.execute("ALTER SESSION SET TIME_ZONE = '+00:00'");
-				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
+				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const r = id.rows[0];
-				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5] };
+				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
 				await connection.rollback();
 				const session: OracleSession = {
 					target, identity,

@@ -87,9 +87,9 @@ it("keeps native errors generic even when their messages contain private input",
 			let failure: unknown;
 			try { loadConfig(env); } catch (error) { failure = error; }
 			expect(failure).toBeInstanceOf(Error);
-			expect(failure).not.toBeInstanceOf(SafeConfigError);
+			if (!env.PIAGENT_TARGETS_FILE) expect(failure).not.toBeInstanceOf(SafeConfigError);
 			handleCliError(failure);
-			expect(output).toHaveBeenLastCalledWith("piagent failed; check local configuration and service availability");
+			expect(output).toHaveBeenLastCalledWith(env.PIAGENT_TARGETS_FILE ? "Invalid or unapproved target configuration" : "piagent failed; check local configuration and service availability");
 		}
 	} finally { output.mockRestore(); process.exitCode = previous; }
 });
