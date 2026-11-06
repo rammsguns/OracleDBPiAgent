@@ -1,0 +1,10 @@
+{
+	"checkedAt": "2026-11-06T06:01:13.292Z",
+	"target": "p1-19c-prod",
+	"sql": "SELECT MAX(originating_timestamp) AS latest_purge_alert FROM v$diag_alert_ext WHERE INSTR(message_text, 'NIGHTLY_PURGE_JOB') > 0",
+	"rows": [
+		[
+			"2026-11-04T04:30:56.298Z"
+		]
+	]
+}
