@@ -30,7 +30,7 @@ it.each(['ORA-00942', 'ORA-01031', 'ORA-65040'])('isolates %s from remaining rep
 	const s = session(); vi.mocked(s.query).mockRejectedValueOnce(new Error(code));
 	const result = await generateReport(context(s), { sections: ['identity', 'parameters'] });
 	expect(result.sections.map(s => s.status)).toEqual(['unavailable', 'ok']);
-	expect(result.sections[0]?.note).toMatch(/needs SELECT|not available in a PDB/);
+	expect(result.sections[0]?.note).toMatch(/needs SELECT|operation not supported in a PDB/);
 });
 it('isolates PDB-inapplicable space views', async () => {
 	const s = session(); vi.mocked(s.query).mockRejectedValue(new Error('ORA-65040'));
@@ -94,4 +94,23 @@ it('keeps non-CDB space JSON and Markdown byte-identical to legacy identities', 
 	expect(JSON.stringify(right)).toBe(JSON.stringify(left));
 	expect(renderSpaceMarkdown(right)).toBe(renderSpaceMarkdown(left));
 	expect(vi.mocked(current.query).mock.calls.map(c=>c[0])).not.toContain(spaceSql.localUndo);
+});
+it('formats an unavailable PDB report reason without a repeated prefix',async()=> {
+	const s=session();vi.mocked(s.query).mockRejectedValue(new Error('ORA-65040'));
+	const result=await generateReport(context(s),{sections:['parameters']});
+	expect(result.sections[0]?.note).toBe('not available: operation not supported in a PDB (SYS.V_$PARAMETER)');
+});
+it.each(['ORA-00942','ORA-01031','ORA-65040'])('formats one PDB view failure sentence for %s',async code=> {
+	const s=session();vi.mocked(s.query).mockRejectedValue(new Error(code));
+	const result=await readSpaceUsage(s,{sections:['tablespaces']});
+	const note=result.sections.tablespaces.note!;
+	expect(note.match(new RegExp(code,'g'))).toHaveLength(1);
+	expect(note).not.toContain('Missing view access');
+	expect(note).not.toContain('Not available in a PDB');
+	expect(note).toContain('dba_tablespaces');
+});
+it('unknown undo scope has exactly one sentence-ending period',async()=> {
+	const result=await readSpaceUsage(session(),{sections:['undo']});
+	expect(result.sections.undo.note).toContain('findings withheld. Empty rows');
+	expect(result.sections.undo.note).not.toContain('..');
 });

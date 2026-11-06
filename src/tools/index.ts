@@ -33,6 +33,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 			const target = p.target ?? ctx.config.defaultTarget;
 			const base = { at: new Date().toISOString(), runId: ctx.runId, target, tool: name };
 			let sql: string | undefined;
+			let overviewQueriesAudited = false;
 			let sourceNote: string | undefined;
 			let viewFound = false;
 			let dictionaryView: string | undefined;
@@ -112,12 +113,15 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 								dictionaryView = answer.view;
 								if (answer.view.startsWith("DBA_")) sql = sql.replace(/\ball_([a-z_]+)\b/gi, "dba_$1");
 								result = answer;
-							} else if (name === "db_overview" && session.identity?.isCdb) result = await readPdbOverview(session, ctx);
+							} else if (name === "db_overview" && session.identity?.isCdb) {
+								overviewQueriesAudited = true;
+								result = await readPdbOverview(session, ctx);
+							}
 							else result = await session.query(sql, binds, { maxRows });
 						}
 						catch (error) {
 							if (name === "run_query") throw await queryErrorHint(error, sql, session, ctx);
-							if (!/ORA-00942/.test(String(error))) throw error;
+							if (!/ORA-00942/.test(String(error)) && !(name === "top_sql" && /ORA-01031/.test(String(error)))) throw error;
 							if (name === "wait_events") throw new Error("ORA-00942: wait_events requires SELECT on SYS.V_$SYSTEM_EVENT (V$SYSTEM_EVENT); no granted equivalent is available", { cause: error });
 							if (name === "top_sql") {
 								sql = `SELECT sql_id, SUM(executions) executions, SUM(elapsed_time) elapsed_time, SUM(cpu_time) cpu_time, SUM(buffer_gets) buffer_gets, MAX(SUBSTR(sql_text,1,300)) sql_text FROM v$sql GROUP BY sql_id ORDER BY ${p.metric ?? "elapsed_time"} DESC FETCH FIRST :n ROWS ONLY`;
@@ -168,10 +172,10 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				if (sourceNote) result = { ...(result as QueryResult), sourceNote };
 				const output = boundedResult(result, ctx.config.limits.maxToolResultBytes, name === "describe_object" ? renderDescribe : undefined);
 				const q = output.details as QueryResult;
-				await ctx.audit.record({ ...base, kind: "tool_call", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), rows: q.rows?.length, truncated: q.truncated, elapsedMs: q.elapsedMs });
+				if (!overviewQueriesAudited) await ctx.audit.record({ ...base, kind: "tool_call", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), rows: q.rows?.length, truncated: q.truncated, elapsedMs: q.elapsedMs });
 				return output;
 			} catch (error) {
-				await ctx.audit.record({ ...base, kind: "tool_error", ...((sql || typeof p.sql === "string") ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), detail: error instanceof Error ? error.name : "Error" });
+				await ctx.audit.record({ ...base, kind: "tool_error", ...((!overviewQueriesAudited && (sql || typeof p.sql === "string")) ? { sqlSha256: createHash("sha256").update(typeof p.sql === "string" ? p.sql : sql!).digest("hex") } : {}), detail: error instanceof Error ? error.name : "Error" });
 				if (name !== "run_query" && /ORA-01031|ORA-65040/.test(String(error))) throw new Error(`${name} not available in this container / not granted (ORA-01031/ORA-65040); ask the DBA to check PDB view access`, { cause: error });
 				throw error;
 			}

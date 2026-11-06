@@ -22,7 +22,7 @@ const groups: Record<string, string[]> = { backups: ['backups', 'archive_switche
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
 	const text = String(error);
-	if (/ORA-65040/.test(text)) return `not available in a PDB (${grant})`;
+	if (/ORA-65040/.test(text)) return `operation not supported in a PDB (${grant})`;
 	if (/ORA-00942|ORA-01031/.test(text)) return `needs SELECT on ${grant}`;
 	if (/NJS-040|NJS-560|DPI-1067|ORA-01013|call timeout|callTimeout/i.test(text)) return `query timed out (${grant})`;
 	return `query failed (${grant}); check local service availability`;

@@ -44,7 +44,7 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 				if(!page.rows.length) break;
 			}
 		} 
-		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031','ORA-65040'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';s.note=code==='ORA-65040'?'Not available in a PDB (ORA-65040).':'Missing view access ('+code+').';}}
+		catch(e) {const code=/ORA-\d{5}/.exec(String(e))?.[0];if(!code||!['ORA-00942','ORA-01031','ORA-65040'].includes(code)) throw e;c.status='unavailable';c.attempts.push({view:c.view,code});if(!optional) {s.status='unavailable';if(!session.identity?.isCdb) s.note=code==='ORA-65040'?'Not available in a PDB (ORA-65040).':'Missing view access ('+code+').';}}
 		if(session.identity?.isCdb && c.status==='unavailable') s.note=[s.note, `${c.view}: not available in this PDB / not granted (${c.attempts[0]?.code}).`].filter(Boolean).join(' ');
 		if(c.truncated) s.note='Row cap reached; snapshot is incomplete.';
 		return c.rows;
@@ -70,7 +70,7 @@ export async function readSpaceUsage(session:OracleSession,options:SpaceOptions=
 		const s=report.sections.undo;
 		if(session.identity?.isCdb) {
 			const mode=str((await read('undo','localUndo'))[0]?.[0]).toUpperCase();
-			undoScope=mode==='TRUE'?'PDB-local (local undo)':mode==='FALSE'?'CDB-wide (shared undo; shared by all PDBs in this CDB)':'Undo scope unknown: LOCAL_UNDO_ENABLED unavailable / not granted or no visible property; findings withheld.';
+			undoScope=mode==='TRUE'?'PDB-local (local undo)':mode==='FALSE'?'CDB-wide (shared undo; shared by all PDBs in this CDB)':'Undo scope unknown: LOCAL_UNDO_ENABLED unavailable / not granted or no visible property; findings withheld';
 			if(!['TRUE','FALSE'].includes(mode)) s.status='unavailable';
 		}
 		s.rows.push(...files(await read('undo','undoFiles')));
