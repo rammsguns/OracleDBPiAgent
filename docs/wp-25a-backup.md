@@ -229,3 +229,65 @@ Evidence database (V$DATABASE): ok
 ```
 
 Final results: typecheck clean; 109 unit files / 1,854 tests passed; 29 integration files / 67 tests passed, one Strata e2e intentionally skipped. Focused backup integration: both labs passed. Both live text commands and the p1 JSON command exited 0. `git diff --check` is clean. No requested contract changes or unapplied code fixes remain.
+
+## Approved-review follow-up (2026-11-06)
+
+Addressed all three observations from `../review-wp-25a-backup/docs/review-wp-25a-backup.md`:
+
+- Normalize SET_STAMP and SET_COUNT numerically when matching datafile backups to sets and pieces. Null, nonnumeric and unsafe-integer identifiers do not match. Mixed number/string/BigInt fixtures retain valid backup associations.
+- Sort invalid/null completion times after valid dates using a finite lower-bound sentinel, so comparators never return NaN and malformed rows cannot displace the newest valid full or incremental. Wholly invalid times still withhold a restore candidate.
+- Throw local BackupUsageError before creating the session provider for an unknown target; the backup CLI prints the error and exits 2, matching sessions. Commander usage errors also exit 2. No database/LLM access is needed by these CLI regression tests.
+
+Changed in this follow-up: `src/backup/index.ts`, `src/backup/cli.ts`, minimal backup-only wiring in `src/cli/index.ts`, `tests/unit/backup.test.ts`, new `tests/unit/backup-cli.test.ts`, and this report. Contract changes: none. No dependencies, SQL, grants or database state changed. Earlier live-output evidence and unverified limitations still apply.
+
+### Review follow-up: npm run typecheck
+
+```text
+
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+```
+
+### Review follow-up: npm test -- --maxWorkers=2
+
+```text
+
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25a-backup
+
+
+ Test Files  110 passed (110)
+      Tests  1861 passed (1861)
+   Start at  15:34:02
+   Duration  64.98s (tests 76%, import 21%, transform 1%, worker 1%)
+
+    Isolate  110 workers spawned · ~255ms startup each (spawn + environment, per file)
+             at least ~13.76s faster with isolate: false — reuses workers across files instead of one per file
+
+```
+
+### Review follow-up: filtered integration
+
+Command: `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`
+
+```text
+
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-25a-backup
+
+
+ Test Files  29 passed (29)
+      Tests  67 passed | 1 skipped (68)
+   Start at  15:34:06
+   Duration  207.00s (tests 96%, import 4%)
+
+```
+
+Review follow-up final results: typecheck clean; 110 unit files / 1,861 tests passed; 29 integration files / 67 tests passed, with the single Strata e2e intentionally skipped. All checks exited 0. No LLM calls, grants or database writes were made. Implementation commit: `012e550`. All three approved-review observations are resolved; no new contract changes or verification limitations. `git diff --check` is clean.
