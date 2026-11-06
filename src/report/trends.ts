@@ -1,3 +1,4 @@
+import { sessionMetrics } from './sessions.js';
 import type { DatabaseReport, ReportSection } from './index.js';
 import type { ReportHistory } from './history.js';
 import { DIFF_THRESHOLDS } from './diff.js';
@@ -59,6 +60,23 @@ export function buildReportTrends(history: ReportHistory): ReportTrends {
 			if (!data.length || data.some(r => r.STATUS !== 'ok')) return null;
 			return data.filter(r => r.SUBJECT !== null).length;
 		}, [['CHECK', 'SEVERITY', 'STATUS', 'SUBJECT']]);
+	}
+	if (reports.some(r => r.sections.some(s => s.name === 'sessions'))) {
+		for (const metric of ['blockers', 'long_transactions']) add(`sessions:${metric}`, `Sessions ${metric.replaceAll('_', ' ')}`, 'count', ['sessions'], ([section]) => {
+			const r = sessionMetrics(section).find(r => r.METRIC === metric);
+			return r ? Number(r.VALUE) : null;
+		}, [['METRIC', 'VALUE', 'STATUS']]);
+		const classes = [...new Set(reports.flatMap(r => sessionMetrics(r.sections.find(s => s.name === 'sessions')).filter(r => r.METRIC === 'wait_seconds' && typeof r.WAIT_CLASS === 'string').map(r => String(r.WAIT_CLASS))))].sort();
+		for (const waitClass of classes) add(`sessions:wait:${waitClass}`, `Non-idle wait ${waitClass} (interval delta)`, 'seconds', ['sessions'], ([section], report) => {
+			const index = reports.indexOf(report), previous = reports[index - 1];
+			if (!previous) return null;
+			const before = previous.sections.find(s => s.name === 'sessions');
+			if (before?.source !== section!.source) return null;
+			const a = sessionMetrics(before).find(r => r.METRIC === 'wait_seconds' && r.WAIT_CLASS === waitClass);
+			const b = sessionMetrics(section).find(r => r.METRIC === 'wait_seconds' && r.WAIT_CLASS === waitClass);
+			return a && b && typeof a.STARTUP_TIME === 'string' && a.STARTUP_TIME.length > 0 && a.STARTUP_TIME === b.STARTUP_TIME && Number(b.VALUE) >= Number(a.VALUE) ? Number(b.VALUE) - Number(a.VALUE) : null;
+		}, [['METRIC', 'WAIT_CLASS', 'VALUE', 'STATUS', 'STARTUP_TIME']]);
+		result.notes.push('Session wait points are deltas between adjacent reports with the same instance startup; missing snapshots, restarts and counter decreases are gaps. Counts describe visible snapshots.');
 	}
 	if (gaps) result.notes.push(`${gaps} series observation(s) missing, unavailable or incompatible; shown as gaps.`);
 	if (reports.some(r => r.sections.some(s => /row limit/i.test(s.note)))) result.notes.push('Row-limited snapshots: counts describe visible saved rows, not database totals.');
