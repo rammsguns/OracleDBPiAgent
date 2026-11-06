@@ -22,13 +22,13 @@ async function fixture(overrides: Partial<WebServerOptions> = {}) {
 }
 it('requires token, approved Host/Origin, method, target and identifiers before opening sessions', async () => {
 	const f = await fixture();
-	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions']) {
+	for (const path of ['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space']) {
 		expect((await f.call(path, undefined, { Authorization: '' })).status).toBe(401);
 		expect((await f.call(path, undefined, { Host: 'evil.test' })).status).toBe(403);
 		expect((await f.call(path, undefined, { Origin: 'null' })).status).toBe(403);
 		expect((await f.call(path, undefined, {}, 'DELETE')).status).toBe(405);
 	}
-	for (const path of ['/api/db-sessions?target=FREEPDB1', '/api/db-sessions?topWaits=0', '/api/db-sessions?minTxSeconds=-1', '/api/db-sessions?includeBackground=yes', '/api/db-sessions?sections=bogus', '/api/db-sessions?extra=x', '/api/alertlog?target=FREEPDB1', '/api/alertlog?since=31d', '/api/alertlog?codes=ORA-600', '/api/alertlog?text=' + 'x'.repeat(2049), '/api/security?target=FREEPDB1', '/api/security?whoCan=HR', '/api/security?whoCan=HR.X;DROP', '/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
+	for (const path of ['/api/space?target=FREEPDB1', '/api/space?top=0', '/api/space?owner=HR;DROP', '/api/space?sections=bad', '/api/space?includeOracleMaintained=yes', '/api/space?extra=x', '/api/db-sessions?target=FREEPDB1', '/api/db-sessions?topWaits=0', '/api/db-sessions?minTxSeconds=-1', '/api/db-sessions?includeBackground=yes', '/api/db-sessions?sections=bogus', '/api/db-sessions?extra=x', '/api/alertlog?target=FREEPDB1', '/api/alertlog?since=31d', '/api/alertlog?codes=ORA-600', '/api/alertlog?text=' + 'x'.repeat(2049), '/api/security?target=FREEPDB1', '/api/security?whoCan=HR', '/api/security?whoCan=HR.X;DROP', '/api/plsql/list?target=FREEPDB1', '/api/plsql/list?owner=HR;DROP', '/api/plsql/doc?object=HR.X;DROP', '/api/plsql/doc?object=HR', '/api/plsql/list?owner=' + 'X'.repeat(129)]) expect((await f.call(path)).status).toBe(400);
 	for (const issue of [{ issue: 'x', since: '31d' }, { issue: 1 }, { issue: '' }, { issue: 'x', target: 'FREEPDB1' }]) expect((await f.call('/api/triage', issue)).status).toBe(400);
 	expect(f.list).not.toHaveBeenCalled(); expect(f.triage).not.toHaveBeenCalled(); expect(f.closeAll).not.toHaveBeenCalled();
 });
@@ -48,7 +48,7 @@ it('shares lock across insight routes and releases after failures', async () => 
 	const pending = new Promise<void>(r => { release = r; }), start = new Promise<void>(r => { started = r; });
 	const f = await fixture({ plsqlList: async () => { started(); await pending; throw new Error('private DSN'); } });
 	const first = f.call(); await start;
-	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); expect((await f.call('/api/security')).status).toBe(429); expect((await f.call('/api/db-sessions')).status).toBe(429); } finally { release(); }
+	try { expect((await f.call('/api/triage', { issue: 'ORA-02292' })).status).toBe(429); expect((await f.call('/api/alertlog')).status).toBe(429); expect((await f.call('/api/sql?sqlId=0123456789abc')).status).toBe(429); expect((await f.call('/api/security')).status).toBe(429); expect((await f.call('/api/db-sessions')).status).toBe(429); expect((await f.call('/api/space')).status).toBe(429); } finally { release(); }
 	const failed = await first; expect(failed.status).toBe(500); expect(failed.text).not.toContain('DSN'); expect((await f.call()).status).toBe(500);
 });
 it('accepts dollar and hash identifiers and forwards doc selection', async () => {
@@ -139,4 +139,17 @@ it('Sessions returns compact JSON and Markdown, caps output, closes and recovers
 	mode = 'cap'; expect((await f.call('/api/db-sessions')).status).toBe(413);
 	mode = 'fail'; for (let i=0;i<2;i++) { const r=await f.call('/api/db-sessions'); expect(r.status).toBe(500); expect(r.text).not.toContain('credential'); }
 	mode = 'ok'; expect((await f.call('/api/db-sessions')).status).toBe(200); expect(f.closeAll).toHaveBeenCalledTimes(5);
+});
+
+it('Space forwards validated options, strips SQL and binds, caps output and cleans up on failures', async () => {
+	const { spaceFixture } = await import('../browser/space-fixture.js');
+	let mode='ok';
+	const read=vi.fn(async () => {if(mode==='fail')throw new Error('private credential');const r=spaceFixture();if(mode==='cap')r.target='x'.repeat(1048576);return r;});
+	const f=await fixture({readSpaceUsage:read});
+	const response=await f.call('/api/space?owner=APP&top=5&includeOracleMaintained=true&sections=segments,redo');
+	expect(response.status).toBe(200);expect(read.mock.calls[0]).toEqual([expect.anything(),{owner:'APP',top:5,includeOracleMaintained:true,sections:['segments','redo']}]);
+	const output=JSON.parse(response.text);expect(output.markdown).toContain('# Space');expect(output.result.sections.tablespaces.evidence).not.toHaveProperty('sql');expect(response.text).not.toContain('private-bind');
+	mode='cap';expect((await f.call('/api/space')).status).toBe(413);
+	mode='fail';for(let i=0;i<2;i++){const r=await f.call('/api/space');expect(r.status).toBe(500);expect(r.text).not.toContain('credential');}
+	mode='ok';expect((await f.call('/api/space')).status).toBe(200);expect(f.closeAll).toHaveBeenCalledTimes(5);
 });

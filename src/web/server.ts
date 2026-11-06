@@ -1,3 +1,4 @@
+import { readWebSpace, validateWebSpace } from './space.js';
 import { readWebDbSessions, validateWebDbSessions } from './dbSessions.js';
 import { readWebSecurity, validateWebSecurity } from './security.js';
 import { readWebSql, validateWebSql } from './sql.js';
@@ -23,6 +24,7 @@ import { createSessions } from "../agent/dbToolsAdapter.js";
 import { JsonlAuditSink } from "../audit/index.js";
 
 export interface WebServerOptions extends SessionOptions {
+	readSpaceUsage?: typeof import('../space/index.js').readSpaceUsage;
 	readSessionActivity?: typeof import('../sessions/index.js').readSessionActivity;
 	readSecurityPosture?: typeof import('../security/index.js').readSecurityPosture;
 	readSqlInsight?: typeof import('../sqlperf/index.js').readSqlInsight;
@@ -95,7 +97,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
-			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions'].includes(raw)) {
+			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';
 				if (req.method !== (isTriage ? 'POST' : 'GET')) throw new WebError(405, 'Method not allowed');
@@ -104,7 +106,9 @@ export function createWebServer(options: WebServerOptions = {}) {
 				if (typeof target !== 'string' || !['d1-19c-lab', 'p1-19c-prod'].includes(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
-					if (raw === '/api/db-sessions') {
+					if (raw === '/api/space') {
+						validateWebSpace(data);
+					} else if (raw === '/api/db-sessions') {
 						validateWebDbSessions(data);
 					} else if (raw === '/api/security') {
 						validateWebSecurity(data);
@@ -129,8 +133,8 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
-					if (raw === '/api/sql' || raw === '/api/security' || raw === '/api/db-sessions') {
-						const output = await (raw === '/api/db-sessions' ? readWebDbSessions : raw === '/api/security' ? readWebSecurity : readWebSql)(ctx, target, data, options);
+					if (raw === '/api/sql' || raw === '/api/security' || raw === '/api/db-sessions' || raw === '/api/space') {
+						const output = await (raw === '/api/space' ? readWebSpace : raw === '/api/db-sessions' ? readWebDbSessions : raw === '/api/security' ? readWebSecurity : readWebSql)(ctx, target, data, options);
 						if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
 						const finished = sessions; sessions = undefined; await finished.closeAll();
 						return json(res, 200, output);
