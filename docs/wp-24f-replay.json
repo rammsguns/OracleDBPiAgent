@@ -1,0 +1,647 @@
+{
+	"base": "fda1a2feabc058618ac0d9fc9477db82d168fb42",
+	"scorerBeforeSha256": "58ba16b75a083a4ba38dac987e59cb56c4ac3c3852570979970a6db2d2877ca4",
+	"scorerAfterSha256": "f6028024c490b062b5e9e1a64b0ba38c19dca8c6b90851079e211c4ad949b8d1",
+	"roots": [
+		{
+			"root": "../eval-archive",
+			"files": 479,
+			"records": 10856,
+			"preservedRetiredRecords": 113,
+			"retiredIds": [
+				"hard-ops-parameter-d1",
+				"hard-ops-jobs-p1",
+				"hard-ops-backups-d1",
+				"hard-health-sh-stats",
+				"hard-health-p1-index",
+				"hard-health-p1-stats",
+				"hard-ops-longops-p1",
+				"hard-ops-parameter-p1-grant",
+				"hard-health-sh-index",
+				"hard-health-sh-schema-stats",
+				"hard-units-sales-mb",
+				"health-sh-stats",
+				"health-p1-index",
+				"health-p1-stats",
+				"ops-parameter-d1",
+				"ops-jobs-p1",
+				"ops-backups-d1"
+			]
+		},
+		{
+			"root": "../needlefish/evals/results",
+			"files": 136,
+			"records": 3174,
+			"preservedRetiredRecords": 0,
+			"retiredIds": []
+		}
+	],
+	"flips": [
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-p1-event-definition-counts",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": true,
+			"after": true,
+			"justification": "Literal slash survives named binding parsing; whole-cell comparison still rejects partial or swapped values."
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-d1-redo-layout",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": false,
+			"after": true,
+			"justification": "Four per-group fields match; total is checked separately by the case-scoped required fact. The archived fifth truth cell is removed only for this case."
+		}
+	],
+	"checkFlips": [
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-p1-event-definition-counts",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": true,
+			"after": true,
+			"changedChecks": [
+				{
+					"check": "fresh ground truth row: [\"System I/O\",40]",
+					"before": false,
+					"after": true
+				},
+				{
+					"check": "fresh ground truth row: [\"User I/O\",59]",
+					"before": false,
+					"after": true
+				}
+			],
+			"justification": "Literal slash survives named binding parsing; whole-cell comparison still rejects partial or swapped values."
+		}
+	],
+	"gateSummary": [
+		{
+			"prefix": "hard-p23-",
+			"records": 6,
+			"archivedPasses": 5,
+			"beforePasses": 5,
+			"afterPasses": 6
+		},
+		{
+			"prefix": "hard-p24-",
+			"records": 6,
+			"archivedPasses": 4,
+			"beforePasses": 4,
+			"afterPasses": 5
+		}
+	],
+	"gate": [
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-d1-dominant-wait-class",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-p1-dominant-wait-class",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-d1-commit-events",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"log file parallel write\",\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"log file sync\",\"Commit\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"log file parallel write\",\"System I/O\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"log file sync\",\"Commit\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-p1-lock-idle-events",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SQL*Net message from client\",\"Idle\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"enq: TM - contention\",\"Application\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"enq: TX - row lock contention\",\"Application\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SQL*Net message from client\",\"Idle\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"enq: TM - contention\",\"Application\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"enq: TX - row lock contention\",\"Application\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-d1-event-definition-counts",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Application\",17]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Commit\",5]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Concurrency\",56]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Application\",17]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Commit\",5]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Concurrency\",56]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p23-p1-event-definition-counts",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Idle\",140]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\",40]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"User I/O\",59]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"Idle\",140]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"System I/O\",40]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"User I/O\",59]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-p1-largest-segment",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHOPAPP\",\"ORDER_LINES\",\"TABLE\",\"NONE\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHOPAPP\",\"ORDER_LINES\",\"TABLE\",\"NONE\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-p1-autoextend-max",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": false,
+			"after": false,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHOP_DATA\",4294967296]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SYSAUX\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SYSTEM\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"USERS\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"SHOP_DATA\",4294967296]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SYSAUX\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"SYSTEM\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"USERS\",34359721984]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-d1-redo-layout",
+			"iteration": 1,
+			"archived": false,
+			"before": false,
+			"scorerOnly": false,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [1,1,209715200,1,3]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [1,2,209715200,1,3]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [1,3,209715200,1,3]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "fact: \\b(?:total(?:\\s+(?:online\\s+)?redo)?\\s+groups?(?:\\s+count)?\\s*[:=|]?\\s*3|(?:total(?:\\s+(?:online\\s+)?redo)?\\s+group\\s+count)\\s*[:=|]?\\s*3|3\\s+(?:(?:online\\s+)?redo\\s+)?groups?\\s+(?:in\\s+)?total)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [1,1,209715200,1]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [1,2,209715200,1]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [1,3,209715200,1]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-p1-recovery-limit",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NOT CONFIGURED\",0]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NOT CONFIGURED\",0]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-d1-undo-settings",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UNDOTBS1\",\"900\",\"NOGUARANTEE\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UNDOTBS1\",\"900\",\"NOGUARANTEE\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase23/gate-23/2026-11-06T16-03-55-312Z-695391b9-a7ac-487f-a70e-3a4fff340a78.json",
+			"id": "hard-p24-d1-largest-lob-owner",
+			"iteration": 1,
+			"archived": true,
+			"before": true,
+			"scorerOnly": true,
+			"after": true,
+			"beforeChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"CO\",\"SYS_LOB0000074050C00004$$\",\"PRODUCTS\",\"PRODUCT_DETAILS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"afterChecks": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"CO\",\"SYS_LOB0000074050C00004$$\",\"PRODUCTS\",\"PRODUCT_DETAILS\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		}
+	]
+}

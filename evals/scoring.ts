@@ -295,7 +295,9 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	return candidates.some(line => {
 		// Named values must agree with their own truth column, even when the
 		// unordered multiset of values would otherwise match a swapped record.
-		const bindings = [...line.matchAll(/(?:^|[|;,/(]\s*)([A-Za-z_][\w$]*)\s*=\s*([^|;,/)]*)/g)];
+		// A literal slash belongs to the value (User I/O, paths). Only a
+		// whitespace-delimited slash separates named fields, as in fields below.
+		const bindings = [...line.matchAll(/(?:^|[|;,(]\s*|\s+\/\s+)([A-Za-z_][\w$]*)\s*=\s*((?:(?!\s+\/\s+)[^|;,)])*)/g)];
 		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index], label)))) return false;
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
 		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(field => field.replace(/\s+\([^)]*\)\s*$/, '')).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);

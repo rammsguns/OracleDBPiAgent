@@ -100,6 +100,7 @@ export function checkPinnedFacts(test: EvalCase, rows: unknown[][]): void {
 /** Challenge prerequisites fail closed when the intended trap or wide answer disappears. */
 export function checkChallengeRows(test: EvalCase, rows: unknown[][]): void {
 	if (test.split !== 'challenge') return;
+	if (test.id === 'hard-p24-d1-redo-layout' && (rows.length !== 3 || rows.some(row => row.length !== 4))) throw new Error('Redo layout requires three groups with four per-group fields');
 	if (test.category === 'wide-exact' && (rows.length < 8 || new Set(rows.map(row => String(row[0]))).size !== rows.length)) throw new Error(`Challenge needs at least eight distinct records: ${test.id}`);
 	if (test.id === 'hard-p11b-salary-ties' && (rows.length <= 3 || !rows.some((row, i) => rows.some((other, j) => i !== j && row[2] === other[2])))) throw new Error('Salary tie prerequisite changed');
 	if (test.id === 'hard-p11b-timestamp-boundary' && !(Number(rows[0]?.[0]) > Number(rows[0]?.[1]))) throw new Error('Date boundary prerequisite changed');
