@@ -5,7 +5,9 @@ Read `PLAN.md` first. It is the source of truth for scope, layout and the work p
 
 ## Hard rules
 
-1. **Oracle 19c only.** Connect only to the two targets in `config/targets.json`.
+1. **Oracle 19c only.** Connect only to the two lab targets in `config/targets.json`.
+   (Since phase 28 the *product* also connects to owner-approved targets listed in
+   the owner's private targets file. Agents and workers never connect to those.)
    The one exception is the 19c-gate integration test, which may connect to
    `localhost:1521/FREEPDB1` to prove refusal. Never use SYS, SYSTEM, HARNESS_APP or
    SHOPAPP credentials. Never run DML, DDL or PL/SQL that changes anything on any

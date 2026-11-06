@@ -3733,6 +3733,163 @@ Every refusal passed.
 - Make the p19 case truths robust to the agent's own V$SQL pollution and to
   nightly statistics times.
 
+## Phase 28: owner-approved real targets, CDB/PDB (approved 2026-11-06; runs before 25–27)
+
+**Owner request (2026-11-06).** "I want to use the app in real databases today",
+then "create the phase and run it today, they are CDB/PDB". Real targets are
+Oracle 19c multitenant: CDB with pluggable databases.
+
+**Problem.** The two lab targets are hard-coded in `src/config/approvedTargets.ts`.
+`loadConfig` requires exactly those two, and `createSessionProvider` accepts only
+`HARNESS_LAB`/`HARNESS_RO`. The product cannot reach any other database.
+
+**Coordinator contract changes (done in this commit).**
+- `TargetEnvironment` gains `"production"`.
+- `DatabaseIdentity` gains optional `containerName` (`USERENV CON_NAME`).
+- AGENTS.md rule 1: the product may connect to owner-approved targets.
+  Agents and workers still connect only to the two labs, plus the 19c-gate
+  FREEPDB1 refusal test.
+
+**Safety model.** These layers stay as they are:
+- the SQL policy: one SELECT/WITH, built-in functions only;
+- `SET TRANSACTION READ ONLY` plus rollback around every query;
+- the 19c gate;
+- secrets read only from `PIAGENT_SECRET_DIR`;
+- Strata only;
+- the audit rules.
+
+New:
+
+1. **The owner's private targets file is the allowlist.**
+   - Where it is found: `PIAGENT_TARGETS_FILE`, else
+     `$PIAGENT_HOME/targets.json` if it exists, else the packaged lab file.
+   - It must be a regular file owned by the current user, not group- or
+     other-writable, inside the existing private-home checks.
+   - It holds 1–20 targets with strict validation:
+     - name `^[a-z0-9][a-z0-9-]{0,62}$`, unique;
+     - host is a DNS name or IP, with no `/ @ ? # :` and no spaces
+       (IPv6 in brackets is allowed);
+     - port 1–65535;
+     - service name `^[A-Za-z0-9][A-Za-z0-9_.$#-]{0,127}$`;
+     - username is an Oracle identifier, optionally `C##`;
+     - `passwordFile` is a basename;
+     - `defaultSchema` is an identifier;
+     - environment is one of the enum values;
+     - `description` is non-empty;
+     - `logTables` is validated as today.
+   - Usernames on a fixed deny list are refused. The list covers SYS,
+     SYSTEM, SYSBACKUP, SYSDG, SYSKM, SYSRAC, AUDSYS, DBSNMP, XDB,
+     GSMADMIN_INTERNAL, OUTLN, LBACSYS, DVSYS, MDSYS, CTXSYS, ORDSYS,
+     WMSYS, OJVMSYS, APPQOSSYS, ANONYMOUS and the lab's HARNESS_APP and
+     SHOPAPP. Refusal happens at load, and again at connect.
+   - The packaged lab file keeps its exact pinned values when it is the
+     source. That keeps the dev and eval safety unchanged.
+2. **Connect-time account check.** It fails closed, runs after the 19c gate
+   and before any feature query, and only ever SELECTs.
+   - `SESSION_USER` must equal the configured username, with no proxy,
+     and `ISDBA` must be FALSE.
+   - Every row of `SESSION_PRIVS` must be on the allowlist:
+     - CREATE SESSION;
+     - ALTER SESSION;
+     - SET CONTAINER;
+     - SELECT ANY DICTIONARY;
+     - SELECT ANY TABLE;
+     - READ ANY TABLE;
+     - SELECT ANY SEQUENCE.
+   - No direct or enabled-role object privilege other than SELECT, READ or
+     EXECUTE may exist, and EXECUTE only on objects owned by
+     Oracle-maintained users. Sources are `USER_TAB_PRIVS` and
+     `ROLE_TAB_PRIVS`.
+   - If the account fails, the error names the offending privilege
+     names. Privilege names are not secret.
+   - If the check itself cannot run, the connection is refused.
+   - Both lab accounts must pass. If one does not, report it; do not widen
+     the allowlist without coordinator approval.
+3. **CDB/PDB.**
+   - Connect through the PDB service name with Easy Connect. Report
+     `containerName`.
+   - Refuse `CDB$ROOT` (`CON_ID` 1). The message tells the owner to use the
+     PDB service.
+   - Non-CDB stays supported, because the labs are non-CDB.
+   - Every fixed feature query must work in a PDB, or degrade to a clear
+     "not available in a PDB / not granted" note. It must never fail the
+     whole command.
+
+**WP-28A: targets, account check and preflight.** Branch
+`wp-28a-real-targets`. Owns `src/config/`, `src/oracle/`, `src/preflight/`
+(new), and the `targets`, `doctor` and `init` wiring in `src/cli/`.
+- The loader and session provider follow the rules above. Keep the
+  `approvedEndpoints` override for the gate test only.
+- `piagent targets` lists the configured targets and their source file.
+- `piagent targets check --target X [--json] [--grants-sql]`:
+  - connects;
+  - prints version, CDB/PDB and container, user, and the account-check
+    result;
+  - probes each feature's views with `SELECT 1 … WHERE ROWNUM = 0`. The
+    features are report sections, sessions, space, security, sql, alertlog,
+    plsql and triage.
+  - prints readable, missing or not-applicable per view.
+  - `--grants-sql` prints the SELECT grant statements a DBA would run in
+    that PDB for the missing views. It applies nothing.
+- `doctor` checks every configured target.
+- `init` writes a commented `targets.example.json` into the private home and
+  never overwrites an existing file.
+- Tests: unit tests for every validation rule, deny-list entry, privilege
+  path, root refusal and file-permission case. Integration: both labs pass
+  the account check and `targets check`.
+
+**WP-28B: owner documentation and the PDB grant template.** Branch
+`wp-28b-real-target-docs`. Owns `docs/real-targets.md` (new),
+`docs/grants-template-pdb.sql` (new), `docs/grants.md`,
+`docs/install.md`, `README.md` and `config/targets.example.json` (new).
+- A step-by-step guide for using a 19c CDB/PDB today:
+  - the DBA creates a PDB-local read-only account;
+  - applies the template;
+  - the owner writes the private targets file and the password file
+    (mode 600);
+  - runs `targets check`, then the deterministic commands, then `ask`.
+- The template creates no objects. It uses placeholders `&pdb_name` and
+  `&ro_user` and grants:
+  - CREATE SESSION;
+  - SELECT on exactly the views the product queries, the union of all
+    grant files;
+  - optionally `SELECT_CATALOG_ROLE` as a documented shortcut.
+- The template never grants AWR/ASH, `DBA_HIST_`, `DBA_EXTENTS`,
+  `UNIFIED_AUDIT_TRAIL`, `USER$` or any write or ANY privilege other than
+  the allowlist.
+- Explain what is untested: RAC, Data Guard standby, TCPS/wallets, other
+  release updates. Explain that live PDB behaviour is unverified until the
+  owner's first run.
+
+**WP-28C: PDB audit of fixed feature SQL.** Branch `wp-28c-pdb-audit`.
+Owns `src/report/`, `src/sessions/`, `src/space/`, `src/security/`,
+`src/sqlperf/`, `src/alertlog/`, `src/triage/`, `src/plsql/`, `src/drift/` and
+`src/tools/`, plus their tests.
+- Audit every fixed query for 19c PDB semantics. Examples:
+  - `V$DATABASE`/`V$LOG`/`V$ARCHIVED_LOG`/`V$RECOVERY_FILE_DEST` are
+    CDB-wide;
+  - `V$DIAG_ALERT_EXT` visibility differs in a PDB;
+  - `DBA_DATA_FILES`/`DBA_TEMP_FILES` and undo depend on local undo;
+  - `CON_ID` filtering;
+  - `V$SESSION` and `V$SQL` are container-scoped.
+- Label CDB-wide facts as such in the output.
+- Make each section degrade to a clear note when a view is missing
+  (ORA-00942/ORA-01031) or not meaningful in a PDB.
+- Add unit tests with fake PDB identities and errors. Write
+  `docs/wp-28c-pdb-audit.md` as a per-query table: query, PDB behaviour,
+  change.
+- No live PDB is available, so cite Oracle 19c documentation semantics.
+  Mark live behaviour as unverified.
+
+**Gate.**
+- Typecheck, unit, browser and integration tests pass.
+- Dev and regression eval suites ×1 and MVP show no regression. The agent
+  path must not change.
+- Coordinator smoke: both labs through a private targets file that copies
+  them, plus refusal smokes: a deny-listed user, a root container, a widened
+  account (simulated in unit tests only), and a bad file mode.
+- Ship as 1.4.0 after owner confirmation.
+
 ## Phase 25: backup and recoverability (proposed 2026-11-06; needs owner approval and p1 grants)
 
 ### Goal

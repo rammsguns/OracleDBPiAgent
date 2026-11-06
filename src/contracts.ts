@@ -7,7 +7,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 // ---------------------------------------------------------------------------
 // Configuration (WP-A implements loadConfig in src/config/)
 
-export type TargetEnvironment = "development" | "production-like";
+export type TargetEnvironment = "development" | "production-like" | "production";
 
 export interface TargetConfig {
 	name: string;
@@ -98,6 +98,8 @@ export interface DatabaseIdentity {
 	instanceName: string;
 	hostName: string;
 	isCdb: boolean;
+	/** SYS_CONTEXT('USERENV','CON_NAME'); undefined for older test doubles (phase 28). */
+	containerName?: string;
 	currentUser: string;
 	currentSchema: string;
 }
