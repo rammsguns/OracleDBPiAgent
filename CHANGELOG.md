@@ -75,6 +75,10 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 - The web tab arrow-key order now matches the visual tab order.
 - The live purge-triage integration test now derives its window from the
   age of the retained alert, instead of a fixed 2-day window.
+- A secret-directory mismatch now prints fixed configuration guidance
+  instead of the generic failure message.
+- Every command now has a one-line `--help` description, and the `drift`
+  description lists all of its scopes.
 
 ## [1.2.1] - 2026-11-05
 
