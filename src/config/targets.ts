@@ -1,4 +1,4 @@
-import { constants, openSync, closeSync, fstatSync, readFileSync, existsSync, type Stats } from 'node:fs';
+import { constants, openSync, closeSync, fstatSync, readFileSync, lstatSync, type Stats } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
 import type { TargetConfig } from '../contracts.js';
@@ -18,7 +18,11 @@ export function validateTarget(t: any): asserts t is TargetConfig {
 	if (t.logTables !== undefined) validateLogTables(t.logTables);
 }
 export function targetsSource(env: NodeJS.ProcessEnv = process.env): string {
-	return resolve(env.PIAGENT_TARGETS_FILE ?? (existsSync(join(agentHome(env), 'targets.json')) ? join(agentHome(env), 'targets.json') : join(PACKAGE_ROOT, 'config/targets.json')));
+	if (env.PIAGENT_TARGETS_FILE !== undefined) return resolve(env.PIAGENT_TARGETS_FILE);
+	const homeFile = join(agentHome(env), 'targets.json');
+	try { lstatSync(homeFile); return homeFile; }
+	catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new SafeConfigError('Invalid or unapproved target configuration'); }
+	return resolve(PACKAGE_ROOT, 'config/targets.json');
 }
 export function validatePrivateTargetsStat(stat: Pick<Stats, 'isFile' | 'mode' | 'uid' | 'size'>, uid = process.getuid?.()): void {
 	if (!stat.isFile() || stat.size > 131072 || (stat.mode & 0o022) !== 0 || (uid !== undefined && stat.uid !== uid)) throw new SafeConfigError('Invalid or unapproved target configuration');

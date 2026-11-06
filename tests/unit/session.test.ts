@@ -77,3 +77,14 @@ it('uses safe guidance when the secret directory is unset before reading secrets
 	expect(mocks.read).not.toHaveBeenCalled();
 	expect(mocks.connect).not.toHaveBeenCalled();
 });
+it.each(['privilege','root','query'])('closes on account-check failure before setting schema: %s',async kind=>{
+	const {c}=connection();c.execute.mockReset();
+	c.execute.mockResolvedValueOnce({rows:[['19.9.1.0.0']]});
+	if(kind==='query') c.execute.mockRejectedValueOnce(new Error('private details'));
+	else {
+		c.execute.mockResolvedValueOnce({rows:[['HARNESS_LAB','FALSE',null,kind==='root'?'1':'0',kind==='root'?'CDB$ROOT':'ORCL']]});
+		c.execute.mockResolvedValueOnce({rows:[['CREATE TABLE']]}).mockResolvedValueOnce({rows:[]});
+	}
+	await expect(createSessionProvider(config).get()).rejects.toThrow();
+	expect(c.close).toHaveBeenCalledOnce();expect(c.execute.mock.calls.some(call=>String(call[0]).startsWith('ALTER SESSION'))).toBe(false);
+});

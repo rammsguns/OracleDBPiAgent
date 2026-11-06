@@ -13,6 +13,7 @@ function setup(failure?: string) {
 	const get = vi.fn(async (name?: string) => {
 		const target = config.targets.find(t => t.name === name)!;
 		if (name === config.targets[0]!.name) {
+			if (failure === "privileges") throw new Error(sensitive);
 			if (failure === "connection") throw new Error(sensitive);
 			if (failure === "gate") throw new UnsupportedVersionError(sensitive, sensitive);
 		}
@@ -29,7 +30,7 @@ it.each([
 	["unloaded", "Strata: unavailable or unloaded"],
 	["connection", "d1-19c-lab: connection check failed"],
 	["gate", "d1-19c-lab: 19c gate check failed"],
-	["privileges", "read-only privileges check failed"],
+	["privileges", "connection check failed"],
 	["views", "view code dependencies check failed"],
 ])("doctor and main fail safely for %s", async (failure, label) => {
 	const test = setup(failure);
@@ -39,8 +40,7 @@ it.each([
 	expect(test.output()).toContain(label);
 	expect(test.output()).not.toContain(sensitive);
 	expect(test.output()).not.toMatch(/localhost|1522|1523|ORCL|PRODCDB/);
-	if (failure === "unloaded") expect(test.createSessions).not.toHaveBeenCalled();
-	else {
+	{
 		expect(test.get).toHaveBeenCalledWith("p1-19c-prod");
 		expect(test.closeAll).toHaveBeenCalledTimes(2);
 	}
@@ -56,6 +56,6 @@ it("redacts unexpected object privileges", async () => {
 	const test = setup();
 	test.get.mockImplementation(async () => ({ identity: { versionFull: "19.9", currentUser: "HARNESS_LAB" }, query: async () => ({ rows: [[sensitive, sensitive]] }) }) as unknown as OracleSession);
 	expect(await doctor(config, test.dependencies)).toBe(false);
-	expect(test.output()).toContain("read-only privileges check failed");
+	expect(test.output()).toContain("view code dependencies check failed");
 	expect(test.output()).not.toContain(sensitive);
 });

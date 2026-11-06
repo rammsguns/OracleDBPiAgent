@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { targetsSource } from '../config/targets.js';
+import { checkTarget } from '../preflight/index.js';
+import { AccountCheckError } from '../oracle/account.js';
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
@@ -25,7 +28,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 	let ok = true;
 	const report = dependencies.report;
 	try { await (dependencies.checkHealth ?? checkStrataHealth)(config.llm); if (report) report("Strata", true); else console.log("Strata: loaded (loopback)"); }
-	catch { if (report) report("Strata", false); else console.error("Strata: unavailable or unloaded; no configuration changes made"); return false; }
+	catch { if (report) report("Strata", false); else console.error("Strata: unavailable or unloaded; no configuration changes made"); ok = false; }
 	let sessions: SessionProvider;
 	try { sessions = await (dependencies.createSessions ?? createSessions)(config); }
 	catch { if (report) report("Session provider", false); else console.error("Session provider: initialization check failed"); return false; }
@@ -37,17 +40,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				check = "19c gate";
 				if (session.identity.versionFull.split(".")[0] !== "19") throw new Error("Identity mismatch");
 				check = "account identity";
-				if (session.identity.currentUser.toUpperCase() !== target.username) throw new Error("Identity mismatch");
-				check = "read-only privileges";
-				const privileges = await session.query("SELECT PRIVILEGE FROM SESSION_PRIVS");
-				const roles = await session.query("SELECT ROLE FROM SESSION_ROLES");
-				// Oracle's SELECT_CATALOG_ROLE also carries FLASHBACK on dictionary views and EXECUTE on
-				// DBMS_ASH and Data Pump types; both are read-only, and sqlPolicy blocks DBMS_ calls.
-				const objectGrants = await session.query("SELECT 'USER', PRIVILEGE FROM USER_TAB_PRIVS_RECD UNION SELECT ROLE, PRIVILEGE FROM ROLE_TAB_PRIVS WHERE ROLE IN (SELECT ROLE FROM SESSION_ROLES)");
-				const unexpected = objectGrants.rows.filter(([role, privilege]) => !["SELECT", "READ", "REFERENCES"].includes(String(privilege)) && !(role === "SELECT_CATALOG_ROLE" && ["FLASHBACK", "EXECUTE"].includes(String(privilege))));
-				if (unexpected.length) throw new Error("Unexpected object privileges");
-				const safe = new Set(["CREATE SESSION", "SELECT ANY DICTIONARY"]);
-				if (privileges.rows.some(r => !safe.has(String(r[0]))) || roles.rows.some(r => ["DBA", "RESOURCE", "IMP_FULL_DATABASE", "EXP_FULL_DATABASE"].includes(String(r[0])))) throw new Error("Unexpected privileges");
+				if (session.identity.currentUser.toUpperCase() !== target.username.toUpperCase()) throw new Error("Identity mismatch");
 				// sqlPolicy only sees the SQL text: a granted view could still run non-Oracle code
 				// (for example an autonomous-transaction function) when selected.
 				check = "view code dependencies";
@@ -56,11 +49,11 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				const oracleOwners = "(SELECT username FROM all_users WHERE oracle_maintained = 'Y')";
 				const viewCode = await session.query(`SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND ((d.referenced_type IN ${code} AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN ${oracleOwners}) OR (d.referenced_type = 'SYNONYM' AND EXISTS (SELECT 1 FROM all_synonyms s JOIN all_objects o ON o.owner = s.table_owner AND o.object_name = s.table_name WHERE s.owner = d.referenced_owner AND s.synonym_name = d.referenced_name AND o.object_type IN ${code} AND o.owner NOT IN ${oracleOwners})))`);
 				if (viewCode.rows.length) throw new Error("Accessible views call non-Oracle code");
-				if (report) report(target.name, true); else console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; session privileges: ${privileges.rows.map(r => r[0]).join(", ")}`);
+				if (report) report(target.name, true); else console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; account check passed`);
 			} catch (error) {
 				ok = false;
 				if (error instanceof UnsupportedVersionError) check = "19c gate";
-				if (report) report(`${target.name}: ${check}`, false); else console.error(`${target.name}: ${check} check failed`);
+				if (report) report(`${target.name}: ${check}`, false); else console.error(`${target.name}: ${error instanceof AccountCheckError ? error.message : `${check} check failed`}`);
 			}
 		}
 	} finally {
@@ -187,9 +180,26 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const { runSchedule } = await import("../report/schedule.js");
 		process.exitCode = runSchedule({ ...options, cli: join(PACKAGE_ROOT, "dist/cli/index.js") });
 	});
-	program.command("targets").description("List the approved Oracle 19c targets").action(() => {
+	const targets = program.command("targets").description("List configured Oracle 19c targets and their source file").action(() => {
 		const cfg = loadConfig();
+		console.log(`Source: ${targetsSource()}`);
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
+	});
+	targets.command("check").description("Check account safety and feature view access; no LLM").requiredOption("--target <target>").option("--json").option("--grants-sql").action(async options => {
+		const sessions = await (dependencies.createSessions ?? createSessions)(loadConfig());
+		try {
+			const result = await checkTarget(sessions, options.target);
+			if (options.json) console.log(JSON.stringify(options.grantsSql ? result : { ...result, grantsSql: undefined }));
+			else {
+				console.log(`${result.identity.target}: Oracle ${result.identity.versionFull}; ${result.identity.isCdb ? 'CDB/PDB' : 'non-CDB'}; container ${result.identity.containerName}; user ${result.identity.currentUser}; account check passed`);
+				for (const view of result.views) console.log(`${view.feature}\t${view.view}\t${view.status}`);
+				if (options.grantsSql) console.log(result.grantsSql.join('\n'));
+			}
+		} catch (error) {
+			const message = error instanceof AccountCheckError ? error.message : 'Target check failed; check local configuration and service availability';
+			console.log(options.json ? JSON.stringify({ target: options.target, accountCheck: 'failed', error: message }) : message);
+			process.exitCode = 1;
+		} finally { await sessions.closeAll(); }
 	});
 	program.command("doctor").description("Check local configuration and service availability").action(async () => { if (!await doctor(loadConfig(), dependencies)) process.exitCode = 1; });
 	async function run(question: string | undefined, options: { target?: string; json?: boolean }) {
