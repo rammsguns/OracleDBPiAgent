@@ -65,3 +65,19 @@ it('propagates the mandatory 19c refusal', async () => {
 	const { ctx, get } = setup(); get.mockRejectedValue(new UnsupportedVersionError('lab', '26.0'));
 	await expect(generateReport(ctx)).rejects.toBeInstanceOf(UnsupportedVersionError);
 });
+it('renders each populated section as one contiguous Markdown table block', async () => {
+	const { ctx, query } = setup();
+	query.mockResolvedValue({ columns: ['NAME', 'VALUE'], rows: [['a|b', 1], ['c\nd', 2]], truncated: false, elapsedMs: 1 });
+	const report = await generateReport(ctx, { sections: ['identity', 'waits'] });
+	const markdown = renderMarkdown(report);
+	const tables = markdown.split('\n\n').filter(block => block.startsWith('|'));
+	expect(tables).toHaveLength(report.sections.length);
+	for (const table of tables) {
+		const lines = table.trimEnd().split('\n');
+		expect(lines).toHaveLength(4);
+		expect(lines[0]).toBe('| NAME | VALUE |');
+		expect(lines[1]).toMatch(/^\|(?: --- \|){2}$/);
+		expect(lines.slice(2)).toEqual(['| a&#124;b | 1 |', '| c d | 2 |']);
+	}
+	expect(markdown).toContain('| c d | 2 |\n\n## waits');
+});

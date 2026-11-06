@@ -105,5 +105,20 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 }
 const cell = (value: unknown): string => String(value === null || value === undefined ? 'NULL' : value instanceof Date ? value.toISOString() : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, ' ');
 export function renderMarkdown(report: DatabaseReport): string {
-	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...report.sections.map(s => [`## ${s.name}`, `Source: ${s.source}`, s.note, ...((s.status === 'ok' || s.name === 'security' && s.rows.length > 0) ? s.rows.length ? [`| ${s.columns.map(cell).join(' | ')} |`, `| ${s.columns.map(() => '---').join(' | ')} |`, ...s.rows.map(r => `| ${r.map((v, i) => cell(s.name === 'space' && ['VALUE', 'MAX_BYTES', 'BYTES_PER_DAY'].includes(s.columns[i]!) && typeof v === 'number' ? formatBytes(v) + (s.columns[i] === 'BYTES_PER_DAY' ? '/day' : '') : v)).join(' | ')} |`)] : ['No matching rows.'] : [])].filter(Boolean).join('\n\n'))].join('\n\n') + '\n';
+	const sections = report.sections.map(s => {
+		const blocks = [`## ${s.name}`, `Source: ${s.source}`, s.note];
+		if (s.status === 'ok' || s.name === 'security' && s.rows.length > 0) {
+			if (s.rows.length) {
+				const lines = [
+					`| ${s.columns.map(cell).join(' | ')} |`,
+					`| ${s.columns.map(() => '---').join(' | ')} |`,
+					...s.rows.map(r => `| ${r.map((v, i) => cell(s.name === 'space' && ['VALUE', 'MAX_BYTES', 'BYTES_PER_DAY'].includes(s.columns[i]!) && typeof v === 'number' ? formatBytes(v) + (s.columns[i] === 'BYTES_PER_DAY' ? '/day' : '') : v)).join(' | ')} |`),
+				];
+				// A table is one Markdown block; only paragraphs get blank lines.
+				blocks.push(lines.join('\n'));
+			} else blocks.push('No matching rows.');
+		}
+		return blocks.filter(Boolean).join('\n\n');
+	});
+	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...sections].join('\n\n') + '\n';
 }
