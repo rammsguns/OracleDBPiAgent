@@ -83,3 +83,46 @@ All selected integration tests passed. The three skips are the explicitly
 excluded Strata/gate cases. No live Strata answer, FREEPDB1 refusal, or external
 Markdown viewer was exercised; table syntax is verified by the contiguous-block
 unit test. Older saved history and timing-evidence compatibility are covered.
+
+## INFO-1 follow-up (coordinator approved)
+
+`src/alertlog/index.ts` now emits only the `No rows returned.` paragraph for
+empty alert-log and ADR incident results, without table headers/separators.
+Metadata/notes/grants and row-cap notes are separated from the result block by
+one blank line. Populated table lines remain contiguous.
+
+Additional changed files: `tests/unit/alertlog.test.ts` covers both result kinds,
+notes, missing grants and truncation; `tests/unit/web-insight.test.ts` verifies
+that `/api/alertlog` retains empty structured rows and exports two separated
+empty paragraphs without table syntax.
+
+The web alert tab renders structured rows independently and downloads the API's
+Markdown unchanged. Triage uses its own structured alert evidence renderer; it
+does not embed or parse `renderAlertLogMarkdown` output. Existing triage fixtures
+and browser coverage remain applicable. No changes to either consumer needed.
+No contracts or dependencies changed; no database or LLM calls made.
+
+Focused checks: 3 files, 63 tests passed (alertlog, web-insight, triage-alerts).
+The initial new web-export test inherited a truncated fixture; it was corrected
+to use an untruncated empty result before the final full unit run.
+
+Final INFO-1 validation outputs:
+
+```text
+npm run typecheck
+> tsc -p tsconfig.json --noEmit
+PASS (no diagnostics)
+
+npm test -- --maxWorkers=2
+Test Files  105 passed (105)
+Tests       1792 passed (1792)
+Duration    67.22s
+
+npm run test:browser
+6 skipped
+71 passed (58.3s)
+```
+
+`git diff --check` passed. Browser skips remain the six opt-in live tests.
+The selected scope changes only Markdown presentation; integration was not
+rerun for INFO-1. Live DB/LLM behavior was not exercised in this follow-up.

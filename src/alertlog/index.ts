@@ -144,14 +144,15 @@ export function readIncidents(ctx: ToolContext, target: string, options: WindowO
 const escape = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResult<IncidentRow>): string {
 	const lines = [`# ${result.view === 'V$DIAG_ALERT_EXT' ? 'Alert log' : 'ADR incidents'}: ${escape(result.target)}`, '', `${result.status}; ${escape(result.view)}; ${result.window.from} to ${result.window.to} (exclusive)`, '', ...(result.note ? [escape(result.note)] : []), ...result.grants.map(g => '`' + g + '`')];
-	if (result.view === 'V$DIAG_ALERT_EXT') {
+	if (lines[lines.length - 1] !== '') lines.push('');
+	if (!result.rows.length) lines.push('No rows returned.');
+	else if (result.view === 'V$DIAG_ALERT_EXT') {
 		lines.push('| First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |', '|---|---|---|---|---|---|---|---|');
 		for (const r of result.rows as AlertRow[]) lines.push(`| ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
 	} else {
 		lines.push('| Created | Incident | Problem | Status |', '|---|---|---|---|');
 		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${formatIncidentStatus(r.status)} |`);
 	}
-	if (!result.rows.length) lines.push('No rows returned.');
-	if (result.truncated) lines.push('Row cap reached; partial result (folding covers only fetched rows).');
+	if (result.truncated) lines.push('', 'Row cap reached; partial result (folding covers only fetched rows).');
 	return lines.join('\n') + '\n';
 }
