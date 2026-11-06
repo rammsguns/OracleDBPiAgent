@@ -15,7 +15,7 @@ function fixture(code?: string) {
 }
 describe('jobs read-only evidence', () => {
 	it.each([
-		'Authorization: Bearer hidden-value', 'authorization: Basic hidden-value',
+		'Authorization: Bearer hidden-value', 'authorization: Basic hidden-value', '{"Authorization": "Basic hidden-value"}',
 		'Bearer hidden-value', 'pass=hidden-value', 'SECRET_KEY: "hidden-value"',
 		'credentials = hidden-value', '{"clientSecret": "hidden-value"}', 'PASSWORD_SUFFIX=hidden-value', 'prefixPASSWDsuffix: hidden-value',
 		'appPWDextra=hidden-value', 'appPASSextra=hidden-value', 'mySECRETstuff=hidden-value',

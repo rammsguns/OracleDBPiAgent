@@ -1,5 +1,8 @@
 # WP-26A completion report
 
+Latest approved-review follow-up is recorded at the end; the original validation
+and live captures below are retained as historical evidence.
+
 Branch: `wp-26a-jobs`. Implementation commits: `bbeaf70`, `30ffb5a`.
 
 ## Built
@@ -27,7 +30,7 @@ through PIAGENT_SECRET_DIR. `node_modules` was absent and was symlinked to
 - `src/preflight/views.ts`: jobs feature group.
 - `docs/jobs.md`: usage, filtering, timestamps, caps, retention/PDB caveats and result contract.
 - `docs/grants-request-2026-11-06-jobs.sql`: eight proposed p1 SELECT grants, not applied.
-- `docs/grants-template-pdb.sql`: eight missing view grants; four feature views already covered.
+- `docs/grants-template-pdb.sql`: six missing view grants; six feature views already covered (the separate p1 request contains eight grants).
 - `tests/unit/jobs.test.ts`: filters, read-only policy, writer refusal, credential redaction,
   UTF-8 truncation, preflight coverage, PDB degradation, auditing and cleanup.
 - `tests/unit/release-help.test.ts`: register jobs in existing CLI help coverage.
@@ -325,3 +328,263 @@ configuration change was attempted. No live jobs were created for fixtures.
 Missing p1 maintenance evidence stays unknown until owner-reviewed grants are
 applied by a human DBA. Grant-limited eval premises must be reviewed before
 that step. Strata e2e and model evals were intentionally excluded as instructed.
+
+## Approved-review follow-up (2026-11-06)
+
+Addressed both minors and both informational findings from
+`../review-wp-26a-jobs/docs/review-wp-26a-jobs.md`.
+
+- Added `src/jobs/redact.ts`, a jobs-local second credential pass after the
+  existing triage redactor and before UTF-8 truncation. It masks Authorization
+  (including quoted JSON keys), Bearer tokens, connection-string userinfo and
+  assignments whose keys contain PASSWORD/PASSWD/PWD/PASS/SECRET/TOKEN/KEY/CREDENTIAL,
+  case-insensitively with arbitrary prefixes/suffixes. Quoted and multiline
+  values, SQL literal concatenation and quoted JSON assignment keys are covered.
+- `docs/jobs.md` explicitly classifies JSON job error fields as
+  **application text, may contain data**. Business literals are not anonymized.
+- Failed-only current jobs include positive failure counts, FAILED/BROKEN/RETRY
+  SCHEDULED states and a latest retained failed run, independent of the history
+  window. A correlated `KEEP (DENSE_RANK LAST ORDER BY LOG_DATE, LOG_ID)` aggregate
+  checks each job before the row cap. If run details are unavailable, a separately
+  audited retry retains the readable job snapshot using state/failure-count
+  predicates and explicitly notes the unavailable latest-run evidence.
+- Qualified both ordering columns in the latest-error analytic function.
+- Corrected the template-grant erratum: six added grants, six already covered;
+  the separate p1 request contains eight grants.
+- Extended `tests/unit/jobs.test.ts` for the requested credential forms, business
+  data preservation, new failure predicates, qualified ordering and all three
+  expected run-details privilege/PDB failures. Extended the jobs integration
+  tests to execute failed-only mode on both labs and check non-successful runs.
+
+Implementation commit: `023d18d`, followed by the quoted-Authorization regression
+and this report. Changed files in this follow-up: `src/jobs/index.ts`,
+`src/jobs/redact.ts`, `tests/unit/jobs.test.ts`, `tests/integration/jobs.test.ts`,
+`docs/jobs.md`, `docs/wp-26a-jobs.md`. No shared contract changes are needed.
+No grants were applied, jobs changed, or Strata/LLM calls made. Live PDB behavior
+and zero-failure-count failed/retry jobs remain unseeded on the labs; no database
+fixtures were modified. Predicate construction is covered by unit tests, and the
+full SELECT runs on both approved labs.
+
+### Live follow-up
+
+Both CLI JSON invocations exited 0 and parsed successfully. Commands:
+
+```sh
+PIAGENT_TARGETS_FILE="$PWD/config/targets.json" PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- jobs --target d1-19c-lab --since 30d --owner SH --failed-only --json
+PIAGENT_TARGETS_FILE="$PWD/config/targets.json" PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run piagent -- jobs --target p1-19c-prod --since 30d --owner SHOPAPP --failed-only --json
+```
+
+Captured parsed status/row-count summary and current job/error rows (SQL and
+unchanged empty row arrays omitted):
+
+```json
+{
+  "d1-19c-lab": {
+    "window": {
+      "from": "2026-10-07T21:35:58.473Z",
+      "to": "2026-11-06T21:35:58.473Z"
+    },
+    "sections": {
+      "jobs": {
+        "status": "ok",
+        "rows": 0
+      },
+      "lastErrors": {
+        "status": "ok",
+        "rows": 0
+      },
+      "runs": {
+        "status": "ok",
+        "rows": 0
+      },
+      "jobLog": {
+        "status": "ok",
+        "rows": 0
+      },
+      "windows": {
+        "status": "ok",
+        "rows": 9
+      },
+      "autotaskClients": {
+        "status": "ok",
+        "rows": 3
+      },
+      "autotaskHistory": {
+        "status": "ok",
+        "rows": 0
+      },
+      "statisticsHistory": {
+        "status": "ok",
+        "rows": 0
+      },
+      "invalidObjects": {
+        "status": "ok",
+        "rows": 0
+      },
+      "indexes": {
+        "status": "ok",
+        "rows": 0
+      },
+      "indexPartitions": {
+        "status": "ok",
+        "rows": 0
+      },
+      "indexSubpartitions": {
+        "status": "ok",
+        "rows": 0
+      },
+      "staleStatistics": {
+        "status": "ok",
+        "rows": 0
+      }
+    },
+    "jobs": [],
+    "lastErrors": []
+  },
+  "p1-19c-prod": {
+    "window": {
+      "from": "2026-10-07T21:34:38.172Z",
+      "to": "2026-11-06T21:34:38.172Z"
+    },
+    "sections": {
+      "jobs": {
+        "status": "ok",
+        "rows": 1
+      },
+      "lastErrors": {
+        "status": "ok",
+        "rows": 1
+      },
+      "runs": {
+        "status": "ok",
+        "rows": 1
+      },
+      "jobLog": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "windows": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "autotaskClients": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "autotaskHistory": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "statisticsHistory": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "invalidObjects": {
+        "status": "ok",
+        "rows": 0
+      },
+      "indexes": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "indexPartitions": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "indexSubpartitions": {
+        "status": "unavailable",
+        "rows": 0
+      },
+      "staleStatistics": {
+        "status": "ok",
+        "rows": 1
+      }
+    },
+    "jobs": [
+      {
+        "OWNER": "SHOPAPP",
+        "JOB_NAME": "NIGHTLY_PURGE_JOB",
+        "ENABLED": "TRUE",
+        "STATE": "SCHEDULED",
+        "LAST_START_DATE": "2026-11-06T03:41:39.238+00:00",
+        "NEXT_RUN_DATE": "2026-11-07T03:41:39.239+00:00",
+        "RUN_COUNT": 9,
+        "FAILURE_COUNT": 1
+      }
+    ],
+    "lastErrors": [
+      {
+        "OWNER": "SHOPAPP",
+        "JOB_NAME": "NIGHTLY_PURGE_JOB",
+        "LOG_ID": 38342,
+        "LOG_DATE": "2026-11-04T04:30:56.304+00:00",
+        "STATUS": "FAILED",
+        "ERROR#": 2292,
+        "ADDITIONAL_INFO": "ORA-02292: integrity constraint (SHOPAPP.SYS_C007669) violated - child record found\nORA-06512: at \"SHOPAPP.WORKLOAD\", line 27\nORA-06512: at line 1\n"
+      }
+    ]
+  }
+}
+```
+
+### Follow-up validation output
+
+`npm run typecheck` (exit 0):
+
+```text
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+```
+
+`npm test -- --maxWorkers=2` (exit 0):
+
+```text
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-26a-jobs
+
+
+ Test Files  109 passed (109)
+      Tests  1877 passed (1877)
+   Start at  15:36:42
+   Duration  67.26s (tests 74%, import 23%, worker 1%, transform 1%)
+
+    Isolate  109 workers spawned · ~287ms startup each (spawn + environment, per file)
+             at least ~15.37s faster with isolate: false — reuses workers across files instead of one per file
+```
+
+Required filtered full integration command (exit 0), with packaged lab targets
+pinned and `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets`:
+
+```text
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-26a-jobs
+
+
+ Test Files  29 passed (29)
+      Tests  67 passed | 1 skipped (68)
+   Start at  15:34:58
+   Duration  209.52s (tests 96%, import 4%)
+```
+
+The one skipped test is the excluded Strata e2e. The final source also passed
+the focused jobs integration file, including failed-only reads on both labs
+(exit 0):
+
+```text
+RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-26a-jobs
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  15:36:47
+   Duration  3.68s (tests 90%, import 5%, transform 4%)
+```
+
+`git diff --check` passed. No outstanding review items or required shared
+contract changes remain. Live PDB verification still requires an owner-run PDB.
