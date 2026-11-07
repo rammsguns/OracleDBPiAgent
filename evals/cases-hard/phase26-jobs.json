@@ -51,7 +51,7 @@
 		},
 		"expect": {
 			"requiredFacts": [
-				"(?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)"
+				"(?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)"
 			],
 			"requiredTools": [
 				"run_query"

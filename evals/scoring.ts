@@ -1,6 +1,16 @@
 import type { AskResult, EvalCase } from './types.js';
 const normalizeHyphens = (text: string) => text.replace(/[\u2010-\u2015\u2212]/g, '-');
 
+const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
+// Compare decimal strings exactly, without floating-point rounding.
+const decimal = (text: string) => {
+	const [integer = '', fraction = ''] = text.replace(/^[-+]/, '').split('.');
+	const tail = fraction.replace(/0+$/, '');
+	const magnitude = integer.replace(/^0+(?=\d)/, '') + (tail ? '.' + tail : '');
+	return (text.startsWith('-') && magnitude !== '0' ? '-' : '') + magnitude;
+};
+const numberTokens = (text: string) => [...text.matchAll(/(?<![\w.+-])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)];
+
 /** Normalize only explicitly UTC-labelled p19 timestamps; never infer a timezone. */
 function p19UtcTimestamps(answer: string): string {
 	const marksUtc = (line: string) => /\bUTC\b(?![+-]\d)/i.test(line) && !/\b(?:not|non)[ -]?UTC\b/i.test(line);
@@ -50,7 +60,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		if (test.groundTruth.mode === 'scalar' && typeof scalar === 'number') {
 			const low = Math.min(scalar, typeof after === 'number' ? after : scalar), high = Math.max(scalar, typeof after === 'number' ? after : scalar);
 			const inRange = (n: number) => n >= low && n <= high;
-			const numbers = [...normalized.matchAll(/(?<![\w.])\d+(?![\w.])/g)].map(match => Number(match[0]));
+			const numbers = numberTokens(normalized).map(match => Number(match[0]));
 			checks.push({ check: `fresh ground truth: ${low === high ? low : `${low}..${high}`}`, pass: numbers.some(inRange) });
 			// Any stated row count must be the expected one, not just mention it somewhere. Deltas,
 			// approximations and optimizer-statistics figures are not claims about the live count.
@@ -70,9 +80,9 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 				const expected = String(value);
 				const escaped = expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 				// Numbers must not be part of a longer number; names may be qualified (ORDERS.CUSTOMER_ID).
-					const numeric = /^-?\d/.test(expected);
-					const bounded = numeric ? `(?<![\\w.])${escaped}(?![\\w.]*\\d)` : `(?<!\\w)${escaped}(?!\\w)`;
-					checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && new RegExp(bounded, 'i').test(normalized) });
+					const startsNumeric = /^-?\d/.test(expected);
+					const bounded = startsNumeric ? `(?<![\\w.])${escaped}(?![\\w.]*\\d)` : `(?<!\\w)${escaped}(?!\\w)`;
+					checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && (numeric(expected) ? numberTokens(normalized).some(match => decimal(match[0]) === decimal(expected)) : new RegExp(bounded, 'i').test(normalized)) });
 			}
 		}
 		checks.push({ check: 'nonempty ground truth', pass: truth.length > 0 });
@@ -121,13 +131,6 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// stars while preserving embedded stars. Historical cases stay unchanged.
 		const plain = p23 ? text.replace(/`/g, '').replace(/(?<!\w)\*+|\*+(?!\w)/g, '') : text.replace(/[`*]/g, '');
 		return normalizeHyphens(plain).replace(/(?<=[A-Za-z_$])\s*\.\s*(?=[A-Za-z_$])/g, '.').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/[−–](?=\d)/g, '-').trim();
-	};
-	const numeric = (text: string) => /^[-+]?\d+(?:\.\d+)?$/.test(text);
-	const decimal = (text: string) => {
-		const negative = text.startsWith('-');
-		const [integer = '', fraction = ''] = text.replace(/^[-+]/, '').split('.');
-		const magnitude = integer.replace(/^0+(?=\d)/, '') + (fraction.replace(/0+$/, '') ? '.' + fraction.replace(/0+$/, '') : '');
-		return (negative && magnitude !== '0' ? '-' : '') + magnitude;
 	};
 	// p27 statistic names include meaningful suffixes such as (hard) and (total).
 	const stripAnnotation = (text: string) => p27 ? text : text.replace(/\s+\([^)]*\)\s*$/, '');
@@ -322,7 +325,8 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (labels.some((label, index) => label && bindings.some(binding => binding[1]!.toLowerCase() === label.toLowerCase() && !same(binding[2]!, row[index], label)))) return false;
 		const structured = /[|=]/.test(line) || / \/ /.test(line);
 		const fields = line.replace(/^[-•]\s+/, '').split(/\s*\|\s*/).map(stripAnnotation).flatMap(field => field.split(/\s+\/\s+|;\s*|,\s+(?=[A-Za-z_]+\s*=)/)).filter(Boolean).flatMap(field => field.includes('=') ? field.split('=').map(clean) : [clean(field)]);
-		if (structured) {
+		// A slash in single-value explanatory prose is not a record separator.
+		if (structured && !(row.length === 1 && !/[|=]/.test(line) && bindings.length === 0)) {
 			// An explicitly qualified object cannot borrow a different owner from
 			// another field. Only owner columns constrain qualifiers; unrelated
 			// child and parent objects may legitimately use different schemas.
@@ -351,6 +355,8 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 				? [...remaining.matchAll(/(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)].find(candidate => same(candidate[0], value))
 				: pattern.exec(remaining);
 			if (!match) return false;
+			// Negation must describe this occurrence, not another claim on the line.
+			if (row.length === 1 && /\b(?:not|no|never|except|without)\s+(?:(?:equal to|configured as|set to)\s+)?$/i.test(remaining.slice(0, match.index))) return false;
 			// Preserve the structured-cell owner check for newly accepted prose
 			// qualifiers as well: an explicit wrong owner is not equivalent.
 			if (qualifier && match[0].includes('.') && /(?:table|table_name|index|index_name|constraint|constraint_name)$/i.test(labels[column] ?? '')) {
