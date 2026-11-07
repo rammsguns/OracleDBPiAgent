@@ -4320,7 +4320,7 @@ design.
   is low. The deterministic revision covers it, but it costs one extra
   request.
 
-## Phase 29: 1.5 follow-ups (approved 2026-11-07: "continue with next phases")
+## Phase 29: 1.5 follow-ups (approved 2026-11-07: "continue with next phases"; release: "continue and push v1.5.1 when the gate passes")
 
 ### Goal
 Close the open follow-ups from phases 21–28 and the 1.5.0 gate. These are
