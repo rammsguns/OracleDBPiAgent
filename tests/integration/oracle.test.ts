@@ -35,7 +35,8 @@ for (const target of targets) it(`19c tools and refusal: ${target.name}`, async 
 				expect(result.details.rows.length).toBeGreaterThan(0);
 				const value = (column: string) => result.details.rows[0][result.details.columns.indexOf(column)];
 				if (granted) {
-					expect(result.details.sourceNote).toBeUndefined();
+					if (tool.name === 'tablespace_usage') expect(result.details.sourceNote).toContain('BYTES and MAXBYTES are bytes, not blocks');
+					else expect(result.details.sourceNote).toBeUndefined();
 					if (tool.name === 'db_overview') for (const column of ['CDB','STARTUP_TIME','DATAFILE_BYTES','SGA_BYTES','PGA_BYTES']) expect(value(column)).not.toBeNull();
 					if (tool.name === 'list_schemas') expect(result.details.columns).toContain('SEGMENT_BYTES');
 				} else {
