@@ -1,5 +1,5 @@
 {
-	"validatedAt": "2026-11-06T22:03:38.007Z",
+	"validatedAt": "2026-11-07T02:05:32.608Z",
 	"caseCount": 144,
 	"records": [
 		{
@@ -187,12 +187,22 @@
 			"target": "p1-19c-prod",
 			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
 			"mode": "allCells",
-			"rowCount": 1,
+			"rowCount": 3,
 			"rows": [
 				[
 					"INDEX",
 					"FAST FULL SCAN",
-					"SYS_C007661"
+					"ORDER_LINES_PK"
+				],
+				[
+					"INDEX",
+					"RANGE SCAN",
+					"ORDER_LINES_PK"
+				],
+				[
+					"TABLE ACCESS",
+					"FULL",
+					"ORDERS"
 				]
 			]
 		},
@@ -1356,7 +1366,7 @@
 			"rows": [
 				[
 					2134003100,
-					1
+					2
 				]
 			]
 		},
@@ -1370,13 +1380,13 @@
 				[
 					"SHOPAPP",
 					"PRODUCTS",
-					"NO",
+					"YES",
 					"2026-11-06T22:00:08Z"
 				],
 				[
 					"SHOPAPP",
 					"SYS_C007655",
-					"NO",
+					"YES",
 					"2026-11-06T22:00:08Z"
 				]
 			]
@@ -1664,7 +1674,7 @@
 			"rowCount": 1,
 			"rows": [
 				[
-					"NO",
+					"YES",
 					"YES"
 				]
 			]

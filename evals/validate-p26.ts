@@ -24,6 +24,7 @@ export async function inspectP26(session: Pick<OracleSession, 'query' | 'identit
 	if (rawId == null || String(rawId).trim() === '' || !Number.isSafeInteger(containerId) || containerId < 0 || typeof rawName !== 'string' || !rawName.trim()) throw new Error('Invalid session container metadata');
 	const container = { id: containerId, name: rawName };
 	// CON_ID 0 is a non-CDB, 1 is CDB$ROOT, and >1 identifies a PDB (including seed).
+	if (container.id === 1 || container.name.toUpperCase() === 'CDB$ROOT') throw new Error('CDB$ROOT refused; connect through a PDB service');
 	const isPdb = container.id > 1;
 	const views = [];
 	for (const view of JOBS_VIEWS) {
@@ -45,6 +46,7 @@ export async function inspectP26(session: Pick<OracleSession, 'query' | 'identit
 		try {
 			const result = await session.query(test.groundTruth!.sql, {}, { maxRows: 100 });
 			if (result.truncated || result.rows.some(row => row.some(cell => cell == null))) throw new Error(`Invalid p26 truth: ${test.id}`);
+			checkP26Cases(cases, { id: test.id, target: session.identity.target, rows: result.rows });
 			records.push({ id: test.id, status: 'readable', rows: result.rows, ...(!result.rows.length ? { note: 'No rows visible; no absence outside this scope inferred.' } : {}) });
 		} catch (error) {
 			const code = accessCode(error);
@@ -68,7 +70,7 @@ export async function validateP26(target: string) {
 	try {
 		const session = await sessions.get(target);
 		try {
-			const cases = (await loadHardCases()).filter(test => test.category === 'jobs');
+			const cases = (await loadHardCases()).filter(test => test.id.startsWith('hard-p26-'));
 			return { target, validatedAt: new Date().toISOString(), ...await inspectP26(session, cases) };
 		} finally { await session.close(); }
 	} finally { await sessions.closeAll(); }

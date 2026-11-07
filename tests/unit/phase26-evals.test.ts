@@ -30,7 +30,7 @@ it('accepts live truth and rejects wrong job, error, count, status and guarantee
 	}
 });
 function fake(code?: string, containerId = 0) {
-	return { query: vi.fn(async (sql: string) => {
+	return { identity: { target: 'd1-19c-lab' }, query: vi.fn(async (sql: string) => {
 		if (sql.includes('SYS_CONTEXT')) return { rows: [[String(containerId), 'TEST']], truncated: false };
 		if (code) throw { code };
 		return { rows: [], truncated: false };
@@ -45,4 +45,24 @@ it('propagates unexpected errors and withholds unverified PDB absence conclusion
 	await expect(inspectP26(fake('NJS-511'), await cases())).rejects.toMatchObject({ code: 'NJS-511' });
 	const report = await inspectP26(fake(undefined, 3), await cases());
 	expect(report.records.every(record => record.code === 'PDB_VISIBILITY_UNVERIFIED')).toBe(true);
+});
+
+it('refuses root before probing views or running truth SQL', async () => {
+	const session = fake(undefined, 1);
+	await expect(inspectP26(session, await cases())).rejects.toThrow('CDB$ROOT refused');
+	expect(session.query).toHaveBeenCalledTimes(1);
+	expect(session.query).toHaveBeenCalledWith(expect.stringContaining('SYS_CONTEXT'), {}, { maxRows: 1 });
+});
+it('fails loudly when the p1 error fixture changes, including absent history', async () => {
+	const tests = await cases();
+	const id = 'hard-p26-p1-last-failed-job';
+	expect(() => checkP26Cases(tests, { id, target: 'p1-19c-prod', rows: [['NIGHTLY_PURGE_JOB', 'ORA-02292']] })).not.toThrow();
+	for (const rows of [[['NIGHTLY_PURGE_JOB', 'ORA-01403']], [['NONE RECORDED', 'NO ERROR RECORDED']], []]) {
+		expect(() => checkP26Cases(tests, { id, target: 'p1-19c-prod', rows })).toThrow('expected ORA-02292');
+	}
+	// d1 is an empty-branch smoke, not the p1 fixture.
+	expect(() => checkP26Cases(tests, { id, target: 'd1-19c-lab', rows: [['NONE RECORDED', 'NO ERROR RECORDED']] })).not.toThrow();
+	const session = fake();
+	Object.assign(session.identity, { target: 'p1-19c-prod' });
+	await expect(inspectP26(session, tests)).rejects.toThrow('expected ORA-02292');
 });

@@ -260,3 +260,255 @@ Live output: p1-19c-prod
 	]
 }
 ```
+
+Review fixes (review-wp-26d-p26-evals, approved with minors)
+
+Minor 1: inspectP26 now refuses CON_ID 1 (and the CDB$ROOT container name)
+immediately after validating container metadata. It fails before view probes or
+truth SQL. A unit test asserts that only the container metadata query ran. Live
+root refusal remains unverified because workers connect only to the two labs.
+
+Minor 3: validateP26 selects test.id.startsWith('hard-p26-'), so unrelated
+future cases in the jobs category do not enter this four-case validator.
+
+Minor 2: hard-p26-p1-last-failed-job's requiredFacts assume the p1 fixture
+failure is ORA-02292, whose meaning involves dependent child records / foreign
+keys. This prerequisite is now explicit in evals/cases-hard/phase26-jobs.notes.md.
+checkP26Cases accepts live truth and fails loudly if the latest retained p1
+failure does not return ORA-02292, including absent failed history. Both
+validateHardCases and inspectP26 invoke this check after reading live truth.
+It is scoped to the actual session target; the d1 empty-branch smoke does not
+inherit p1's prerequisite. Unit tests cover the expected error, another error,
+absent history and propagation through inspectP26.
+
+No existing case definitions, scoring rules or product contracts changed.
+Changed files in this review fix: evals/validate-p26.ts,
+evals/validate-hard.ts, evals/cases-hard/phase26-jobs.notes.md,
+tests/unit/phase26-evals.test.ts, refreshed docs/wp-26d-live-*.json and
+hard-ground-truth-validation.json, and this report. No LLM calls were made.
+Both lab validator commands passed again; live values match the earlier
+output, with fresh timestamps in the JSON artifacts.
+
+Review-fix verification output
+
+Typecheck (exit 0)
+
+```text
+> oracledb-pi-agent@1.4.0 typecheck
+> tsc -p tsconfig.json --noEmit
+```
+
+Unit suite (exit 0)
+
+```text
+> oracledb-pi-agent@1.4.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-26d-p26-evals
+
+
+ Test Files  116 passed (116)
+      Tests  2159 passed (2159)
+   Start at  20:04:40
+   Duration  78.11s (tests 78%, import 20%, worker 1%, transform 1%)
+
+    Isolate  116 workers spawned · ~284ms startup each (spawn + environment, per file)
+             at least ~16.21s faster with isolate: false — reuses workers across files instead of one per file
+```
+
+Full hard truth (exit 0)
+
+```text
+Validated 122 ground-truth queries for 144 hard cases; row counts recorded.
+```
+
+The additional strict eval/test typecheck passed (exit 0, no output). Both p26 validator commands passed (exit 0). Refreshed live output follows.
+
+d1-19c-lab
+
+```json
+{
+	"target": "d1-19c-lab",
+	"validatedAt": "2026-11-07T02:04:49.959Z",
+	"scope": "Current container visible scheduler and maintenance metadata",
+	"container": {
+		"id": 0,
+		"name": "ORCL"
+	},
+	"note": "Retained visible history only; a scheduled next run is an estimate, not a guarantee.",
+	"views": [
+		{
+			"view": "DBA_SCHEDULER_JOBS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_SCHEDULER_JOB_RUN_DETAILS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_OBJECTS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_AUTOTASK_CLIENT",
+			"status": "readable"
+		}
+	],
+	"records": [
+		{
+			"id": "hard-p26-p1-last-failed-job",
+			"status": "readable",
+			"rows": [
+				[
+					"NONE RECORDED",
+					"NO ERROR RECORDED"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-invalid-objects",
+			"status": "readable",
+			"rows": [
+				[
+					"SHOPAPP",
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-stats-autotask",
+			"status": "readable",
+			"rows": [
+				[
+					"auto optimizer stats collection",
+					"ENABLED"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-next-run-semantics",
+			"status": "readable",
+			"rows": [],
+			"note": "No rows visible; no absence outside this scope inferred."
+		}
+	]
+}
+```
+
+p1-19c-prod
+
+```json
+{
+	"target": "p1-19c-prod",
+	"validatedAt": "2026-11-07T02:04:51.735Z",
+	"scope": "Current container visible scheduler and maintenance metadata",
+	"container": {
+		"id": 0,
+		"name": "PRODCDB"
+	},
+	"note": "Retained visible history only; a scheduled next run is an estimate, not a guarantee.",
+	"views": [
+		{
+			"view": "DBA_SCHEDULER_JOBS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_SCHEDULER_JOB_RUN_DETAILS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_OBJECTS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_AUTOTASK_CLIENT",
+			"status": "readable"
+		}
+	],
+	"records": [
+		{
+			"id": "hard-p26-p1-last-failed-job",
+			"status": "readable",
+			"rows": [
+				[
+					"NIGHTLY_PURGE_JOB",
+					"ORA-02292"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-invalid-objects",
+			"status": "readable",
+			"rows": [
+				[
+					"SHOPAPP",
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-stats-autotask",
+			"status": "readable",
+			"rows": [
+				[
+					"auto optimizer stats collection",
+					"ENABLED"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-next-run-semantics",
+			"status": "readable",
+			"rows": [
+				[
+					"SHOPAPP",
+					"NIGHTLY_PURGE_JOB",
+					"TRUE",
+					"PRESENT"
+				]
+			]
+		}
+	]
+}
+```
+
+Review-fix integration rerun (Strata e2e excluded): 72 passed, one skipped,
+one failed; the sole failure remains the pre-existing backup.test.ts:13
+expectation of partial p1 access after grants. The p26 integration test passes.
+No changes made to that other WP's assertion.
+
+```text
+> oracledb-pi-agent@1.4.0 test:integration
+> vitest run tests/integration --no-file-parallelism --testNamePattern=^(?!.*answers one end-to-end ask through local Strata)
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-26d-p26-evals
+
+ ❯ tests/integration/backup.test.ts (2 tests | 1 failed) 768ms
+   × reads backup metadata on p1-19c-prod 210ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/backup.test.ts > reads backup metadata on p1-19c-prod
+AssertionError: expected 'ok' to be 'partial' // Object.is equality
+
+Expected: "partial"
+Received: "ok"
+
+ ❯ tests/integration/backup.test.ts:13:26
+     11|   expect(Object.keys(r.evidence)).toHaveLength(13);
+     12|   if(target==='d1-19c-lab') expect(r.status).toBe('ok');
+     13|   else {expect(r.status).toBe('partial');expect(r.restoreEstimate.stat…
+       |                          ^
+     14|  } catch(e) {
+     15|   if(/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|ORA-01034|ORA-27101/.te…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 32 passed (33)
+      Tests  1 failed | 72 passed | 1 skipped (74)
+   Start at  20:04:50
+   Duration  269.09s (tests 96%, import 3%)
+```
