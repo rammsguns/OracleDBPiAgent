@@ -1,0 +1,147 @@
+[
+	{
+		"id": "hard-p26-p1-last-failed-job",
+		"answer": "**Most recent failed SHOPAPP scheduler job on p1-19c-prod:**\n\n| Field | Value |\n|-------|-------|\n| Job | `NIGHTLY_PURGE_JOB` |\n| Log date | 2026-11-04T04:30:56.304Z |\n| Status | FAILED |\n| Oracle error code | **ORA-02292** |\n\n**Meaning of ORA-02292:** An attempt was made to delete (or update) a parent row, but the operation was blocked because one or more child rows still reference it through a foreign-key constraint. The purge logic tried to remove a row that is still referenced by dependent data.",
+		"checks": [
+			{
+				"check": "fact: child\\s+record|referential|foreign\\s+key",
+				"pass": false
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"ORA-02292\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		],
+		"iteration": 1
+	},
+	{
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "## RMAN history counts \u2014 target `d1-19c-lab` (non\u2011CDB)\n\nQueried in the requested order:\n\n| # | Source | View used | Result |\n|---|--------|-----------|--------|\n| 1 | RMAN job history | `V$RMAN_BACKUP_JOB_DETAILS` | **0** (readable, confirmed empty) |\n| 2 | Datafile backups | `V$RMAN_BACKUPSET_DATAFILES` | **not verifiable from this database** (`ORA-00942`: view not present/granted) |\n| 3 | Backup sets | `V$RMAN_BACKUPSET_DETAILS` | **not verifiable from this database** (`ORA-00942`) |\n| 4 | Backup pieces | `V$RMAN_BACKUP_PIECE_DETAILS` | **not verifiable from this database** (`ORA-00942`) |\n\n### Why I did not print \"NO BACKUPS RECORDED\"\nThat statement requires **all four** sources to be readable *and* zero. Only the job\u2011history view is accessible here (it returns 0). The other three views are not granted/exposed in this instance \u2014 a `SELECT` against them fails with `ORA-00942`, and an inventory of accessible RMAN views (`all_tab_privs`) confirms only these exist for this user: `V$RMAN_BACKUP_JOB_DETAILS`, `V$RMAN_BACKUP_SUBJOB_DETAILS`, `V$RMAN_BACKUP_TYPE`, `V$RMAN_COMPRESSION_ALGORITHM`, `V$RMAN_CONFIGURATION`, `V$RMAN_ENCRYPTION_ALGORITHMS`, `V$RMAN_OUTPUT`, `V$RMAN_STATUS`. So those three counts are **not verifiable**, not zero.\n\n### Important caveats\n- **Control\u2011file history alone cannot establish external media availability.** Even the one readable view (`..._BACKUP_JOB_DETAILS`) reflects only what is recorded in the control file's RMAN metadata. It does not prove that backup pieces, image copies, or archived logs exist on disk/SBT/cloud, nor that they are restorable. Absence of rows here is *not* evidence that no backups exist anywhere.\n- **CDB\u2011wide labeling does not apply.** `d1-19c-lab` is a **non\u2011CDB** (no PDBs), so this backup/archived\u2011log evidence is instance\u2011local, not shared across PDBs. I am deliberately not applying the \"CDB\u2011wide / shared by all PDBs\" label here because there are no PDBs on this target.\n\nTo make the remaining three counts verifiable, the corresponding `V$RMAN_BACKUPSET_*` / `V$RMAN_BACKUP_PIECE_DETAILS` views would need to be present and granted \u2014 that is a configuration/privilege observation, not an inference about backup existence.",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "fact: \\bNO\\s+BACKUPS\\s+RECORDED\\b",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		],
+		"iteration": 1
+	},
+	{
+		"id": "hard-p21-alert-levels-d1",
+		"answer": "Alert message counts by severity level on **d1-19c-lab** (`V$DIAG_ALERT_EXT`), for `ORIGINATING_TIMESTAMP` from 2026\u201110\u201106 00:00:00 UTC through 2026\u201111\u201103 (inclusive):\n\n| MESSAGE_LEVEL | Count |\n|---|---|\n| 1 (Critical) | 6 |\n| 16 (Informational/normal) | 6,376 |\n\nNotes:\n- The query used `ORIGINATING_TIMESTAMP` (the timestamp column in `V$DIAG_ALERT_EXT`; `ADR_TIME` is not a valid column there \u2014 the first attempt returned ORA\u201100904).\n- Only two severity levels appear in that window. Level 1 denotes critical/error entries; level 16 is the routine informational level and dominates the volume. No other `MESSAGE_LEVEL` values were present in the range.",
+		"checks": [
+			{
+				"check": "fresh ground truth row: [1,6]",
+				"pass": false
+			},
+			{
+				"check": "fresh ground truth row: [16,6376]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		],
+		"iteration": 2
+	},
+	{
+		"id": "hard-p21-products-stats",
+		"answer": "## SHOPAPP.PRODUCTS Statistics \u2014 p1-19c-prod\n\n| Attribute | Value |\n|-----------|-------|\n| **Statistics present?** | Yes (NUM_ROWS = 5,000; LAST_ANALYZED = 2026-11-07 22:02:23) |\n| **Stale?** | **YES** \u2014 `STALE_STATS = YES` in `ALL_TAB_STATISTICS` |\n| **Global statistics?** | **YES** \u2014 `GLOBAL_STATS = YES` (i.e., gathered at the table level, not aggregated from partitions) |\n\nThe statistics are **stale** (Oracle has flagged them due to DML exceeding the staleness threshold since the last gather) and they **are global statistics**.",
+		"checks": [
+			{
+				"check": "fresh ground truth row: [\"YES\",\"YES\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"describe_object",
+			"run_query",
+			"run_query"
+		],
+		"iteration": 3
+	},
+	{
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "## RMAN history counts \u2014 target `d1-19c-lab` (19c EE, **non\u2011CDB**)\n\n| # | Source (view) | Rows |\n|---|---------------|------|\n| 1 | RMAN job history \u2014 `V$RMAN_BACKUP_JOB_DETAILS` | **0** |\n| 2 | Datafile backups \u2014 `V$BACKUP_DATAFILE` | **0** |\n| 3 | Backup sets \u2014 `V$BACKUP_SET` | **0** |\n| 4 | Backup pieces \u2014 `V$BACKUP_PIECE` | **0** |\n\n**NO BACKUPS RECORDED** in the readable control\u2011file history.\n\n### Notes on verifiability\n- The view literally named `V$RMAN_BACKUP_FILE_DETAILS` returned **ORA\u201100942 (does not exist / not present in this build)**, so it was *not* used to infer absence. I substituted the standard datafile\u2011backup view `V$BACKUP_DATAFILE`, which **is** readable and returned 0 \u2014 so all four figures above come from sources that were actually read successfully, not inferred.\n- These counts reflect only what is recorded in this database's own control file / RMAN repository metadata.\n\n### Important caveats (as requested)\n- A zero count here means **no backup metadata is recorded in this database's readable control\u2011file history**. It does **not** prove that no backups exist anywhere \u2014 backups could reside on external media, in a separate recovery catalog, or in another target's repository that this instance cannot see. It also does **not** mean restoration is impossible.\n- The control\u2011file history alone **cannot establish external media availability**: it only lists what the instance itself recorded, not whether backup files are physically present, accessible, or restorable on disk/tape/object store.\n\n### CDB\u2011wide labeling\nNot applicable here: `d1-19c-lab` is a **non\u2011CDB** (no PDBs), so there is no CDB\u2011wide / shared\u2011across\u2011PDBs backup evidence to label. (On a CDB, RMAN backup and archived\u2011log evidence would be CDB\u2011root level and shared by all PDBs.)",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "fact: \\bNO\\s+BACKUPS\\s+RECORDED\\b",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		],
+		"iteration": 1
+	}
+]

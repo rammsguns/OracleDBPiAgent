@@ -11,7 +11,7 @@
 		},
 		"expect": {
 			"requiredFacts": [
-				"child\\s+record|referential|foreign\\s+key"
+				"\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b"
 			],
 			"requiredTools": [
 				"run_query"

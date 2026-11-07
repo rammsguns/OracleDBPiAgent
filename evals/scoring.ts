@@ -38,8 +38,14 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 	// Canonicalize only explicit vertical attributes; keep each table separate.
 	if (test.id === 'hard-p21-products-stats') {
 		answer = answer.split('\n').map(line => line.replace(
-			/^\|\s*[`*]*(Stale(?:[ _]Stats|\?)|Global(?:[ _]Stats| statistics\?))[`*]*\s*\|\s*[`*]*(YES|NO|UNKNOWN)[`*]*(?:\s+[-—][^|]*)?\s*\|\s*$/i,
-			(_line, label: string, value: string) => `| ${/^stale/i.test(label) ? 'stale_stats' : 'global_stats'} | ${value} |`)).join('\n');
+			/^\|\s*[`*]*(Stale(?:[ _]Stats|\?)|Global(?:[ _]Stats| statistics\?))[`*]*\s*\|\s*([`*]*(YES|NO|UNKNOWN)[`*]*(?:\s+-\s+[^|]*)?)\s*\|\s*$/i,
+			(_line, label: string, cell: string, value: string) => {
+				const plain = cell.replace(/[`*]/g, '').trim();
+				const explanation = plain.replace(/^(?:YES|NO|UNKNOWN)\s*-\s*/i, '');
+				const contradicted = [...explanation.matchAll(/\b(?:STALE_STATS|GLOBAL_STATS)\s*=\s*(YES|NO|UNKNOWN)\b/gi)].some(match => match[1]!.toUpperCase() !== value.toUpperCase())
+					|| new RegExp(`\\b(?:not|never)\\s+${value}\\b|\\b${value}\\s+(?:is\\s+)?(?:false|incorrect|wrong)\\b|\\b(?:actually|instead)\\s+(?!${value}\\b)(?:YES|NO|UNKNOWN)\\b`, 'i').test(explanation);
+				return `| ${/^stale/i.test(label) ? 'stale_stats' : 'global_stats'} | ${contradicted ? plain : value} |`;
+			})).join('\n');
 	}
 
 	for (const pattern of test.expect.requiredFacts) checks.push({ check: `fact: ${pattern}`, pass: new RegExp(pattern, 'i').test(answer) });
@@ -73,6 +79,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 				historySignature: test.id === 'hard-p21-history-signature',
 				p23: test.id.startsWith('hard-p23-'),
 				p27: test.id.startsWith('hard-p27-'),
+				backupCounts: test.id === 'hard-p25-d1-no-backups-recorded',
 			}) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
@@ -121,10 +128,11 @@ interface RowMatchOptions {
 	historySignature?: boolean;
 	p23?: boolean;
 	p27?: boolean;
+	backupCounts?: boolean;
 }
 
 function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], options: RowMatchOptions = {}): boolean {
-	const { preserveQualified = false, p19 = false, historySignature = false, p23 = false, p27 = false } = options;
+	const { preserveQualified = false, p19 = false, historySignature = false, p23 = false, p27 = false, backupCounts = false } = options;
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => {
 		// p23 event names contain a literal SQL*Net; remove boundary Markdown
@@ -141,7 +149,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		const value = String(expected);
 		// A positive descriptive cell may name its exact value in parentheses.
 		const annotation = /\s+\(([^()]*)\)\s*$/.exec(clean(actual));
-		if (annotation && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(clean(actual))
+		if (annotation && !numeric(value) && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(clean(actual))
 			&& clean(annotation[1]!).toLowerCase() === clean(value).toLowerCase()) return true;
 		if (historySignature && label === 'defaulted' && value === 'N' && /^(?:no|none)$/i.test(text)) return true;
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
@@ -180,6 +188,12 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	};
 	const hasRoutineIdentity = labels.some(label => /^(?:entry_point|subprogram|(?:procedure|function|routine)(?:_name)?)$/i.test(label));
 	const lines = answer.split(/\r?\n/).map(clean).map(line => {
+		// Remove descriptive numeric annotations as whole cells before named bindings
+		// or slash separators can inspect their contents. Keep wrong numbers intact.
+		if (line.startsWith('|') && line.endsWith('|')) line = '|' + line.split('|').slice(1, -1).map(cell => {
+			const annotation = /^\s*([-+]?\d+(?:\.\d+)?)\s+\(([^()]*)\)\s*$/.exec(cell);
+			return annotation && !row.some(value => !numeric(String(value)) && clean(annotation[2]!).toLowerCase() === clean(String(value)).toLowerCase()) && !/\d|\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(annotation[2]!) ? annotation[1]! : cell;
+		}).join('|') + '|';
 		if (row.length !== 1 || !line.startsWith('|') || !line.endsWith('|')) return line;
 		return '|' + line.split('|').slice(1, -1).map(clean).map(singleColumnCell).join('|') + '|';
 	}).flatMap(line => {
@@ -193,7 +207,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			if (char === ')') { depth = Math.max(0, depth - 1); return ' '; }
 			return depth ? ' ' : char;
 		}).join('');
-		const recordText = hasRoutineIdentity ? masked : line;
+		const recordText = masked;
 		const firstKey = /(?:^[-•]?\s*|[|;])\s*([A-Za-z_]+)\s*=/.exec(recordText)?.[1];
 		const records: string[] = [];
 		let offset = 0;
@@ -304,6 +318,19 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// record can use Detail and Value together, but only inside this table
 		// and only for a single truth record; never pool unrelated tables.
 		const header = block[0] ?? [];
+		// The backup question specifies four sources in order. A Source (view)
+		// column describes those sources, while presentation ordinals are ignored.
+		if (singleRow && backupCounts && header.some(cell => /^source\s*\(view\)$/i.test(cell))) {
+			for (const index of indices) candidates[index] = '';
+			const sourceColumn = header.findIndex(cell => /^source\s*\(view\)$/i.test(cell));
+			const countColumn = header.findIndex(cell => /^(?:rows|row count|count|result|value)$/i.test(cell));
+			const sources = [/^RMAN job history\b|^V\$RMAN_BACKUP_JOB_DETAILS\b/i, /^Datafile backups\b|^V\$BACKUP_DATAFILE\b/i, /^Backup sets\b|^V\$BACKUP_SET\b/i, /^Backup pieces\b|^V\$BACKUP_PIECE\b/i];
+			if (countColumn >= 0 && block.length === row.length + 1 && row.length === sources.length
+				&& block.slice(1).every((cells, index) => sources[index]!.test(cells[sourceColumn] ?? '') && same(cells[countColumn] ?? '', row[index]))) {
+				candidates.push(row.map(String).join(' | '));
+			}
+			continue;
+		}
 		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property|category|source(?: view)?)$/i.test(cell));
 		const valueColumns = header.flatMap((cell, index) => /^(?:value|recorded value|detail|rows|row count)$/i.test(cell) ? [index] : []);
 		// In a vertical relationship table, child and parent attributes describe
@@ -352,7 +379,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (!/[|=]/.test(line)) continue;
 		const expanded = line.split(/(\|| \/ )/).map(cell => {
 			const annotation = /\s+\(([^()]*)\)\s*$/.exec(clean(cell));
-			return annotation && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(cell)
+			return annotation && !numeric(clean(annotation[1]!)) && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(cell)
 				&& row.some(value => clean(annotation[1]!).toLowerCase() === clean(String(value)).toLowerCase()) ? (cell.includes('=') ? cell.slice(0, cell.indexOf('=') + 1) : '') + annotation[1]! : cell;
 		}).join('');
 		if (expanded !== line) candidates.push(expanded);
