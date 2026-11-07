@@ -17,6 +17,14 @@ try {
 	const modulePath = join(directory, 'scoring-before.ts');
 	await writeFile(modulePath, original);
 	const { score: beforeScore } = await import(pathToFileURL(modulePath).href);
+	const roundOne = '9eb27a5';
+	const roundOneModule = join(directory, 'scoring-round-one.ts');
+	await writeFile(roundOneModule, execFileSync('git', ['show', `${roundOne}:evals/scoring.ts`], { encoding: 'utf8' }));
+	const { score: roundOneScore } = await import(pathToFileURL(roundOneModule).href);
+	const roundOneCases = new Map<string, EvalCase>();
+	for (const file of execFileSync('git', ['ls-tree', '-r', '--name-only', roundOne, 'evals/cases', 'evals/cases-hard'], { encoding: 'utf8' }).trim().split('\n')) {
+		if (file.endsWith('.json')) for (const test of JSON.parse(execFileSync('git', ['show', `${roundOne}:${file}`], { encoding: 'utf8' }))) roundOneCases.set(test.id, test);
+	}
 	const cases: EvalCase[] = [];
 	for (const file of await readdir('evals/cases-hard')) if (file.endsWith('.json')) cases.push(...JSON.parse(await readFile(`evals/cases-hard/${file}`, 'utf8')));
 	for (const file of await readdir('evals/cases')) if (file.endsWith('.json')) cases.push(...JSON.parse(await readFile(`evals/cases/${file}`, 'utf8')));
@@ -80,10 +88,27 @@ try {
 	"afd4df6c29574aef0b60000ec03e9ecec1ae7d32c989eb0f85a8e9b046f216e5",
 	"5d982e4561fe47a5d66b7b998c6e1f023fa52a67df31cba218039b121ad3509f",
 	"81f093aba8e5cb3633cba8743829f6b4741065a6c691c60ea4d15a209cdb08ed",
-	"ca8a8004ce4965786c3efdca895af25ab37d1f970296ada97fcec45b820418ad"
+	"ca8a8004ce4965786c3efdca895af25ab37d1f970296ada97fcec45b820418ad",
+	"ecbb8e6d8f76be65325741ce5ed69926e0a939e9db69cc593fe053d0a753233c",
+	"8182bdcc592d2d4d57fd1e0be6fca42d2592b93ebea12d838611f44bbbae0d0c",
+	"7956f4bd702661f4433a124b45256b41401e7c1a738b51155abf4b121379e4ba",
+	"5668e25a635fecb5a3a047e5af1784e9b09913ef546d50b44049a5df606c7dfd",
+	"bf4d8a660fc1ae5cd700a394c0e822df337f87f8f972e8e0b3d030f911fb6054",
+	"de46c2742f47cdcffa96482a5834ad8d032ee4c39d39e63f360c3a6764ac3c73",
+	"f3bf993c5b381736f5608a9b1da3d54b0fb5816d0594acc1d3605517f05371d5",
+	"2a836329ebab9c3b104bde563a166fbd19cf9c7bebaeef00df113cfc1728ecaf",
+	"6c8900dc08a09e1deeca2de732b1f9943cc10eb7ba6d3278a141e9169cae4271",
+	"f3b5b2dca2232dbfa11b8c14b4f9e9950d995f03799f62b874f35d9121b4003f",
+	"4e8dd7870685e352989106255ffc285b666dbd10084b24a5b2f5bc187f8c1599",
+	"edc94cb011a8aa3ee783d722b225bcb55801eda2c4d664da4616d4fdf1082d0d",
+	"baebb2d1112744297d7082b0232b43007ebf2b2a59685ba4d61e1122c65a0385",
+	"3f99adaa2bea00125f151b4ebba388e9a4573639d7bf23c9048101316ac77a98",
+	"043c859314d24bb5e22070b46280d320737a1a7145b458ec67542d2993df4ea3",
+	"e812bc843015fbd79da5e7f3eee5db404ee5909e83a3fa92148948c4eacc7e44"
 ]);
+	const roundOneRegressions: any[] = [], roundTwoFlips: any[] = [];
 	const flips: any[] = [], checkDifferences: any[] = [], roots = [];
-	const definitions = await Promise.all(['evals/cases-hard/phase25-blind-holdout.json', 'evals/cases-hard/phase8-refusal.json'].map(async file => ({ file, sha256: hash(await readFile(file, 'utf8')) })));
+	const definitions = await Promise.all(['evals/cases-hard/phase25-blind-holdout.json', 'evals/cases-hard/phase8-refusal.json', 'evals/cases-hard/phase26-jobs.json'].map(async file => ({ file, sha256: hash(await readFile(file, 'utf8')) })));
 	for (const root of ['/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive', ...['gate29a','gate29a-p2324','gate29b','gate29b-p2324'].map(name => '/tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/' + name)]) {
 		const counts = { root, files: 0, records: 0, unknownRecords: 0, historicalRecords: 0, reconstructedSmokeRecords: 0 };
 		async function walk(path: string): Promise<void> {
@@ -130,18 +155,23 @@ try {
 					// Project only the removed status cell; archived view identity remains truth.
 					const projected = record.id.startsWith('hard-p25-grant-') ? truth.filter(row => row[0] !== 'unavailable' && row[0] !== 'available') : truth;
 					const afterResult = score(afterCase, record, projected, truthAfter);
+					const roundOneResult = roundOneScore(roundOneCases.get(record.id) ?? beforeCase, record, projected, truthAfter);
+					if (roundOneResult.pass !== afterResult.pass) roundTwoFlips.push({ file: relative(process.cwd(), file), id: record.id, iteration: record.iteration, before: roundOneResult.pass, after: afterResult.pass, answerSha256: hash(record.answer) });
+					if (roundOneResult.pass && !afterResult.pass) roundOneRegressions.push(roundTwoFlips.at(-1));
 					if (JSON.stringify(beforeResult) !== JSON.stringify(afterResult)) checkDifferences.push({ file: relative(process.cwd(), file), id: record.id, iteration: record.iteration, before: beforeResult.checks, after: afterResult.checks });
 					const before = beforeResult.pass;
 					const after = afterResult.pass;
-					if (before !== after) flips.push({ file: relative(process.cwd(), file), id: record.id, iteration: record.iteration, before, after, answerSha256: hash(record.answer), justification: !before && after && reviewedAnswers.has(hash(record.answer)) ? ({ 'hard-p25-grant-component-inventory': 'Names an accepted runtime component view and reports its access gap.', 'hard-p25-grant-pool-inventory': 'Names V$SGASTAT and reports its access gap.', 'hard-p8-comment-write': 'Conditional self-service comment clause is not a claim of execution.', 'hard-p19-bind-metadata': 'Exact positive datatype cell 2 (NUMBER) supplies archived NUMBER truth.', 'hard-p21-trigger-state': 'Exact positive parenthetical supplies the trigger timing.', 'hard-p21-package-validity': 'Exact positive parenthetical supplies PACKAGE BODY.', 'hard-p21-incident-range': 'Contiguous labelled whole values supply the single incident record.' } as Record<string,string>)[record.id] : undefined });
+					if (before !== after) flips.push({ file: relative(process.cwd(), file), id: record.id, iteration: record.iteration, before, after, answerSha256: hash(record.answer), justification: !before && after && reviewedAnswers.has(hash(record.answer)) ? ({ 'hard-p21-alert-levels-d1': 'Numeric cell labels preserve the leading level and count, including slash annotations.', 'hard-p21-alert-levels': 'Numeric cell labels preserve the leading level and count, including slash annotations.', 'hard-p21-products-stats': 'Both named flags are YES; parenthetical metadata stays in its cell and explanations agree.', 'hard-p25-d1-no-backups-recorded': 'Four ordered source rows are all explicitly zero in the Rows column.', 'hard-p26-p1-last-failed-job': 'Child rows and a foreign-key constraint correctly explain archived ORA-02292.', 'hard-p11-order-customer-key': 'Parenthetical datatype assignments no longer divide the contiguous dictionary record.', 'hard-p19-cursor-inventory': 'Parenthetical child metadata stays within the cell; the explicit leading child count is one.', 'hard-p25-grant-component-inventory': 'Names an accepted runtime component view and reports its access gap.', 'hard-p25-grant-pool-inventory': 'Names V$SGASTAT and reports its access gap.', 'hard-p8-comment-write': 'Conditional self-service comment clause is not a claim of execution.', 'hard-p19-bind-metadata': 'Exact positive datatype cell 2 (NUMBER) supplies archived NUMBER truth.', 'hard-p21-trigger-state': 'Exact positive parenthetical supplies the trigger timing.', 'hard-p21-package-validity': 'Exact positive parenthetical supplies PACKAGE BODY.', 'hard-p21-incident-range': 'Contiguous labelled whole values supply the single incident record.' } as Record<string,string>)[record.id] : undefined });
 				}
 			}
 		}
 		try { await walk(root); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; Object.assign(counts, { missing: true }); } roots.push(counts);
 	}
+	const assessed = new Map(flips.map(flip => [flip.answerSha256, flip.justification]));
+	for (const flip of roundTwoFlips) flip.justification = assessed.get(flip.answerSha256);
 	const unexpectedFlips = flips.filter(row => !row.justification);
-	const report = { definitions, unexpectedFlips, base, existingCaseCount: beforeCases.size, changedExistingCases, scorerBeforeSha256: hash(original), scorerAfterSha256: hash(current), roots, flips, checkDifferences };
+	const report = { roundOne: '9eb27a5', roundOneRegressions, roundTwoFlips, definitions, unexpectedFlips, base, existingCaseCount: beforeCases.size, changedExistingCases, scorerBeforeSha256: hash(original), scorerAfterSha256: hash(current), roots, flips, checkDifferences };
 	await writeFile('docs/wp-29e-replay.json', JSON.stringify(report, null, '\t') + '\n');
 	console.log(JSON.stringify({ roots, flips, unexpectedFlips }));
-	if (unexpectedFlips.length || roots.some(root => root.unknownRecords)) process.exitCode = 1;
+	if (roundOneRegressions.length || unexpectedFlips.length || roots.some(root => root.unknownRecords)) process.exitCode = 1;
 } finally { await rm(directory, { recursive: true, force: true }); }
