@@ -14,7 +14,20 @@ export function validateWebOperations(path: string, data: Record<string, unknown
 }
 export async function readWebOperations(ctx: ToolContext, target: string, path: string, data: Record<string, unknown>, signal: AbortSignal) {
 	validateWebOperations(path, data);
-	if (path === '/api/jobs') return { result: await readJobs(ctx, target) };
+	if (path === '/api/jobs') {
+		const sessions: ToolContext['sessions'] = {
+			get: async name => {
+				signal.throwIfAborted();
+				const raw = await ctx.sessions.get(name);
+				return { target: raw.target, identity: raw.identity, close: () => raw.close(), query: async (sql, binds, options) => {
+					signal.throwIfAborted();
+					return raw.query(sql, binds, options);
+				} };
+			},
+			closeAll: () => ctx.sessions.closeAll(),
+		};
+		return { result: await readJobs({ ...ctx, sessions }, target) };
+	}
 	const raw = await ctx.sessions.get(target);
 	const session: OracleSession = { target: raw.target, identity: raw.identity, close: () => raw.close(), query: async (sql, binds, options) => {
 		signal.throwIfAborted();

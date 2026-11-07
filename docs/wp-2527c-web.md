@@ -139,3 +139,30 @@ No shared contract changes requested. `sql.counterSummary` and the bounded count
 Live 19c PDB behavior, RAC, Data Guard, real backup media and restore capability remain unverified. Populated backup chains/gaps, failed-run rendering and missing-view behavior use fixture/unit coverage. Counter resets also have unit coverage; the live d1 sampler classified several non-monotonic counters as reset. Synthetic screenshots are labelled separately from lab evidence. Screenshots are overviews; long evidence remains accessible below or in disclosures.
 
 No Strata/LLM requests, eval runs, RMAN execution or scheduler execution were performed. No database-changing DML, DDL or PL/SQL was issued. The required integration suite retains its documented gate-only unsupported-version refusal test.
+
+## Review follow-up — Minor-1
+
+Read `docs/review-wp-2527c-web.md` from branch `review-wp-2527c-web` (APPROVE). Fixed Minor-1 by wrapping Jobs session acquisition in `src/web/operations.ts`. The wrapper checks the request's AbortSignal before acquisition and before every query, including any reader fallback. An already-running SELECT may finish; cancellation prevents subsequent SELECTs and the reader's existing `finally` still closes its session.
+
+The implementation stays within the web adapter: `src/jobs/index.ts`, its public signature, existing callers and CLI output are unchanged. No shared contract changes are needed.
+
+Added three unit cases in `tests/unit/web-operations.test.ts`: abort after the first successful query, abort after the first unavailable-view query, and a request already aborted before acquisition. The first two assert exactly one query and exactly one close; the last asserts no session acquisition. All tests use fakes and perform no database or LLM calls.
+
+Requested follow-up checks all passed:
+
+```text
+npm run typecheck
+> tsc -p tsconfig.json --noEmit
+(exit 0)
+
+npm test -- --maxWorkers=2
+Test Files  116 passed (116)
+Tests       2157 passed (2157)
+Duration    78.27s
+
+npm run test:browser
+7 skipped
+83 passed (1.1m)
+```
+
+The focused adapter suite also passed all six cases. This follow-up changes only the web adapter, its unit tests and this report; the earlier live captures and integration observations above remain historical evidence.

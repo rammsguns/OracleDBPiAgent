@@ -8,6 +8,34 @@ describe('web operations adapter', () => {
 		for (const seconds of ['5', '120', undefined]) expect(() => validateWebOperations('/api/top', { seconds })).not.toThrow();
 		for (const path of ['/api/backup', '/api/jobs', '/api/top']) expect(() => validateWebOperations(path, { sql: 'SELECT 1' })).toThrow();
 	});
+	for (const unavailable of [false, true]) it(`aborted jobs request stops after its current query (unavailable=${unavailable})`, async () => {
+		let queries = 0, closed = 0;
+		const controller = new AbortController();
+		const ctx = {
+			config: { targets: [{ name: 'd1-19c-lab' }], limits: { maxRows: 200, statementTimeoutSeconds: 15 } },
+			runId: 'test', audit: { record: async () => {} },
+			sessions: { get: async () => ({
+				target: { name: 'd1-19c-lab' }, identity: { isCdb: false }, close: async () => { closed++; },
+				query: async () => {
+					queries++; controller.abort();
+					if (unavailable) throw new Error('ORA-00942');
+					return { rows: [], columns: [], truncated: false, elapsedMs: 1 };
+				},
+			}) },
+		} as unknown as ToolContext;
+		await expect(readWebOperations(ctx, 'd1-19c-lab', '/api/jobs', {}, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+		expect(queries).toBe(1); expect(closed).toBe(1);
+	});
+	it('does not acquire a jobs session for an already-aborted request', async () => {
+		let acquired = 0;
+		const controller = new AbortController(); controller.abort();
+		const ctx = {
+			config: { targets: [{ name: 'd1-19c-lab' }] },
+			sessions: { get: async () => { acquired++; throw new Error('Unexpected acquisition'); } },
+		} as unknown as ToolContext;
+		await expect(readWebOperations(ctx, 'd1-19c-lab', '/api/jobs', {}, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+		expect(acquired).toBe(0);
+	});
 	it('cancellation interrupts the Node wait and prevents second snapshot reads', async () => {
 		let queries = 0; const events: unknown[] = []; const controller = new AbortController();
 		const ctx = { runId: 'test', audit: { record: async (event: unknown) => { events.push(event); } }, sessions: { get: async () => ({ target: { name: 'd1-19c-lab' }, identity: { isCdb: false }, query: async () => {
