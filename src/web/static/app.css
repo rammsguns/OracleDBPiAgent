@@ -242,3 +242,18 @@ td:nth-child(2) { max-width: 24rem; }
 @media (prefers-color-scheme: dark) { .space-used { background: #66b9df; } .space-threshold { border-color: #ffb39e; } }
 .space-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
 .space-legend span { display: inline-block; width: 1.2rem; height: 1rem; border: 1px solid currentColor; margin-left: .5rem; }
+
+.operations-card { border: 1px solid var(--border, #596273); border-radius: .5rem; padding: .8rem; margin: .8rem 0; min-width: 0; }
+.operations-card p, .operations-card td { overflow-wrap: anywhere; }
+.operations-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.operations-toolbar input { width: 6rem; }
+.operations-track { position: relative; height: 1.1rem; background: #293b4c; border-radius: .3rem; }
+.operations-mark { position: absolute; height: 100%; min-width: .4rem; background: #53c6ba; }
+.operations-failed { background: #ff8686; border: 2px solid #fff; }
+.operations-error { border-left: .3rem solid #ff8686; padding-left: .5rem; }
+.operations-gaps { border-left: .3rem solid #ff8686; }
+.operations-hint { font-size: .85rem; }
+.operations-card .table-scroll { max-width: 100%; }
+#backup-panel, #jobs-panel, #top-panel { min-width: 0; overflow-wrap: anywhere; }
+.operations-card .table-scroll { width: 100%; min-width: 0; }
+.operations-card table { min-width: 30rem; }

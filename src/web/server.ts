@@ -1,3 +1,4 @@
+import { readWebOperations, validateWebOperations } from './operations.js';
 import { readWebSpace, validateWebSpace } from './space.js';
 import { readWebDbSessions, validateWebDbSessions } from './dbSessions.js';
 import { readWebSecurity, validateWebSecurity } from './security.js';
@@ -97,7 +98,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
-			if (['/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
+			if (['/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';
 				if (req.method !== (isTriage ? 'POST' : 'GET')) throw new WebError(405, 'Method not allowed');
@@ -106,7 +107,9 @@ export function createWebServer(options: WebServerOptions = {}) {
 				if (typeof target !== 'string' || !['d1-19c-lab', 'p1-19c-prod'].includes(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
-					if (raw === '/api/space') {
+					if (['/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
+						validateWebOperations(raw, data);
+					} else if (raw === '/api/space') {
 						validateWebSpace(data);
 					} else if (raw === '/api/db-sessions') {
 						validateWebDbSessions(data);
@@ -133,6 +136,18 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
+					if (['/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
+						const abort = new AbortController();
+						const cancel = () => { if (!res.writableEnded) abort.abort(); };
+						res.on('close', cancel);
+						try {
+							const output = await readWebOperations(ctx, target, raw, data, abort.signal);
+							if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
+							const finished = sessions; sessions = undefined; await finished.closeAll();
+							if (!abort.signal.aborted) return json(res, 200, output);
+							return;
+						} finally { res.off('close', cancel); }
+					}
 					if (raw === '/api/sql' || raw === '/api/security' || raw === '/api/db-sessions' || raw === '/api/space') {
 						const output = await (raw === '/api/space' ? readWebSpace : raw === '/api/db-sessions' ? readWebDbSessions : raw === '/api/security' ? readWebSecurity : readWebSql)(ctx, target, data, options);
 						if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
