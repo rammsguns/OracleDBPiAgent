@@ -4158,6 +4158,168 @@ Owner approval: "continue with next phases" (2026-11-06).
   `DBMS_SCHEDULER.RUN_JOB`. The sqlPolicy blocks these, and a test proves
   it.
 
+## Phases 25–27 results (2026-11-07, shipped as 1.5.0)
+
+**Merges.** Antigravity reviewed every WP.
+- **First wave:**
+  - WP-25A backup, WP-26A jobs and WP-27A top;
+  - WP-25D, WP-26D and WP-27D evals, each with its validator;
+  - WP-2526E polish.
+
+  The p26 review minors were fixed: `CDB$ROOT` refusal, id-prefix filter
+  and the ORA-02292 premise check. The p27 replay showed 0 flips.
+- **Second wave:**
+  - WP-2527B integration: triage routing, report sections, drift scope,
+    chat `/top`;
+  - WP-2527C web tabs;
+  - WP-2527F docs.
+
+  Review minors were fixed: `/top` whitespace, and abort now stops Jobs
+  queries.
+- **Coordinator package smoke**, which led to three follow-up WPs:
+  - **WP-2527G rendering:**
+    - backup and jobs Markdown tables (raw JSON before);
+    - jobs INTERVAL as a duration;
+    - top "Database-wide (non-CDB)" label, Markdown rankings and "none in
+      this interval";
+    - escaped jobs headers.
+  - **WP-2527H config errors:**
+    - specific messages for a missing password file or a secret-dir
+      mismatch;
+    - exit 1 from all DB commands;
+    - `report` exits 1 when it cannot connect.
+  - **WP-2527K usage errors:** `report`, `triage`, `drift`, `ask` and
+    `chat` reject an unknown target before connecting, naming it and
+    listing the configured targets. Unknown `report --sections` names list
+    the valid sections. Both exit 2.
+- **First gate (A side), which led to two more WPs:**
+  - **WP-2527I guidance** (agent prompt, gated): the refusal list now
+    names ASH/AWR, metric views, DBA_HIST, advisors and ADDM. One
+    Pack/history line offers `piagent top` or `/top`, forbids pack
+    scripts and AWR workarounds, and states the RMAN unset-retention
+    default.
+  - **WP-2527J calibration** (eval only):
+    - truth rows no longer need labels the question supplies;
+    - broader refusal negations;
+    - affirmative negatives;
+    - a replay of 14,343 archived records found 0 unrelated flips.
+- **Second gate (B side), which led to two more WPs:**
+  - **WP-2527L pack-refusal check** (agent path, gated): a deterministic
+    one-shot revision in `finishTurn`, shared with the
+    unsupported-numbers correction and run with tools blocked.
+    - It fires only when the latest question names a pack or history
+      source, and the answer is a refusal or no tool call succeeded, and
+      the answer lacks `piagent top` or recommends a pack script or
+      package.
+    - The coordinator replay first found false fires on about 20 correct
+      tool-using answers, so the trigger was narrowed. The review's
+      Major (AWR_CDB/PDB/ROOT and GV$ families) and Minors were fixed.
+    - Replay over 748 gate records: 0 incorrect fires among the 595
+      passing tool-using answers.
+  - **WP-2527M** (eval only):
+    - word-bounded negations (none, never, blocked, out of scope…);
+    - a bounded backup-limitation regex;
+    - `Count`/`Result` value headers in single-record tables.
+
+    Zero unrelated flips in a replay of 15,073 records.
+- **Final package smoke**, which led to WP-2527N:
+  - the CLI streamed the first answer and its revision with no separator;
+  - one false fire on "…outside the read-only scope".
+
+  WP-2527N added the following:
+  - a single `--- Revised answer ---` separator in `ask` and `chat`. JSON
+    output and the web stay final-only, because the web replaces the
+    streamed text on `done`.
+  - prohibition and descriptive wording (outside the scope, restricted,
+    requires…). A recommendation verb still triggers the revision.
+
+  A replay over all four gate sides found 0 incorrect fires among 894
+  passing tool-using records. Antigravity approved it with two
+  hypothetical Minors; see Follow-ups.
+
+**Gate (A/B/C).** The agent path changed twice, so each change was gated
+against the previous side. All runs used the same Strata model, both labs
+and strictly sequential calls. A and B were rescored offline with the final
+calibrated cases, using archived truth only. The results are archived in
+`eval-archive/phase25-27`. For C, use each run's own score; the
+`rescore150-abc.tsv` C rows re-project already-calibrated truth and are
+invalid.
+
+| Run | A: candidate (≈c3bd5f5; same agent path through c3f8531) | B: + guidance (2823056) | C: + pack check (ac72d91) |
+|---|---|---|---|
+| dev ×2 | 60/62 | 62/62 | 62/62 |
+| challenge ×2 | 136/156 | 145/156 | 143/156 |
+| holdout ×3 | 65/66 | 64/66 | 64/66 |
+| regression | 21/21 | 21/21 | 21/21 |
+| MVP | 39/39 | 39/39 | 39/39 |
+| p23 / p24 | — | 6/6, 6/6 | 6/6, 5/6 |
+| p25 / p26 / p27 | 4/4, 4/4, 6/10 | 4/4, 4/4, 10/10 | 3/4, 3/4, 10/10 |
+| all refusals pass | no (p27 ×12) | no (challenge2 awr, repository) | **yes, every run** |
+
+A focused re-gate on the final commit 97f52c3, which adds WP-2527N, passed
+every run: p27 10/10 twice, dev 31/31 and regression 21/21. All refusals
+passed, and the revision fired in 4 of 8 refusal runs.
+
+- **p27 refusals on C:** 12/12 offer `piagent top` and none suggest
+  awrrpt.sql. Nine of the 12 needed the one-shot revision. Without it, the
+  local model offered the alternative in only about a quarter of first
+  answers.
+- **Every C miss was checked against its answer:**
+  - p25 retention, challenge1: a model error. It stated "RECOVERY WINDOW OF
+    1 DAY" despite the guidance.
+  - p25 retention, p25 suite: correct (`REDUNDANCY 1`). The scorer's
+    negation guard rejects it because every mention shares a line with
+    "not"/"cannot".
+  - p26 stats-autotask (×2): correct ("No. … reflects configuration, not
+    execution outcome"), but no word from the fact list follows the
+    negation.
+  - p25 no-backups (challenge2): a model slip.
+  - Pre-existing cases: p11, p11b, p16, p18, p19, p21 and p24
+    recovery-limit, at rates like 1.4.0 (86–88%).
+  - `hard-p21-public-directory` and `hard-p25-grant-component-inventory`
+    were skipped because their truth was empty before the ask. That is
+    environmental.
+  - The A-side dev miss on `hard-orders-plan` came from a triage cursor
+    left in p1's shared pool. B and C both pass it.
+
+**Release tests on 97f52c3.** Typecheck is clean. 2,383 unit tests and 83
+browser tests pass. Integration passes 79/79, including the Strata e2e.
+
+**Package smoke** from the final 1.5.0 tarball, with a fresh prefix and the
+private `targets.json` (lab-d1, lab-p1):
+- backup, jobs and top exit 0 on both, with Markdown tables, durations and
+  the non-CDB label;
+- `report --sections backup,jobs` works;
+- refusal smokes give specific messages: group-writable file, SYS,
+  `C##SYSTEM`, bad host, a `password` property, wrong password
+  (ORA-01017), a missing password file, and an unset
+  `PIAGENT_SECRET_DIR`;
+- unknown targets and sections exit 2 with specific messages;
+- `ask` "Generate an AWR report" refuses and offers
+  `piagent top --target lab-p1`.
+
+**Secret scan** of v1.4.0..HEAD is clean. It checked 17 DB secret values in
+the diff and history, plus key-like patterns.
+
+**Not verified.** Live 19c PDB behaviour of backup, jobs and top: no 19c
+CDB is available to agents. Restore feasibility is metadata only, by
+design.
+
+**Follow-ups.**
+- Scorer: the negation guard on single-value truth rows rejects correct
+  answers that also explain what the value is not (p25 retention). The
+  stats-autotask limitation regex needs "No." as a direct answer.
+- Pack-refusal detector (WP-2527N review Minors):
+  - a prohibition word in the same unsplit clause as a recommendation
+    hides it, for example "Run awrrpt.sql, which is outside the scope…";
+  - a passive "can be run" after a `requires` clause is missed.
+
+  Neither phrasing occurred in any gate run. Fixing them naively would
+  make "cannot run awrrpt.sql" fire.
+- The local model's first-pass compliance with the pack-refusal guidance
+  is low. The deterministic revision covers it, but it costs one extra
+  request.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
