@@ -19,16 +19,82 @@ function sources(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
 		? sources(`${dir}/${entry.name}`) : /\.(?:ts|js)$/.test(entry.name) ? [`${dir}/${entry.name}`] : []);
 }
-// Scan all source text conservatively (including fragments and examples).
-// Imports are module paths, not SQL; comments/prose are classified per file.
+// Keep JavaScript literal boundaries: neighboring fragments and English prose
+// must never be stitched into a synthetic SQL FROM clause. Visit interpolations
+// recursively so nested templates and quoted dictionary choices stay visible.
 function literals(source: string): string[] {
-	return [source.replace(/^.*\b(?:import|export)\b[^\n]*\bfrom\s+['"][^'"\n]+['"];?$/gm, '')];
+	if (/^\s*(?:SELECT|WITH)\b/i.test(source)) return [source];
+	const result: string[] = [];
+	let i = 0;
+	function code(interpolation = false): void {
+		let depth = 0;
+		while (i < source.length) {
+			const c = source[i]!;
+			if (source.startsWith('//', i)) { while (i < source.length && source[i] !== '\n') i++; }
+			else if (source.startsWith('/*', i)) { const end = source.indexOf('*/', i + 2); i = end < 0 ? source.length : end + 2; }
+			else if (c === '/' && /(?:[=(,:!?\[{};>]|\breturn)\s*$/.test(source.slice(0, i))) {
+				i++; let inClass = false;
+				while (i < source.length) {
+					const token = source[i++]!;
+					if (token === '\\') i++;
+					else if (token === '[') inClass = true;
+					else if (token === ']') inClass = false;
+					else if (token === '/' && !inClass) break;
+				}
+			}
+			else if (c === "'" || c === '"' || c === '`') quoted(c);
+			else if (c === '{') { depth++; i++; }
+			else if (c === '}' && interpolation && depth === 0) { i++; return; }
+			else { if (c === '}') depth--; i++; }
+		}
+	}
+	function quoted(delimiter: string): void {
+		i++;
+		let text = '';
+		while (i < source.length) {
+			if (source[i] === '\\') { text += source[i + 1] ?? ''; i += 2; }
+			else if (source[i] === delimiter) { i++; result.push(text); return; }
+			else if (delimiter === '`' && source.startsWith('${', i)) {
+				const start = i; i += 2; code(true); text += source.slice(start, i);
+			} else text += source[i++]!;
+		}
+	}
+	code();
+	return result;
 }
 function references(source: string): string[] {
-	return literals(source).flatMap(sql => [
-		...Array.from(sql.matchAll(/\b(?:FROM|JOIN)\s+((?:[A-Z_][A-Z0-9_$#]*\.)?[A-Z_][A-Z0-9_$#]*)/gi), m => m[1]!.toUpperCase().replace(/^SYS\./, '')),
-		...Array.from(sql.matchAll(/['"`]((?:V\$|DBA_|ALL_|USER_)[A-Z][A-Z0-9_#]*)['"`]/gi), m => m[1]!.toUpperCase()),
-	]);
+	// Resolve finite identifier fragments conservatively. Include every quoted
+	// dictionary name below as well: runtime-selected views must be covered too.
+	const values = new Map<string, string[]>();
+	for (const m of source.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*(['"])([A-Z][A-Z0-9_$#]*)\2/gi)) values.set(m[1]!, [m[3]!]);
+	for (const m of source.matchAll(/\[([^\]\n]+)\]\.map\(\s*(\w+)\s*=>/g)) {
+		values.set(m[2]!, [...m[1]!.matchAll(/['"]([A-Z][A-Z0-9_$#]*)['"]/gi)].map(v => v[1]!));
+	}
+	const expanded = literals(source).flatMap(literal => {
+		let variants = [literal];
+		for (const [name, options] of values) {
+			if (literal.includes('${' + name + '}')) variants = variants.flatMap(text => options.map(option => text.split('${' + name + '}').join(option)));
+		}
+		return variants;
+	});
+	const identifier = '(?:"[A-Z_][A-Z0-9_$#]*"|[A-Z_][A-Z0-9_$#]*)';
+	const relation = `(${identifier}(?:\\s*\\.\\s*${identifier})?)(?![A-Z0-9_$#{])`;
+	return expanded.flatMap(raw => {
+		const named = /^(?:V\$|DBA_|ALL_|USER_)[A-Z][A-Z0-9_#]*$/i.test(raw) ? [raw.toUpperCase()] : [];
+		if (!/\bSELECT\b/i.test(raw) && !/^\s*(?:(?:FROM|JOIN)\b|(?:V\$|DBA_|ALL_)[A-Z0-9_$#]+\s+JOIN\b)/i.test(raw)) return named;
+		const sql = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+		const normalize = (name: string) => name.replace(/["\s]/g, '').toUpperCase().replace(/^SYS\./, '');
+		const direct = [...sql.matchAll(new RegExp(`\\b(?:FROM|JOIN)\\s+${relation}`, 'gi'))].map(m => normalize(m[1]!));
+		// Scan comma relations only within FROM clauses, never SELECT lists or
+		// function arguments. Nested subqueries are scanned independently too.
+		const comma: string[] = [];
+		const alias = '(?:"(?:[^"]|"")*"|[A-Z_][A-Z0-9_$#]*)';
+		const fromList = new RegExp(`\\bFROM\\s+${relation}(?:\\s+(?!WHERE\\b|JOIN\\b|GROUP\\b|ORDER\\b)${alias})?((?:\\s*,\\s*${identifier}(?:\\s*\\.\\s*${identifier})?(?:\\s+(?!WHERE\\b|JOIN\\b|GROUP\\b|ORDER\\b)${alias})?)+)`, 'gi');
+		for (const clause of sql.matchAll(fromList)) {
+			for (const m of clause[2]!.matchAll(new RegExp(`,\\s*${relation}`, 'gi'))) comma.push(normalize(m[1]!));
+		}
+		return [...direct, ...comma, ...named];
+	});
 }
 // Only file-scoped non-view names are permitted. Never add dictionary views here.
 // Prose/comment tokens, regex fragments and TABLE(...) function syntax found
@@ -48,7 +114,7 @@ const NON_VIEWS: Record<string, readonly string[]> = {
 	'space/index.ts': ['THIS'],
 	'sqlperf/index.ts': ['TABLE'],
 	'tools/index.ts': ['COMPLETE', 'INNER', 'LIST', 'LISTS', 'TABLE', 'WHERE'],
-	'tools/overview.ts': ['CONNECTION'],
+	'tools/overview.ts': [],
 	'triage/alerts.ts': ['ALERT', 'BOUNDED', 'COMPLETING'],
 	'triage/history.ts': ['THE'],
 	'triage/index.ts': ['ALERT', 'BOUNDED', 'ITS', 'THE', 'V$DIAG'],
@@ -62,7 +128,7 @@ const NON_VIEWS: Record<string, readonly string[]> = {
 const configuredTables = new Set<string>((JSON.parse(readFileSync(new URL('../../config/targets.json', import.meta.url), 'utf8'))
 	.targets as { logTables?: { table: string }[] }[]).flatMap(target => target.logTables?.map(log => log.table.toUpperCase()) ?? []));
 const MODULE_FEATURE: Record<string, string> = {
-	report: 'report', sessions: 'sessions', space: 'space', security: 'security',
+	backup: 'backup', jobs: 'jobs', report: 'report', sessions: 'sessions', space: 'space', security: 'security',
 	sqlperf: 'sql', alertlog: 'alertlog', plsql: 'plsql', triage: 'triage',
 	tools: 'ask', oracle: 'connection', drift: 'drift', top: 'top',
 };
@@ -122,4 +188,69 @@ it('grant template covers every grantable catalog base object', () => {
 	const missing = [...new Set(Object.values(FEATURE_VIEWS).flat())]
 		.filter(view => !NO_GRANT_VIEWS.has(view) && !grants.has(grantObject(view)));
 	expect(missing).toEqual([]);
+});
+
+it.each([
+	['comma joins', 'SELECT * FROM FIRST_VIEW a, SYS.SECOND_VIEW b WHERE a.id=b.id', ['FIRST_VIEW', 'SECOND_VIEW']],
+	['quoted identifiers', 'SELECT * FROM "SYS" . "NEW_VIEW" JOIN "OTHER_VIEW" ON 1=1', ['NEW_VIEW', 'OTHER_VIEW']],
+	['optimizer hints', 'SELECT /*+ FULL(a) */ * FROM /*+ NO_MERGE */ NEW_VIEW a JOIN /* hint */ OTHER_VIEW b ON 1=1', ['NEW_VIEW', 'OTHER_VIEW']],
+	['interpolated constant', "const view = 'NEW_VIEW'; const sql = `SELECT * FROM ${view}`", ['NEW_VIEW']],
+	['interpolated fragments', "const prefix = 'DBA'; const suffix = 'NEW_VIEW'; const sql = `SELECT * FROM ${prefix}_${suffix}`", ['DBA_NEW_VIEW']],
+	['interpolated family', "['DBA', 'ALL'].map(p => `SELECT * FROM ${p}_NEW_VIEW`)", ['DBA_NEW_VIEW', 'ALL_NEW_VIEW']],
+])('detects %s for catalog and grant coverage', (_label, source, expected) => {
+	expect(references(source)).toEqual(expect.arrayContaining(expected));
+	const catalog = new Set<string>();
+	expect([...new Set(references(source))].filter(view => !catalog.has(view))).toEqual(expect.arrayContaining(expected));
+});
+
+it('does not treat SELECT/function commas or hints as relation names', () => {
+	const found = references('SELECT a, FAKE_COLUMN, COALESCE(x, FAKE_ARG) FROM REAL_VIEW WHERE x IN (1, FAKE_VALUE) /* JOIN FAKE_HINT */');
+	expect(found).toEqual(['REAL_VIEW']);
+});
+
+it.each([
+	['quoted aliases', 'SELECT * FROM "SYS"."FIRST_VIEW" "a", "SYS"."UNGRANTED_VIEW" "b" WHERE "a".id="b".id', ['FIRST_VIEW', 'UNGRANTED_VIEW']],
+	['dollar aliases', 'SELECT * FROM FIRST_VIEW "a alias", SECOND_VIEW b#2, THIRD_VIEW "c alias"', ['FIRST_VIEW', 'SECOND_VIEW', 'THIRD_VIEW']],
+	['lowercase view', "const view = 'v$session'; const sql = `select * from ${view}`", ['V$SESSION']],
+	['mixed-case fragments', "const prefix = 'dBa'; const suffix = 'new_view'; const sql = `SELECT * FROM ${prefix}_${suffix}`", ['DBA_NEW_VIEW']],
+	['lowercase family', "['dba', 'All'].map(p => `select * from ${p}_new_view`)", ['DBA_NEW_VIEW', 'ALL_NEW_VIEW']],
+])('retains coverage with %s', (_label, source, expected) => {
+	expect(references(source)).toEqual(expect.arrayContaining(expected));
+});
+
+it('ignores diagnostic prose, comments and adjacent code without ignore-list entries', () => {
+	expect(references(`
+		// SELECT * FROM COMMENT_VIEW
+		const note = 'identity fields retained from connection, other facts NULL.';
+		const select = 'SELECT x FROM ';
+		const where = ' WHERE x = 1';
+		const code = 'JOIN '; const next = 'CODE_FRAGMENT';
+		const sql = 'SELECT * FROM REAL_VIEW';
+	`)).toEqual(['REAL_VIEW']);
+});
+
+it('keeps nested SQL templates and quoted dictionary choices visible', () => {
+	expect(references('const sql = `SELECT * FROM FIRST_VIEW WHERE x IN (${flag ? `SELECT x FROM SECOND_VIEW` : `SELECT x FROM THIRD_VIEW`})`;'))
+		.toEqual(expect.arrayContaining(['FIRST_VIEW', 'SECOND_VIEW', 'THIRD_VIEW']));
+});
+
+it('retains every previously scanned catalog relation in each source file', () => {
+	const known = new Set([...Object.values(FEATURE_VIEWS).flat(), ...NO_GRANT_VIEWS]);
+	for (const file of files) {
+		const source = readFileSync(file, 'utf8');
+		const previous = [
+			...[...source.matchAll(/\b(?:FROM|JOIN)\s+((?:[A-Z_][A-Z0-9_$#]*\.)?[A-Z_][A-Z0-9_$#]*)/gi)].map(m => m[1]!.toUpperCase().replace(/^SYS\./, '')),
+			...[...source.matchAll(/['"`]((?:V\$|DBA_|ALL_|USER_)[A-Z][A-Z0-9_#]*)['"`]/gi)].map(m => m[1]!.toUpperCase()),
+		].filter(view => known.has(view));
+		expect(references(source), file).toEqual(expect.arrayContaining([...new Set(previous)]));
+	}
+});
+
+it('keeps literals after regular expressions containing quotes visible', () => {
+	expect(references(`const pattern = /[^\\s'"<>]*\\.trc\\b/gi; const sql = 'SELECT * FROM NEW_VIEW';`)).toEqual(['NEW_VIEW']);
+});
+
+it('handles escaped quotes inside comma-join aliases', () => {
+	expect(references('SELECT * FROM FIRST_VIEW "a""alias", SECOND_VIEW b$1, THIRD_VIEW c#2'))
+		.toEqual(['FIRST_VIEW', 'SECOND_VIEW', 'THIRD_VIEW']);
 });

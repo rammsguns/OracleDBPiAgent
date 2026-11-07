@@ -123,6 +123,7 @@ it('ask after init names the key-file setting before contacting Strata or a DB',
 	vi.stubEnv('PIAGENT_HOME', home);
 	vi.stubEnv('PIAGENT_ENV_FILE', join(home, '.env'));
 	vi.stubEnv('PIAGENT_LLM_API_KEY_FILE', '/absolute/path/to/strata-api-key');
+	vi.stubEnv('PIAGENT_SECRET_DIR', join(home, 'unused-secrets'));
 	const llm = await import('../../src/llm/index.js');
 	const health = vi.spyOn(llm, 'checkStrataHealth');
 	const adapter = await import('../../src/agent/dbToolsAdapter.js');

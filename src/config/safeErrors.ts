@@ -2,6 +2,7 @@ import { targetErrorMessage, type TargetIssue } from './targetErrors.js';
 /** Reviewed fixed guidance or structured target templates; never accept arbitrary runtime messages. */
 export const SAFE_CONFIG_MESSAGES = Object.freeze([
 	"Set PIAGENT_LLM_API_KEY_FILE to your private Strata API-key file; the init placeholder is still configured. Edit your private .env or export PIAGENT_LLM_API_KEY_FILE.",
+	"PIAGENT_SECRET_DIR still holds the init placeholder /absolute/path/to/db-secrets. Edit your private .env or export PIAGENT_SECRET_DIR to your private database password directory.",
 	"LLM URL must be an HTTP loopback URL without credentials, query or fragment",
 	"Only Strata on port 8080 at /v1 is supported",
 	"Expected the two approved 19c targets",

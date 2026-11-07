@@ -1,3 +1,4 @@
+import { assertConfiguredSecretDir } from "./environment.js";
 import { loadTargets } from './targets.js';
 import { SafeConfigError } from "./safeErrors.js";
 import { agentHome, PACKAGE_ROOT } from "./paths.js";
@@ -33,6 +34,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): TunableAppConf
 		if (!Number.isSafeInteger(n) || n < 1) throw new SafeConfigError(numericErrors[key]);
 		return n;
 	};
+	assertConfiguredSecretDir(path(get("SECRET_DIR", "/home/kiwi/OracleDBHarness/databases/secrets")));
 	const baseUrl = get("LLM_BASE_URL", "http://127.0.0.1:8080/v1");
 	const llmUrl = assertLoopbackUrl(baseUrl);
 	if (llmUrl.port !== "8080" || llmUrl.pathname.replace(/\/$/, "") !== "/v1") throw new SafeConfigError("Only Strata on port 8080 at /v1 is supported");
