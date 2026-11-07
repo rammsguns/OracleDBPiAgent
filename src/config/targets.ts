@@ -11,13 +11,14 @@ import { validateLogTables } from './logTables.js';
 const packagedTargets = new WeakSet<object>();
 export function usesPackagedTargets(targets: readonly TargetConfig[]): boolean { return packagedTargets.has(targets); }
 export const DENIED_USERS = new Set('SYS SYSTEM SYSBACKUP SYSDG SYSKM SYSRAC AUDSYS DBSNMP XDB GSMADMIN_INTERNAL OUTLN LBACSYS DVSYS MDSYS CTXSYS ORDSYS WMSYS OJVMSYS APPQOSSYS ANONYMOUS HARNESS_APP SHOPAPP'.split(' '));
+export const targetNamePattern = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const identifier = /^(?:C##)?[A-Za-z][A-Za-z0-9_$#]{0,127}$/;
 export function validateTarget(t: any, index?: number): asserts t is TargetConfig {
 	const context = { index, name: typeof t?.name === 'string' ? t.name : undefined };
 	const invalid = (field: typeof TARGET_FIELDS[number]): never => { throw new SafeConfigError({kind:'invalid',field,...context}); };
 	if (!t || typeof t !== 'object' || Array.isArray(t)) invalid('name');
 	for (const property of Object.keys(t)) if (!(TARGET_FIELDS as readonly string[]).includes(property)) throw new SafeConfigError({kind:'unknown',property,...context});
-	if (typeof t.name !== 'string' || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(t.name)) invalid('name');
+	if (typeof t.name !== 'string' || !targetNamePattern.test(t.name)) invalid('name');
 	const host = typeof t.host === 'string' ? t.host : '';
 	const validHost = host.startsWith('[') ? host.endsWith(']') && isIP(host.slice(1,-1)) === 6 : host.length <= 253 && host.split('.').every((s: string) => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(s));
 	if (!validHost) invalid('host');

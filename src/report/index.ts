@@ -1,3 +1,5 @@
+import { validateReportSections } from './arguments.js';
+export { sectionNames } from './arguments.js';
 import { readFeatureReport } from './features.js';
 import { formatBytes } from '../space/index.js';
 import { readReportSpace } from './space.js';
@@ -18,7 +20,6 @@ export interface ReportSection {
 }
 export interface DatabaseReport { target: string; generatedAt: string; sections: ReportSection[] }
 export interface ReportOptions { target?: string; owner?: string; sections?: string[]; historyDirectory?: string }
-export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions', 'space', 'backup', 'jobs'];
 const groups: Record<string, string[]> = { backups: ['backups', 'archive_switches'], scheduler_jobs: ['scheduler_jobs', 'scheduler_failures'], index_health: ['index_health', 'index_partitions', 'index_subpartitions'] };
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
@@ -34,7 +35,7 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 	if (!cfg || (ctx.pinnedTarget && target !== ctx.pinnedTarget)) throw new Error('Unknown or unpinned target');
 	const owner = options.owner ?? cfg.defaultSchema;
 	if (!/^[A-Za-z][A-Za-z0-9_$#]{0,127}$/.test(owner)) throw new Error('Invalid owner');
-	if (options.sections?.some(n => !sectionNames.includes(n))) throw new Error(`Unknown report section; choose ${sectionNames.join(', ')}`);
+	validateReportSections(options.sections);
 	const selected = options.sections ? new Set(options.sections.flatMap(n => groups[n] ?? [n])) : undefined;
 	const report: DatabaseReport = { target, generatedAt: new Date().toISOString(), sections: [] };
 	for (const definition of reportQueries.filter(q => !selected || selected.has(q.name))) {

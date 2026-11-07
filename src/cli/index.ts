@@ -2,6 +2,8 @@
 import { parseTopCommand, runChatTop } from './chatTop.js';
 import { connectionGuidance, throwConnectionFailure, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
 import { renderFeatureSummary } from '../preflight/render.js';
+import { TargetUsageError, requireConfiguredTarget } from "../config/targetUsage.js";
+import { ReportSectionUsageError, validateReportSections } from "../report/arguments.js";
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
 import { AccountCheckError } from '../oracle/account.js';
@@ -84,6 +86,9 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		if (options.json && options.md) throw new SafeConfigError("Choose --json or --md");
 		if (options.diffOnly && options.summarize) throw new SafeConfigError("--diff-only cannot summarize");
 		const config = loadConfig();
+		requireConfiguredTarget(options.target, config.targets);
+		const sections = options.sections?.split(",").map(s => s.trim());
+		validateReportSections(sections);
 		const { generateReport, renderMarkdown } = await import("../report/index.js");
 		const { loadLatestReport, saveReport, validateReportTarget } = await import("../report/history.js");
 		const { diff, renderDiffMarkdown } = await import("../report/diff.js");
@@ -93,7 +98,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const previous = compare ? await loadLatestReport(out!, options.target, config.targets) : null;
 		const sessions = await createSessions(config);
 		try {
-			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, historyDirectory: out, sections: options.sections?.split(",").map(s => s.trim()) });
+			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, historyDirectory: out, sections });
 			throwConnectionFailure();
 			const markdown = renderMarkdown(report);
 			const changes = compare ? diff(previous, report) : undefined;
@@ -118,6 +123,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		console.log(options.json ? JSON.stringify(result) : renderTrends(result));
 	});
 	program.command("triage").description("Read-only issue evidence and debug checklist").requiredOption("--target <target>").option("--issue <text>").option("--issue-file <file>").option("--since <duration>", "Recent window, at most 30d", "24h").option("--json").option("--out <dir>").option("--summarize").action(async options => {
+		requireConfiguredTarget(options.target, loadConfig().targets);
 		const { runTriage } = await import("../triage/cli.js"); await runTriage(options);
 	});
 	program.command("backup").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Read-only backup and recoverability metadata; no LLM").requiredOption("--target <target>").option("--json").action(async options => {
@@ -197,6 +203,9 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
 	});
 	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security, space or backup); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+		const config = loadConfig();
+		requireConfiguredTarget(options.left, config.targets);
+		requireConfiguredTarget(options.right, config.targets);
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
 	});
@@ -239,8 +248,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	async function run(question: string | undefined, options: { target?: string; json?: boolean }) {
 		const config = loadConfig();
 		let pinnedTarget: string | undefined;
-		if (options.target) {
-			if (!config.targets.some(t => t.name === options.target)) throw new SafeConfigError("Unknown target");
+		if (options.target !== undefined) {
+			requireConfiguredTarget(options.target, config.targets);
 			config.defaultTarget = options.target;
 			pinnedTarget = options.target;
 		}
@@ -311,7 +320,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	await withConnectionFailures(async () => { await program.parseAsync(argv); });
 }
 export function handleCliError(error: unknown): void {
-	console.error(error instanceof SafeConfigError ? error.message : connectionGuidance(error) ?? "piagent failed; check local configuration and service availability");
-	process.exitCode = 1;
+	const usage = error instanceof TargetUsageError || error instanceof ReportSectionUsageError;
+	console.error(usage || error instanceof SafeConfigError ? error.message : connectionGuidance(error) ?? "piagent failed; check local configuration and service availability");
+	process.exitCode = usage ? 2 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch(handleCliError);
