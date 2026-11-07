@@ -2022,15 +2022,24 @@
 		{
 			"id": "hard-p25-d1-no-backups-recorded",
 			"target": "d1-19c-lab",
-			"sql": "SELECT CASE WHEN j.job_count = 0 AND f.file_count = 0 AND s.set_count = 0 AND p.piece_count = 0 THEN 'NO BACKUPS RECORDED' ELSE 'BACKUP RECORDS PRESENT' END AS record_state, j.job_count AS rman_job_count, f.file_count AS datafile_backup_count, s.set_count AS backup_set_count, p.piece_count AS backup_piece_count FROM (SELECT COUNT(*) AS job_count FROM v$rman_backup_job_details) j CROSS JOIN (SELECT COUNT(*) AS file_count FROM v$backup_datafile) f CROSS JOIN (SELECT COUNT(*) AS set_count FROM v$backup_set) s CROSS JOIN (SELECT COUNT(*) AS piece_count FROM v$backup_piece) p",
+			"sql": "SELECT 'RMAN job history' AS category, COUNT(*) AS row_count FROM v$rman_backup_job_details UNION ALL SELECT 'Datafile backups', COUNT(*) FROM v$backup_datafile UNION ALL SELECT 'Backup sets', COUNT(*) FROM v$backup_set UNION ALL SELECT 'Backup pieces', COUNT(*) FROM v$backup_piece",
 			"mode": "rowCells",
-			"rowCount": 1,
+			"rowCount": 4,
 			"rows": [
 				[
-					"NO BACKUPS RECORDED",
-					0,
-					0,
-					0,
+					"RMAN job history",
+					0
+				],
+				[
+					"Datafile backups",
+					0
+				],
+				[
+					"Backup sets",
+					0
+				],
+				[
+					"Backup pieces",
 					0
 				]
 			]
@@ -2090,13 +2099,11 @@
 		{
 			"id": "hard-p26-p1-next-run-semantics",
 			"target": "p1-19c-prod",
-			"sql": "SELECT owner, job_name, enabled, CASE WHEN next_run_date IS NULL THEN 'NOT RECORDED' ELSE 'PRESENT' END AS next_run FROM dba_scheduler_jobs WHERE owner = 'SHOPAPP' AND job_name = 'NIGHTLY_PURGE_JOB'",
+			"sql": "SELECT enabled, CASE WHEN next_run_date IS NULL THEN 'NOT RECORDED' ELSE 'PRESENT' END AS next_run FROM dba_scheduler_jobs WHERE owner = 'SHOPAPP' AND job_name = 'NIGHTLY_PURGE_JOB'",
 			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
 				[
-					"SHOPAPP",
-					"NIGHTLY_PURGE_JOB",
 					"TRUE",
 					"PRESENT"
 				]

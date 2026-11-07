@@ -1,7 +1,7 @@
 {
 	"target": "d1-19c-lab",
-	"validatedAt": "2026-11-06T21:34:54.637Z",
-	"scope": "CDB-wide (shared by all PDBs)",
+	"validatedAt": "2026-11-07T03:17:04.485Z",
+	"scope": "Database-wide (non-CDB)",
 	"container": {
 		"id": 0,
 		"name": "ORCL"
@@ -85,10 +85,19 @@
 			"status": "readable",
 			"rows": [
 				[
-					"NO BACKUPS RECORDED",
-					0,
-					0,
-					0,
+					"RMAN job history",
+					0
+				],
+				[
+					"Datafile backups",
+					0
+				],
+				[
+					"Backup sets",
+					0
+				],
+				[
+					"Backup pieces",
 					0
 				]
 			]

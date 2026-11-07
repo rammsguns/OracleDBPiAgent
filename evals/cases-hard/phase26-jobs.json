@@ -67,7 +67,7 @@
 		"split": "challenge",
 		"question": "On p1, for SHOPAPP.NIGHTLY_PURGE_JOB report whether it is enabled and whether a next run time is recorded (PRESENT or NOT RECORDED). Explain whether a recorded next run time is an estimate or a guarantee of actual execution and success. Do not report its moving timestamp or run counts.",
 		"groundTruth": {
-			"sql": "SELECT owner, job_name, enabled, CASE WHEN next_run_date IS NULL THEN 'NOT RECORDED' ELSE 'PRESENT' END AS next_run FROM dba_scheduler_jobs WHERE owner = 'SHOPAPP' AND job_name = 'NIGHTLY_PURGE_JOB'",
+			"sql": "SELECT enabled, CASE WHEN next_run_date IS NULL THEN 'NOT RECORDED' ELSE 'PRESENT' END AS next_run FROM dba_scheduler_jobs WHERE owner = 'SHOPAPP' AND job_name = 'NIGHTLY_PURGE_JOB'",
 			"mode": "rowCells"
 		},
 		"expect": {

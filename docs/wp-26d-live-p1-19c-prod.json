@@ -1,6 +1,6 @@
 {
 	"target": "p1-19c-prod",
-	"validatedAt": "2026-11-07T02:04:51.735Z",
+	"validatedAt": "2026-11-07T03:17:31.122Z",
 	"scope": "Current container visible scheduler and maintenance metadata",
 	"container": {
 		"id": 0,
@@ -61,8 +61,6 @@
 			"status": "readable",
 			"rows": [
 				[
-					"SHOPAPP",
-					"NIGHTLY_PURGE_JOB",
 					"TRUE",
 					"PRESENT"
 				]

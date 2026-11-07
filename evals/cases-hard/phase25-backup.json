@@ -71,12 +71,13 @@
 		"split": "challenge",
 		"question": "On d1, report the total row counts for RMAN job history, datafile backups, backup sets and backup pieces together, in that order. If all four are zero, say NO BACKUPS RECORDED in the readable control-file history, without claiming that no backups exist anywhere or that restoration is impossible. If any source cannot be read, say not verifiable from this database rather than inferring absence. Explain that control-file history alone cannot establish external media availability. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
 		"groundTruth": {
-			"sql": "SELECT CASE WHEN j.job_count = 0 AND f.file_count = 0 AND s.set_count = 0 AND p.piece_count = 0 THEN 'NO BACKUPS RECORDED' ELSE 'BACKUP RECORDS PRESENT' END AS record_state, j.job_count AS rman_job_count, f.file_count AS datafile_backup_count, s.set_count AS backup_set_count, p.piece_count AS backup_piece_count FROM (SELECT COUNT(*) AS job_count FROM v$rman_backup_job_details) j CROSS JOIN (SELECT COUNT(*) AS file_count FROM v$backup_datafile) f CROSS JOIN (SELECT COUNT(*) AS set_count FROM v$backup_set) s CROSS JOIN (SELECT COUNT(*) AS piece_count FROM v$backup_piece) p",
+			"sql": "SELECT 'RMAN job history' AS category, COUNT(*) AS row_count FROM v$rman_backup_job_details UNION ALL SELECT 'Datafile backups', COUNT(*) FROM v$backup_datafile UNION ALL SELECT 'Backup sets', COUNT(*) FROM v$backup_set UNION ALL SELECT 'Backup pieces', COUNT(*) FROM v$backup_piece",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
-				"(?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)"
+				"(?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"\\bNO\\s+BACKUPS\\s+RECORDED\\b"
 			],
 			"requiredTools": [
 				"run_query"

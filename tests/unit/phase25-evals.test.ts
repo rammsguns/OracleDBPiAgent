@@ -34,7 +34,7 @@ it('selects four backup cases without exposing the blind replacement in the p25 
 it('scores live empty-history truth and rejects invented dates, zero gaps and retention overrides', async () => {
 	for (const test of await backupCases()) {
 		const rows = live.records.find((record: { id: string }) => record.id === test.id).rows;
-		const answer = rows.map((row: unknown[]) => row.join(' | ')).join('\n') + '\nThis does not prove recoverability or establish external media availability.';
+		const answer = rows.map((row: unknown[]) => row.join(' | ')).join('\n') + '\nNO BACKUPS RECORDED. This does not prove recoverability or establish external media availability.';
 		const response = { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
 		expect(score(test, response, rows).pass, test.id).toBe(true);
 		const wrong = { ...response, answer: 'The last level 0 was 2026-11-06 12:00:00; gap count 0; retention REDUNDANCY 1; backups are available.' };

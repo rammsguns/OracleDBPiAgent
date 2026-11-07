@@ -1,0 +1,65 @@
+[
+	{
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "All four sources were readable and returned zero. Here are the totals on **d1-19c-lab**, in the requested order:\n\n| Category | Source view (readable) | Row count |\n|---|---|---|\n| RMAN job history | `V$RMAN_BACKUP_JOB_DETAILS` | 0 |\n| Datafile backups | `V$BACKUP_DATAFILE_DETAILS` | 0 |\n| Backup sets | `V$BACKUP_SET_DETAILS` | 0 |\n| Backup pieces | `V$BACKUP_PIECE_DETAILS` | 0 |\n\n**NO BACKUPS RECORDED** in the readable control-file history.\n\nNotes and caveats:\n- This is a statement about what the **control file's RMAN/backup history** shows on this database \u2014 not a claim that no backups exist anywhere, nor that restoration is impossible. Backups taken with a recovery catalog, on another target, or whose control-file records were aged out (`CONTROL_FILE_RECORD_KEEP_TIME`) would not appear here.\n- The control-file history alone **cannot establish external media availability**: it does not confirm whether backup pieces/archived logs are physically present on disk, SBT/tape, or object storage, nor their accessibility. Verifying restorability requires checking the actual media (e.g., `CROSS CHECK BACKUP`, catalog contents, or storage inventory), which is outside what these views can prove.\n- **CDB-wide labeling not applicable:** d1-19c-lab is a **non-CDB** (per target configuration), so this backup/archived-log evidence is not shared across PDBs \u2014 there are no PDBs here.\n\n(For transparency: my first attempt used `V$RMAN_BACKUPSET_DETAILS`/`V$RMAN_BACKUP_PIECE_DETAILS`, which do not exist on this DB and returned ORA-00942; I confirmed the correct view names via `V$FIXED_VIEW_DEFINITION` and re-queried them successfully, so all four counts above are verifiable, not inferred.)",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO BACKUPS RECORDED\",0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"id": "hard-p26-p1-next-run-semantics",
+		"answer": "## Result \u2014 `SHOPAPP.NIGHTLY_PURGE_JOB` on **p1-19c-prod**\n\n| Property | Value |\n|----------|-------|\n| **Enabled** | `TRUE` |\n| **Next run time recorded?** | **PRESENT** |\n\n*(Source: `DBA_SCHEDULER_JOBS`, target `p1-19c-prod`.)*\n\n---\n\n### Is the recorded next-run time a guarantee?\n\nNo. `NEXT_RUN_DATE` is a **scheduler-side estimate**, not a promise of actual execution or success. Several factors can cause the job to skip, delay, or fail relative to that timestamp:\n\n- **Instance state** \u2013 If the instance is down, in restricted mode, or the job coordinator/slave processes are unavailable at the scheduled moment, the run is missed and `NEXT_RUN_DATE` simply advances.\n- **Job-class resource limits** \u2013 The job's `JOB_CLASS` may cap concurrent jobs (`MAX_JOBS`) or CPU (`CPU_PER_CALL`); contention can defer a start.\n- **Maintenance windows / scheduler windows** \u2013 If the job is associated with a window and the window closes, the run may be stopped (`STOP_ON_WINDOW_CLOSE`).\n- **Predecessor constraints** \u2013 Jobs with `HAS_CONSTRAINTS = TRUE` wait on other jobs; the next-run time doesn't account for predecessor delays.\n- **Runtime failure** \u2013 Even if the job *starts* at the recorded time, it can fail (exceptions, ORA-errors, timeouts via `MAX_RUN_DURATION`). A successful *start* \u2260 a successful *completion*.\n\nIn short, `NEXT_RUN_DATE` tells you **when the scheduler will attempt to fire the job next**, given the current schedule and enabled state. It does not guarantee that the job will actually execute at that moment, nor that it will complete successfully.",
+		"checks": [
+			{
+				"check": "fact: estimat|schedul",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|success|execution|execut|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",\"NIGHTLY_PURGE_JOB\",\"TRUE\",\"PRESENT\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	}
+]
