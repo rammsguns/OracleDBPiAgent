@@ -32,9 +32,9 @@ function arguments and hints do not introduce fake relations. Existing explicit
 adapters remain for runtime view families and validated application tables.
 Backup and jobs now also receive per-feature catalog checks.
 
-The scan found no missing catalog views or template grants. Two additional
-file-scoped non-view exemptions classify prose/SQL-fragment tokens (`OTHER` in
-overview guidance and `WHERE` in SQL analysis). Neither is a dictionary view.
+The scan found no missing catalog views or template grants. The initial version
+added file-scoped exemptions for `OTHER` and `WHERE`; the review follow-up below
+removes those exemptions by keeping source literal boundaries intact.
 `src/preflight/views.ts` and `docs/grants-template-pdb.sql` needed no changes.
 
 This is a conservative coverage scanner, not a TypeScript evaluator or full
@@ -82,3 +82,46 @@ No DB or LLM implementation was changed, so integration tests and gated evals
 were not run. Live database behavior and Strata behavior remain unverified here;
 the coordinator owns the gated evals. No database connections or LLM requests
 were made. No push or merge was performed.
+
+
+## Antigravity review follow-up
+
+Addressed all three Minors from `review-wp-29c-config-preflight`:
+
+- **Minor-1:** Comma-join aliases use Oracle identifier syntax, including quoted
+  aliases with spaces or doubled quotes, and unquoted dollar/hash aliases.
+  Tests prove later relations are still detected, including unfamiliar names
+  outside the dictionary-prefix heuristic.
+- **Minor-2:** A lightweight source-literal reader keeps separate strings and
+  templates separate, ignores source comments, and visits nested template
+  interpolations. SQL scanning is limited to SQL-bearing literals/fragments;
+  exact dictionary-name literals still participate in coverage. Adjacent code
+  and diagnostic prose no longer manufacture relations. Removed the `WHERE`
+  and `OTHER` exemptions (and the now-unneeded overview `CONNECTION` exemption).
+  Tests exercise the review's exact prose/adjacent-fragment cases, nested SQL
+  templates, and regular expressions containing quotes before SQL literals.
+- **Minor-3:** Finite identifier values and array-map family choices match
+  case-insensitively, while results retain uppercase normalization. Tests cover
+  lowercase view constants, mixed-case prefix/suffix compositions and families.
+
+The global catalog, per-feature catalog and grants-template assertions remain
+active. A source-by-source retention test also compares the new scan with every
+known catalog relation found by the previous scanner, preventing the source
+boundary change from silently dropping existing coverage. No catalog or grants
+changes were required; no product code, dependencies or shared contracts changed.
+
+Follow-up validation (both exit 0):
+
+```text
+$ npm run typecheck
+> tsc -p tsconfig.json --noEmit
+
+$ npm test -- --maxWorkers=2
+Test Files  129 passed (129)
+     Tests  2403 passed (2403)
+  Duration  86.86s
+```
+
+All 22 preflight scanner/catalog tests pass, including ten new review
+regressions. `git diff --check` passes. No DB or LLM calls made; integration
+tests were not rerun for this test-only change.
