@@ -250,6 +250,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		try {
 			const agent = await createOracleAgent(ctx);
 			let toolCalls: { name: string; id: string }[] = [];
+			let activeTop: AbortController | undefined;
 			agent.subscribe(event => {
 				if (event.type === "tool_execution_start") toolCalls.push({ name: event.toolName, id: event.toolCallId });
 				if (!options.json && event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") process.stdout.write(event.assistantMessageEvent.delta);
@@ -262,10 +263,11 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 					try {
 						if (parseTopCommand(q)) {
 							const controller = new AbortController();
+							activeTop = controller;
 							const cancel = () => controller.abort();
 							process.once('SIGINT', cancel);
 							try { console.log(await runChatTop(ctx, q, controller.signal)); }
-							finally { process.removeListener('SIGINT', cancel); }
+							finally { activeTop = undefined; process.removeListener('SIGINT', cancel); }
 							return;
 						}
 					} catch (error) { console.error(error instanceof Error && error.name === 'AbortError' ? 'Top sample cancelled.' : 'Top: ' + (error instanceof Error && error.name === 'TopUsageError' || error instanceof Error && error.message.startsWith('Usage:') ? error.message : 'failed; check local database availability')); return; }
@@ -296,6 +298,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			if (question !== undefined) await ask(question);
 			else {
 				const rl = createInterface({ input: process.stdin, output: process.stdout });
+				// Terminal readline consumes Ctrl-C instead of emitting process SIGINT.
+				rl.on('SIGINT', () => { if (activeTop) activeTop.abort(); else rl.close(); });
 				try { while (true) { let q: string; try { q = await rl.question("piagent> "); } catch { break; } if (["exit", "quit", "/exit"].includes(q.trim())) break; if (q.trim()) await ask(q); } }
 				finally { rl.close(); }
 			}
