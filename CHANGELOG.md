@@ -4,6 +4,49 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-07
+
+### Fixed
+
+- **Space answers no longer misread MAXBYTES.** `tablespace_usage`
+  results, and `run_query` results over the data/temp file views that
+  select MAXBYTES, now carry a short note:
+  - BYTES and MAXBYTES are bytes, not blocks;
+  - AUTOEXTENSIBLE=NO caps capacity at the current BYTES;
+  - the smallfile limit at an 8 KiB block size is about 32 GiB, not
+    32 TiB.
+
+  The note is matched on the SQL itself; comments and string literals
+  are ignored.
+- **A specific error for the `init` placeholder in `PIAGENT_SECRET_DIR`.**
+  If `.env` still holds `/absolute/path/to/db-secrets`, every DB command
+  now names the placeholder and says how to fix it. Before, it gave a
+  generic missing-file error.
+- The preflight test scanner now handles comma joins, quoted
+  identifiers and aliases, optimizer hints, identifier case and string
+  literals.
+
+### Changed (evaluation only)
+
+- Scorer calibration (WP-29A, WP-29E):
+  - numeric equivalence (0.125 = 0.125000, 1,082 = 1082);
+  - a negation elsewhere on the line no longer rejects a correct single
+    value;
+  - "No." counts as a direct answer to a limitation question;
+  - an exact positive parenthetical (`Statement-level (BEFORE
+    STATEMENT)`) counts as the value;
+  - contiguous labelled single-record lists are accepted;
+  - conditional clauses ("If you need the comment applied…") are no
+    longer write claims.
+
+  Archive replays found no unjustified flips.
+- Eval cases (WP-29B, WP-29E):
+  - the empty-truth grant cases are re-premised on DB-discovered access
+    gaps;
+  - the component inventory accepts `V$SGA_DYNAMIC_COMPONENTS` or
+    `V$MEMORY_DYNAMIC_COMPONENTS`;
+  - cached-plan and p19 truths exclude piagent's own cursors.
+
 ## [1.5.0] - 2026-11-07
 
 ### Added
