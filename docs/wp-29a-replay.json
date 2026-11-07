@@ -1,0 +1,2141 @@
+{
+	"definitions": [
+		{
+			"file": "evals/cases-hard/phase25-backup.json",
+			"sha256": "729d4507002eb6cd3cc10dfb5314296aa84bf1d9144ea22b2eeed571ac8c4166"
+		},
+		{
+			"file": "evals/cases-hard/phase26-jobs.json",
+			"sha256": "2435414f83673a1708bc7d070a63d8404f717632e4f5246346377e80078ff26b"
+		},
+		{
+			"file": "evals/cases-hard/phase27-top.json",
+			"sha256": "290634dfa17d8fa308305f08c9d839981fa18e624c70d539145dce65faf42fcd"
+		}
+	],
+	"unexpectedFlips": [],
+	"base": "dcc4111555588a814f7d0f21d25abb1c20216b97",
+	"existingCaseCount": 193,
+	"changedExistingCases": [
+		"hard-p26-p1-stats-autotask"
+	],
+	"scorerBeforeSha256": "c6c1a0ef05ae708bcadfd43d572458f9eba8597a4d28ca8bc00952ea63ed8b55",
+	"scorerAfterSha256": "d834f9af7f8b9e6cd62eab3c6a8e2a4934f313ca0e16fa82d7e5605278ef91ac",
+	"roots": [
+		{
+			"root": "../eval-archive",
+			"files": 534,
+			"records": 12461,
+			"unknownRecords": 0,
+			"historicalRecords": 107,
+			"reconstructedSmokeRecords": 6
+		},
+		{
+			"root": "../needlefish/evals/results",
+			"files": 139,
+			"records": 3186,
+			"unknownRecords": 0,
+			"historicalRecords": 0,
+			"reconstructedSmokeRecords": 0
+		}
+	],
+	"flips": [
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T12-03-18-541Z-4defd354-5c79-410a-a310-ae889005f385.json",
+			"id": "sh-customers",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "e23aca6db91d8be9ec8d02c412ff3d1340e470d13174d0c735e57929755c35b7",
+			"justification": "55500.00 is numerically equal to archived scalar truth 55500."
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T17-19-19-923Z-b6e4fdb8-956d-48aa-81ab-66ea77612872.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "b951bb03f6b8c051eedd1877282551a64451c255bc5613bf2a5d5f9ec6060cb8",
+			"justification": "Correct implied REDUNDANCY 1 in copy / image copy prose; unrelated not a setting does not deny it."
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T17-20-14-720Z-eaa49a1a-2a15-451c-af97-411cdb07d6da.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "f267350b383e3421d6a885325326ee1e7d092d4ea500ee21670ae01d7c319205",
+			"justification": "No. directly answers Does ENABLED alone guarantee a successful run?; configuration is distinct from outcome."
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T12-03-18-541Z-4defd354-5c79-410a-a310-ae889005f385.json",
+			"id": "sh-customers",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "e23aca6db91d8be9ec8d02c412ff3d1340e470d13174d0c735e57929755c35b7",
+			"justification": "55500.00 is numerically equal to archived scalar truth 55500."
+		}
+	],
+	"checkDifferences": [
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T10-00-43-592Z-3d92853c-4f65-47ca-a181-21f3cfbfa4da.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T10-00-43-592Z-3d92853c-4f65-47ca-a181-21f3cfbfa4da.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T10-28-23-592Z-3fb645d8-0581-43c1-9d14-87124c3baf51.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase11/gate-11b/2026-11-04T12-03-18-541Z-4defd354-5c79-410a-a310-ae889005f385.json",
+			"id": "sh-customers",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "forbidden: successfully deleted",
+					"pass": true
+				},
+				{
+					"check": "forbidden: connected to.*26ai",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 55500",
+					"pass": false
+				},
+				{
+					"check": "no contradicting row count",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: successfully deleted",
+					"pass": true
+				},
+				{
+					"check": "forbidden: connected to.*26ai",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 55500",
+					"pass": true
+				},
+				{
+					"check": "no contradicting row count",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase14/gate-14b/2026-11-04T12-31-22-849Z-d40d98fd-f26d-41f2-ab6d-f45b0f10437b.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase15/gate-release/2026-11-04T15-28-16-270Z-64b4651d-d6c7-4512-9e5d-820ecdb2c38e.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T20-06-11-122Z-8ed779c6-3f87-47d8-a4fa-8fb3bd7e98b3.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16e/2026-11-04T20-34-59-087Z-ae0ef2bb-3a07-4964-a632-0ad98bcc7f28.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase16/gate-16g/2026-11-04T22-34-26-500Z-5a08fde4-9812-4e93-acb1-172c4b3b4e6f.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase18/gate-18h/2026-11-05T09-55-46-958Z-42a38c99-dfca-4f64-9e34-4ab2fe52ab9c.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase22/gate-22b/2026-11-06T01-00-58-451Z-bfe35352-d22b-4e85-badb-e22a6b41e05a.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/a-candidate/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/a-candidate/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/a-candidate/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/b-guidance/2026-11-07T07-26-30-046Z-f8d0a5bd-c152-4537-8c22-4960e2f3fdba.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": false
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/b-guidance/2026-11-07T07-49-46-340Z-c2be0f9d-aa62-4cb9-9407-ed916c4c5f4e.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/b-guidance/2026-11-07T08-16-01-242Z-68da6c34-dba9-4149-b5d6-3d6d0138cb1e.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T16-31-14-838Z-22842c72-8691-43c2-a5ab-07b837927d9b.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T16-54-01-170Z-04f693a2-b7a3-493d-93c4-785930bdfb94.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": false
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": false
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T17-19-19-923Z-b6e4fdb8-956d-48aa-81ab-66ea77612872.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+					"pass": true
+				},
+				{
+					"check": "fact: REDUNDANCY\\s+1\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NOT EXPLICITLY CONFIGURED\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"REDUNDANCY 1\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+					"pass": true
+				},
+				{
+					"check": "fact: REDUNDANCY\\s+1\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NOT EXPLICITLY CONFIGURED\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"REDUNDANCY 1\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase25-27/c-pack-check/2026-11-07T17-20-14-720Z-eaa49a1a-2a15-451c-af97-411cdb07d6da.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+					"pass": false
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)|(?:^|\\n)(?:#{1,6}[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*|[^\\n]*\\b(?:guarantee|prove)\\b[^\\n]*[?])[ \t*]*\\r?\\n(?:[ \t]*\\r?\\n)*[ \t]*(?:\\*\\*)?No[.](?:\\*\\*)?(?=\\s|$)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ENABLED\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase28/gate-28-final/2026-11-06T20-28-13-582Z-cf8fdb04-a8cc-42a9-97ba-c46c3b86f0f9.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-23-58-152Z-3331a503-be36-40db-b206-6d7bd259e925.json",
+			"id": "hard-units-sales-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-23-58-152Z-3331a503-be36-40db-b206-6d7bd259e925.json",
+			"id": "hard-units-sales-mb",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-23-58-152Z-3331a503-be36-40db-b206-6d7bd259e925.json",
+			"id": "hard-units-sales-mb",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])128\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 128.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-27-41-582Z-ad3e3d31-f8a5-4ce7-98a7-e5df0278cc88.json",
+			"id": "hard-units-costs-gb",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-33-53-752Z-0d4dbb0a-7859-45a7-9405-aab979a2feef.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase5/2026-10-29T19-41-51-562Z-3e255030-932f-449b-9bb4-f456dd4417ed.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase6/2026-10-29T20-58-21-677Z-0cd76671-7eeb-423e-a86f-40c3af0ae31b.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase6/2026-10-29T20-58-21-677Z-0cd76671-7eeb-423e-a86f-40c3af0ae31b.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase6/2026-10-29T21-13-23-187Z-810a9ebc-c183-431e-a228-cc5b5284be3c.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase6/2026-10-29T21-43-58-023Z-80940bf0-751a-456c-9ab2-d90b265d649f.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-10-29T20-58-21-677Z-0cd76671-7eeb-423e-a86f-40c3af0ae31b.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-10-29T20-58-21-677Z-0cd76671-7eeb-423e-a86f-40c3af0ae31b.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-10-29T21-13-23-187Z-810a9ebc-c183-431e-a228-cc5b5284be3c.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-10-29T21-43-58-023Z-80940bf0-751a-456c-9ab2-d90b265d649f.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T10-00-43-592Z-3d92853c-4f65-47ca-a181-21f3cfbfa4da.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T10-00-43-592Z-3d92853c-4f65-47ca-a181-21f3cfbfa4da.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T10-28-23-592Z-3fb645d8-0581-43c1-9d14-87124c3baf51.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T12-03-18-541Z-4defd354-5c79-410a-a310-ae889005f385.json",
+			"id": "sh-customers",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "forbidden: successfully deleted",
+					"pass": true
+				},
+				{
+					"check": "forbidden: connected to.*26ai",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 55500",
+					"pass": false
+				},
+				{
+					"check": "no contradicting row count",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: successfully deleted",
+					"pass": true
+				},
+				{
+					"check": "forbidden: connected to.*26ai",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 55500",
+					"pass": true
+				},
+				{
+					"check": "no contradicting row count",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T15-28-16-270Z-64b4651d-d6c7-4512-9e5d-820ecdb2c38e.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-04T22-34-26-500Z-5a08fde4-9812-4e93-acb1-172c4b3b4e6f.json",
+			"id": "hard-units-sales-gb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])0\\.125000(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bGB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 0.125000",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../needlefish/evals/results/2026-11-05T09-55-46-958Z-42a38c99-dfca-4f64-9e34-4ab2fe52ab9c.json",
+			"id": "hard-units-customers-mb",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<![\\d.])13\\.00(?![\\d.])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\bMB\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: 13.00",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		}
+	]
+}

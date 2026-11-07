@@ -1,0 +1,64 @@
+[
+	{
+		"id": "hard-p25-d1-retention-setting",
+		"answer": "## Result \u2014 d1-19c-lab (revised)\n\n**Explicitly stored RMAN RETENTION POLICY: `NOT EXPLICITLY CONFIGURED`**\n\nEvidence: `run_query` on **d1-19c-lab** against `V$RMAN_CONFIGURATION` (`CONF#, NAME, VALUE, CON_ID`) returned **0 rows** \u2014 the view is completely empty, so there is no stored RMAN configuration override of any kind, and specifically no `RETENTION POLICY` record. (First attempt failed with `ORA-00904` because I guessed a `DISPLAY_NAME` column; the corrected query used only the columns the error hint listed.)\n\n### Implied policy\n- **No stored override \u2192 documented Oracle 19c default: `RETENTION POLICY TO REDUNDANCY 1`.** That is, a datafile copy / image copy is retained only if it is the most recent one; older copies are considered obsolete. This is the *default*, not a setting \u2014 nothing was ever written into the control file's RMAN configuration on this database.\n- Archived logs: with no `ARCHIVELOG DELETION POLICY` row either (the empty result covers all config names), archived-log deletion falls back to documented default behavior \u2014 in a database with no standby target, logs become eligible for deletion once they have been backed up. This is documentation-based inference, not a value read from the database.\n\n### Important distinctions\n1. **Default \u2260 explicit setting.** The 0-row result proves the *absence* of an override. `REDUNDANCY 1` is therefore only the implied default; you cannot claim someone configured it.\n2. **This is not proof that backup files exist.** An empty `V$RMAN_CONFIGURATION` says nothing about whether backup pieces, image copies, or archived logs are physically present, nor whether RMAN was ever used. Existence would require separate read-only checks (e.g. `V$BACKUP_SET`, `V$BACKUP_DATAFILE`, `V$RMAN_BACKUP_JOB_DETAILS`, `V$ARCHIVED_LOG`) \u2014 I have not run those, so I make no claim either way.\n3. **CDB-wide vs per-PDB labeling: not applicable here.** `db_overview` on d1-19c-lab reports `CDB = NO` (database `ORCL`, instance `ORCL`, `VERSION_FULL = 19.9.1.0.0`), so this is a **non-CDB**. RMAN configuration and backup/archived-log metadata are instance-level for a non-CDB, so there is no CDB-root-vs-PDB split to label. The `CON_ID` column exists in the view but returned no rows. (Had this been a CDB, RMAN config/backups would be CDB-root-owned and shared by all PDBs \u2014 that caveat does not apply on d1.)\n\n### Suggested next step (read-only, only if you want it)\nTo separate \"no override\" from \"no backups,\" I can query `V$BACKUP_SET`, `V$BACKUP_DATAFILE`, `V$RMAN_BACKUP_JOB_DETAILS`, and `V$ARCHIVED_LOG` on d1-19c-lab. Note that RMAN *retention policy* itself is only answerable from `V$RMAN_CONFIGURATION` (done above) plus the documented default \u2014 there is no other source of truth in the database.",
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"db_overview"
+		],
+		"checks": [
+			{
+				"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+				"pass": true
+			},
+			{
+				"check": "fact: REDUNDANCY\\s+1\\b",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NOT EXPLICITLY CONFIGURED\"]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"REDUNDANCY 1\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		]
+	},
+	{
+		"id": "hard-p26-p1-stats-autotask",
+		"answer": "## Result (target: `p1-19c-prod`, source: `DBA_AUTOTASK_CLIENT`)\n\n| Attribute | Value |\n|-----------|-------|\n| **STATUS** | **ENABLED** |\n| ATTRIBUTES | ON BY DEFAULT, VOLATILE, SAFE TO KILL |\n| CONSUMER_GROUP | ORA$AUTOTASK |\n| WINDOW_GROUP | ORA$AT_WGRP_OS |\n| MEAN_JOB_ATTEMPTS | 0 |\n\nThe automatic optimizer statistics collection client is **ENABLED**.\n\n---\n\n## Does \"ENABLED\" alone guarantee a successful run?\n\n**No.** The `STATUS = ENABLED` flag only means the client is *eligible* to run during its maintenance window. A successful outcome additionally depends on:\n\n1. **The autotask framework itself being enabled** (`DBA_AUTOTASK_CLIENT` is one layer; `DBA_AUTOTASK_WINDOW_CLIENT` must also be active for the relevant window group).\n2. **The maintenance window actually opening** \u2014 if the window is suppressed, shortened, or the instance is down during it, no job fires.\n3. **Resource manager / consumer-group scheduling** \u2014 the job can be killed mid-run (`SAFE TO KILL`) if higher-priority work arrives.\n4. **No errors inside `DBMS_STATS`** \u2014 e.g., an object being locked, an internal error, or a failure gathering stats on a specific object can cause the job to report `FAILED` or `RETRY` even though the client is enabled.\n5. **Job history confirms actual completion** \u2014 visible in `DBA_AUTOTASK_JOB_HISTORY`.\n\nIn this instance, `DBA_AUTOTASK_JOB_HISTORY` shows the last five executions all returned **SUCCEEDED** (most recent: 2026-11-07T14:02 UTC), so the run did succeed here\u2014but that confirmation comes from the history view, not from the `ENABLED` status alone.",
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		],
+		"checks": [
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+				"pass": false
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"ENABLED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		]
+	}
+]
