@@ -211,6 +211,9 @@ it.each([
 	['tablespace_usage', {}],
 	['run_query', { sql: 'SELECT autoextensible, bytes, maxbytes FROM dba_data_files' }],
 	['run_query', { sql: 'SELECT MAXBYTES FROM DBA_TEMP_FILES' }],
+	['run_query', { sql: 'SELECT maxbytes FROM cdb_data_files' }],
+	['run_query', { sql: 'SELECT maxbytes FROM cdb_temp_files' }],
+	['run_query', { sql: 'SELECT "MAXBYTES" FROM "CDB_DATA_FILES"' }],
 ])('clarifies file capacity units in %s without changing numeric evidence', async (name, params) => {
 	const { ctx, query } = setup();
 	ctx.config.limits.maxToolResultBytes = 4000;
@@ -226,5 +229,21 @@ it.each([
 it('does not add file capacity guidance to unrelated queries', async () => {
 	const { tools } = setup();
 	const r = await tools.find(t => t.name === 'run_query')!.execute('1', { sql: 'SELECT 1 FROM dual' });
+	expect(r.details.sourceNote).toBeUndefined();
+});
+
+it.each([
+	"SELECT bytes FROM dba_data_files -- maxbytes",
+	"SELECT bytes FROM cdb_temp_files /* maxbytes */",
+	"SELECT bytes FROM dba_data_files WHERE file_name LIKE '%maxbytes%'",
+	"SELECT 'it''s maxbytes' FROM cdb_data_files",
+	"SELECT q'[it's maxbytes]' FROM cdb_data_files",
+	"SELECT q'!maxbytes!' FROM cdb_temp_files",
+	"SELECT 'maxbytes cdb_data_files' FROM dual",
+	"SELECT maxbytes FROM dual /* cdb_data_files */",
+	'SELECT "MAXBYTES_EXTRA" FROM cdb_data_files',
+])('ignores file capacity mentions in comments and literals: %s', async sql => {
+	const { tools } = setup();
+	const r = await tools.find(t => t.name === 'run_query')!.execute('1', { sql });
 	expect(r.details.sourceNote).toBeUndefined();
 });

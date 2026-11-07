@@ -4,6 +4,8 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolContext, QueryResult, OracleSession } from "../contracts.js";
 import { classifySql } from "../oracle/sqlPolicy.js";
 
+import { queriesFileMaxbytes } from "../space/queryNote.js";
+
 import { readPdbOverview } from "./overview.js";
 
 const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
@@ -169,7 +171,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					result = { ...source, columns: ["LINE", "TEXT"], rows, startLine: start, totalLines: lines.length, hasMore, nextStartLine: hasMore ? start + rows.length : null, truncated: hasMore };
 				}
 				// Space semantics only; keep numeric rows and all shared consumer contracts intact.
-				if (!sourceNote && (name === "tablespace_usage" || (name === "run_query" && /\b(?:dba|all|user)_(?:data|temp)_files\b/i.test(sql ?? "") && /\bmaxbytes\b/i.test(sql ?? "")))) {
+				if (!sourceNote && (name === "tablespace_usage" || (name === "run_query" && queriesFileMaxbytes(sql ?? "")))) {
 					sourceNote = "Note: BYTES and MAXBYTES are bytes, not blocks; never multiply by BLOCK_SIZE. AUTOEXTENSIBLE=NO means autoextend OFF: capacity is current BYTES; MAXBYTES=0 means no autoextend limit applied, not zero capacity or unlimited growth. YES means ON: capacity is GREATEST(BYTES,MAXBYTES). Sum per tablespace. Smallfile limits depend on block size: at 8 KiB, the per-file cap is about 32 GiB (34359721984 bytes), not 32 TiB; bigfile limits differ.";
 				}
 				if (dictionaryView) result = { ...(result as QueryResult), view: dictionaryView };

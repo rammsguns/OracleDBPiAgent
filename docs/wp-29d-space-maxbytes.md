@@ -55,3 +55,32 @@ No contract changes, dependencies, grants or coordinator edits needed.
 No Strata calls made. Model improvement is unverified pending the coordinator's
 gated A/B. No new live-PDB behavior is claimed. Dependencies were supplied by the
 requested ignored `node_modules` symlink to `../needlefish/node_modules`.
+
+## Antigravity review follow-up
+
+Addressed the Minor and inexpensive comment/literal Info from
+`review-wp-29d-space-maxbytes/docs/review-wp-29d-space-maxbytes.md`:
+
+- `src/space/queryNote.ts`: small identifier matcher for already policy-validated
+  SQL. Skips line/block comments, ordinary strings (including escaped quotes),
+  and Oracle alternative-quoted strings. Preserves quoted identifiers. Matches
+  MAXBYTES with DBA/ALL/USER/**CDB** DATA_FILES or TEMP_FILES identifiers.
+- `src/tools/index.ts`: use that matcher for the existing run_query note trigger.
+  The exact note text above, tablespace_usage behavior, SQL execution and
+  numeric evidence remain unchanged.
+- `tests/unit/tools.test.ts`: add CDB data/temp and quoted-identifier positives;
+  nine negatives for comments, ordinary/alternative strings, view names only
+  in prose and identifier suffixes.
+
+Follow-up validation:
+
+- `npm run typecheck`: PASS, exit 0.
+- `npm test -- --maxWorkers=2`: PASS, 128 files / 2399 tests, 81.09 s,
+  exit 0. Output included `context canceled` but all test files/tests passed.
+- `git diff --check`: PASS.
+- Integration was not rerun for this SQL-text matching-only follow-up; the
+  original integration results above remain the latest DB verification.
+
+No contract changes or dependencies. No DB or Strata calls in this follow-up.
+CDB note matching is verified with stubs; live CDB/PDB behavior and model A/B
+remain unverified.
