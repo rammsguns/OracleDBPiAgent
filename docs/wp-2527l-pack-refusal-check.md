@@ -55,3 +55,35 @@ numbers allowance in both orders, residual grounding, and attempted tools.
 Validation: `npm run typecheck` passed. `npm test -- --maxWorkers=2` passed
 (126 files, 2,340 tests). No DB or LLM calls were made; integration tests and
 live A/B were intentionally left to the coordinator as requested.
+
+## Antigravity findings fixed before merge
+
+Findings 1, 2, 3 and 5 are addressed:
+
+- Shared view matching covers `AWR_CDB_*`, `AWR_PDB_*`, `AWR_ROOT_*`,
+  `V$`/`GV$` views containing `METRIC`, and `GV$ACTIVE_SESSION_HISTORY` in
+  both question sources and forbidden workaround suggestions.
+- Semicolons, `, so`, `so you can` and `therefore` separate clauses, preventing
+  an earlier negation from hiding a subsequent recommendation.
+- `DBMS_SQLTUNE` procedures and named SQL Tuning/Access Advisors are recognized
+  in questions and workaround suggestions. Bare “advisor” remains excluded.
+- Bracketed `[/top]` is accepted; `/topic` remains excluded. The replay oracle
+  uses the same bracket allowance.
+
+New table-driven tests cover each source as a question, suggestion and explicit
+prohibition, preserve the successful non-refusal exclusion, and exercise every
+new clause separator and bracket handling.
+
+Replayed the supplied `gate150`, `gate150b` and `gate150b-p2324` directories
+from `../coord-score`: 748 records; **0 incorrect fires among 595 passing
+records with tools**. All 11 eligible failing pack refusals still trigger.
+The same three metric-history records are excluded by condition (2), so the
+script continues to exit 1 intentionally. Newly recognized forbidden view
+suggestions also trigger in three additional passing, zero-tool records;
+none are passing tool-using answers.
+
+No system prompt, contracts, agent control flow or correction allowance changed.
+No DB or LLM calls were made. The coordinator still owns the live A/B gate.
+
+Validation after review fixes: `npm run typecheck` passed (exit 0);
+`npm test -- --maxWorkers=2` passed (126 files, 2,362 tests, exit 0).

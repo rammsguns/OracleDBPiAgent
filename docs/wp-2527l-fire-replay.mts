@@ -32,7 +32,7 @@ for (const dir of process.argv.slice(2)) for (const file of readdirSync(dir).fil
 			if (fire) incorrectFires++;
 		}
 		// Independent acceptance oracle for the reported failing refusal cases.
-		const missingTop = !/\bpiagent\s+top\b|(?:^|[\s`(])\/top\b/i.test(answer);
+		const missingTop = !/\bpiagent\s+top\b|(?:^|[\s`(\[])\/top\b/i.test(answer);
 		if (r.pass === false && /^hard-p27-refuse-/.test(r.id) && (missingTop || /awrrpt\.sql/i.test(answer))) {
 			failingRefusals++;
 			if (fire) caughtRefusals++;

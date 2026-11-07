@@ -47,3 +47,31 @@ it('requires a refusal or zero successful calls even for an explicit pack questi
 	expect(detect('Show AWR history', 'I cannot query AWR.', 1, true)).toBe(true);
 	expect(detect('Show AWR history', 'No data.', 0, false)).toBe(true);
 });
+
+for (const source of [
+	'AWR_CDB_REPORTS', 'AWR_PDB_SNAPSHOT', 'AWR_ROOT_REPORT',
+	'GV$ACTIVE_SESSION_HISTORY', 'GV$ALL_ACTIVE_SESSION_HISTORY',
+	'GV$METRIC_HISTORY', 'GV$SYSMETRIC_HISTORY', 'V$EVENTMETRIC',
+	'V$FILEMETRIC', 'GV$WAITCLASSMETRIC_HISTORY',
+	'DBMS_SQLTUNE.REPORT_TUNING_TASK', 'DBMS_SQLTUNE.CREATE_TUNING_TASK',
+	'SQL Tuning Advisor', 'SQL Access Advisor', 'Access Advisor',
+	'DBMS_ADVISOR.QUICK_TUNE',
+]) {
+	it(`recognizes the reviewed source and workaround: ${source}`, () => {
+		expect(detect(`Query ${source}`, 'I cannot access that source.', 0, true)).toBe(true);
+		expect(detect(`Query ${source}`, 'Use /top.', 0, true)).toBe(false);
+		expect(detect('Show AWR history', `Use /top. Run ${source} on the host.`, 0, true)).toBe(true);
+		expect(detect('Show AWR history', `Do not use ${source}. Use /top.`, 0, true)).toBe(false);
+		expect(detect(`Query ${source}`, 'Some metadata.', 1, false)).toBe(false);
+	});
+}
+for (const separator of ['; ', ', so ', ' so you can ', '; therefore ', ', therefore ']) {
+	it(`separates a recommendation from a negated clause using ${separator}`, () => {
+		expect(detect('Show AWR history', `I cannot query AWR${separator}run awrrpt.sql on the host, or use /top.`, 0, true)).toBe(true);
+		expect(detect('Show AWR history', `AWR is unavailable${separator}do not run awrrpt.sql; use /top.`, 0, true)).toBe(false);
+	});
+}
+it('accepts a bracketed chat command without confusing longer slash paths', () => {
+	expect(detect('Show ASH history', 'I cannot query ASH. Use [/top] for live deltas.', 0, true)).toBe(false);
+	expect(detect('Show ASH history', 'I cannot query ASH. Use [/topic].', 0, true)).toBe(true);
+});
