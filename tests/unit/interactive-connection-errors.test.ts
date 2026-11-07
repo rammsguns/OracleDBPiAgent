@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
-	question: vi.fn(), close: vi.fn(), prompt: vi.fn(), closeAll: vi.fn(), prepare: vi.fn(), listen: vi.fn(),
+	question: vi.fn(), close: vi.fn(), prompt: vi.fn(), closeAll: vi.fn(), prepare: vi.fn(), listen: vi.fn(), on: vi.fn(), top: vi.fn(),
 }));
-vi.mock('node:readline/promises', () => ({ createInterface: () => ({ question: mocks.question, close: mocks.close }) }));
+vi.mock('node:readline/promises', () => ({ createInterface: () => ({ question: mocks.question, close: mocks.close, on: mocks.on }) }));
 vi.mock('../../src/llm/index.js', () => ({ checkStrataHealth: vi.fn(async () => {}) }));
 vi.mock('../../src/agent/index.js', () => ({ createOracleAgent: vi.fn(async () => ({ state: { messages: [] }, subscribe: vi.fn(), prompt: mocks.prompt })) }));
 vi.mock('../../src/agent/dbToolsAdapter.js', () => ({ createSessions: vi.fn(async () => ({ closeAll: mocks.closeAll })) }));
 vi.mock('../../src/cli/chatTriage.js', () => ({ parseTriageCommand: () => ({ issue: 'connection unavailable' }), prepareChatQuestion: mocks.prepare }));
+vi.mock('../../src/cli/chatTop.js', async importOriginal => ({ ...await importOriginal<typeof import('../../src/cli/chatTop.js')>(), runChatTop: mocks.top }));
 vi.mock('../../src/web/server.js', () => ({ createWebServer: () => ({ listen: mocks.listen, close: vi.fn() }) }));
 import { main, handleCliError } from '../../src/cli/index.js';
 import { recordConnectionFailure, withConnectionFailures, withoutConnectionFailures } from '../../src/oracle/connectionErrors.js';
@@ -42,4 +43,18 @@ it('isolates any REPL operation while preserving one-shot failure propagation', 
 		await withoutConnectionFailures(async () => { recordConnectionFailure(new Error('ORA-12541')); });
 	})).resolves.toBeUndefined();
 	await expect(withConnectionFailures(async () => { recordConnectionFailure(new Error('ORA-12541')); })).rejects.toThrow('ORA-12541: listener unreachable');
+});
+
+it('cancels /top on readline SIGINT, returns to the REPL and never prompts the agent', async () => {
+	const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+	mocks.question.mockResolvedValueOnce('/top').mockResolvedValueOnce('/exit');
+	mocks.top.mockImplementation(async (_ctx: unknown, _question: string, signal: AbortSignal) => {
+		const interrupt = mocks.on.mock.calls.find(([event]) => event === 'SIGINT')?.[1] as () => void;
+		expect(interrupt).toBeTypeOf('function'); interrupt();
+		expect(signal.aborted).toBe(true); throw signal.reason;
+	});
+	await main(['node', 'piagent', 'chat']).catch(handleCliError);
+	expect(mocks.top).toHaveBeenCalledOnce(); expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.prompt).not.toHaveBeenCalled();
+	expect(stderr).toHaveBeenCalledExactlyOnceWith('Top sample cancelled.');
+	expect(mocks.question).toHaveBeenCalledTimes(2); expect(mocks.close).toHaveBeenCalledOnce(); expect(mocks.closeAll).toHaveBeenCalledOnce();
 });
