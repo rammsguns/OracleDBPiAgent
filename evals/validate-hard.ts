@@ -103,7 +103,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 export function checkP26Cases(cases: EvalCase[], liveTruth?: { id: string; target: string; rows: unknown[][] }): void {
 	// Explanation facts assume the p1 fixture error; never silently grade a different failure.
 	if (liveTruth?.target === 'p1-19c-prod' && liveTruth.id === 'hard-p26-p1-last-failed-job' &&
-		(liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[1] !== 'ORA-02292')) throw new Error('p26 p1 failure fixture changed: expected ORA-02292; review requiredFacts');
+		(liveTruth.rows.length !== 2 || liveTruth.rows[1]?.[0] !== 'ORA-02292')) throw new Error('p26 p1 failure fixture changed: expected ORA-02292; review requiredFacts');
 	if (cases.length !== 4 || new Set(cases.map(test => test.id)).size !== 4) throw new Error('Expected four distinct p26 jobs cases');
 	for (const test of cases) {
 		if (test.target !== 'p1-19c-prod' || test.category !== 'jobs' || test.split !== 'challenge' || test.groundTruth?.mode !== 'rowCells') throw new Error('p26 requires p1 challenge rowCells truth');

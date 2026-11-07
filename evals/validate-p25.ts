@@ -15,6 +15,14 @@ function accessCode(error: unknown): string | undefined {
 	return undefined;
 }
 
+/** This absence challenge has a fixed explanatory fact; fail if its fixture changes. */
+export function checkNoBackupsPremise(id: string, rows: unknown[][]): void {
+	if (id !== 'hard-p25-d1-no-backups-recorded') return;
+	if (rows.length !== 1 || rows[0]?.length !== 4 || rows[0].some(value => value !== 0)) {
+		throw new Error('p25 no-backups fixture changed: expected four zero counts; review requiredFacts');
+	}
+}
+
 /** Missing views are evidence gaps, never zero backup/gap counts. Unexpected errors fail. */
 export async function inspectP25(session: Pick<OracleSession, 'query' | 'identity'>, cases: EvalCase[]) {
 	checkP25Cases(cases);
@@ -45,6 +53,7 @@ export async function inspectP25(session: Pick<OracleSession, 'query' | 'identit
 		try {
 			const result = await session.query(test.groundTruth!.sql, {}, { maxRows: 100 });
 			if (result.truncated || !result.rows.length || result.rows.some(row => row.some(cell => cell == null))) throw new Error(`Invalid p25 truth: ${test.id}`);
+			checkNoBackupsPremise(test.id, result.rows);
 			records.push({ id: test.id, status: 'readable', rows: result.rows });
 		} catch (error) {
 			const code = accessCode(error);

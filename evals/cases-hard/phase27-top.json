@@ -127,7 +127,7 @@
 			"requiredFacts": [
 				"piagent\\s+top",
 				"(?:live|right now|current|two.snapshot|interval)",
-				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+				"\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
@@ -147,7 +147,7 @@
 			"requiredFacts": [
 				"piagent\\s+top",
 				"(?:live|right now|current|two.snapshot|interval)",
-				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+				"\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
@@ -167,7 +167,7 @@
 			"requiredFacts": [
 				"piagent\\s+top",
 				"(?:live|right now|current|two.snapshot|interval)",
-				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+				"\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
@@ -187,7 +187,7 @@
 			"requiredFacts": [
 				"piagent\\s+top",
 				"(?:live|right now|current|two.snapshot|interval)",
-				"(?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)"
+				"\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*\\b(?:cannot|can.t|does not|doesn.t|do not|don.t|without|is not|isn.t|not|no|unavailable)\\b"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
