@@ -95,5 +95,17 @@ describe('jobs read-only evidence', () => {
 		expect(md).not.toMatch(/\n{3}|\|\n\n\|/);
 		for (const name of Object.keys(result.sections)) expect(md).toContain(`## ${name} (${result.sections[name]!.view}): ok\n|`);
 	});
+	it('escapes table headers just like body cells without changing evidence', async () => {
+		const f = fixture();
+		const label = 'alias|<value>&\r\nnext';
+		f.query.mockResolvedValue({ columns: [label], rows: [[label]], truncated: false, elapsedMs: 1 });
+		const result = await readJobs(f.ctx, 'd1-19c-lab');
+		const before = JSON.stringify(result);
+		const md = renderJobs(result);
+		const escapedRow = '| alias&#124;&lt;value&gt;&amp;<br>next |';
+		expect(md).toContain(`${escapedRow}\n| --- |\n${escapedRow}`);
+		expect(md).not.toContain(label);
+		expect(JSON.stringify(result)).toBe(before);
+	});
 	it('redacts split credentials and keeps small text', () => { expect(safeJobText("token =\n'sensitive'").text).not.toContain('sensitive'); expect(safeJobText('ORA-00001')).toEqual({ text: 'ORA-00001', truncated: false }); });
 });

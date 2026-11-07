@@ -102,7 +102,7 @@ export function renderJobs(result: JobsResult): string {
 		lines.push('', `## ${name} (${section.view}): ${section.status}`);
 		if (section.note) lines.push(section.note);
 		if (!section.rows.length) lines.push(section.status === 'ok' ? 'No rows returned within visible scope.' : 'Evidence unavailable.');
-		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(timestampColumns.has(c) ? utcTimestamp(row[c]) : typeof row[c] === 'number' ? markdownNumber(row[c]) : formatDuration(row[c]))).join(' | ') + ' |'); }
+		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.map(escape).join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(timestampColumns.has(c) ? utcTimestamp(row[c]) : typeof row[c] === 'number' ? markdownNumber(row[c]) : formatDuration(row[c]))).join(' | ') + ' |'); }
 		if (section.truncated) lines.push('', 'Row cap reached; partial evidence.');
 	}
 	return lines.join('\n') + '\n';

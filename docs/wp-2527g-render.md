@@ -83,3 +83,17 @@ No SQL, findings, redaction, caps, JSON shapes or web rendering changed in this
 follow-up. No contract changes are needed. Integration tests were not rerun for
 this formatting-only follow-up; the initial 9-test live result above is retained.
 No LLM calls were made for the follow-up.
+
+## Approved review Minor: Jobs header escaping
+
+Addressed the sole Minor in `docs/review-wp-2527g-render.md` on branch
+`review-wp-2527g-render`: `renderJobs` now uses `columns.map(escape)` for
+Markdown table headers, matching body-cell escaping. Added a Jobs unit test
+with a column alias containing a pipe, HTML delimiters, ampersand and CR/LF;
+it checks identical header/body escaping and unchanged serialized evidence.
+
+- `npm run typecheck`: passed.
+- `npx vitest run tests/unit/jobs.test.ts --maxWorkers=2`: 1 file, 46 tests passed.
+
+Changed only `src/jobs/index.ts`, `tests/unit/jobs.test.ts` and this report.
+No contract changes or additional live verification are needed for this fix.
