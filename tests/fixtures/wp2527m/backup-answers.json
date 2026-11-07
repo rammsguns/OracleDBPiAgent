@@ -1,0 +1,5 @@
+{
+	"table": "| Source view | Category | Count |\n|---|---|---|\n| V$RMAN_BACKUP_JOB_DETAILS | RMAN job history | 0 |\n| V$BACKUP_DATAFILE | Datafile backups | 0 |\n| V$BACKUP_SET | Backup sets | 0 |\n| V$BACKUP_PIECE | Backup pieces | 0 |",
+	"limitation": "**Control-file record \u2260 proof of a usable backup.** A control-file row in the RMAN views only proves the *control file* was copied at that moment. It says nothing about whether the datafile backup set is complete",
+	"affirmative": "The control-file record proves the backup is restorable."
+}

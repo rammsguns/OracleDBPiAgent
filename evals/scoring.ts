@@ -288,6 +288,10 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			if (attributes.length) candidates.push(`role=${role} / ` + attributes.flatMap(cells => valueColumns.map(col => cells[col] ?? '')).join(' / '));
 			continue;
 		}
+		// Extra value headers apply only to the constrained single-record alias.
+		if (singleRow) header.forEach((cell, index) => {
+			if (/^(?:count|result)$/i.test(cell)) valueColumns.push(index);
+		});
 		if (singleRow && keyColumn >= 0 && valueColumns.length) {
 			for (const index of indices) candidates[index] = '';
 			candidates.push(block.slice(1).flatMap(cells => valueColumns.map(col =>
