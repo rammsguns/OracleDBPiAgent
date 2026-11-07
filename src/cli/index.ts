@@ -263,6 +263,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			let activeTop: AbortController | undefined;
 			agent.subscribe(event => {
 				if (event.type === "tool_execution_start") toolCalls.push({ name: event.toolName, id: event.toolCallId });
+				if (!options.json && event.type === "message_start" && agent.isCorrectionMessage(event.message)) process.stdout.write("\n\n--- Revised answer ---\n");
 				if (!options.json && event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") process.stdout.write(event.assistantMessageEvent.delta);
 			});
 			const ask = async (q: string) => {

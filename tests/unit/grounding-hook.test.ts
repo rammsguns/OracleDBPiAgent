@@ -28,6 +28,8 @@ it('corrects unsupported numbers once using the exact follow-up, keeping identif
 	const { agent, audit, contexts } = await fixture(['TOOL', '`PROMO`: 3,331,394.74', '`PROMOTIONS`: 3,313,394.74']);
 	await agent.prompt('What is the table total?');
 	expect(contexts).toHaveLength(3);
+	expect(agent.isCorrectionMessage(contexts[2].messages.at(-1))).toBe(true);
+	expect(agent.isCorrectionMessage({ role: 'user', content: 'ordinary question', timestamp: 0 })).toBe(false);
 	expect(contexts[2].messages.at(-1).content).toContain("These numbers do not appear in this conversation's tool results: 3,331,394.74. Return the complete revised answer, which will replace your previous answer. Keep the rest of your answer, including any refusal, and only fix or remove the listed numbers; use tools only if needed.");
 	expect(contexts[2].messages.at(-1).content).not.toContain('PROMO');
 	expect(agent.unverified).toEqual([]);
@@ -139,6 +141,7 @@ it('revises zero-tool pack refusals once, even with grounding disabled, and remo
 		const { agent, contexts, audit } = await fixture(['AWR is unavailable.', 'AWR is unavailable.'], enabled);
 		await agent.prompt('Show AWR for the last hour.');
 		expect(contexts).toHaveLength(2);
+		expect(agent.isCorrectionMessage(contexts[1].messages.at(-1))).toBe(true);
 		const correction = contexts[1].messages.at(-1).content;
 		expect(correction).toContain(`piagent top --target ${loadConfig({}).defaultTarget} --seconds N`);
 		expect(correction).toContain('one live 5-120 second interval now (default 15)');
