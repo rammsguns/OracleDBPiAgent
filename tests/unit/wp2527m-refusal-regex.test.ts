@@ -32,7 +32,10 @@ it('accepts bounded backup limitations and the B-side single-record table header
 	const level0 = cases.find(test => test.id === 'hard-p25-d1-last-level0')!;
 	const pattern = new RegExp(level0.expect.requiredFacts[0]!, 'i');
 	expect(pattern.test(fixtures.limitation!)).toBe(true);
-	expect(pattern.test(fixtures.affirmative!)).toBe(false);
+	for (const key of ['affirmative', 'affirmativeNow', 'affirmativeKnow']) {
+		expect(pattern.test(fixtures[key]!), fixtures[key]).toBe(false);
+	}
+	expect(pattern.test(fixtures.negativeProof!)).toBe(true);
 	for (const negation of ['nothing', 'no', 'never', 'without', '≠', 'only proves']) {
 		expect(pattern.test(`${negation} proof of a usable backup`)).toBe(true);
 		expect(pattern.test(`${negation}.${' proof of a usable backup'}`)).toBe(false);

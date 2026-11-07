@@ -5,7 +5,7 @@ Implemented the requested eval-only follow-up to WP-2527J, including the coordin
 ## Changes
 
 - `evals/cases-hard/phase27-top.json`: all four refusal negation facts include none, never, neither, nor, unable, blocked, out of scope, unsupported, not supported and not available in both orders. Word boundaries and `[^.\n]*` scope are preserved.
-- `evals/cases-hard/phase25-backup.json`: last-level0 limitation adds nothing, no, never, without, ≠ and only proves, preserving the 90-character sentence bound.
+- `evals/cases-hard/phase25-backup.json`: last-level0 limitation adds nothing, no, never, without, ≠ and only proves, preserving the 90-character sentence bound. Word alternatives are enclosed in `\b...\b`; the non-word ≠ alternative remains outside those boundaries.
 - `evals/scoring.ts`: Count and Result value headers are recognized only in the constrained singleRow vertical-table branch. Value was already recognized. Other scoring branches retain their header rules.
 - `tests/fixtures/wp2527m/refusal-answers.json` and `backup-answers.json`: exact quoted refusal line, affirmative negatives, exact Source view / Category / Count table, and quoted control-file limitation.
 - `tests/unit/wp2527m-refusal-regex.test.ts`: all four refusal definitions, both orders of every requested alternative, sentence/newline and word boundaries, affirmative negatives, backup limitation length/scope, all three table headers, wrong counts and missing rows.
@@ -44,3 +44,17 @@ No flips for hard-p27-refuse-ash, hard-p27-refuse-awr or hard-p27-refuse-reposit
 - `git diff --check`: PASS.
 
 Used the authorized `node_modules -> ../needlefish/node_modules` symlink; no dependencies added. No contract changes needed. Integration/live behavior was not exercised: this is offline eval calibration, with no product source changes. No push or merge performed.
+
+## Coordinator review correction
+
+Added word boundaries to the last-level0 word-negation alternatives so `no` cannot match inside now, know or note. Kept ≠ outside the boundaries. Added exact fixtures asserting that “The control-file record now proves the backup is restorable.” and “We know it proves the backup is restorable.” fail, and “There is no proof the backup is restorable.” passes. Updated the definition checksum and replay artifact.
+
+Replayed against the same original branch base with all four roots (including gate150b): 15,073 compared records; the same three justified false-to-true flips listed above; zero unrelated flips or check differences. No additional flips resulted from the boundary correction. No DB/LLM calls or contract changes.
+
+Review verification rerun:
+
+- Focused `vitest run tests/unit/wp2527m-refusal-regex.test.ts --maxWorkers=2`: PASS, 1 file / 2 tests, exit 0.
+- `npm run typecheck`: PASS, exit 0.
+- `npm test -- --maxWorkers=2`: PASS, 126 files / 2,292 tests, exit 0 (82.09 seconds).
+- `node_modules/.bin/tsx docs/wp-2527m-replay.ts`: PASS, exit 0.
+- `git diff --check`: PASS.

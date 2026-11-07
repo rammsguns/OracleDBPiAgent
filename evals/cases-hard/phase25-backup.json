@@ -11,7 +11,7 @@
 		},
 		"expect": {
 			"requiredFacts": [
-				"(?:not|does not|cannot|isn.t|nothing|no|never|without|≠|only proves)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)"
+				"(?:\\b(?:not|does not|cannot|isn.t|nothing|no|never|without|only proves)\\b|≠)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)"
 			],
 			"requiredTools": [
 				"run_query"

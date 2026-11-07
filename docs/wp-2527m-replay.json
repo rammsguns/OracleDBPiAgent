@@ -2,7 +2,7 @@
 	"definitions": [
 		{
 			"file": "evals/cases-hard/phase25-backup.json",
-			"sha256": "4eea90fdb8a83e9c7d0220fe45e348da6e7270d6c1deb1fa6dd18a66bc8c02d6"
+			"sha256": "729d4507002eb6cd3cc10dfb5314296aa84bf1d9144ea22b2eeed571ac8c4166"
 		},
 		{
 			"file": "evals/cases-hard/phase26-jobs.json",
