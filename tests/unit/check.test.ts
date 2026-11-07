@@ -16,12 +16,13 @@ describe('check thresholds and exits', () => {
 	it('max_state_alt precedence is CRIT > WARN > UNKNOWN > OK', () => { expect(worst(['CRIT','UNKNOWN'])).toBe('CRIT'); expect(worst(['UNKNOWN','WARN'])).toBe('WARN'); expect(worst(['OK','UNKNOWN'])).toBe('UNKNOWN'); expect(worst(['SKIPPED'])).toBe('OK'); expect(worst(['OK','CRIT','WARN'])).toBe('CRIT'); expect(worst(['OK','WARN'])).toBe('WARN'); });
 	it('uses defaults and overrides without cross-target mutation', () => { const c = parseCheckConfig({version:1, defaults:{space:{warn:70,crit:90}},targets:{lab:{space:{warn:60,crit:80}}}},['lab','other']); expect(thresholdsFor(c,'lab').space.warn).toBe(60); expect(thresholdsFor(c,'other').space.warn).toBe(70); expect(DEFAULTS.space.warn).toBe(85); });
 	for (const raw of [null,[],{}, {version:2}, {version:1,password:'secret'}, {version:1,defaults:{bad:1}}, {version:1,targets:{unknown:{}}}, {version:1,defaults:{space:{warn:95,crit:85}}}, {version:1,defaults:{space:{warn:80,crit:101}}}, {version:1,defaults:{space:{warn:80,crit:90,extra:1}}}, {version:1,defaults:{windowHours:0}}, {version:1,defaults:{windowHours:721}}, {version:1,defaults:{expiry:{warn:3,crit:14}}}]) it(`rejects invalid config ${JSON.stringify(raw)}`, () => expect(() => parseCheckConfig(raw,['lab'])).toThrow());
-	it('requires mode 0600 and refuses symlinks, malformed or oversized files', () => {
+	it('accepts modes 0600 and 0400 and refuses symlinks, malformed or oversized files', () => {
 		const home = mkdtempSync(join(tmpdir(),'check-'));
 		try {
 			const env = {PIAGENT_HOME:home}; expect(loadCheckConfig(['lab'],env)).toEqual({});
 			const path=join(home,'check.json'); writeFileSync(path,'{"version":1}',{mode:0o600}); expect(loadCheckConfig(['lab'],env)).toEqual({version:1});
-			chmodSync(path,0o644); expect(() => loadCheckConfig(['lab'],env)).toThrow(/0600/); chmodSync(path,0o600);
+			chmodSync(path,0o400); expect(loadCheckConfig(['lab'],env)).toEqual({version:1});
+			for(const mode of [0o644,0o640,0o604,0o440,0o404,0o700,0o200,0]) { chmodSync(path,mode); expect(() => loadCheckConfig(['lab'],env)).toThrow(); } chmodSync(path,0o600);
 			writeFileSync(path,'{'); expect(() => loadCheckConfig(['lab'],env)).toThrow(/JSON/);
 			writeFileSync(path,' '.repeat(131073)); expect(() => loadCheckConfig(['lab'],env)).toThrow(/128 KiB/);
 			rmSync(path); symlinkSync('missing',path); expect(() => loadCheckConfig(['lab'],env)).toThrow();
@@ -104,11 +105,11 @@ it('passes a decreasing deadline to sequential statements and stops a timed-out 
 	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
 	expect(timeouts).toHaveLength(1);expect(timeouts[0]).toBeLessThanOrEqual(0.01);expect(r.targets[0]!.checks.find(x=>x.id==='tablespaces')!.status).toBe('UNKNOWN');
 });
-it('no applicable expiry and malformed expiry are UNKNOWN',async()=>{
+it('no expiry is OK while malformed expiry is UNKNOWN',async()=>{
 	for(const expiry of [null,'not-a-date']) {
 		const {context,readers}=fake(), security=readers.security;
 		readers.security=async()=>{const r=await security();r.checks[0]!.evidence[0]!.rows[0]![4]=expiry as never;return r;};
-		const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.targets[0]!.checks.find(x=>x.id==='expiry')!.status).toBe('UNKNOWN');
+		const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.targets[0]!.checks.find(x=>x.id==='expiry')!.status).toBe(expiry===null?'OK':'UNKNOWN');
 	}
 });
 it('rejects unconfigured or unpinned API targets before any collector',async()=>{
@@ -176,3 +177,36 @@ it('default password usernames use only simple identifiers, max 10 and +N more',
 	const names=Array.from({length:12},(_,i)=>`USER${String(i).padStart(2,'0')}`);const note=defaultPasswordAccounts([...names,'USER00','bad user','password=secret','A'.repeat(129)]);expect(note).toContain('USER09 +2 more');expect(note).not.toContain('USER10');expect(note).not.toContain('secret');expect(defaultPasswordAccounts(['SCOTT','C##APP','A_$#'])).toBe('Accounts: A_$#, C##APP, SCOTT.');
 });
 it('truncated and missing evidence explain why without generic UNKNOWN text',()=>{expect(evidenceReason({status:'ok',view:'DBA_USERS',truncated:true})).toContain('DBA_USERS: row cap');expect(evidenceReason(undefined)).toContain('not returned');});
+it('complete users with unlimited lifetimes are OK, without an invented minimum expiry',async()=>{
+	const {context,readers}=fake(), security=readers.security;
+	readers.security=async()=>{const r=await security();r.checks[0]!.evidence[0]!.rows=[['APP','N','OPEN','DEFAULT',null],['LOCKED_APP','N','LOCKED','DEFAULT','2020-01-01T00:00:00Z'],['ORACLE_OWNER','Y','OPEN','DEFAULT','2020-01-01T00:00:00Z']] as never;return r;};
+	const r=await runChecks(context,['lab'],()=>({...DEFAULTS,checks:{expiry:{unknownAs:'crit'}}}),readers as unknown as typeof collectors,now), c=r.targets[0]!.checks.find(c=>c.id==='expiry')!;
+	expect(c.status).toBe('OK');expect(c.value).toBeNull();expect(c.display).toBe('none');expect(c.note).toBe('No expiring unlocked accounts (unlimited or no expiry)');expect(c.observedStatus).toBeUndefined();expect(renderCheckMarkdown(r)).toContain('| expiry | OK | none |');expect(r.status).toBe('OK');
+});
+for(const state of ['unavailable','truncated'])it(`no expiry with ${state} users stays UNKNOWN`,async()=>{
+	const {context,readers}=fake(), security=readers.security;
+	readers.security=async()=>{const r=await security(),users=r.checks[0]!.evidence[0]!;users.rows[0]![4]=null as never;Object.assign(users,state==='unavailable'?{status:'unavailable',view:'DBA_USERS',attempts:[{code:'ORA-00942'}]}:{truncated:true,view:'DBA_USERS'});return r;};
+	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now),c=r.targets[0]!.checks.find(c=>c.id==='expiry')!;expect(c.status).toBe('UNKNOWN');expect(c.note).toContain('DBA_USERS');expect(c.note).not.toContain('No expiring');
+});
+it('an explicitly expired unlocked account remains critical even if its expiry date is absent',async()=>{
+	const {context,readers}=fake(),security=readers.security;readers.security=async()=>{const r=await security();r.checks[0]!.evidence[0]!.rows[0]![2]='EXPIRED';r.checks[0]!.evidence[0]!.rows[0]![4]=null as never;return r;};const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.targets[0]!.checks.find(c=>c.id==='expiry')!.status).toBe('CRIT');
+});
+for(const [count,expected] of [[0,'UNKNOWN'],[1,'WARN'],[9,'WARN'],[10,'CRIT'],[100,'CRIT']] as const)it(`truncated alert count ${count} reports ${expected} with lower-bound semantics`,async()=>{
+	const {context,readers}=fake();readers.alerts=async()=>({status:'ok',view:'V$DIAG_ALERT_EXT',rows:count?[{codes:['ORA-00600'],count}]:[],truncated:true}) as never;
+	const r=await runChecks(context,['lab'],()=>({...DEFAULTS,alertErrors:{warn:1,crit:10}}),readers as unknown as typeof collectors,now),c=r.targets[0]!.checks.find(c=>c.id==='alertErrors')!;
+	expect(c.status).toBe(expected);expect(c.note).toContain('V$DIAG_ALERT_EXT: row cap reached');expect(c.note).toContain(`at least ${count}`);
+	if(expected==='UNKNOWN'){expect(c.value).toBeNull();expect(c.display).toBe('UNKNOWN');expect(c.lowerBound).toBeUndefined();expect(c.note).toContain('below threshold');}else{expect(c.value).toBe(count);expect(c.display).toBe(`>= ${count} errors`);expect(c.lowerBound).toBe(true);expect(renderCheckMarkdown(r)).toContain(`>= ${count} errors`);expect(exitCode(r.status)).toBe(expected==='CRIT'?2:1);}
+});
+it('truncated alert counts compare ORA occurrences only and honor target thresholds',async()=>{
+	const {context,readers}=fake();readers.alerts=async()=>({status:'ok',view:'V$DIAG_ALERT_EXT',rows:[{codes:['TNS-12514'],count:100},{codes:['ORA-00600'],count:2},{codes:['ORA-07445'],count:3}],truncated:true}) as never;
+	const config=parseCheckConfig({version:1,targets:{lab:{alertErrors:{warn:5,crit:20}},other:{alertErrors:{warn:6,crit:20}}}},['lab','other']);const r=await runChecks(context,['lab','other'],target=>thresholdsFor(config,target),readers as unknown as typeof collectors,now);expect(r.targets[0]!.checks.find(c=>c.id==='alertErrors')!.display).toBe('>= 5 errors');expect(r.targets[0]!.status).toBe('WARN');expect(r.targets[1]!.checks.find(c=>c.id==='alertErrors')!.status).toBe('UNKNOWN');
+});
+it('complete alert counts remain exact and unavailable alert evidence cannot assert a lower bound',async()=>{
+	for(const status of ['ok','unavailable']){
+		const {context,readers}=fake();readers.alerts=async()=>({status,view:'V$DIAG_ALERT_EXT',rows:[{codes:['ORA-00600'],count:100}],truncated:status!=='ok',attempts:status==='ok'?[]:[{code:'ORA-00942'}]}) as never;
+		const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now),c=r.targets[0]!.checks.find(c=>c.id==='alertErrors')!;expect(c.status).toBe(status==='ok'?'WARN':'UNKNOWN');expect(c.display).toBe(status==='ok'?'100 errors':'UNKNOWN');expect(c.lowerBound).toBeUndefined();
+	}
+});
+it('truncated incident rows already prove the any-incident critical threshold',async()=>{
+	const {context,readers}=fake();readers.incidents=async()=>({status:'ok',view:'V$DIAG_INCIDENT',rows:[{}],truncated:true}) as never;const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now),c=r.targets[0]!.checks.find(c=>c.id==='incidents')!;expect(c.status).toBe('CRIT');expect(c.value).toBe(1);expect(c.display).toBe('>= 1 incidents');expect(c.lowerBound).toBe(true);expect(c.note).toContain('row cap reached');
+});

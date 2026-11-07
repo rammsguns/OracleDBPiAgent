@@ -50,7 +50,7 @@ export function loadCheckConfig(targets: readonly string[], env = process.env): 
 	catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {}; throw new CheckUsageError('check.json: cannot open private regular file'); }
 	try {
 		const s = fstatSync(fd);
-		if (!s.isFile() || (s.mode & 0o777) !== 0o600 || s.uid !== process.getuid?.() || s.size > 131072) throw new CheckUsageError('check.json: requires owner-owned regular file mode 0600, at most 128 KiB');
+		if (!s.isFile() || ![0o600,0o400].includes(s.mode & 0o777) || s.uid !== process.getuid?.() || s.size > 131072) throw new CheckUsageError('check.json: requires owner-owned regular file mode 0600 or 0400, at most 128 KiB');
 		let raw: unknown; try { raw = JSON.parse(readFileSync(fd, 'utf8')); } catch { throw new CheckUsageError('check.json: invalid JSON'); }
 		return parseCheckConfig(raw, targets);
 	} finally { closeSync(fd); }

@@ -13,7 +13,7 @@ import { CheckUsageError, DEFAULTS, type Thresholds, type CheckName } from './co
 export * from './config.js';
 export type Status = 'OK' | 'WARN' | 'CRIT' | 'UNKNOWN';
 export type CheckStatus = Status | 'SKIPPED';
-export interface Verdict { id: string; status: CheckStatus; observedStatus?: Status; display: string; value: number | null; unit: string; threshold: { warn: number; crit: number | null } | null; scope: string; command: string; note: string }
+export interface Verdict { id: string; status: CheckStatus; observedStatus?: Status; lowerBound?: boolean; display: string; value: number | null; unit: string; threshold: { warn: number; crit: number | null } | null; scope: string; command: string; note: string }
 export interface CheckRun { version: 1; capturedAt: string; status: Status; targets: { target: string; status: Status; checks: Verdict[] }[] }
 export const collectors = { space: readSpaceUsage, sessions: readSessionActivity, backup: readBackup, jobs: readJobs, alerts: readAlertLog, incidents: readIncidents, security: readSecurityPosture };
 export function worst(statuses: CheckStatus[]): Status { return statuses.includes('CRIT') ? 'CRIT' : statuses.includes('WARN') ? 'WARN' : statuses.includes('UNKNOWN') ? 'UNKNOWN' : 'OK'; }
@@ -67,14 +67,15 @@ export async function runChecks(ctx: ToolContext, targets: readonly string[], se
 		let sessionPromise: Promise<OracleSession> | undefined;
 		const thresholdFor = (id: string) => ['tablespaces','temp','undo'].includes(id) ? t.space : id === 'recovery' ? t.recovery : ['blocking','backupAge','failedJobs','alertErrors','maintenance','expiry'].includes(id) ? t[id as 'blocking'|'backupAge'|'failedJobs'|'alertErrors'|'maintenance'|'expiry'] : null;
 		const disabled = (id: string) => t.disable?.includes(checkName(id));
-		const add = (id: string, value: number | null, threshold: Verdict['threshold'], unit: string, command: string, valid = true, note = '', shared = false, descending = false) => {
+		const add = (id: string, value: number | null, threshold: Verdict['threshold'], unit: string, command: string, valid = true, note = '', shared = false, descending = false, measurement?: { status?: Status; display?: string; lowerBound?: boolean }) => {
 			const known = valid && value !== null && Number.isFinite(value);
-			const observed: Status = !known ? 'UNKNOWN' : threshold ? classify(value, threshold, descending) : value! > 0 ? 'CRIT' : 'OK';
+			const observed: Status = measurement?.status ?? (!known ? 'UNKNOWN' : threshold ? classify(value, threshold, descending) : value! > 0 ? 'CRIT' : 'OK');
 			const policy = t.checks?.[checkName(id)]?.unknownAs ?? 'unknown';
 			const status: CheckStatus = disabled(id) ? 'SKIPPED' : observed === 'UNKNOWN' ? policy.toUpperCase() as Status : observed;
 			const reason = known ? note : note || `${id}: collector returned a non-finite or absent ${unit || 'measurement'} value.`;
-			checks.push({ id, value: known && status !== 'SKIPPED' ? value : null, display: status === 'SKIPPED' ? 'SKIPPED' : displayValue(known ? value : null,unit), threshold, unit,
+			checks.push({ id, value: known && status !== 'SKIPPED' ? value : null, display: status === 'SKIPPED' ? 'SKIPPED' : measurement?.display ?? displayValue(known ? value : null,unit), threshold, unit,
 				scope: shared && scope.startsWith('This PDB') ? 'CDB-wide (shared by all PDBs)' : scope, command: `piagent ${command} --target ${target}`, status,
+				...(known && status !== 'SKIPPED' && measurement?.lowerBound ? {lowerBound: true} : {}),
 				...(observed === 'UNKNOWN' && status !== 'UNKNOWN' && status !== 'SKIPPED' ? {observedStatus: observed} : {}),
 				note: status === 'SKIPPED' ? 'Disabled by check.json; does not contribute to totals or overall status.' : reason + (observed === 'UNKNOWN' && policy !== 'unknown' ? ` Policy unknownAs=${policy} maps UNKNOWN to ${status}.` : '') });
 		};
@@ -165,15 +166,23 @@ export async function runChecks(ctx: ToolContext, targets: readonly string[], se
 		});
 		await probe(['alertErrors'], 'alertlog', async (_s,c) => {
 			const r = await readers.alerts(c,target,{ since: `${t.windowHours}h`, level: 'all', limit: c.config.limits.maxRows });
-			add('alertErrors', r.rows.filter(x => x.codes.some(code => code.startsWith('ORA-'))).reduce((n,x) => n+x.count,0), t.alertErrors, 'errors', 'alertlog', complete(r), evidenceReason(r) || 'ORA occurrences in the lookback window.', true);
+			const count = r.rows.filter(x => x.codes.some(code => code.startsWith('ORA-'))).reduce((n,x) => n+x.count,0);
+			const reached = ['WARN','CRIT'].includes(classify(count,t.alertErrors));
+			const lowerBound = r.status === 'ok' && r.truncated && reached;
+			add('alertErrors', count, t.alertErrors, 'errors', 'alertlog', complete(r) || lowerBound, r.truncated ? `${evidenceReason(r)} Visible ORA count is at least ${count}; ${reached ? 'threshold already reached.' : 'below threshold; unseen rows may change the verdict.'}` : evidenceReason(r) || 'ORA occurrences in the lookback window.', true, false, lowerBound ? {display: `>= ${count} errors`,lowerBound:true} : undefined);
 		});
-		await probe(['incidents'], 'alertlog', async (_s,c) => { const r = await readers.incidents(c,target,{since:`${t.windowHours}h`,limit:c.config.limits.maxRows}); add('incidents',r.rows.length,null,'incidents','alertlog',complete(r),evidenceReason(r),true); });
+		await probe(['incidents'], 'alertlog', async (_s,c) => {
+			const r = await readers.incidents(c,target,{since:`${t.windowHours}h`,limit:c.config.limits.maxRows});
+			const lowerBound = r.status === 'ok' && r.truncated && r.rows.length > 0;
+			add('incidents',r.rows.length,null,'incidents','alertlog',complete(r) || lowerBound,evidenceReason(r),true,false,lowerBound ? {display:`>= ${r.rows.length} incidents`,lowerBound:true} : undefined);
+		});
 		await probe(['expiry','defaultPasswords'], 'security', async s => {
 			const r = await readers.security(s,{checks:['accounts','default-passwords']});
 			const accounts = r.checks.find(x => x.id === 'accounts')!, defaults = r.checks.find(x => x.id === 'default-passwords')!;
 			const users = accounts.evidence.find(x => x.label === 'users');
 			const days = (users?.rows ?? []).filter(x => x[1] === 'N' && !String(x[2]).includes('LOCKED') && (x[4] != null || String(x[2]).includes('EXPIRED'))).map(x => x[4] == null ? 0 : (new Date(String(x[4])).getTime()-now.getTime())/86400000);
-			add('expiry', days.length ? Math.min(...days) : null, t.expiry, 'days', 'security', !!users && complete(users), evidenceReason(users) || (days.some(d => !Number.isFinite(d)) ? 'Invalid expiry timestamp in DBA_USERS.' : days.length ? '' : 'No expiring unlocked non-Oracle-maintained accounts visible in DBA_USERS.'), false, true);
+			const noExpiry = !!users && complete(users) && days.length === 0;
+			add('expiry', days.length ? Math.min(...days) : null, t.expiry, 'days', 'security', !!users && complete(users), evidenceReason(users) || (days.some(d => !Number.isFinite(d)) ? 'Invalid expiry timestamp in DBA_USERS.' : noExpiry ? 'No expiring unlocked accounts (unlimited or no expiry)' : ''), false, true, noExpiry ? {status:'OK',display:'none'} : undefined);
 			add('defaultPasswords', defaults.findings.length, null, 'accounts', 'security', complete(defaults), evidenceReason(...defaults.evidence) || defaultPasswordAccounts(defaults.findings.map(f => f.subject)));
 		});
 		result.targets.push({target,status:worst(checks.map(x => x.status)),checks});

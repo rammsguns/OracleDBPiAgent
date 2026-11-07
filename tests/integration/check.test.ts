@@ -14,7 +14,7 @@ for (const target of ['d1-19c-lab','p1-19c-prod']) it(`check collects read-only 
 		const result=await runChecks({config,sessions,audit:{record:async()=>{}},runId:'check-integration'},[target],undefined,readers);
 		expect(result.targets).toHaveLength(1);expect(result.targets[0]!.checks.length).toBeGreaterThanOrEqual(10);
 		expect(exitCode(result.status)).toBeGreaterThanOrEqual(0);
-		for(const check of result.targets[0]!.checks){expect(['OK','WARN','CRIT','UNKNOWN']).toContain(check.status);expect(check.command).toContain(`--target ${target}`);expect(check.scope).toContain('non-CDB');if(check.value===null) expect(check.status).toBe('UNKNOWN');}
+		for(const check of result.targets[0]!.checks){expect(['OK','WARN','CRIT','UNKNOWN']).toContain(check.status);expect(check.command).toContain(`--target ${target}`);expect(check.scope).toContain('non-CDB');if(check.value===null && check.status==='OK'){expect(check.id).toBe('expiry');expect(check.display).toBe('none');expect(check.note).toBe('No expiring unlocked accounts (unlimited or no expiry)');}else if(check.value===null) expect(check.status).toBe('UNKNOWN');}
 		expect(result.targets[0]!.checks.find(x=>x.id==='failedJobs')!.value).not.toBeNull();
 		expect(result.targets[0]!.checks.find(x=>x.id==='defaultPasswords')!.value).not.toBeNull();
 		const checks=result.targets[0]!.checks;
