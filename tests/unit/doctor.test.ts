@@ -84,7 +84,7 @@ it.each([false,true])('routes targets check failure output correctly with json=%
 	});
 	expect(process.exitCode).toBe(1);expect(closeAll).toHaveBeenCalledOnce();
 	if(json){
-		expect(error).not.toHaveBeenCalled();expect(log).toHaveBeenCalledOnce();
+		expect(error).toHaveBeenCalledExactlyOnceWith(message);expect(log).toHaveBeenCalledOnce();
 		expect(JSON.parse(String(log.mock.calls[0]![0]))).toEqual({target:'d1-19c-lab',accountCheck:'failed',error:message});
 	}else{
 		expect(log).not.toHaveBeenCalled();expect(error).toHaveBeenCalledExactlyOnceWith(message);

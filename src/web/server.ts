@@ -1,3 +1,5 @@
+import type { SessionProvider } from '../contracts.js';
+import { connectionGuidance, withConnectionFailures } from '../oracle/connectionErrors.js';
 import { readWebOperations, validateWebOperations } from './operations.js';
 import { readWebSpace, validateWebSpace } from './space.js';
 import { readWebDbSessions, validateWebDbSessions } from './dbSessions.js';
@@ -83,8 +85,8 @@ export function createWebServer(options: WebServerOptions = {}) {
 		res.setHeader("Referrer-Policy", "no-referrer");
 		void handle(req, res).catch(error => {
 			if (res.destroyed) return;
-			if (res.headersSent) { res.write(`event: error\ndata: ${JSON.stringify({ message: "Request failed" })}\n\n`); res.end(); }
-			else json(res, error instanceof WebError ? error.status : 500, { message: error instanceof WebError ? error.message : "Request failed" });
+			if (res.headersSent) { res.write(`event: error\ndata: ${JSON.stringify({ message: connectionGuidance(error) ?? "Request failed" })}\n\n`); res.end(); }
+			else json(res, error instanceof WebError ? error.status : 500, { message: error instanceof WebError ? error.message : connectionGuidance(error) ?? "Request failed" });
 		});
 	});
 	async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -132,7 +134,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 				} catch { throw new WebError(400, 'Invalid insight input'); }
 				if (insightActive) throw new WebError(429, 'An insight request is already running');
 				insightActive = true;
-				let sessions;
+				let sessions: SessionProvider | undefined;
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
@@ -182,17 +184,18 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try { parseScope(data.scope); } catch { throw new WebError(400, "Invalid scope"); }
 				if (driftActive) throw new WebError(429, "A drift comparison is already running");
 				driftActive = true;
-				let sessions;
+				let sessions: SessionProvider | undefined;
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
-					const result = await (options.drift ?? compareTargets)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID() }, { left: data.left as string, right: data.right as string, scope: data.scope });
+					const activeSessions = sessions;
+					const result = await withConnectionFailures(async () => (options.drift ?? compareTargets)({ config: manager.config, sessions: activeSessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID() }, { left: data.left as string, right: data.right as string, scope: data.scope as string }));
 					const output = JSON.stringify(result);
 					if (Buffer.byteLength(output) > 1024 * 1024) throw new WebError(413, "Drift output exceeds 1 MiB; choose a narrower scope");
 					const finished = sessions; sessions = undefined; await finished.closeAll();
 					return json(res, 200, result);
 				} catch (error) {
 					if (error instanceof WebError) throw error;
-					throw new WebError(500, "Drift failed");
+					throw new WebError(500, connectionGuidance(error) ?? "Drift failed");
 				} finally {
 					try { await sessions?.closeAll(); } catch { throw new WebError(500, "Drift failed"); }
 					finally { driftActive = false; }
@@ -219,10 +222,11 @@ export function createWebServer(options: WebServerOptions = {}) {
 				if (sections?.some(name => !sectionNames.includes(name))) throw new WebError(400, "Invalid sections");
 				if (params.has("summarize") && params.get("summarize") !== "1") throw new WebError(400, "Invalid summary option");
 				const release = params.has("summarize") ? acquireLlm() : () => {};
-				let sessions;
+				let sessions: SessionProvider | undefined;
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
-					const report = await (options.report ?? generateReport)({ config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target }, { target, sections });
+					const activeSessions = sessions;
+					const report = await withConnectionFailures(async () => (options.report ?? generateReport)({ config: manager.config, sessions: activeSessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target }, { target, sections }));
 					const directory = options.reportDirectory ?? reportDirectory();
 					const previous = await (options.loadReport ?? loadLatestReport)(directory, target, manager.config.targets);
 					const diff = webReportDiff(previous, report);
@@ -233,8 +237,8 @@ export function createWebServer(options: WebServerOptions = {}) {
 					const finished = sessions; sessions = undefined; await finished.closeAll();
 					if (saving) await (options.saveReport ?? saveReport)(directory, report, manager.config.targets, options.reportDirectory === undefined);
 					return json(res, 200, { report, diff, ...(saving ? { savedAt: report.generatedAt } : {}), ...(summary === undefined ? {} : { summary, unverified }) });
-				} catch { throw new WebError(500, "Report failed"); }
-				finally { try { await sessions?.closeAll(); } catch { throw new WebError(500, "Report failed"); } finally { release(); } }
+				} catch (error) { throw new WebError(500, connectionGuidance(error) ?? "Report failed"); }
+				finally { try { await sessions?.closeAll(); } catch (error) { throw new WebError(500, connectionGuidance(error) ?? "Report failed"); } finally { release(); } }
 			}
 			if (raw === "/api/health" && req.method === "GET") {
 				const release = acquireLlm();

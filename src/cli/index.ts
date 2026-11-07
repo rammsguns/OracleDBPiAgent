@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseTopCommand, runChatTop } from './chatTop.js';
-import { connectionGuidance, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
+import { connectionGuidance, throwConnectionFailure, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
 import { renderFeatureSummary } from '../preflight/render.js';
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
@@ -94,6 +94,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		const sessions = await createSessions(config);
 		try {
 			const report = await generateReport({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, owner: options.owner, historyDirectory: out, sections: options.sections?.split(",").map(s => s.trim()) });
+			throwConnectionFailure();
 			const markdown = renderMarkdown(report);
 			const changes = compare ? diff(previous, report) : undefined;
 			if (out) await saveReport(out, report, config.targets, options.out === undefined);
@@ -230,7 +231,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			clearConnectionFailure();
 			const message = error instanceof AccountCheckError || error instanceof SafeConfigError ? error.message : connectionGuidance(error) ?? 'Target check failed; check local configuration and service availability';
 			if (options.json) console.log(JSON.stringify({ target: options.target, accountCheck: 'failed', error: message }));
-			else console.error(message);
+			console.error(message);
 			process.exitCode = 1;
 		} finally { await sessions.closeAll(); }
 	});
@@ -270,7 +271,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 							finally { activeTop = undefined; process.removeListener('SIGINT', cancel); }
 							return;
 						}
-					} catch (error) { console.error(error instanceof Error && error.name === 'AbortError' ? 'Top sample cancelled.' : 'Top: ' + (error instanceof Error && error.name === 'TopUsageError' || error instanceof Error && error.message.startsWith('Usage:') ? error.message : 'failed; check local database availability')); return; }
+					} catch (error) { console.error(error instanceof Error && error.name === 'AbortError' ? 'Top sample cancelled.' : 'Top: ' + (error instanceof Error && error.name === 'TopUsageError' || error instanceof Error && error.message.startsWith('Usage:') ? error.message : connectionGuidance(error) ?? 'failed; check local database availability')); return; }
 					let command: ReturnType<typeof parseTriageCommand>;
 					try {
 						command = parseTriageCommand(q);
@@ -281,8 +282,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 					if (command !== undefined) {
 						try {
 							prepared = await prepareChatQuestion(ctx, q);
-						} catch {
-							console.error("Triage failed; check local database availability");
+						} catch (error) {
+							console.error(connectionGuidance(error) ?? "Triage failed; check local database availability");
 							return;
 						}
 					}

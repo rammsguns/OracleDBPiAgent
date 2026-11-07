@@ -234,3 +234,32 @@ passwords, keys or raw sensitive SQL/source/log text.
 - File validation failure: check ownership, mode and private-home configuration.
 - Missing view: DBA reviews `--grants-sql`; not-applicable does not require more access.
 - Version/account refusal: use 19c and a dedicated read-only login; never bypass the gate.
+
+### Password-file and secret-directory setup errors
+
+Every database command exits 1 and writes setup guidance to stderr if its
+password file cannot be read. The message names the target and password-file
+basename only. It never includes the secret-directory path or file contents.
+For example:
+
+```text
+Password file d1_lab.pw for target d1-19c-lab is missing, unreadable, non-regular or empty in PIAGENT_SECRET_DIR (chmod 600, owned by you)
+```
+
+Check that the configured `passwordFile` basename exists inside the exported
+`PIAGENT_SECRET_DIR`, is a regular file readable by your user, and contains the
+password. Keep it owned by you with mode 600. Do not paste its contents into a
+terminal transcript, issue, or chat.
+
+If the message says `Set PIAGENT_SECRET_DIR to the same private secret directory
+configured for this process.`, export the same absolute directory used by the
+process configuration. Avoid a literal `~` in the environment value; use an
+absolute path or shell-expanded `$HOME`. Restart the command after correcting
+its environment.
+
+A report that cannot establish a connection exits 1 before printing or saving a
+report. Missing view grants after a successful connection still produce the
+usual per-section unavailable notes. `targets check --json` keeps its structured
+failure on stdout and also writes the guidance to stderr. Doctor reports setup
+failures per target. Web responses and chat `/top` and `/triage` show the same
+safe guidance; interactive sessions remain usable after a handled error.

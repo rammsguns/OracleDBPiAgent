@@ -1,11 +1,12 @@
-import { recordConnectionFailure } from './connectionErrors.js';
+import { recordConnectionFailure, PasswordFileError } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
 import { checkAccount } from './account.js';
 import { SafeConfigError } from "../config/safeErrors.js";
 import { APPROVED_ENDPOINTS, APPROVED_TARGETS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 export { APPROVED_ENDPOINTS, type ApprovedEndpoint } from "../config/approvedTargets.js";
 import oracledb from "oracledb";
-import { readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
+import { constants } from "node:fs";
 import { resolve, basename } from "node:path";
 import { UnsupportedVersionError, type AppConfig, type OracleSession, type SessionProvider, type QueryOptions, type QueryResult, type DatabaseIdentity } from "../contracts.js";
 import { classifySql } from "./sqlPolicy.js";
@@ -32,11 +33,21 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 			if (usesPackagedTargets(config.targets) && !APPROVED_TARGETS.some(e => Object.entries(e).every(([k,v]) => (target as any)[k] === v))) throw new SafeConfigError("Target endpoint is not approved");
 			if (!/^[A-Za-z][A-Za-z0-9_$#]*$/.test(target.defaultSchema)) throw new SafeConfigError("Invalid schema");
 			const secretDir = process.env.PIAGENT_SECRET_DIR;
-			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw new SafeConfigError("Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process.");
+			if (!secretDir || resolve(secretDir) !== resolve(config.secretDir)) throw recordConnectionFailure(new SafeConfigError("Set PIAGENT_SECRET_DIR to the same private secret directory configured for this process."));
 			if (basename(target.passwordFile) !== target.passwordFile) throw new SafeConfigError("Invalid password file");
 			if (approvedEndpoints && !approvedEndpoints.some(e => e.name === target.name && e.host === target.host && e.port === target.port && e.serviceName === target.serviceName && e.username === target.username)) throw new SafeConfigError("Target endpoint is not approved");
 			if (!oracledb.thin) throw new SafeConfigError("Only thin mode is supported");
-			const password = (await readFile(resolve(secretDir, target.passwordFile), "utf8")).trim();
+			let password: string;
+			try {
+				// Use nonblocking open for FIFOs; inspect the opened file before reading.
+				const file = await open(resolve(secretDir, target.passwordFile), constants.O_RDONLY | constants.O_NONBLOCK);
+				try {
+					const info = await file.stat();
+					if (!info.isFile() || !(info.mode & 0o444)) throw new Error();
+					password = (await file.readFile("utf8")).trim();
+					if (!password) throw new Error();
+				} finally { await file.close(); }
+			} catch { throw recordConnectionFailure(new PasswordFileError(target.name, basename(target.passwordFile))); }
 			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` }).catch((error: unknown) => { throw recordConnectionFailure(error); });
 			let closed = false; let busy = false;
 			try {
