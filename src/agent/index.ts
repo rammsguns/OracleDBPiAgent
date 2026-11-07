@@ -1,5 +1,6 @@
 import { appendToolNotes, type TunableLlmConfig } from "../config/tunables.js";
 import { Agent, type AgentMessage, type StreamFn } from "@earendil-works/pi-agent-core";
+import { needsPackRefusalCorrection } from "./packRefusal.js";
 import { checkFacts, isRefusal } from "./grounding.js";
 import { createHash } from "node:crypto";
 import type { ToolContext } from "../contracts.js";
@@ -53,6 +54,7 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 	const tools = appendToolNotes(await createDbTools(ctx), (ctx.config.llm as TunableLlmConfig).toolNotes);
 	const llm = wiring ?? await createStrataProvider(ctx.config.llm);
 	let calls = 0, successfulCalls = 0, started = 0, exhausted = false, finalScheduled = false, correctionScheduled = false;
+	let packCorrectionScheduled = false;
 	const correctionMessages = new Set<string>();
 	const starts = new Map<string, number>();
 	const record = (kind: Parameters<typeof ctx.audit.record>[0]["kind"], extra = {}) => ctx.audit.record({ at: new Date().toISOString(), runId: ctx.runId, kind, ...extra });
@@ -63,6 +65,7 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 		transformContext: async messages => pruneContext((ctx.config.llm as TunableLlmConfig).dropPriorThinking ? dropPriorThinking(messages) : messages, ctx.config.llm.contextWindow),
 		beforeToolCall: async ({ toolCall, args }) => {
 			const target = (args as { target?: string })?.target ?? ctx.config.defaultTarget;
+			if (packCorrectionScheduled) return { block: true, terminate: true, reason: "Revise the refusal without tools." };
 			if (exhausted || calls >= ctx.config.limits.maxToolCalls || Date.now() - started >= ctx.config.limits.maxWallSeconds * 1000) {
 				exhausted = true;
 				await record("tool_blocked", { tool: toolCall.name, target });
@@ -97,20 +100,29 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 			}
 			return undefined;
 		},
-		prepareRequest: ({ context }) => exhausted ? { context: { ...context, tools: [], messages: context.messages.map(m => m.role === "system" ? { ...m, tools: [] } : m) } } : undefined,
+		prepareRequest: ({ context }) => exhausted || packCorrectionScheduled ? { context: { ...context, tools: [], messages: context.messages.map(m => m.role === "system" ? { ...m, tools: [] } : m) } } : undefined,
 		finishTurn: ({ message, context }) => {
 			if (message.stopReason === "error" || message.stopReason === "aborted") return;
 			if (exhausted && !finalScheduled) { finalScheduled = true; return { action: "continue" }; }
-			if (message.content.some(c => c.type === "toolCall")) return finalScheduled ? { action: "end" } : undefined;
+			if (message.content.some(c => c.type === "toolCall")) return finalScheduled || packCorrectionScheduled ? { action: "end" } : undefined;
+			const answer = message.content.filter(c => c.type === "text").map(c => c.text).join("\n");
+			const userQuestions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text));
+			const questions = userQuestions.join("\n");
+			if (!correctionScheduled && needsPackRefusalCorrection(userQuestions.at(-1) ?? "", answer, successfulCalls, isRefusal(answer))) {
+				correctionScheduled = true;
+				packCorrectionScheduled = true;
+				const text = `Return the complete revised answer, which will replace your previous answer. Keep the refusal. Remove any Diagnostics/Tuning Pack scripts, packages, reports or snapshot workarounds, including host-side workarounds. Offer piagent top --target ${ctx.pinnedTarget ?? ctx.config.defaultTarget} --seconds N (or /top in chat): one live 5-120 second interval now (default 15) of SQL, load and host CPU deltas, no history. Do not call tools.`;
+				correctionMessages.add(text);
+				agent.followUp({ role: "user", content: text, timestamp: Date.now() });
+				return { action: "continue" };
+			}
 			if ((ctx.config.llm as TunableLlmConfig).groundingCheck !== false) {
-				const answer = message.content.filter(c => c.type === "text").map(c => c.text).join("\n");
 				if (successfulCalls === 0 || isRefusal(answer)) {
 					agent.unverified = [];
 					if (finalScheduled) return { action: "end" };
 					return undefined;
 				}
 				const toolTexts = context.messages.filter(m => m.role === "toolResult").map(m => m.content.filter(c => c.type === "text").map(c => c.text).join("\n"));
-				const questions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text)).join("\n");
 				const toolCalls = new Map(context.messages.flatMap(m => m.role === "assistant"
 					? m.content.filter(c => c.type === "toolCall").map(c => [c.id, c.arguments] as const) : []));
 				const owners = context.messages.filter(m => m.role === "toolResult").map(m => {
@@ -134,7 +146,7 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 	}), { unverified: [] as string[] });
 	agent.subscribe(async event => {
 		if (event.type === "agent_start") {
-			calls = 0; successfulCalls = 0; started = Date.now(); exhausted = false; finalScheduled = false; correctionScheduled = false; agent.unverified = [];
+			calls = 0; successfulCalls = 0; started = Date.now(); exhausted = false; finalScheduled = false; correctionScheduled = false; packCorrectionScheduled = false; agent.unverified = [];
 			await record("run_start");
 		}
 		if (event.type === "agent_end") await record("run_end", { elapsedMs: Date.now() - started, unverifiedCount: agent.unverified.length });
