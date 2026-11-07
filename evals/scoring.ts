@@ -57,7 +57,13 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), test.id.startsWith('hard-p18-'), p19, test.id === 'hard-p21-history-signature', test.id.startsWith('hard-p23-'), test.id.startsWith('hard-p27-')) });
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
+				preserveQualified: test.id.startsWith('hard-p18-'),
+				p19,
+				historySignature: test.id === 'hard-p21-history-signature',
+				p23: test.id.startsWith('hard-p23-'),
+				p27: test.id.startsWith('hard-p27-'),
+			}) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
@@ -99,7 +105,16 @@ function truthLabels(sql: string): string[] {
 
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
-function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], preserveQualified = false, p19 = false, historySignature = false, p23 = false, p27 = false): boolean {
+interface RowMatchOptions {
+	preserveQualified?: boolean;
+	p19?: boolean;
+	historySignature?: boolean;
+	p23?: boolean;
+	p27?: boolean;
+}
+
+function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: string[], options: RowMatchOptions = {}): boolean {
+	const { preserveQualified = false, p19 = false, historySignature = false, p23 = false, p27 = false } = options;
 	if (!row.length || row.some(value => value == null)) return false;
 	const clean = (text: string) => {
 		// p23 event names contain a literal SQL*Net; remove boundary Markdown

@@ -1,9 +1,9 @@
 {
-	"base": "d25f1cb3e613572db3195dee9d6bd931b1af7d40",
-	"existingCaseCount": 179,
+	"base": "6fd2971",
+	"existingCaseCount": 189,
 	"changedExistingCases": [],
-	"scorerBeforeSha256": "f6028024c490b062b5e9e1a64b0ba38c19dca8c6b90851079e211c4ad949b8d1",
-	"scorerAfterSha256": "6dcf172c1cef41e5edd6d249dee08a6294489f7aaf433be6323aef272e27a14f",
+	"scorerBeforeSha256": "6dcf172c1cef41e5edd6d249dee08a6294489f7aaf433be6323aef272e27a14f",
+	"scorerAfterSha256": "5753f65dbf20b04a5727c766685aec469f60a9efb23e5d3460947d3eaf1b907d",
 	"roots": [
 		{
 			"root": "../eval-archive",
@@ -18,5 +18,6 @@
 			"unknownRecords": 0
 		}
 	],
-	"flips": []
+	"flips": [],
+	"checkDifferences": []
 }

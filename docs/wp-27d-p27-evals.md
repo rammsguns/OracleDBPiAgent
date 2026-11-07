@@ -96,3 +96,33 @@ The lab truth validator deliberately fails closed on missing/empty metadata;
 it does not convert a visibility gap to zero. No new product fixed queries or
 preflight/grant changes were introduced. Existing shared test totals will need
 the ordinary reconciliation if other WPs add hard cases concurrently.
+
+## Approved review follow-up: Minor-1
+
+Replaced the five trailing positional booleans in `rowMatches` with a typed
+`RowMatchOptions` object: `preserveQualified`, `p19`, `historySignature`, `p23`,
+and `p27`. The call site now names every option; destructuring retains each
+original `false` default. Matching expressions and branches are unchanged.
+
+Updated `docs/wp-27d-replay.ts` to compare against the approved pre-refactor
+commit `6fd2971`, including all 189 case definitions. It also compares the
+serialized complete scoring result (ordered check names and outcomes, plus
+pass status), rather than only detecting overall pass/fail flips.
+
+Verification for this follow-up:
+
+- `npx tsx docs/wp-27d-replay.ts`: exit 0. Scanned all 496 JSON files in
+  `../eval-archive` and 139 in `../needlefish/evals/results`. Replayed 14,343
+  matching records (11,157 + 3,186): **0 score flips, 0 serialized-result
+  differences**, and no changed existing cases. The same 113 archive records
+  without matching case definitions remain explicitly counted as unknown.
+  The updated [replay artifact](wp-27d-replay.json) records this pre-refactor
+  comparison and both scorer hashes; it supersedes the artifact from the
+  original branch-base comparison above.
+- `npm run typecheck`: exit 0, no diagnostics.
+- `npm test -- --maxWorkers=2`: exit 0; all 116 files and 2,158 tests passed
+  (78.32 s).
+- `git diff --check`: clean.
+
+Changed only `evals/scoring.ts`, the replay script/artifact, and this report.
+No contract changes, database calls, or LLM calls were needed for this refactor.
