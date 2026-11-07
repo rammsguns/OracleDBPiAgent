@@ -2,7 +2,7 @@
 
 `piagent check --target d1-19c-lab --json` runs sequential, read-only Oracle 19c collectors without an LLM. Use `--all-targets` instead of `--target` to check all configured owner-approved targets. Agents verify only the two packaged labs.
 
-Text output is a Markdown table. JSON has a versioned envelope: `version: 1`, `capturedAt` (UTC), aggregate `status`, and ordered `targets`. Each target has `target`, `status`, and `checks`. Each check has a stable `id`, `status`, numeric `value` (or null for UNKNOWN), `unit`, `threshold`, `scope`, `command`, and `note`. Named tablespaces produce `tablespace:NAME`, `undo:NAME` and `temp:NAME` IDs. Missing/inapplicable sections have an UNKNOWN placeholder. Raw SQL, binds, job messages, alert messages, account names and connection credentials are omitted.
+Text output is a Markdown table. JSON has a versioned envelope: `version: 1`, `capturedAt` (UTC), aggregate `status`, and ordered `targets`. Each target has `target`, `status`, and `checks`. Each check has a stable `id`, `status`, numeric `value` (or null for UNKNOWN/SKIPPED), rounded `display` string, `unit`, `threshold`, `scope`, `command`, and `note`. Named tablespaces produce `tablespace:NAME`, `undo:NAME` and `temp:NAME` IDs. Missing/inapplicable sections have an UNKNOWN placeholder. Raw SQL, binds, job messages, alert messages and connection credentials are omitted. The default-password note names at most ten validated usernames, followed by `+N more`; only simple Oracle identifiers of at most 128 characters are accepted. Percentages, days and hours display one decimal; seconds display as integers. JSON retains the original numeric measurement alongside `display`. CLI Markdown escapes pipes and backticks without HTML entities.
 
 Defaults (limits are inclusive):
 
@@ -25,9 +25,9 @@ Tablespaces and temp include autoextend headroom, respecting fixed allocations. 
 
 The default lookback is one hour. Failed runs and alerts use the configured lookback on every invocation, including the first. This is a rolling window, not a persisted cursor; schedule runs at or below the lookback interval to avoid gaps. Overlap intentionally repeats evidence. Counts are limited to visible retained history.
 
-Missing privileges (ORA-00942, ORA-01031, ORA-65040), timeouts, errors, incomplete row-capped results and inapplicable evidence yield UNKNOWN, never OK. A missing optional view used by a check also makes that check UNKNOWN. Scope labels distinguish this PDB, shared CDB metadata and non-CDB databases. PDB-empty backup and recovery metadata cannot establish absence. Live CDB/PDB behavior has not been verified on the non-CDB labs.
+By default, missing privileges (ORA-00942, ORA-01031, ORA-65040), timeouts, errors, incomplete row-capped results and inapplicable evidence yield UNKNOWN. Notes retain the view and Oracle code, or explain NOARCHIVELOG, PDB-hidden metadata, no configured recovery area (DB_RECOVERY_FILE_DEST unset), or no backups recorded in visible control-file history (external catalogs and aged-out records not checked). An explicit `unknownAs` policy can change the effective status, while retaining the UNKNOWN observation, null measurement and original reason. A missing optional view used by a check also makes that check UNKNOWN. Scope labels distinguish this PDB, shared CDB metadata and non-CDB databases. PDB-empty backup and recovery metadata cannot establish absence. Live CDB/PDB behavior has not been verified on the non-CDB labs.
 
-Exit codes are 0 OK, 1 WARN, 2 CRIT, 3 UNKNOWN. UNKNOWN takes precedence over CRIT, then WARN, so lost visibility cannot disappear behind a known finding. `--fail-on warn` uses these defaults. `--fail-on crit` maps WARN to 0 and preserves CRIT=2 and UNKNOWN=3. Usage and threshold configuration errors exit 2 with a `Usage/config error:` stderr message and no verdict JSON. Commander syntax errors also exit 2 with `error:` on stderr. A CRIT health result instead prints a normal verdict containing `status: "CRIT"`. Existing application configuration errors retain the CLI's exit 1 semantics. Output persistence errors retain exit 1 unless the output file fails the private-file validation (exit 2).
+Exit codes are 0 OK, 1 WARN, 2 CRIT, 3 UNKNOWN. Aggregation uses the monitoring-plugins `max_state_alt` order **OK < UNKNOWN < WARN < CRIT**, rather than numeric exit-code order. Any CRIT makes the overall result CRIT (exit 2); otherwise any WARN makes it WARN (exit 1); otherwise any UNKNOWN makes it UNKNOWN (exit 3); otherwise it is OK (exit 0). Apply this order within each target and across all targets. SKIPPED checks do not contribute. The header includes actual effective-status counts and selected target names, for example `# Check: CRIT — 1 CRIT, 1 WARN, 3 UNKNOWN, 10 OK (d1-19c-lab)`. `--fail-on warn` uses these defaults. `--fail-on crit` maps WARN to 0 and preserves CRIT=2 and UNKNOWN=3. Usage and threshold configuration errors exit 2 with a `Usage/config error:` stderr message and no verdict JSON. Commander syntax errors also exit 2 with `error:` on stderr. A CRIT health result instead prints a normal verdict containing `status: "CRIT"`. Existing application configuration errors retain the CLI's exit 1 semantics. Output persistence errors retain exit 1 unless the output file fails the private-file validation (exit 2).
 
 ## Private thresholds
 
@@ -48,7 +48,31 @@ Create `~/.piagent/check.json` (or `$PIAGENT_HOME/check.json`) as the current us
 }
 ```
 
-Known threshold keys are `space`, `recovery`, `blocking`, `backupAge`, `failedJobs`, `alertErrors`, `maintenance`, `expiry`, and `windowHours`. Pairs require exactly `warn` and `crit`; a pair override replaces the entire pair. All numeric thresholds must be finite, nonnegative, and no greater than 1000000 (percentages no greater than 100). WARN must be below CRIT, except expiry where CRIT must be below WARN. `alertErrors.crit` may be null (default: no count-based critical level; incidents remain critical). `windowHours` must be an integer from 1 through 720. Unknown keys and unconfigured target overrides are rejected. Per-target pairs override global pairs, which override built-ins. Threshold files contain no passwords or SQL.
+Known threshold keys are `space`, `recovery`, `blocking`, `backupAge`, `failedJobs`, `alertErrors`, `maintenance`, `expiry`, and `windowHours`; `disable` and `checks` configure monitoring policies. Pairs require exactly `warn` and `crit`; a pair override replaces the entire pair. All numeric thresholds must be finite, nonnegative, and no greater than 1000000 (percentages no greater than 100). WARN must be below CRIT, except expiry where CRIT must be below WARN. `alertErrors.crit` may be null (default: no count-based critical level; incidents remain critical). `windowHours` must be an integer from 1 through 720. Unknown keys and unconfigured target overrides are rejected. Per-target pairs override global pairs, which override built-ins. Threshold files contain no passwords or SQL.
+
+## Disabling checks and setting UNKNOWN policy
+
+Monitoring policies can be placed in `defaults` or a configured target override. Example for the packaged p1 lab, which has no recovery area, no retained backup history and uses NOARCHIVELOG:
+
+```json
+{
+  "version": 1,
+  "targets": {
+    "p1-19c-prod": {
+      "disable": ["backupAge", "archiveGaps"],
+      "checks": {
+        "recovery": { "unknownAs": "warn" }
+      }
+    }
+  }
+}
+```
+
+`disable` accepts unique names from `tablespaces`, `temp`, `undo`, `recovery`, `blocking`, `backupAge`, `archiveGaps`, `failedJobs`, `alertErrors`, `incidents`, `maintenance`, `expiry`, `defaultPasswords`. Use the configured target name (the coordinator's private target aliases may differ). The three space families disable all their named tablespaces. Disabled rows show `SKIPPED`, a null value and `display: "SKIPPED"`; they are excluded from aggregate status and header counts. An entirely disabled collector is not invoked. A partially disabled collector may still read its shared views for enabled checks.
+
+`checks.NAME.unknownAs` accepts exactly `ok`, `warn`, `crit`, or `unknown` (default). It only maps an UNKNOWN result; it never changes a measured WARN or CRIT. Mapped JSON retains `observedStatus: "UNKNOWN"`, `value: null`, `display: "UNKNOWN"` and the original reason, with an explicit policy note. Header counts and exit codes use the effective mapped status. A disabled check stays SKIPPED regardless of `unknownAs`.
+
+Per-target `disable` replaces the defaults list; an empty list enables the checks again. `checks` policies merge by check name, with target policy taking precedence. Unknown check names, duplicate disable names, extra policy keys and invalid mapping values are rejected with exit 2. An all-disabled run is OK with zero counted checks, and its table makes the skipped checks explicit.
 
 ## Trends and operational bounds
 
