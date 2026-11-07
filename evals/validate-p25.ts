@@ -53,7 +53,7 @@ export async function inspectP25(session: Pick<OracleSession, 'query' | 'identit
 		}
 	}
 	return {
-		scope: 'CDB-wide (shared by all PDBs)',
+		scope: isPdb ? 'CDB-wide (shared by all PDBs)' : 'Database-wide (non-CDB)',
 		container,
 		note: isPdb ? 'PDB visibility may hide control-file records; empty rows do not establish absence.' : 'Readable empty control-file history does not prove external backups absent or restoration impossible.',
 		views, records,
