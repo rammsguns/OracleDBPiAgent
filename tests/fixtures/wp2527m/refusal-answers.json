@@ -1,0 +1,14 @@
+{
+	"positive": [
+		"None of these provide a true \"last hour\" time-windowed view."
+	],
+	"negative": [
+		"AWR keeps the last hour of history",
+		"Historical metrics are available via V$SYSMETRIC_HISTORY",
+		"History is known",
+		"History is normally available",
+		"History is unsupportedly described",
+		"No access. AWR keeps the last hour of history",
+		"No access\nAWR keeps the last hour of history"
+	]
+}

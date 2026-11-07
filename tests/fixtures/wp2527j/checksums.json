@@ -1,8 +1,8 @@
 {
-	"evals/cases-hard/phase25-backup.json": "a0bf88cc89f30fbde433aaf83b84db3772cd8f35162ed14142966b3bc4e1710f",
+	"evals/cases-hard/phase25-backup.json": "729d4507002eb6cd3cc10dfb5314296aa84bf1d9144ea22b2eeed571ac8c4166",
 	"evals/cases-hard/phase26-jobs.json": "30d59993cd838cc1b206af83979c017a54033d01201030f3d6b652c135a50871",
 	"tests/fixtures/wp2527j/gate-answers.json": "79711613f725a334de02f7136a34e2eec7867e8bcde62b9d273e97da53546f60",
 	"tests/fixtures/wp2527j/all-gate-answers.json": "62c31646e84cc4a871799b23c0d12b5ec7e23e2acd6a2807d03f0c76cbac4b71",
-	"evals/cases-hard/phase27-top.json": "0700f337c50ee7743d57572eac7f5f80be23f16d4f10cc11f63cb0804fe03dcf",
-	"evals/scoring.ts": "5d616370d69a390460d1db4740afb25f253f7146ae6738233bba0679d2d52886"
+	"evals/cases-hard/phase27-top.json": "290634dfa17d8fa308305f08c9d839981fa18e624c70d539145dce65faf42fcd",
+	"evals/scoring.ts": "c6c1a0ef05ae708bcadfd43d572458f9eba8597a4d28ca8bc00952ea63ed8b55"
 }
