@@ -4320,6 +4320,113 @@ design.
   is low. The deterministic revision covers it, but it costs one extra
   request.
 
+## Phase 29: 1.5 follow-ups (approved 2026-11-07: "continue with next phases")
+
+### Goal
+Close the open follow-ups from phases 21–28 and the 1.5.0 gate. These are
+scorer false negatives, dead or flaky eval cases, one agent misread and
+small product gaps. Ship as 1.5.1. No new grants and no new features.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-29A scorer | `wp-29a-scorer` | Codex | `evals/scoring.ts`, scorer tests, replay doc |
+| WP-29B eval cases | `wp-29b-eval-cases` | Codex | `evals/cases-hard/*`, validators, case tests |
+| WP-29C config and preflight | `wp-29c-config-preflight` | Codex | `src/config/`, preflight test scanner, tests |
+| WP-29D space MAXBYTES | `wp-29d-space-maxbytes` | Codex | `src/space/`, the space tool output in `src/tools/`, tests |
+
+- **WP-29A:** fix three scorer false negatives.
+  - Numeric equivalence: 0.125 = 0.125000, thousands separators
+    (1,082 = 1082), and level labels ("1 (Critical)").
+  - The negation guard on single-value truth rows: a negation elsewhere
+    on the line must not reject a correct value. Example: p25 retention,
+    "`REDUNDANCY 1` … not a setting".
+  - Accept "No." as the direct answer to a question line in limitation
+    facts (p26 stats-autotask).
+  - A replay over all archives must show 0 unrelated flips, and every
+    flip must be justified. Wrong values must still fail.
+- **WP-29B:** repair the eval cases.
+  - `hard-p21-public-directory` and `hard-p25-grant-component-inventory`
+    are skipped every run because their truth is empty. Re-premise them
+    on stable, DB-discovered truth or replace them, keeping the
+    holdout's blindness rules.
+  - `hard-orders-plan` and the p19 cases pick up the agent's own cursors
+    and the triage cursors left in p1's shared pool. Make their truth
+    exclude piagent sessions' cursors, for example by MODULE or
+    PARSING_SCHEMA, and make them robust to nightly statistics times.
+  - The validators must pass on both labs.
+- **WP-29C:**
+  - **Secret-dir placeholder.** Check that the `init` placeholder in
+    `PIAGENT_SECRET_DIR` gives a specific message naming the
+    placeholder, as WP-21D does for the LLM key file. Add a smoke test.
+  - **Preflight test scanner.** Close its gaps: comma joins, quoted
+    identifiers, hints and interpolated names.
+- **WP-29D:** `hard-p24-p1-autoextend-max`: the agent misreads MAXBYTES.
+  Make the space tool output unambiguous, for example by labelling
+  autoextend off, MAXBYTES 0 and the 32 GB cap. This is an agent-path
+  change, so it is gated.
+
+### Gate
+- A/B over dev ×2, challenge ×2, holdout ×3, regression, MVP and p23–p27.
+- Both sides are scored with the same final cases and scorer.
+- All refusals must pass, and every miss is checked against its answer.
+
+## Phase 30: `piagent check`, threshold health check for monitoring (approved 2026-11-07: "continue with next phases")
+
+### Goal
+`piagent check --target T [--json] [--all-targets]` gives one fast,
+read-only, no-LLM health verdict that cron or Nagios/Icinga/Zabbix can
+run. It reuses the existing collectors, so it needs no new views or
+grants.
+
+| Check | Source (existing module) | Default WARN / CRIT |
+|---|---|---|
+| tablespace used % (autoextend-aware), temp, undo | space | 85 / 95 |
+| recovery area used %, reclaimable-aware | space/backup | 80 / 90 |
+| blocking chains: longest blocked wait | sessions | 60 s / 300 s |
+| last successful full or level-0 backup age; archived-log sequence gaps | backup | 26 h / 50 h; gap = CRIT |
+| failed scheduler jobs since the last check window | jobs | 1 / 3 |
+| alert-log ORA- errors and incidents in the window | alertlog | 1 / incident |
+| invalid objects and unusable indexes (non-Oracle-maintained owners) | jobs maintenance | 1 / 20 |
+| accounts expiring within N days; default passwords | security | 14 d / 3 d |
+
+- Each check returns OK, WARN, CRIT or UNKNOWN with its value, threshold,
+  scope label (CDB-wide or this PDB) and the `piagent` command to drill
+  in.
+- UNKNOWN covers a missing grant (ORA-00942, ORA-01031 or ORA-65040) and
+  NOARCHIVELOG where it applies. It is never shown as OK.
+- **Exit codes:** worst status, Nagios style: 0 OK, 1 WARN, 2 CRIT,
+  3 UNKNOWN. `--fail-on warn|crit` maps them for cron. Config and usage
+  errors keep their current codes.
+- **Thresholds** live in a private `~/.piagent/check.json`, validated as
+  strictly as `targets.json`: mode 0600, owner only, known keys,
+  per-target overrides and bounded numbers. Built-in defaults apply
+  without it.
+- **`--out DIR`** appends one JSON line per run, for trends. Every string
+  is credential-redacted.
+- **Web:** a Check tab runs the check on demand for one target or all
+  targets, with the same cancellation and size limits as Top.
+- **Agent:** a `health_check` tool lets `ask` "is my database healthy?"
+  use it. This changes the agent path, so it is gated.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-30A engine and CLI | `wp-30a-check` | Codex | `src/check/`, `check` command, thresholds config, docs/check.md, tests |
+| WP-30B web and agent tool | `wp-30b-check-web-agent` | Codex | Web Check tab, `health_check` tool and its guidance, tests (after 30A) |
+| WP-30C evals | `wp-30c-check-evals` | Codex | p30 cases with DB-derived truth and a validator (after 30A) |
+
+### Rules
+The phase 25–27 rules apply: real CDB/PDB labelling, degrading per view,
+writes stay impossible, preflight and grants-template coverage, and
+nothing printed from secrets. A check must never run longer than the
+statement timeout per probe, and probes run sequentially.
+
+### After phases 29 and 30
+Release 1.5.1 after the phase 29 gate. Release 1.6.0 after phase 30, with
+a full release gate and package smoke. Pushing and tagging either release
+needs the owner's go-ahead. Until then, merges stay on local master.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
