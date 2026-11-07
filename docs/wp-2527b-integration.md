@@ -175,3 +175,9 @@ Live CDB/PDB behavior, RAC, Data Guard, remote targets and media restore validat
 - `1b79939`: CLI cancellation regression coverage without model calls.
 
 No push, merge, rebase or PR was performed.
+
+## Authorized preflight follow-up
+
+With coordinator authorization, added only `V$DATABASE` to `FEATURE_VIEWS.drift` in `src/preflight/views.ts`. Confirmed the existing `GRANT SELECT ON SYS.V_$DATABASE TO &ro_user CONTAINER=CURRENT;` at `docs/grants-template-pdb.sql:101`; the template was unchanged. The p1 backup integration assertion was left untouched for its owning branch.
+
+Validation: `npm run typecheck` exits 0. `npx vitest run tests/unit/preflight-catalog.test.ts tests/unit/release-help.test.ts` exits 0: 2 files, 30 tests pass (26.99 s), including per-feature coverage and grant-template reconciliation. This resolves the previously reported drift catalog coverage failure; the broader catalog suggestions above remain coordinator follow-ups.
