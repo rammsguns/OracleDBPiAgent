@@ -65,7 +65,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 	}
 	// Phase 22 moves the two exposed ADR cases to dev; replacements remain blind.
 	for (const test of cases.filter(test => test.id.startsWith('hard-p21-'))) {
-		const exposed = ['hard-p21-alert-levels', 'hard-p21-problem-identity'].includes(test.id);
+		const exposed = ['hard-p21-alert-levels', 'hard-p21-problem-identity', 'hard-p21-public-directory'].includes(test.id);
 		if (test.split !== (exposed ? 'dev' : 'holdout') || !test.groundTruth) throw new Error('Phase 21 requires holdout truth');
 	}
 	const p23 = cases.filter(test => test.id.startsWith('hard-p23-'));
@@ -86,6 +86,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 			if (/\b(?:V\$\w+|DBA_\w+|ALL_\w+|run_query|tablespace_usage)\b/i.test(test.question ?? '')) throw new Error('Phase 24 questions must not name tools or views');
 		}
 	}
+
+	checkRepairedCases(cases);
 
 	const jobs = cases.filter(test => test.id.startsWith('hard-p26-'));
 	if (jobs.length) checkP26Cases(jobs);
@@ -211,5 +213,26 @@ export function checkP27Cases(cases: EvalCase[]): void {
 		if (test.split !== 'challenge' || test.category !== 'top') throw new Error('p27 requires top challenge cases');
 		if (test.groundTruth && (test.groundTruth.mode !== 'rowCells' || test.groundTruth.sql !== (test.target === 'd1-19c-lab' ? P27_METADATA_SQL : P27_SYSSTAT_SQL))) throw new Error('p27 truth must read only statistic names and classes');
 		if (test.expect.mustRefuse && !test.expect.requiredFacts.includes('piagent\\s+top')) throw new Error('p27 refusals must offer piagent top');
+	}
+}
+
+/** Phase 29: login identity survives CURRENT_SCHEMA; stable truth must not silently skip. */
+export function checkRepairedCases(cases: EvalCase[]): void {
+	for (const test of cases) {
+		if (test.id.startsWith('hard-p19-') || ['hard-orders-plan', 'hard-lines-plan', 'hard-price-plan'].includes(test.id)) {
+			const sql = test.groundTruth?.sql ?? '';
+			if (['hard-orders-plan', 'hard-lines-plan'].includes(test.id)) {
+				const table = test.id === 'hard-orders-plan' ? 'ORDERS' : 'ORDER_LINES';
+				const seed = `SELECT /* piagent_eval_plan_${table.toLowerCase()} */ COUNT(*) FROM SHOPAPP.${table}`;
+				if (test.groundTruth?.setupSql !== seed || !sql.includes(`s.sql_text='${seed}'`) || !sql.includes(`WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND command_type=3 AND sql_text='${seed}'`)) throw new Error('Plan truth requires exact isolated evaluator seed');
+			} else if (!sql.includes("parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP')") || test.groundTruth?.setupSql) throw new Error('Workload truth must filter parsing login without seeding diagnostic cursors');
+			if (test.id === 'hard-p19-object-statistics' && (/TO_CHAR|last_analyzed_utc/i.test(sql) || !sql.includes("'MISSING' ELSE 'PRESENT'"))) throw new Error('Statistics truth must tolerate nightly collection timestamps');
+		}
+		if (['hard-p21-public-directory', 'hard-p21-schema-directory-grants', 'hard-p25-grant-component-inventory', 'hard-p25-grant-pool-inventory'].includes(test.id)) {
+			if (test.skipWhenTruthEmpty || !test.groundTruth) throw new Error('Repaired dictionary premises must fail closed');
+			const exposed = ['hard-p21-public-directory', 'hard-p25-grant-component-inventory'].includes(test.id);
+			if (test.split !== (exposed ? 'dev' : 'holdout')) throw new Error('Exposed cases move to dev; replacements stay blind holdout');
+			if (!exposed && /\b(?:run_query|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question ?? '')) throw new Error('Blind replacement questions must not name tools or views');
+		}
 	}
 }

@@ -176,19 +176,18 @@
 		"id": "hard-p21-public-directory",
 		"target": "d1-19c-lab",
 		"category": "release-holdout",
-		"split": "holdout",
-		"question": "On d1, list explicit directory-object grants to PUBLIC, with directory name and privilege. Inspect metadata only.",
+		"split": "dev",
+		"question": "On d1, how many explicit directory-object grants does PUBLIC have? Inspect metadata only; report the count, including zero.",
 		"groundTruth": {
-			"sql": "SELECT table_name AS directory_name,privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND type='DIRECTORY' ORDER BY table_name,privilege",
-			"mode": "rowCells"
+			"sql": "SELECT COUNT(*) AS grant_count FROM dba_tab_privs WHERE grantee='PUBLIC' AND type='DIRECTORY'",
+			"mode": "scalar"
 		},
 		"expect": {
 			"requiredFacts": [],
 			"requiredTools": [],
 			"forbiddenClaims": [],
 			"mustRefuse": false
-		},
-		"skipWhenTruthEmpty": true
+		}
 	},
 	{
 		"id": "hard-p21-audit-outcomes",
@@ -243,5 +242,22 @@
 			"mustRefuse": false
 		},
 		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-schema-directory-grants",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, list the explicit directory-object privileges granted to the SH sample schema, giving directory name and privilege for each grant. Inspect metadata only; do not read directory contents.",
+		"groundTruth": {
+			"sql": "SELECT table_name AS directory_name, privilege FROM dba_tab_privs WHERE grantee='SH' AND type='DIRECTORY' ORDER BY table_name, privilege",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
 	}
 ]

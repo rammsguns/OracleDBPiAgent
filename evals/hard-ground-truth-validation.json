@@ -1,6 +1,6 @@
 {
-	"validatedAt": "2026-11-07T02:05:32.608Z",
-	"caseCount": 144,
+	"validatedAt": "2026-11-07T19:05:06.292Z",
+	"caseCount": 156,
 	"records": [
 		{
 			"id": "hard-region-channel",
@@ -166,7 +166,7 @@
 		{
 			"id": "hard-price-plan",
 			"target": "p1-19c-prod",
-			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
 			"mode": "allCells",
 			"rowCount": 2,
 			"rows": [
@@ -185,31 +185,21 @@
 		{
 			"id": "hard-orders-plan",
 			"target": "p1-19c-prod",
-			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND s.command_type=3 AND s.sql_text='SELECT /* piagent_eval_plan_orders */ COUNT(*) FROM SHOPAPP.ORDERS' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND command_type=3 AND sql_text='SELECT /* piagent_eval_plan_orders */ COUNT(*) FROM SHOPAPP.ORDERS' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
 			"mode": "allCells",
-			"rowCount": 3,
+			"rowCount": 1,
 			"rows": [
 				[
 					"INDEX",
 					"FAST FULL SCAN",
-					"ORDER_LINES_PK"
-				],
-				[
-					"INDEX",
-					"RANGE SCAN",
-					"ORDER_LINES_PK"
-				],
-				[
-					"TABLE ACCESS",
-					"FULL",
-					"ORDERS"
+					"SYS_C007661"
 				]
 			]
 		},
 		{
 			"id": "hard-lines-plan",
 			"target": "p1-19c-prod",
-			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND s.command_type=3 AND s.sql_text='SELECT /* piagent_eval_plan_order_lines */ COUNT(*) FROM SHOPAPP.ORDER_LINES' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND command_type=3 AND sql_text='SELECT /* piagent_eval_plan_order_lines */ COUNT(*) FROM SHOPAPP.ORDER_LINES' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
 			"mode": "allCells",
 			"rowCount": 1,
 			"rows": [
@@ -1360,7 +1350,7 @@
 		{
 			"id": "hard-p19-cursor-inventory",
 			"target": "p1-19c-prod",
-			"sql": "SELECT s.plan_hash_value AS plan_hash_value, COUNT(*) AS child_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.plan_hash_value ORDER BY s.plan_hash_value",
+			"sql": "SELECT s.plan_hash_value AS plan_hash_value, COUNT(*) AS child_count FROM v$sql s WHERE s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.plan_hash_value ORDER BY s.plan_hash_value",
 			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
@@ -1373,7 +1363,7 @@
 		{
 			"id": "hard-p19-object-statistics",
 			"target": "p1-19c-prod",
-			"sql": "SELECT DISTINCT t.owner AS owner, t.table_name AS object_name, NVL(t.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(t.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_tab_statistics t JOIN v$sql_plan p ON p.object_owner=t.owner AND p.object_name=t.table_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND t.object_type='TABLE' UNION SELECT DISTINCT i.owner AS owner, i.index_name AS object_name, NVL(i.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(i.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_ind_statistics i JOIN v$sql_plan p ON p.object_owner=i.owner AND p.object_name=i.index_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND i.object_type='INDEX' ORDER BY owner, object_name",
+			"sql": "SELECT DISTINCT t.owner AS owner, t.table_name AS object_name, NVL(t.stale_stats,'UNKNOWN') AS stale_stats, CASE WHEN t.last_analyzed IS NULL THEN 'MISSING' ELSE 'PRESENT' END AS statistics_presence FROM dba_tab_statistics t JOIN v$sql_plan p ON p.object_owner=t.owner AND p.object_name=t.table_name JOIN v$sql c ON c.sql_id=p.sql_id AND c.child_number=p.child_number AND c.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND t.object_type='TABLE' UNION SELECT DISTINCT i.owner AS owner, i.index_name AS object_name, NVL(i.stale_stats,'UNKNOWN') AS stale_stats, CASE WHEN i.last_analyzed IS NULL THEN 'MISSING' ELSE 'PRESENT' END AS statistics_presence FROM dba_ind_statistics i JOIN v$sql_plan p ON p.object_owner=i.owner AND p.object_name=i.index_name JOIN v$sql c ON c.sql_id=p.sql_id AND c.child_number=p.child_number AND c.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND i.object_type='INDEX' ORDER BY owner, object_name",
 			"mode": "rowCells",
 			"rowCount": 2,
 			"rows": [
@@ -1381,20 +1371,20 @@
 					"SHOPAPP",
 					"PRODUCTS",
 					"YES",
-					"2026-11-06T22:00:08Z"
+					"PRESENT"
 				],
 				[
 					"SHOPAPP",
 					"SYS_C007655",
 					"YES",
-					"2026-11-06T22:00:08Z"
+					"PRESENT"
 				]
 			]
 		},
 		{
 			"id": "hard-p19-bind-metadata",
 			"target": "p1-19c-prod",
-			"sql": "SELECT b.name AS bind_name, b.position AS position, b.datatype_string AS datatype, b.was_captured AS was_captured FROM v$sql_bind_capture b WHERE (b.sql_id,b.child_number) IN (SELECT s.sql_id,s.child_number FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) ORDER BY s.child_number FETCH FIRST 1 ROW ONLY) ORDER BY b.position",
+			"sql": "SELECT b.name AS bind_name, b.position AS position, b.datatype_string AS datatype, b.was_captured AS was_captured FROM v$sql_bind_capture b WHERE (b.sql_id,b.child_number) IN (SELECT s.sql_id,s.child_number FROM v$sql s WHERE s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) ORDER BY s.child_number FETCH FIRST 1 ROW ONLY) ORDER BY b.position",
 			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
@@ -1409,7 +1399,7 @@
 		{
 			"id": "hard-p19-plan-controls",
 			"target": "p1-19c-prod",
-			"sql": "SELECT s.sql_id AS sql_id, COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.sql_id",
+			"sql": "SELECT s.sql_id AS sql_id, COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP') AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.sql_id",
 			"mode": "rowCells",
 			"rowCount": 1,
 			"rows": [
@@ -2501,12 +2491,53 @@
 					"TIME_ID"
 				]
 			]
-		}
-	],
-	"skipped": [
+		},
 		{
 			"id": "hard-p21-public-directory",
-			"reason": "Empty truth permitted by skipWhenTruthEmpty"
+			"target": "d1-19c-lab",
+			"sql": "SELECT COUNT(*) AS grant_count FROM dba_tab_privs WHERE grantee='PUBLIC' AND type='DIRECTORY'",
+			"mode": "scalar",
+			"rowCount": 1,
+			"rows": [
+				[
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p21-schema-directory-grants",
+			"target": "d1-19c-lab",
+			"sql": "SELECT table_name AS directory_name, privilege FROM dba_tab_privs WHERE grantee='SH' AND type='DIRECTORY' ORDER BY table_name, privilege",
+			"mode": "rowCells",
+			"rowCount": 3,
+			"rows": [
+				[
+					"DATA_FILE_DIR",
+					"READ"
+				],
+				[
+					"LOG_FILE_DIR",
+					"READ"
+				],
+				[
+					"LOG_FILE_DIR",
+					"WRITE"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-grant-pool-inventory",
+			"target": "p1-19c-prod",
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGASTAT' view_name FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells",
+			"rowCount": 1,
+			"rows": [
+				[
+					"V$SGASTAT",
+					"unavailable"
+				]
+			]
 		}
-	]
+	],
+	"skipped": []
 }
