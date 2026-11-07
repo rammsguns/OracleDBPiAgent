@@ -1,3 +1,4 @@
+import { PACK_REFUSALS, PHASE27_GUIDANCE } from './fixtures/phase27-guidance.js';
 import { expect, it } from 'vitest';
 import { systemPrompt } from '../../src/agent/index.js';
 import { createDbTools } from '../../src/tools/index.js';
@@ -10,7 +11,7 @@ it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTa
 	const ctx = { config: loadConfig({}), pinnedTarget } as ToolContext;
 	const prompt = systemPrompt(ctx);
 	const tools = serialize(ctx);
-	expect(prompt.length - ADR_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
+	expect(prompt.length - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
 	const next = { ...ctx, config: loadConfig({}), runId: 'another-session' };
 	expect(systemPrompt(next)).toBe(prompt);
 	expect(serialize(next)).toBe(tools);
@@ -49,12 +50,12 @@ it('keeps every requested row and the requested output format with a small prefi
 	const rowAndFormatGuidance = "List every requested row without merging rows into ranges or \"N more\", and follow the requested output format exactly.";
 	const config = { ...loadConfig({}), targets: [], defaultTarget: "d1-19c-lab" };
 	const prompt = systemPrompt({ config } as ToolContext);
-	expect(prompt).toContain(`${baselineGuidance}\n${rowAndFormatGuidance}`);
+	expect(prompt.replace(PACK_REFUSALS, "")).toContain(`${baselineGuidance}\n${rowAndFormatGuidance}`);
 	// Pre-WP-11B system prompt with no target descriptions or appendix.
 	const baselinePromptChars = 1095;
 	// ~40 tokens at the existing conservative estimate of 3 characters per token.
-	expect(prompt.length - ADR_GUIDANCE.length - baselinePromptChars).toBeGreaterThan(0);
-	expect(prompt.length - ADR_GUIDANCE.length - baselinePromptChars).toBeLessThanOrEqual(40 * 3);
+	expect(prompt.length - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length - baselinePromptChars).toBeGreaterThan(0);
+	expect(prompt.length - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length - baselinePromptChars).toBeLessThanOrEqual(40 * 3);
 });
 
 // The historical saving budgets above exclude only this explicitly bounded addition.

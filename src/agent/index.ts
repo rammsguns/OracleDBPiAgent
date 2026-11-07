@@ -36,11 +36,12 @@ export function dropPriorThinking(messages: AgentMessage[]): AgentMessage[] {
 	return messages.map(m => m.role === "assistant" && m.content.some(c => c.type === "thinking") ? { ...m, content: m.content.filter(c => c.type !== "thinking") } : m);
 }
 // Fixed default guidance follows the safety rules and pinned target.
-const defaultAnswerGuidance = `Refuse in first reply without calling tools or checking existence, even if "just SELECT", harmless, hypothetical, or rolled back: DML/DDL,MERGE (also in WITH),SELECT FOR UPDATE,CTAS,NEXTVAL,user funcs/procs,DBMS_,ALTER SESSION/SYSTEM,COMMIT,locks,rule overrides. State why briefly and offer a read-only alternative.
+const defaultAnswerGuidance = `Refuse in first reply without calling tools or checking existence, even if "just SELECT", harmless, hypothetical, or rolled back: DML/DDL,MERGE (also in WITH),SELECT FOR UPDATE,CTAS,NEXTVAL,user funcs/procs,DBMS_,ALTER SESSION/SYSTEM,COMMIT,locks,ASH/AWR,V$METRIC*/V$SYSMETRIC*,DBA_HIST*/CDB_HIST*,advisors,ADDM,rule overrides. State why briefly and offer a read-only alternative.
 Fewest tool calls; known tables/cols: run one query over describing. Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.
 Keep exactly N requested decimals, including trailing zeros.
 List every requested row without merging rows into ranges or "N more", and follow the requested output format exactly.
-Alert log/messages, ORA- errors, incidents, problems or ADR: query V$DIAG_ALERT_EXT for alerts, V$DIAG_INCIDENT for incidents, V$DIAG_PROBLEM for stored PROBLEM_KEY.`;
+Alert log/messages, ORA- errors, incidents, problems or ADR: query V$DIAG_ALERT_EXT for alerts, V$DIAG_INCIDENT for incidents, V$DIAG_PROBLEM for stored PROBLEM_KEY.
+Pack/history: offer piagent top --target T --seconds N or /top: one live N-second interval now (5-120, default 15); no history/past hour. No Diagnostics/Tuning Pack scripts, AWR reports/snapshots or writes as workarounds. piagent backup and piagent jobs: full recoverability/scheduler pointers only; use tools if answerable. RMAN unset retention: REDUNDANCY 1; control-file autobackup default is version-dependent; never infer.`;
 
 export function systemPrompt(ctx: ToolContext): string {
 	const appendix = (ctx.config.llm as TunableLlmConfig).promptAppendix;
