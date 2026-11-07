@@ -6,9 +6,14 @@ Run `piagent backup --target d1-19c-lab` or add `--json` for the complete struct
 
 Each current datafile is matched by file number and creation SCN. Backup sets must have all expected pieces available and not deleted; backup datafile records must belong to the current resetlogs incarnation. Full backups include nonincremental fulls and level 0. Last incremental times are inventory facts, not proof of a valid incremental chain. Image copies and external recovery catalogs are outside this reader, so an absence refers only to the queried control-file history.
 
-Findings cover no full/level 0 in seven days (per file), sequence gaps after the oldest full checkpoint, explicit control-file autobackup OFF, recorded block corruption, files needing recovery and no backups recorded. When access is unavailable, the high finding says “not verifiable from this database.” An omitted configuration row does not assert OFF: effective defaults depend on database configuration. RMAN configuration, including explicit retention settings, and job outcomes are included as evidence without inventing defaults.
+Findings cover no full/level 0 in seven days (one grouped finding listing the affected file numbers), sequence gaps after the oldest full checkpoint, explicit control-file autobackup OFF, recorded block corruption, files needing recovery and no backups recorded. When core backup inventory or RMAN job history is unreadable or capped, the high finding says “not verifiable from this database.” An omitted configuration row does not assert OFF: effective defaults depend on database configuration. RMAN configuration, including explicit retention settings, and job outcomes are included as evidence without inventing defaults.
 
 Archive duplicates are deduplicated by incarnation, thread and sequence. Log history supplies expected sequences even when an archived log is missing at the ends. Deleted/unavailable archived logs cannot fill a gap. A candidate restore interval requires complete readable evidence, full backups for every visible datafile, ARCHIVELOG mode, no gaps/corruption/recovery rows, and continuous SCN coverage from the oldest backup checkpoint for every visible history thread. The latest full completion bounds the start; the earliest continuous archived-log end across threads bounds the end. A requested time X outside these bounds is not established. PDB snapshots never receive a positive candidate because whole-CDB completeness cannot be established. No candidate is a recovery guarantee: backup media, encryption keys, external catalogs, online redo and actual restore duration remain unverified. Empty gap lists without a full baseline do not mean gap-free recovery.
+
+The Markdown restore estimate uses prose with a status, From/Through bounds,
+evidence IDs and limitations; JSON retains the structured estimate. In
+NOARCHIVELOG mode, point-in-time recovery is not possible: only consistent
+(cold/mounted) backups can be restored, and no candidate interval is issued.
 
 FRA balance reports allocation, used, reclaimable, nonreclaimable and remaining capacity after potential reclaim. Reclaimable space is not free space and no deletion is requested.
 
@@ -18,6 +23,14 @@ For a human DBA: use RMAN's SHOW ALL and LIST BACKUP SUMMARY to compare the conf
 
 For a human DBA: design and validate the intended point-in-time restore in an approved recovery environment, checking every datafile, redo thread, control file, encryption key and backup medium. The application executes none of these operations.
 
-The proposed p1 SELECT-only grants are in `grants-request-2026-11-06-backup.sql`. They have not been applied. WP-25D must re-premise the affected eval cases before the coordinator considers grants.
+The owner approved “Apply all” and the 13 p1 SELECT grants in
+[the backup request](grants-request-2026-11-06-backup.sql) were applied on
+2026-11-06 after WP-25D re-premised the affected evals. The request file retains
+its original proposed-grant header; it is historical DBA material, not setup.
+Preflight exposes the `backup` feature group. The full reader is also available
+through `report --target T --sections backup`; `drift --scope backup` compares
+explicit RMAN configuration only. Saved report history tracks finding count,
+archive-gap count and oldest full-backup age when evidence is complete. Backup-related triage issues reuse this evidence,
+and the web Backup tab shows the restore estimate and backup/archive timeline.
 
 Oracle 19c references: [V$RMAN_CONFIGURATION](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-RMAN_CONFIGURATION.html), [RMAN configuration and defaults](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/configuring-rman-client-basic.html), [backup concepts](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/rman-backup-concepts.html). Live PDB, RAC and media recovery behaviour remain unverified; the labs are non-CDBs.

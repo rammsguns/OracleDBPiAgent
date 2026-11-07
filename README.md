@@ -36,7 +36,7 @@ See [install details](docs/install.md) for permissions, defaults and overrides.
 
 For an owner-approved Oracle 19c PDB, follow the [real-target setup guide](docs/real-targets.md):
 DBA-local account and reviewed grants, private targets/password files, preflight,
-then deterministic commands and ask. This needs the merged phase 28 build;
+then deterministic commands and ask. Private targets are supported since 1.4.0;
 live PDB behaviour is unverified. The lab workflow below remains available.
 
 Use Node 24 and npm. Have the two approved Oracle 19c targets in
@@ -98,11 +98,14 @@ private `.env`. See the [documentation index](docs/README.md).
 | `piagent ask "question" --target d1-19c-lab --json` | One agent question; target and JSON are optional. Uses the LLM. |
 | `piagent chat --target d1-19c-lab` | Interactive agent conversation; optional target. Uses the LLM. |
 | `piagent web --port 8765` | Loopback web server; port is optional. |
+| `piagent backup --target T [--json]` | Read-only backup and recoverability metadata; no RMAN execution or LLM. See [backup](docs/backup.md). |
+| `piagent jobs --target T [--since <duration>] [--owner <owner>] [--failed-only] [--json]` | Scheduler jobs, failures and maintenance debt; default history 24h, maximum 30d. No LLM. See [jobs](docs/jobs.md). |
+| `piagent top --target T [--seconds N] [--json]` | Two-snapshot SQL and load deltas; default 15 seconds, range 5–120. No ASH or LLM. See [top](docs/top.md). |
 | `piagent report --target d1-19c-lab` | Fourteen fixed checks; `--md` (default), `--json`, `--sections`, `--owner`, `--out`, `--diff`, `--diff-only`, optional LLM `--summarize`. |
 | `piagent report history --target d1-19c-lab --last 10 --json` | Saved-file trends; last 1–30 (default 30), optional JSON. No DB/LLM. |
 | `piagent report schedule --target d1-19c-lab --every 1h` | Print setup, systemd service/timer and alternative cron line; optional `--out`. No installation or DB/LLM. |
 | `piagent report schedule run --target d1-19c-lab` | Run the scheduled read-only report; optional absolute `--home` and `--out`. |
-| `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`, `security`; optional JSON and `--out`. No LLM. |
+| `piagent drift --left d1-19c-lab --right p1-19c-prod --scope schema:HR --json` | Compare visible metadata; scopes `parameters`, `schema:OWNER`, `objects:OWNER`, `security`, `space`, `backup`; optional JSON and `--out`. No LLM. |
 | `piagent plsql list --target p1-19c-prod --owner SHOPAPP` | List PL/SQL objects with status, line count and last DDL time; optional `--json`. No LLM. See [PL/SQL docs](docs/plsql.md). |
 | `piagent plsql doc --target p1-19c-prod --object SHOPAPP.WORKLOAD` | Document a package, procedure or trigger: signatures, tables read and written, callers, jobs, errors, source and a Mermaid graph; `--json`, `--out`. No LLM. |
 | `piagent triage --target p1-19c-prod --issue "NIGHTLY_PURGE_JOB failed"` | Turn an issue report into read-only evidence: ranked hypotheses, debug SQL checklist, trace diagram and suggested fixes; `--issue-file`, `--since 24h`, `--json`, `--out`, optional LLM `--summarize`. With no issue, scans recent failures. See [triage](docs/triage.md). |
@@ -131,6 +134,15 @@ text even with `--json`; omit it for a single JSON value. Summary numbers are
 checked against the report and unsupported values appear as Unverified, with no
 correction call. See [report details](docs/report.md).
 
+`report --target T --sections backup,jobs` opts into the full recoverability and
+maintenance readers. `drift --left L --right R --scope backup` compares explicit
+RMAN configuration only, including retention and autobackup settings; it does not
+compare backup history or establish recoverability. Triage routes backup failures,
+recoverability and RMAN/ORA-19* issues to backup evidence, scheduler-job failures
+to job/run/error evidence, and “slow right now” issues to a 15-second sample with
+the leading elapsed-time SQL passed to SQL insight. Chat `/top` runs the sampler
+directly without a model turn; see [top](docs/top.md) for its interval option.
+
 The default grounding check compares hard facts with tool evidence, accepting
 rounding and unit conversions. Only unsupported numbers with four or more
 significant digits can trigger one correction turn; identifiers are flagged only.
@@ -152,7 +164,10 @@ sparklines and worsening flags. The CLI selects security reports with
 metadata without an LLM; the CLI also supports `drift --scope security`. The PL/SQL tab documents an object with an SVG
 dependency graph, the SQL tab drills into one cached statement with a plan tree,
 the Security tab shows posture findings by severity with a who-can privilege graph,
-the Alert Log tab lists folded alert-log entries and ADR
+the Backup tab shows recoverability and backup/archive timeline evidence, the Jobs tab
+shows run timelines and maintenance debt, and the Top tab samples live deltas on
+request with a progress state and no automatic polling. See [backup](docs/backup.md),
+[jobs](docs/jobs.md) and [top](docs/top.md). The Alert Log tab lists folded alert-log entries and ADR
 incidents with decoded status names, and the Triage panel turns a pasted issue into evidence, including
 correlated alert-log entries and SQL performance evidence, and a debug checklist. The UI follows the system
 light or dark theme. In chat, `/triage [--since 7d] <issue>` runs triage, then asks the
