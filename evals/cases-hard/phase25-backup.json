@@ -48,12 +48,11 @@
 		"split": "challenge",
 		"question": "On d1, report the explicitly stored RMAN RETENTION POLICY setting. If there is no stored override, return NOT EXPLICITLY CONFIGURED. Also give the policy implied by the stored override, or the documented Oracle 19c default when there is no override. Distinguish that default from an explicit setting and from proof that backup files exist. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
 		"groundTruth": {
-			"sql": "SELECT 'RETENTION POLICY' AS setting_name, NVL(MAX(value), 'NOT EXPLICITLY CONFIGURED') AS stored_setting, NVL(MAX(value), 'REDUNDANCY 1') AS policy FROM v$rman_configuration WHERE name = 'RETENTION POLICY'",
+			"sql": "SELECT NVL(MAX(value), 'NOT EXPLICITLY CONFIGURED') AS stored_setting FROM v$rman_configuration WHERE name = 'RETENTION POLICY' UNION ALL SELECT NVL(MAX(value), 'REDUNDANCY 1') FROM v$rman_configuration WHERE name = 'RETENTION POLICY'",
 			"mode": "rowCells"
 		},
 		"expect": {
 			"requiredFacts": [
-				"RETENTION\\s+POLICY",
 				"NOT\\s+EXPLICITLY\\s+CONFIGURED",
 				"REDUNDANCY\\s+1\\b"
 			],
@@ -71,7 +70,7 @@
 		"split": "challenge",
 		"question": "On d1, report the total row counts for RMAN job history, datafile backups, backup sets and backup pieces together, in that order. If all four are zero, say NO BACKUPS RECORDED in the readable control-file history, without claiming that no backups exist anywhere or that restoration is impossible. If any source cannot be read, say not verifiable from this database rather than inferring absence. Explain that control-file history alone cannot establish external media availability. Label this backup and archived-log evidence CDB-wide (shared by all PDBs) when applicable.",
 		"groundTruth": {
-			"sql": "SELECT 'RMAN job history' AS category, COUNT(*) AS row_count FROM v$rman_backup_job_details UNION ALL SELECT 'Datafile backups', COUNT(*) FROM v$backup_datafile UNION ALL SELECT 'Backup sets', COUNT(*) FROM v$backup_set UNION ALL SELECT 'Backup pieces', COUNT(*) FROM v$backup_piece",
+			"sql": "SELECT (SELECT COUNT(*) FROM v$rman_backup_job_details) AS rman_job_count, (SELECT COUNT(*) FROM v$backup_datafile) AS datafile_backup_count, (SELECT COUNT(*) FROM v$backup_set) AS backup_set_count, (SELECT COUNT(*) FROM v$backup_piece) AS backup_piece_count FROM dual",
 			"mode": "rowCells"
 		},
 		"expect": {

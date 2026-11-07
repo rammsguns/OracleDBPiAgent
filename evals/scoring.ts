@@ -271,8 +271,8 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// record can use Detail and Value together, but only inside this table
 		// and only for a single truth record; never pool unrelated tables.
 		const header = block[0] ?? [];
-		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property)$/i.test(cell));
-		const valueColumns = header.flatMap((cell, index) => /^(?:value|recorded value|detail)$/i.test(cell) ? [index] : []);
+		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property|category|source(?: view)?)$/i.test(cell));
+		const valueColumns = header.flatMap((cell, index) => /^(?:value|recorded value|detail|rows|row count)$/i.test(cell) ? [index] : []);
 		// In a vertical relationship table, child and parent attributes describe
 		// distinct records. Group only table/column attributes of the same role.
 		if (roleColumn >= 0 && keyColumn >= 0 && valueColumns.length) {

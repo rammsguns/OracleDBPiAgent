@@ -1,6 +1,6 @@
 {
 	"target": "d1-19c-lab",
-	"validatedAt": "2026-11-07T03:17:04.485Z",
+	"validatedAt": "2026-11-07T04:01:43.986Z",
 	"scope": "Database-wide (non-CDB)",
 	"container": {
 		"id": 0,
@@ -74,8 +74,9 @@
 			"status": "readable",
 			"rows": [
 				[
-					"RETENTION POLICY",
-					"NOT EXPLICITLY CONFIGURED",
+					"NOT EXPLICITLY CONFIGURED"
+				],
+				[
 					"REDUNDANCY 1"
 				]
 			]
@@ -85,19 +86,9 @@
 			"status": "readable",
 			"rows": [
 				[
-					"RMAN job history",
-					0
-				],
-				[
-					"Datafile backups",
-					0
-				],
-				[
-					"Backup sets",
-					0
-				],
-				[
-					"Backup pieces",
+					0,
+					0,
+					0,
 					0
 				]
 			]

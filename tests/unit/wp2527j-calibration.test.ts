@@ -7,7 +7,7 @@ import { checkNoBackupsPremise } from '../../evals/validate-p25.js';
 import type { AskResult } from '../../evals/types.js';
 
 const archived = JSON.parse(readFileSync('tests/fixtures/wp2527j/gate-answers.json', 'utf8')) as AskResult[] & { id: string }[];
-const counts = [['RMAN job history', 0], ['Datafile backups', 0], ['Backup sets', 0], ['Backup pieces', 0]];
+const counts = [[0, 0, 0, 0]];
 
 it('passes the two exact gate answers and rejects wrong or missing discovered facts', async () => {
 	const cases = await loadHardCases();
@@ -42,10 +42,10 @@ it('passes the two exact gate answers and rejects wrong or missing discovered fa
 it('fails closed when the fixed no-backups premise changes or a source is missing', () => {
 	expect(() => checkNoBackupsPremise('hard-p25-d1-no-backups-recorded', counts)).not.toThrow();
 	for (let i = 0; i < 4; i++) {
-		const wrong = structuredClone(counts); wrong[i]![1] = 1;
+		const wrong = structuredClone(counts); wrong[0]![i] = 1;
 		expect(() => checkNoBackupsPremise('hard-p25-d1-no-backups-recorded', wrong)).toThrow('fixture changed');
 	}
-	expect(() => checkNoBackupsPremise('hard-p25-d1-no-backups-recorded', counts.slice(1))).toThrow('fixture changed');
+	expect(() => checkNoBackupsPremise('hard-p25-d1-no-backups-recorded', [[0, 0, 0]])).toThrow('fixture changed');
 });
 
 it('pins the calibrated definitions and the exact archived answer fixture', () => {

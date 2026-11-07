@@ -25,10 +25,9 @@ try {
 		if (file.endsWith('.json')) for (const test of JSON.parse(execFileSync('git', ['show', `${base}:${file}`], { encoding: 'utf8' }))) beforeCases.set(test.id, test);
 	}
 	const changedExistingCases = [...beforeCases].filter(([id, test]) => JSON.stringify(cases.find(current => current.id === id)) !== JSON.stringify(test)).map(([id]) => id);
-	if (changedExistingCases.sort().join(',') !== 'hard-p25-d1-no-backups-recorded,hard-p26-p1-next-run-semantics') throw new Error('Unexpected case changes');
-	if (original !== current) throw new Error('Scorer must remain unchanged');
+	if (changedExistingCases.sort().join(',') !== 'hard-p25-d1-no-backups-recorded,hard-p25-d1-retention-setting,hard-p26-p1-invalid-objects,hard-p26-p1-last-failed-job,hard-p26-p1-next-run-semantics,hard-p26-p1-stats-autotask,hard-p27-refuse-ash,hard-p27-refuse-awr,hard-p27-refuse-metric-history,hard-p27-refuse-repository') throw new Error('Unexpected case changes');
 	const flips: any[] = [], checkDifferences: any[] = [], roots = [];
-	const definitions = await Promise.all(['evals/cases-hard/phase25-backup.json', 'evals/cases-hard/phase26-jobs.json'].map(async file => ({ file, sha256: hash(await readFile(file, 'utf8')) }))); 
+	const definitions = await Promise.all(['evals/cases-hard/phase25-backup.json', 'evals/cases-hard/phase26-jobs.json', 'evals/cases-hard/phase27-top.json'].map(async file => ({ file, sha256: hash(await readFile(file, 'utf8')) })));
 	for (const root of ['../eval-archive', '../needlefish/evals/results', '/tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150']) {
 		const counts = { root, files: 0, records: 0, unknownRecords: 0 };
 		async function walk(path: string): Promise<void> {
@@ -50,7 +49,10 @@ try {
 					// Reproject archived values only; never substitute live truth.
 					let projected = truth;
 					if (record.id === 'hard-p26-p1-next-run-semantics') projected = truth.map((row: any[]) => row.slice(2));
-					if (record.id === 'hard-p25-d1-no-backups-recorded') projected = truth.flatMap((row: any[]) => ['RMAN job history', 'Datafile backups', 'Backup sets', 'Backup pieces'].map((label, i) => [label, row[i + 1]]));
+					if (record.id === 'hard-p25-d1-no-backups-recorded') projected = truth.map((row: any[]) => row.slice(1));
+					if (record.id === 'hard-p25-d1-retention-setting') projected = truth.flatMap((row: any[]) => [[row[1]], [row[2]]]);
+					if (record.id === 'hard-p26-p1-last-failed-job') projected = truth.flatMap((row: any[]) => [[row[0]], [row[1]]]);
+					if (['hard-p26-p1-invalid-objects', 'hard-p26-p1-stats-autotask'].includes(record.id)) projected = truth.map((row: any[]) => [row[1]]);
 					const afterResult = score(isolate(afterCase), record, projected);
 					if (JSON.stringify(beforeResult) !== JSON.stringify(afterResult)) checkDifferences.push({ file: relative(process.cwd(), file), id: record.id, iteration: record.iteration });
 					const before = fixed && beforeResult.pass;

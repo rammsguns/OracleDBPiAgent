@@ -56,12 +56,12 @@ it('refuses root before probing views or running truth SQL', async () => {
 it('fails loudly when the p1 error fixture changes, including absent history', async () => {
 	const tests = await cases();
 	const id = 'hard-p26-p1-last-failed-job';
-	expect(() => checkP26Cases(tests, { id, target: 'p1-19c-prod', rows: [['NIGHTLY_PURGE_JOB', 'ORA-02292']] })).not.toThrow();
-	for (const rows of [[['NIGHTLY_PURGE_JOB', 'ORA-01403']], [['NONE RECORDED', 'NO ERROR RECORDED']], []]) {
+	expect(() => checkP26Cases(tests, { id, target: 'p1-19c-prod', rows: [['NIGHTLY_PURGE_JOB'], ['ORA-02292']] })).not.toThrow();
+	for (const rows of [[['NIGHTLY_PURGE_JOB'], ['ORA-01403']], [['NONE RECORDED'], ['NO ERROR RECORDED']], []]) {
 		expect(() => checkP26Cases(tests, { id, target: 'p1-19c-prod', rows })).toThrow('expected ORA-02292');
 	}
 	// d1 is an empty-branch smoke, not the p1 fixture.
-	expect(() => checkP26Cases(tests, { id, target: 'd1-19c-lab', rows: [['NONE RECORDED', 'NO ERROR RECORDED']] })).not.toThrow();
+	expect(() => checkP26Cases(tests, { id, target: 'd1-19c-lab', rows: [['NONE RECORDED'], ['NO ERROR RECORDED']] })).not.toThrow();
 	const session = fake();
 	Object.assign(session.identity, { target: 'p1-19c-prod' });
 	await expect(inspectP26(session, tests)).rejects.toThrow('expected ORA-02292');

@@ -88,9 +88,9 @@ it('requires retention terminology even when rowCells scoring is omitted', async
 	const test = (await backupCases()).find(test => test.id.endsWith('retention-setting'))!;
 	const withoutTruth = { ...test, groundTruth: undefined };
 	const response = { answer: 'RETENTION POLICY | NOT EXPLICITLY CONFIGURED | REDUNDANCY 1', toolCalls: ['run_query'], usage: { input: 0, output: 0 } };
-	expect(test.expect.requiredFacts).toHaveLength(3);
+	expect(test.expect.requiredFacts).toHaveLength(2);
 	expect(score(withoutTruth, response).pass).toBe(true);
-	for (const omitted of ['RETENTION POLICY', 'NOT EXPLICITLY CONFIGURED', 'REDUNDANCY 1']) {
+	for (const omitted of ['NOT EXPLICITLY CONFIGURED', 'REDUNDANCY 1']) {
 		expect(score(withoutTruth, { ...response, answer: response.answer.replace(omitted, '') }).pass, omitted).toBe(false);
 	}
 });

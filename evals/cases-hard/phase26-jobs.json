@@ -6,7 +6,7 @@
 		"split": "challenge",
 		"question": "On p1, identify SHOPAPP's most recent failed scheduler job in retained history and give its Oracle error code and meaning. Do not include free-form error text or data values. If none is visible, say NONE RECORDED; do not infer that no job ever failed.",
 		"groundTruth": {
-			"sql": "SELECT NVL(MAX(job_name) KEEP (DENSE_RANK LAST ORDER BY log_date, log_id), 'NONE RECORDED') AS job_name, CASE WHEN COUNT(*) = 0 THEN 'NO ERROR RECORDED' ELSE 'ORA-' || LPAD(TO_CHAR(MAX(error#) KEEP (DENSE_RANK LAST ORDER BY log_date, log_id)), 5, '0') END AS error_code FROM dba_scheduler_job_run_details WHERE owner = 'SHOPAPP' AND status = 'FAILED'",
+			"sql": "SELECT NVL(MAX(job_name) KEEP (DENSE_RANK LAST ORDER BY log_date, log_id), 'NONE RECORDED') AS discovered_fact FROM dba_scheduler_job_run_details WHERE owner = 'SHOPAPP' AND status = 'FAILED' UNION ALL SELECT CASE WHEN COUNT(*) = 0 THEN 'NO ERROR RECORDED' ELSE 'ORA-' || LPAD(TO_CHAR(MAX(error#) KEEP (DENSE_RANK LAST ORDER BY log_date, log_id)), 5, '0') END FROM dba_scheduler_job_run_details WHERE owner = 'SHOPAPP' AND status = 'FAILED'",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -27,7 +27,7 @@
 		"split": "challenge",
 		"question": "On p1, how many currently visible objects owned by SHOPAPP are invalid? Count objects, not source errors or index partitions; do not treat missing access as zero.",
 		"groundTruth": {
-			"sql": "SELECT 'SHOPAPP' AS owner, COUNT(*) AS invalid_objects FROM dba_objects WHERE owner = 'SHOPAPP' AND status = 'INVALID'",
+			"sql": "SELECT COUNT(*) AS invalid_objects FROM dba_objects WHERE owner = 'SHOPAPP' AND status = 'INVALID'",
 			"mode": "rowCells"
 		},
 		"expect": {
@@ -46,7 +46,7 @@
 		"split": "challenge",
 		"question": "On p1, is the automatic optimizer statistics collection client enabled? Report its current client status. Explain whether this alone guarantees that a statistics collection run succeeded.",
 		"groundTruth": {
-			"sql": "SELECT client_name, status FROM dba_autotask_client WHERE client_name = 'auto optimizer stats collection'",
+			"sql": "SELECT status FROM dba_autotask_client WHERE client_name = 'auto optimizer stats collection'",
 			"mode": "rowCells"
 		},
 		"expect": {

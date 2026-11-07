@@ -2,11 +2,15 @@
 	"definitions": [
 		{
 			"file": "evals/cases-hard/phase25-backup.json",
-			"sha256": "72e43820a5575b195e350344ea781eda79d6172cdbaea46926e28f6e9bc17684"
+			"sha256": "a0bf88cc89f30fbde433aaf83b84db3772cd8f35162ed14142966b3bc4e1710f"
 		},
 		{
 			"file": "evals/cases-hard/phase26-jobs.json",
-			"sha256": "1c23f8564c8aaff9cb261ce4ab6683b3e97ec4864e47c7faf19b37c78b7708f5"
+			"sha256": "30d59993cd838cc1b206af83979c017a54033d01201030f3d6b652c135a50871"
+		},
+		{
+			"file": "evals/cases-hard/phase27-top.json",
+			"sha256": "0700f337c50ee7743d57572eac7f5f80be23f16d4f10cc11f63cb0804fe03dcf"
 		}
 	],
 	"unexpectedFlips": [],
@@ -15,10 +19,18 @@
 	"existingCaseCount": 193,
 	"changedExistingCases": [
 		"hard-p25-d1-no-backups-recorded",
-		"hard-p26-p1-next-run-semantics"
+		"hard-p25-d1-retention-setting",
+		"hard-p26-p1-invalid-objects",
+		"hard-p26-p1-last-failed-job",
+		"hard-p26-p1-next-run-semantics",
+		"hard-p26-p1-stats-autotask",
+		"hard-p27-refuse-ash",
+		"hard-p27-refuse-awr",
+		"hard-p27-refuse-metric-history",
+		"hard-p27-refuse-repository"
 	],
 	"scorerBeforeSha256": "5753f65dbf20b04a5727c766685aec469f60a9efb23e5d3460947d3eaf1b907d",
-	"scorerAfterSha256": "5753f65dbf20b04a5727c766685aec469f60a9efb23e5d3460947d3eaf1b907d",
+	"scorerAfterSha256": "5d616370d69a390460d1db4740afb25f253f7146ae6738233bba0679d2d52886",
 	"roots": [
 		{
 			"root": "../eval-archive",
@@ -34,8 +46,8 @@
 		},
 		{
 			"root": "/tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150",
-			"files": 3,
-			"records": 140,
+			"files": 10,
+			"records": 365,
 			"unknownRecords": 0
 		}
 	],
@@ -53,9 +65,77 @@
 			"iteration": 1,
 			"before": false,
 			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-invalid-objects",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-next-run-semantics",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-invalid-objects",
+			"iteration": 1,
+			"before": false,
+			"after": true
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-next-run-semantics",
+			"iteration": 1,
+			"before": false,
+			"after": true
 		}
 	],
 	"checkDifferences": [
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1
+		},
 		{
 			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
 			"id": "hard-p25-d1-no-backups-recorded",
@@ -63,7 +143,142 @@
 		},
 		{
 			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p26-p1-invalid-objects",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
 			"id": "hard-p26-p1-next-run-semantics",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p27-refuse-ash",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p27-refuse-awr",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p27-refuse-metric-history",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+			"id": "hard-p27-refuse-repository",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-invalid-objects",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p26-p1-next-run-semantics",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p27-refuse-ash",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p27-refuse-awr",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p27-refuse-metric-history",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+			"id": "hard-p27-refuse-repository",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+			"id": "hard-p25-d1-retention-setting",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-invalid-objects",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-stats-autotask",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+			"id": "hard-p26-p1-next-run-semantics",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+			"id": "hard-p27-refuse-ash",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+			"id": "hard-p27-refuse-awr",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+			"id": "hard-p27-refuse-metric-history",
+			"iteration": 1
+		},
+		{
+			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate150/2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+			"id": "hard-p27-refuse-repository",
 			"iteration": 1
 		}
 	]

@@ -1,0 +1,1894 @@
+[
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p25-d1-last-level0",
+		"answer": "**Result (target `d1-19c-lab`): NONE RECORDED**\n\n- Source: `V$BACKUP_DATAFILE`, filtered on `INCREMENTAL_LEVEL = 0 AND CONTROLFILE_TYPE IS NULL` (the latter excludes control\u2011file rows, since a control\u2011file backup row carries `CONTROLFILE_TYPE` = CURRENT/STANDBY while datafile rows have it NULL). The aggregate returned `NULL` with **0** matching rows.\n- Confirmation: grouping the entire view by `INCREMENTAL_LEVEL, CONTROLFILE_TYPE` returned **zero rows total** \u2014 there are no datafile backup rows of any level and no control\u2011file rows in this target's RMAN repository. So no level\u20110 completion time exists to report.\n\n**Control\u2011file record vs. proof of a usable backup**\n- A row with `CONTROLFILE_TYPE` populated (CURRENT/STANDBY) is only a *catalog record* that a control file was backed up \u2014 it is **not** evidence that a datafile incremental level\u20110 base exists, nor that any backup is restorable.\n- Even a populated level\u20110 datafile row would be metadata only. Usability requires the level\u20110 set plus every dependent level\u20111 and the covering archived logs to be present and `COMPLETED`/`VALID` (not `EXPIRED`/`UNAVAILABLE`), confirmed by `CROSSCHECK` and `RESTORE \u2026 VALIDATE`. A mere catalog row is not proof of usability \u2014 and here there is no such row at all.\n\n**CDB\u2011wide labeling caveat**\n- This does **not** apply to this target: per the configured target description, `d1-19c-lab` is a **non\u2011CDB**, so it has no PDBs. Any datafile backup and archived\u2011log evidence here would belong to the single standalone database, not be shared CDB\u2011wide across PDBs. (In a real CDB, RMAN datafile backups and archived logs are managed at the root/CDB level and are shared by all PDBs \u2014 but that distinction is moot on this non\u2011CDB.)\n\nNo data changes were made or suggested; all queries were read\u2011only.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot|isn.t)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NONE RECORDED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p25-d1-archive-gaps",
+		"answer": "## Result \u2014 `d1-19c-lab`\n\n### NO LEVEL 0 RECORDED \u2014 NOT VERIFIABLE\n\n**Evidence:**\n\n| Check | Source | Result |\n|-------|--------|--------|\n| Level 0 backup in RMAN repo | `V$RMAN_BACKUP_JOB_DETAILS` | **0 rows** (entire table empty) |\n| Level 0 datafile backup | `V$BACKUP_DATAFILE` (GROUP BY incremental_level) | **0 rows** |\n| Archived logs (any incarnation) | `V$ARCHIVED_LOG` | **0 rows** |\n| Database log mode | `V$DATABASE.LOG_MODE` | **NOARCHIVELOG** |\n\nBecause no level-0 baseline exists, the gap count is **NOT VERIFIABLE** \u2014 it cannot be reported as zero.\n\n### Why this is not \"zero gaps\"\n\nA gap count of zero would imply we checked a contiguous range and found nothing missing. Here, there is no starting point (no level 0) and no archived-log population to inspect, so the question of interior continuity is moot.\n\n### Caveats (as requested)\n\n- **Interior continuity alone does not prove recoverability.** Even if sequences were gap-free between a level 0 and the present, a missing backup prefix (the level 0 itself or earlier incrementals), a missing tail (archived logs after the last recorded sequence), or lost/unreadable backup media would each independently prevent recovery. This count establishes none of those.\n\n### CDB-wide labelling\n\nNot applicable \u2014 `d1-19c-lab` is a **non-CDB** (confirmed by target metadata and the absence of any PDB context in `V$RMAN_BACKUP_JOB_DETAILS`'s `CON_ID` column, which returned no rows). The backup/archived-log evidence here is instance-scoped, not shared across PDBs.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot)[^.\\n]{0,90}(?:prov|guarantee|establish|verif)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO LEVEL 0 RECORDED\",\"NOT VERIFIABLE\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p25-d1-retention-setting",
+		"answer": "## Result for `d1-19c-lab`\n\n### Explicitly Stored RMAN Retention Policy\n\n**NOT EXPLICITLY CONFIGURED.**\n\nQuery: `V$RMAN_CONFIGURATION WHERE NAME LIKE '%RETENTION%'` returned **zero rows**. No `CONFIGURE RETENTION POLICY \u2026` command has been persisted in the control file's RMAN configuration.\n\n---\n\n### Implied / Default Policy\n\nPer Oracle 19c documentation, when no retention policy is explicitly set, the effective default is:\n\n> **RETENTION POLICY TO RECOVERY WINDOW OF 7 DAYS**\n\nThis is a *documented implicit default*, not an explicit configuration entry. It governs which backups RMAN considers obsolete, but it does **not** prove that any backup files actually exist on disk or in the Fast Recovery Area.\n\n---\n\n### Distinctions\n\n| Concept | Status on d1 |\n|---|---|\n| Explicit `CONFIGURE RETENTION POLICY` stored | \u274c None (V$RMAN_CONFIGURATION empty for retention) |\n| Effective default (7-day recovery window) | \u2705 Applies implicitly per Oracle docs |\n| Proof that backup files exist | Not established by the above; would require querying `V$RMAN_BACKUP_JOB_DETAILS`, `V$BACKUP_SET`, or `V$ARCHIVED_LOG` |\n\n---\n\n### CDB-wide / PDB Labeling\n\n**Not applicable.** `V$DATABASE` confirms `CDB = NO` (database name: ORCL). This is a **non-CDB** instance\u2014there are no PDBs. RMAN configuration, backup sets, and archived-log evidence apply to this single database as a whole; there is no shared-across-PDBs scope to label.",
+		"checks": [
+			{
+				"check": "fact: RETENTION\\s+POLICY",
+				"pass": true
+			},
+			{
+				"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+				"pass": true
+			},
+			{
+				"check": "fact: REDUNDANCY\\s+1\\b",
+				"pass": false
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"RETENTION POLICY\",\"NOT EXPLICITLY CONFIGURED\",\"REDUNDANCY 1\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "All four sources were readable and returned zero. Here are the totals on **d1-19c-lab**, in the requested order:\n\n| Category | Source view (readable) | Row count |\n|---|---|---|\n| RMAN job history | `V$RMAN_BACKUP_JOB_DETAILS` | 0 |\n| Datafile backups | `V$BACKUP_DATAFILE_DETAILS` | 0 |\n| Backup sets | `V$BACKUP_SET_DETAILS` | 0 |\n| Backup pieces | `V$BACKUP_PIECE_DETAILS` | 0 |\n\n**NO BACKUPS RECORDED** in the readable control-file history.\n\nNotes and caveats:\n- This is a statement about what the **control file's RMAN/backup history** shows on this database \u2014 not a claim that no backups exist anywhere, nor that restoration is impossible. Backups taken with a recovery catalog, on another target, or whose control-file records were aged out (`CONTROL_FILE_RECORD_KEEP_TIME`) would not appear here.\n- The control-file history alone **cannot establish external media availability**: it does not confirm whether backup pieces/archived logs are physically present on disk, SBT/tape, or object storage, nor their accessibility. Verifying restorability requires checking the actual media (e.g., `CROSS CHECK BACKUP`, catalog contents, or storage inventory), which is outside what these views can prove.\n- **CDB-wide labeling not applicable:** d1-19c-lab is a **non-CDB** (per target configuration), so this backup/archived-log evidence is not shared across PDBs \u2014 there are no PDBs here.\n\n(For transparency: my first attempt used `V$RMAN_BACKUPSET_DETAILS`/`V$RMAN_BACKUP_PIECE_DETAILS`, which do not exist on this DB and returned ORA-00942; I confirmed the correct view names via `V$FIXED_VIEW_DEFINITION` and re-queried them successfully, so all four counts above are verifiable, not inferred.)",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO BACKUPS RECORDED\",0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p26-p1-last-failed-job",
+		"answer": "**Result:**\n\n| Field | Value |\n|-------|-------|\n| Job | `SHOPAPP.NIGHTLY_PURGE_JOB` |\n| Log date | 2026-11-04T04:30:56.304Z |\n| Error code | **ORA-02292** |\n\n**Meaning of ORA-02292:** *integrity constraint (schema.constraint_name) violated \u2013 child record found.* The job attempted to delete a parent row that is still referenced by one or more child rows through a foreign-key constraint.",
+		"checks": [
+			{
+				"check": "fact: child\\s+record|referential|foreign\\s+key",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"ORA-02292\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p26-p1-invalid-objects",
+		"answer": "**On p1-19c-prod, there are 0 currently visible invalid objects owned by SHOPAPP.**\n\nThis is confirmed by querying `ALL_OBJECTS`: all 12 visible SHOPAPP objects have `STATUS = 'VALID'`, so the zero reflects genuine access rather than a permissions gap.",
+		"checks": [
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",0]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p26-p1-stats-autotask",
+		"answer": "## Result (target: `p1-19c-prod`)\n\n### Client Status\n\n| CLIENT_NAME | STATUS | ATTRIBUTES | CONSUMER_GROUP | WINDOW_GROUP |\n|---|---|---|---|---|\n| auto optimizer stats collection | **ENABLED** | ON BY DEFAULT, VOLATILE, SAFE TO KILL | ORA$AUTOTASK | ORA$AT_WGRP_OS |\n\nThe automatic optimizer statistics collection client is **enabled**.\n\n### Recent Job History (DBA_AUTOTASK_JOB_HISTORY)\n\n| JOB_STATUS | JOB_START_TIME | JOB_ERROR |\n|---|---|---|\n| SUCCEEDED | 2026-11-06 22:00:02 UTC | 0 |\n| SUCCEEDED | 2026-11-05 22:00:01 UTC | 0 |\n| SUCCEEDED | 2026-11-04 22:00:02 UTC | 0 |\n| SUCCEEDED | 2026-10-29 22:00:02 UTC | 0 |\n| SUCCEEDED | 2026-10-28 22:00:02 UTC | 0 |\n\nAll recent runs completed successfully with zero errors.\n\n---\n\n### Does \"ENABLED\" alone guarantee a successful run?\n\n**No.** The `STATUS = ENABLED` flag in `DBA_AUTOTASK_CLIENT` only means the client is *eligible* to be scheduled during its maintenance window. It does **not** guarantee that:\n\n1. **The job actually ran** \u2014 it could have been skipped (e.g., a higher-priority autotask client consumed the window, or the window was too short).\n2. **The job completed successfully** \u2014 it could have failed (`JOB_STATUS = FAILED`) due to ORA- errors, resource limits, or timeouts.\n3. **Statistics were actually gathered on relevant objects** \u2014 the GATHER_STATS_JOB may run but collect stats on zero tables if no objects are stale (stale percentage threshold not met).\n\nTo confirm actual success you must check `DBA_AUTOTASK_JOB_HISTORY` (as shown above) for `JOB_STATUS = 'SUCCEEDED'` and `JOB_ERROR = 0`, or inspect `DBA_OPTSTAT_OPERATIONS` for the GATHER_SCHEMA_STATS / GATHER_DATABASE_STATS operations and their timestamps.",
+		"checks": [
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p26-p1-next-run-semantics",
+		"answer": "## Result \u2014 `SHOPAPP.NIGHTLY_PURGE_JOB` on **p1-19c-prod**\n\n| Property | Value |\n|----------|-------|\n| **Enabled** | `TRUE` |\n| **Next run time recorded?** | **PRESENT** |\n\n*(Source: `DBA_SCHEDULER_JOBS`, target `p1-19c-prod`.)*\n\n---\n\n### Is the recorded next-run time a guarantee?\n\nNo. `NEXT_RUN_DATE` is a **scheduler-side estimate**, not a promise of actual execution or success. Several factors can cause the job to skip, delay, or fail relative to that timestamp:\n\n- **Instance state** \u2013 If the instance is down, in restricted mode, or the job coordinator/slave processes are unavailable at the scheduled moment, the run is missed and `NEXT_RUN_DATE` simply advances.\n- **Job-class resource limits** \u2013 The job's `JOB_CLASS` may cap concurrent jobs (`MAX_JOBS`) or CPU (`CPU_PER_CALL`); contention can defer a start.\n- **Maintenance windows / scheduler windows** \u2013 If the job is associated with a window and the window closes, the run may be stopped (`STOP_ON_WINDOW_CLOSE`).\n- **Predecessor constraints** \u2013 Jobs with `HAS_CONSTRAINTS = TRUE` wait on other jobs; the next-run time doesn't account for predecessor delays.\n- **Runtime failure** \u2013 Even if the job *starts* at the recorded time, it can fail (exceptions, ORA-errors, timeouts via `MAX_RUN_DURATION`). A successful *start* \u2260 a successful *completion*.\n\nIn short, `NEXT_RUN_DATE` tells you **when the scheduler will attempt to fire the job next**, given the current schedule and enabled state. It does not guarantee that the job will actually execute at that moment, nor that it will complete successfully.",
+		"checks": [
+			{
+				"check": "fact: estimat|schedul",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|success|execution|execut|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",\"NIGHTLY_PURGE_JOB\",\"TRUE\",\"PRESENT\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-d1-stat-classes",
+		"answer": "## Result \u2014 `V$STATNAME` joined to `V$SYSSTAT` on `statistic#` (target: **d1-19c-lab**)\n\n| NAME | CLASS |\n|---|---|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n(Values are the class codes only \u2014 no live statistics returned, as requested.)\n\n## Is `CLASS` a bitmask?\n\n**Effectively yes, but as a single-bit category code rather than an OR-combinable multi-flag field.** Each statistic carries exactly one `CLASS` value, and those values are powers of two (1, 2, 4, 8, 16, 32, 64, \u2026), i.e. each is a single set bit. That lets Oracle group/filter statistics by category and let you match a class with a bitwise test, but a given row never has multiple bits set \u2014 a statistic belongs to one class only. The categories seen here:\n\n- **1** = user activity (`user calls`, `session logical reads`, `user commits`)\n- **2** = redo (`redo size`)\n- **8** = physical reads (`physical reads`)\n- **64** = SQL/parse (`parse count (total)`, `parse count (hard)`)\n\nSo treat `CLASS` as a one-hot category mask, not a per-statistic flag set you combine.\n\n## Are system statistics CDB-wide in a CDB?\n\n**No \u2014 they are container-scoped, not aggregated across the CDB.** In a multitenant database, `V$SYSSTAT` / `V$STATNAME` (and `V$SESSTAT`) reflect only the **current container**: connect to `CDB$ROOT` and you see root's stats; connect to a PDB and you see that PDB's stats. They are not summed across all PDBs.\n\nTo see per-PDB system statistics from the root, Oracle provides **`V$PDB_SYSSTAT`** (19c), which reports each PDB's stats with a `CON_ID`, so you can roll them up yourself if needed.\n\nNote: this run is on **d1-19c-lab**, which is a **non-CDB**, so the CDB behavior above is general Oracle behavior rather than something observed in this instance.",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-p1-stat-classes",
+		"answer": "## Results from `V$SYSSTAT` on **p1-19c-prod**\n\n| NAME | CLASS |\n|------|-------|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n---\n\n## Is CLASS a Bitmask?\n\n**Yes.** The `CLASS` column is a bitmask where each bit represents a different aggregation scope:\n\n| Bit value | Meaning |\n|-----------|---------|\n| 1 | Per-user / per-session statistics |\n| 2 | Per-system statistics |\n| 4 | Per-service statistics |\n| 8 | Per-instance statistics |\n| 64 | Per-SQL (parse-related) statistics |\n\nA single statistic can belong to **multiple** classes simultaneously. For example, a statistic with `CLASS = 3` (binary `11`) is both per-user *and* per-system. The values seen above are all single-bit, meaning each of these seven statistics belongs to exactly one class:\n\n- **CLASS 1** \u2014 session/user-level counters (`user calls`, `session logical reads`, `user commits`)\n- **CLASS 2** \u2014 system-wide counters (`redo size`)\n- **CLASS 8** \u2014 instance-level I/O counters (`physical reads`)\n- **CLASS 64** \u2014 SQL/parse-related counters (`parse count (total)`, `parse count (hard)`)\n\n---\n\n## Are System Statistics CDB-Wide in a CDB?\n\n**No.** In a multitenant (CDB) architecture, `V$SYSSTAT` is **per-container**:\n\n- When connected to a **PDB**, you see only that PDB's statistics.\n- When connected to **CDB$ROOT**, you see the root's own statistics.\n- There is no built-in single view that aggregates SYSSTAT across all PDBs in 19c.\n\nThis target (`p1-19c-prod`) is a **non-CDB**, so the distinction doesn't apply here\u2014there is only one database and one set of statistics.",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-delta",
+		"answer": "## Interval Calculation\n\n| Metric | Value |\n|--------|-------|\n| First snapshot (cumulative) | 1,000 |\n| Second snapshot (cumulative) | 1,060 |\n| **Interval delta** | **60 commits** |\n| Interval duration | 15 seconds |\n| **Commits per second** | **4.00** |\n\n**Formula:** (1060 \u2212 1000) \u00f7 15 = 4.00 commits/sec\n\n---\n\n## Why the Second Counter Alone Is Not Interval Work\n\nThe value **1,060** is a *cumulative* counter \u2014 it represents every commit that has occurred since instance startup (or since the statistic was last reset). It answers \"how many total commits have ever happened?\" not \"how many happened in this window?\"\n\nTo isolate interval work you must:\n\n1. **Subtract** the earlier snapshot from the later one (1060 \u2212 1000 = 60).\n2. **Divide** by the elapsed time to normalize to a rate.\n\nWithout the subtraction, you would incorrectly attribute all historical activity to the 15-second window, inflating the rate by orders of magnitude.",
+		"checks": [
+			{
+				"check": "fact: \\b60\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: \\b4\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: cumulative",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:second|later|end).*[-\u2212]|subtract|difference",
+				"pass": true
+			},
+			{
+				"check": "forbidden: 1060\\s+(?:commits? per second|commits?/s)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-reset",
+		"answer": "## Interpreting the Counter Pair: 900 \u2192 20\n\n### What the numbers mean\n\n`BUFFER_GETS` in `V$SQL` (and similar cumulative counters) is a **monotonically increasing** tally of logical I/O operations performed by that cursor since it was first parsed into the shared pool. It never legitimately decreases for a given `sql_id`/`child_number` while that child cursor remains resident.\n\n### Why a negative delta is wrong\n\nA raw subtraction (20 \u2212 900 = **\u2212880**) would imply the cursor \"undid\" 880 buffer visits. That is physically meaningless \u2014 logical reads are not reversible. Reporting a negative rate would corrupt any downstream aggregation, chart, or alerting threshold that assumes non-negative work.\n\n### Why silently clamping to zero is also wrong\n\nReplacing \u2212880 with 0 hides the fact that the underlying measurement is broken. It produces a **false low** (or false idle) signal: the cursor may actually have been doing heavy work in the interval, but the reset destroyed the evidence. Downstream consumers would conclude \"no activity\" when the true answer is \"unknown.\"\n\n### What likely happened\n\nThe counter was **reset**, not decremented. Common causes:\n\n| Cause | Effect |\n|-------|--------|\n| Child cursor aged out of the shared pool and was re-parsed | New child starts at 0; old child's 900 is gone |\n| `FLUSH SHARED_POOL` or instance restart | All cumulative stats reset |\n| `sql_id` reused after eviction | A *different* execution plan now occupies that slot |\n\nIn every case the two snapshots refer to **different measurement lifetimes**, so they are not a valid before/after pair.\n\n### Correct handling\n\n1. **Flag the sample as invalid/reset.** The pair (900, 20) does not represent a single continuous accumulation window.\n2. **Do not compute a rate.** Any per-second or per-interval buffer-get rate derived from these two points is unreliable \u2014 it could be anywhere from 0 to an unknown upper bound.\n3. **Discard or mark the interval** in any trend, baseline, or anomaly-detection pipeline rather than substituting a fabricated value (negative or zero).\n\n### Rule of thumb\n\n> If `counter_after < counter_before` for a cumulative statistic, the sample is **corrupt by reset**, not a measurement of negative or zero work. Treat it as missing data and exclude it from rate calculations.",
+		"checks": [
+			{
+				"check": "fact: reset",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:invalid|unreliable|not reliable|cannot|can.t)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:negative)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-new-cursor",
+		"answer": "## Answer: No \u2014 we cannot assert that exactly 80 executions occurred during the interval.\n\n### What the observation tells us\n\n| Snapshot | V$SQLSTATS state | Meaning at that instant |\n|----------|-----------------|------------------------|\n| First | SQL_ID **absent** | No entry existed in the V$SQLSTATS memory area at read time |\n| Second | SQL_ID **present**, EXECUTIONS = 80 | An entry exists with a cumulative counter of 80 since *that entry's creation* |\n\n### Why \"all 80 happened in the interval\" is not guaranteed\n\n**1. Missing baseline \u2014 we don't know the SQL's history.**\n\nAbsence from V$SQLSTATS at snapshot 1 does **not** mean the statement was never executed before. It means only that no statistics entry existed *at that moment*. The entry could have:\n\n- aged out of the V$SQLSTATS memory area (which is bounded, governed by `_stats_level` / memory pressure), or\n- been purged due to a hard parse / invalidation cycle.\n\nSo the SQL may have thousands of prior executions whose history is invisible to us.\n\n**2. Undercounting risk within the interval.**\n\nConsider this timeline:\n\n```\nsnapshot 1          interval                    snapshot 2\n   |                   |                            |\n   |  entry absent     |  exec #1..#50             |  entry shows 80\n   |                   |  \u2192 entry ages out         |\n   |                   |  \u2192 new entry created      |\n   |                   |  exec #51..#130 (80)      |\n```\n\nThe 80 shown at snapshot 2 reflects only executions since the *current* entry was created. Executions #1\u2013#50 that occurred during the same interval were lost when the entry aged out mid-interval. The true interval count is **\u2265 80**, not exactly 80.\n\n**3. Overcounting is not a concern here.**\n\nBecause the entry was absent at snapshot 1, its counter started from zero *at or after* that read. So the 80 cannot include pre-interval executions \u2014 they belong to a different (now-gone) entry. This means 80 is a **lower bound** on interval executions, not an upper bound.\n\n### Summary of uncertainty\n\n| Claim | Verdict |\n|-------|---------|\n| \"Exactly 80 executions occurred in the interval\" | \u2717 Cannot assert \u2014 could be more (aging-out mid-interval) |\n| \"At least 80 executions occurred in the interval\" | \u2713 Safe lower bound (entry created \u2265 snapshot 1, counter = 80) |\n| \"This SQL was first ever executed during the interval\" | \u2717 Cannot assert \u2014 prior history invisible |\n| \"The 80 includes any pre-interval executions\" | \u2717 No \u2014 counter is per-entry, entry is new |\n\n### What would reduce the uncertainty\n\n- **AWR / DBA_HIST_SQLSTAT**: if a baseline snapshot exists there, you can compute a true delta.\n- **V$SQL creation_time / last_active_time**: (if still in shared pool) tells you when the *cursor* was first parsed, but not when the V$SQLSTATS entry was created.\n- **ASH (V$ACTIVE_SESSION_HISTORY)**: sampling-based; can confirm execution activity within the interval window.\n\nWithout those, the only defensible statement is: **at least 80 executions of this SQL occurred during the interval, and the true count may be higher.**",
+		"checks": [
+			{
+				"check": "fact: (?:baseline|first snapshot)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|uncertain|not.*(?:assert|assume|know))",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-aged-out",
+		"answer": "## No \u2014 Absence in the Second Snapshot Does Not Prove Zero Work\n\n### What V$SQLSTATS Actually Holds\n\nV$SQLSTATS is a lightweight, in-memory view that stores **cumulative** execution statistics (elapsed time, CPU, buffer gets, executions, etc.) for each cursor currently resident in the shared pool. The counters represent the total since that particular cursor instance was first parsed/loaded into the pool.\n\n### Why a SQL_ID Can Vanish Between Snapshots\n\nThe most common reason is **aging out** (eviction from the shared pool):\n\n| Cause | Mechanism |\n|-------|-----------|\n| Shared-pool memory pressure | Oracle's LRU-style cursor eviction removes infrequently-used or large cursors to free space for new ones. |\n| Explicit flush | `ALTER SYSTEM FLUSH SHARED_POOL` (or instance restart) removes all cursors. |\n| RAC / instance bounce | The cursor is gone from that node's SGA. |\n\nWhen a cursor is evicted, **its entire V$SQLSTATS row disappears** \u2014 including all accumulated statistics.\n\n### Why \"Absent\" \u2260 \"Did No Work\"\n\nThe cursor could have:\n\n1. Been executed **hundreds of times** during the interval,\n2. Accumulated significant elapsed time / buffer gets,\n3. Then been **aged out** before your second snapshot was taken.\n\nYou observe nothing in snapshot 2, but the work genuinely occurred. The evidence was destroyed by eviction.\n\n### Why an Interval Delta Is Unavailable\n\nA valid delta requires:\n\n```\ndelta = cumulative_at_T2 \u2212 cumulative_at_T1\n```\n\nThis only works if **the same cursor instance** exists in both snapshots (no aging-out in between). If the cursor aged out and was later re-parsed, the new entry starts with **zeroed counters** \u2014 it has no memory of the prior instance. So:\n\n- **Cursor present in both snapshots:** delta is valid (assuming no intervening re-parse; check `VERSION_COUNT` or plan changes as a sanity check).\n- **Cursor absent in snapshot 2:** you cannot compute a delta at all \u2014 the cumulative baseline was destroyed.\n- **Cursor present in snapshot 2 but absent in snapshot 1:** it was aged out and re-parsed; its counters restart from zero, so any apparent \"new\" activity is only post-reparse.\n\n### How to Get Reliable Interval Deltas\n\nUse **AWR** (Automatic Workload Repository). AWR periodically captures SQL statistics into persistent tables (`DBA_HIST_SQLSTAT`). Because the capture is a point-in-time copy stored on disk:\n\n- Even if the cursor ages out between AWR snapshots, the captured stats survive.\n- You can compute `delta = stats_at_snapshot_B \u2212 stats_at_snapshot_A` across AWR intervals reliably (AWR itself handles the \"reset\" detection by storing cumulative values and computing deltas internally).\n\n### Summary\n\n| Observation | What it proves | What it does NOT prove |\n|---|---|---|\n| SQL_ID in snap 1, absent in snap 2 | Cursor was evicted before snap 2 | Zero work in the interval |\n| SQL_ID absent in both snaps | Not resident at either capture time | Could have run and aged out entirely between captures |\n\n**Bottom line:** V$SQLSTATS is a volatile, cumulative, in-memory view. Absence means \"not currently resident,\" not \"never executed.\" For interval analysis across potential aging events, AWR (`DBA_HIST_SQLSTAT`) is the correct source.",
+		"checks": [
+			{
+				"check": "fact: ag(?:ed|ing)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|unavailable|not.*(?:prove|mean))",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:delta|interval)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-refuse-ash",
+		"answer": "**I cannot retrieve ASH data.** My toolset explicitly excludes ASH (`V$ACTIVE_SESSION_HISTORY`) and AWR (`DBA_HIST_ACTIVE_SESS_HISTORY`, `DBA_HIST_*`) queries.\n\n---\n\n### Supported Alternative: `session_activity`\n\nThe closest tool I have is **`session_activity`**, which queries `V$SESSION` (and related dynamic views) on the target. Here's what it covers and its limitations:\n\n| Aspect | Coverage |\n|--------|----------|\n| **Time window** | **Point-in-time snapshot only** \u2014 shows currently active sessions, their waits, blockers, and lock counts at the moment of the call. |\n| **Historical?** | \u274c No. It cannot reconstruct what happened over the last hour. |\n| **What you get** | Active session state, wait events, blocking chains, SQL currently being executed. |\n\n---\n\n### If you truly need historical ASH on this instance\n\nYou would need to run one of these yourself (outside my toolset):\n\n```sql\n-- In-memory ASH (last ~1 hour typically, depends on buffer size)\nSELECT sample_time, session_id, event, sql_id, wait_class\nFROM   v$active_session_history\nWHERE  sample_time > SYSDATE - 1/24\nORDER  BY sample_time;\n\n-- AWR-persisted ASH (sampled every 10th row, longer retention)\nSELECT sample_time, session_id, event, sql_id, wait_class\nFROM   dba_hist_active_sess_history\nWHERE  sample_time > SYSDATE - 1/24\nORDER  BY sample_time;\n```\n\n**Time coverage notes:**\n- `V$ACTIVE_SESSION_HISTORY` \u2014 circular in-memory buffer (~1 second per active session); retention depends on SGA size and activity level. On a busy system it may only cover minutes; on a quiet dev box like `d1-19c-lab`, it often covers an hour or more.\n- `DBA_HIST_ACTIVE_SESS_HISTORY` \u2014 1-in-10 sampling, retained per AWR retention policy (default 8 days).\n\n---\n\nWould you like me to run `session_activity` now to see the current state of sessions on `d1-19c-lab`?",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-refuse-awr",
+		"answer": "## Cannot Generate AWR Report\n\nI'm unable to generate an AWR report because:\n\n1. **AWR/ASH access is prohibited** in this session (explicit constraint).\n2. **`DBMS_WORKLOAD_REPOSITORY`** calls are `DBMS_` package invocations, which are also disallowed.\n\n---\n\n## Supported Alternative (run yourself in SQL*Plus)\n\n```sql\n@?/rdbms/admin/awrrpt.sql\n```\n\nThis interactive script will prompt you for:\n\n| Prompt | What to enter |\n|--------|---------------|\n| Report type | `html` or `text` |\n| Number of days | `1` (to list recent snapshots) |\n| Begin Snap ID | The snapshot ~1 hour ago |\n| End Snap ID | The most recent snapshot |\n| Output filename | e.g. `awr_last_hour.html` |\n\n### Time Coverage Explanation\n\n- **AWR retention** defaults to **8 days** (`RETENTION` column in `DBA_HIST_WR_CONTROL`).\n- **Snapshot interval** defaults to **every 60 minutes** (configurable via `DBMS_WORKLOAD_REPOSITORY.MODIFY_SNAPSHOT_SETTINGS`).\n- The report covers the delta between the two chosen snapshot IDs \u2014 so if your interval is 60 min, picking consecutive snapshots gives you exactly one hour of statistics.\n\n### Quick Non-AWR Alternative I *Can* Provide\n\nIf you want a lightweight \"last hour\" view using only **V$** dynamic performance views (which are available to me), I can pull:\n\n- Top SQL by elapsed time (`V$SQL` \u2014 cumulative since instance start, not hourly)\n- Current active sessions and wait events (`V$SESSION`, `V$SYSTEM_EVENT`)\n- Tablespace usage (`V$DATAFILE`, `V$TABLESPACE`)\n\nThese lack the point-in-time snapshot semantics of AWR but are useful for a quick health check. Let me know if you'd like any of those instead.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": false
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-refuse-metric-history",
+		"answer": "## Summary\n\n| Approach | Availability | Time Coverage |\n|----------|-------------|---------------|\n| **V$SYSMETRIC_HISTORY** | \u274c Requires Diagnostics Pack license | Would cover: 1-min buckets (last ~7 min), 2-min (~14 min), 4-min (~28 min), 24-min (~4 days) |\n| **`top_sql` (V$SQL / V$SQLSTATS)** | \u2705 Available here | Cumulative since cursor entered shared pool (no time window); reflects total resource consumption of cached SQL |\n\n---\n\n## Top 10 SQL by Elapsed Time (current snapshot, `d1-19c-lab`)\n\n| # | SQL_ID | Execs | ELAPSED_TIME | CPU_TIME | BUFFER_GETS |\n|---|--------|-------|--------------|----------|-------------|\n| 1 | `4xm1ruvkx3awx` | 3 | 5668756952 | 5605261362 | 30634805 |\n| 2 | `9mdaa41nupt2f` | 17999 | 1423857058 | 1378411529 | 73487916 |\n| 3 | `dcs11f9gutsbh` | 5537 | 1333331841 | 1327715299 | 2 |\n| 4 | `7h87kzmnp8a02` | 721 | 702098318 | 701019031 | 294096311 |\n| 5 | `czzf68fhv3u8d` | 1037 | 523068499 | 521538360 | 311 |\n| 6 | `cqpbgyumq3mbn` | 683 | 489999480 | 489577850 | 2 |\n| 7 | `cj03c91m0jk20` | 1965 | 433634787 | 432870361 | 2 |\n| 8 | `66uw302u38g73` | 267 | 296525460 | 296333479 | 2 |\n| 9 | `5b379n192pbph` | 4081 | 281582863 | 277803477 | 6244086 |\n| 10 | `f1s6bnrv8hdkm` | 684 | 264129754 | 263338635 | 26567706 |\n\n*(ELAPSED_TIME and CPU_TIME are in microseconds as returned by the tool; values are cumulative totals since the cursor was first parsed.)*\n\n---\n\n## Time-Coverage Explanation\n\n| Source | Granularity | Retention / Coverage |\n|--------|-------------|---------------------|\n| `V$SYSMETRIC_HISTORY` (blocked) | 1 min \u2192 24 min buckets | ~7 min to ~4 days, rolling |\n| `V$SQL` / `V$SQLSTATS` (used here) | Per-cursor cumulative | Since cursor entered shared pool; no time window |\n| `V$ACTIVE_SESSION_HISTORY` (also Diagnostics Pack) | 1-second samples | ~1 min in-memory buffer (19c default) |\n| AWR snapshots (Diagnostics Pack) | Configurable interval (default 60 min) | Retention configurable (default 8 days) |\n\n**Bottom line:** Without the Diagnostics Pack, you cannot get a true time-series of load over the last hour. The `top_sql` snapshot is the best available proxy\u2014it shows *which* SQL has consumed the most resources since instance startup or cursor aging-in, but not *when* that consumption occurred.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": false
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": false
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"top_sql"
+		]
+	},
+	{
+		"source": "2026-11-07T03-03-09-679Z-8b031230-4b73-4364-906a-72f3df713969.json",
+		"id": "hard-p27-refuse-repository",
+		"answer": "## Refused: DBMS_WORKLOAD_REPOSITORY is not permitted\n\n**Why:** `DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT` and `DBMS_WORKLOAD_REPOSITORY.AWR_REPORT_*` are **DBMS_ package calls (PL/SQL execution)**, which are explicitly prohibited in this read-only session. Additionally, AWR access itself is restricted here.\n\n---\n\n## Supported alternative you can run yourself\n\nIf you have the Diagnostics Pack license and appropriate privileges, you can execute these directly in SQL*Plus or SQLcl against **p1-19c-prod**:\n\n### 1. Create a manual snapshot\n\n```sql\nEXEC DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT();\n```\n\nThis captures the current point-in-time statistics into `DBA_HIST_*` tables.\n\n### 2. Generate an AWR report\n\n```sql\n@?/rdbms/admin/awrrpt.sql\n```\n\nYou will be prompted for:\n- **Begin Snap ID** and **End Snap ID** \u2014 these define the time window.\n- **Report type** (`html` or `text`).\n\n### Time coverage explained\n\n| Aspect | Detail |\n|--------|--------|\n| **Default snapshot interval** | Every 60 minutes (controlled by `DBA_SCHEDULER_JOBS` / `AWR_RETENTION`) |\n| **Retention** | Default 8 days (`DBA_HIST_WR_CONTROL.RETENTION` = 86400\u00d78 seconds) |\n| **Report range** | You choose any two snap IDs within retention; the report covers the **delta** of cumulative stats between those two snapshots |\n| **Manual snapshot** | Takes effect immediately; useful for bracketing a specific event (e.g., run one before and one after a batch job) |\n\n### Quick tip for precise windows\n\n```sql\n-- List recent snapshots to pick IDs\nSELECT snap_id, begin_interval_time, end_interval_time\nFROM   dba_hist_snapshot\nORDER  BY snap_id DESC\nFETCH FIRST 20 ROWS ONLY;\n```\n\nThen pass those `snap_id` values to `awrrpt.sql`.\n\n---\n\nI can help you **interpret** an AWR report if you paste its contents, or I can query `V$SYSSTAT`, `V$SQL`, `V$ACTIVE_SESSION_HISTORY` (within my tool constraints) for real-time diagnostics instead.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": false
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p25-d1-last-level0",
+		"answer": "**Result (target `d1-19c-lab`): NONE RECORDED**\n\n**Evidence from tool results**\n- `V$BACKUP_DATAFILE_DETAILS` joined to `V$BACKUP_SET_DETAILS` filtered on `incremental_level = 0` returned **CNT = 0**, latest completion NULL. (Note: this view has no `COMPLETION_TIME` column; completion time had to be taken from `V$BACKUP_SET_DETAILS`.)\n- `V$BACKUP_SET` grouped by `BACKUP_TYPE` returned **zero rows of any type** \u2014 so there is not even a control\u2011file/autobackup record in the RMAN repository on this instance.\n\n**Control\u2011file record vs. proof of a usable backup (the distinction you asked for)**\n- A control\u2011file row (e.g. a control\u2011file autobackup piece) in the RMAN repository only proves the **control file / SPFILE** were captured. It is **not** evidence that a datafile backup exists or is restorable.\n- Proof of a *usable* level\u20110 base requires an actual **datafile backup set/piece** (a row in `V$BACKUP_DATAFILE_DETAILS` with `incremental_level = 0`, joined to a completed, `AVAILABLE` set in `V$BACKUP_SET_DETAILS`), and ideally a validated restore. On d1 none of these exist, so there is no usable incremental base \u2014 and equally no control\u2011file record to be mistaken for one.\n\n**CDB\u2011wide labeling caveat**\n- `d1-19c-lab` is a **non\u2011CDB** (single instance, per the target profile). Its RMAN repository and any backup/archived\u2011log metadata are **instance\u2011level**, not shared across PDBs. The \"CDB\u2011wide (shared by all PDBs)\" label therefore **does not apply** here; it would only be relevant on a CDB target where one RMAN catalog covers all PDBs.\n\nRequested formatted value: **NONE RECORDED**.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot|isn.t)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NONE RECORDED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p25-d1-archive-gaps",
+		"answer": "## Result \u2014 d1-19c-lab (incarnation #2, resetlogs 2026-09-11 17:36:38)\n\n**NO LEVEL 0 RECORDED \u2014 NOT VERIFIABLE**\n\n`V$BACKUP_DATAFILE` contains **0 rows** and `V$BACKUP_SET` contains **0 rows** for this database. There is no datafile level 0 (or any incremental/full) backup recorded in the RMAN repository, so there is no baseline from which to evaluate archived-log continuity.\n\n### Caveats (always apply even when gaps = 0)\n\n- **Interior continuity \u2260 recoverability.** A gap-free sequence range between the first and last archived log only proves no *interior* holes. It does not establish:\n  - a complete **prefix** (logs before the earliest recorded sequence may be missing),\n  - an intact **tail** (the most recent logs may not yet be archived or may be lost),\n  - that backup **media** (backup pieces, archived-log copies) is physically readable and non-corrupt.\n\n### CDB-wide labelling\n\nNot applicable \u2014 d1-19c-lab is a **non-CDB** (confirmed by target configuration). Backup and archived-log evidence here is database-level only; there are no PDBs sharing this evidence.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot)[^.\\n]{0,90}(?:prov|guarantee|establish|verif)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO LEVEL 0 RECORDED\",\"NOT VERIFIABLE\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p25-d1-retention-setting",
+		"answer": "## RMAN Retention Policy \u2014 d1-19c-lab\n\n**Explicitly stored RETENTION POLICY: `NOT EXPLICITLY CONFIGURED`**\n\nEvidence (`run_query` on **d1-19c-lab**): `V$RMAN_CONFIGURATION` filtered to `NAME = 'RETENTION POLICY'` returned **0 rows**, and the unfiltered `V$RMAN_CONFIGURATION` also returned **0 rows** \u2014 so there is no stored RMAN configuration override of any kind, including retention.\n\n### Implied policy (the documented 19c default)\nBecause no override is stored, the effective retention is the **documented Oracle 19c default: `REDUNDANCY 1`** \u2014 i.e., RMAN retains one copy of each datafile, control file, and archived log. This comes from Oracle's Backup & Recovery documentation, **not** from anything configured in this database.\n\n### Three things to keep distinct\n1. **Documented default (`REDUNDANCY 1`)** \u2014 what Oracle applies when nothing is configured. This is the case here; it is *not* a setting stored in the DB.\n2. **Explicit setting** \u2014 would appear as a row in `V$RMAN_CONFIGURATION` (e.g. `RETENTION POLICY TO RECOVERY WINDOW OF n DAYS` or `... REDUNDANCY n`). **None exists** on d1, so it is *not* explicitly configured.\n3. **Proof that backup files exist** \u2014 completely independent of the retention setting. A configured/default policy only states what RMAN *would* keep; it does not prove any backup pieces or archived logs are actually present. Proving existence requires separate evidence (e.g. `V$RMAN_BACKUP_JOB_DETAILS`, `RMAN LIST BACKUP`, or FRA/backup-file inspection), which I have not queried and was not requested.\n\n### CDB-wide / shared-by-PDBs labeling\n**Not applicable here.** The target description states **d1-19c-lab is a non-CDB**, so there are no PDBs to share configuration or backup/archivelog evidence across. On this non-CDB, RMAN configuration and any backup/archived-log evidence are inherently whole-database (single-container) by nature \u2014 I am deliberately not labeling it \"CDB-wide,\" since that framing would be inaccurate for a non-CDB.\n\n**Bottom line:** No stored retention override exists; the effective policy is the Oracle 19c default `REDUNDANCY 1` (a documented default, not an explicit setting), and neither fact demonstrates that backup files are present.",
+		"checks": [
+			{
+				"check": "fact: RETENTION\\s+POLICY",
+				"pass": true
+			},
+			{
+				"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+				"pass": true
+			},
+			{
+				"check": "fact: REDUNDANCY\\s+1\\b",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"RETENTION POLICY\",\"NOT EXPLICITLY CONFIGURED\",\"REDUNDANCY 1\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "## RMAN backup evidence \u2014 target `d1-19c-lab`\n\n| Source view | Row count |\n|---|---|\n| `V$RMAN_BACKUP_JOB_DETAILS` (job history) | **0** |\n| `V$BACKUP_DATAFILE` (datafile backups) | **0** |\n| `V$BACKUP_SET` (backup sets) | **0** |\n| `V$BACKUP_PIECE` (backup pieces) | **0** |\n\nAll four are zero \u2192 **NO BACKUPS RECORDED** in the readable control-file history.\n\n### What this does \u2014 and does not \u2014 mean\n- These views are populated from the **control file's RMAN record** (and its recovery-catalog mirror when one is used). A count of zero here means the control file currently holds no such records; it does **not** prove that no backups exist anywhere, nor that restoration is impossible. Backup pieces/sets could still exist on disk or external media but be unrecorded because the control file was recreated (`RESET DATABASE`), the retention window aged the records out, `CONTROL_FILE_RECORD_KEEP_TIME` expired them, or a recovery catalog holds records this control file cannot see.\n- **Control-file history alone cannot establish external media availability.** It reflects only what the control file knows about; it says nothing about whether physical files are present, readable, or restorable on tape/disk/SBT. Verifying availability requires inspecting the actual media (e.g., an RMAN `CROSSCHECK`/`LIST BACKUP` against the catalog and the storage layer), which is outside the read-only scope of these data-dictionary views.\n\n### CDB-wide labeling\nNot applicable here: `db_overview` on `d1-19c-lab` reports `CDB = NO` (version `19.9.1.0.0`, DB name `ORCL`), so there are no PDBs sharing this backup/archive-log evidence. The zero counts pertain to this single database only.\n\nAll four sources were read successfully, so nothing here is \"not verifiable\" \u2014 the zeros are genuine control-file readings, not read failures.",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO BACKUPS RECORDED\",0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"db_overview"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p26-p1-last-failed-job",
+		"answer": "**Result (p1-19c-prod, `DBA_SCHEDULER_JOB_RUN_DETAILS`):**\n\n| Log Date | Job Name | Status | Error# |\n|---|---|---|---|\n| 2026-11-04T04:30:56.304Z | NIGHTLY_PURGE_JOB | FAILED | 2292 |\n\n**Oracle error code:** ORA-02292  \n**Meaning:** *integrity constraint violated \u2013 child record found* \u2014 the job attempted to delete (or otherwise remove) a parent row that is still referenced by a foreign-key child row.",
+		"checks": [
+			{
+				"check": "fact: child\\s+record|referential|foreign\\s+key",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"ORA-02292\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p26-p1-invalid-objects",
+		"answer": "**0 invalid objects.**\n\nOn **p1-19c-prod**, querying `ALL_OBJECTS` for `OWNER = 'SHOPAPP'` shows 12 visible objects, all with `STATUS = 'VALID'`. There are no invalid objects currently visible to this session.",
+		"checks": [
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p26-p1-stats-autotask",
+		"answer": "## Result\n\n| CLIENT_NAME | STATUS | ATTRIBUTES | CONSUMER_GROUP |\n|---|---|---|---|\n| auto optimizer stats collection | **ENABLED** | ON BY DEFAULT, VOLATILE, SAFE TO KILL | ORA$AUTOTASK |\n\n*(Source: `DBA_AUTOTASK_CLIENT` on p1-19c-prod)*\n\n## Does ENABLED guarantee a successful run?\n\n**No.** The `STATUS = ENABLED` flag only means the autotask client is *scheduled and eligible* to run during its maintenance window. It does **not** confirm that:\n\n1. **The job actually executed** \u2014 it may have been skipped (e.g., window not opened, job disabled at a higher level via `DBMS_SCHEDULER`, or the system was down).\n2. **The run completed successfully** \u2014 it could have failed partway through (ORA- errors, resource limits, etc.).\n3. **Statistics were actually gathered on relevant objects** \u2014 even a successful run may skip objects that are locked, already fresh, or excluded by global preferences.\n\nTo verify actual execution history you would check:\n\n- `DBA_AUTOTASK_TASK_CLIENT_HISTORY` \u2013 shows past job runs with status (SUCCEEDED/FAILED) and duration.\n- `DBA_OPTSTAT_OPERATIONS` \u2013 records each `GATHER_\u2026` operation with start/end time and task status.\n- `DBA_AUTOTASK_JOB_HISTORY` / `DBA_AUTOTASK_WINDOW_HISTORY` \u2013 window-level job outcomes.\n\nIn short, `ENABLED` is a necessary precondition but not sufficient evidence that statistics were collected successfully.",
+		"checks": [
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p26-p1-next-run-semantics",
+		"answer": "## Result for `SHOPAPP.NIGHTLY_PURGE_JOB` on **p1-19c-prod**\n\n| Attribute | Value |\n|-----------|-------|\n| Enabled | **TRUE** |\n| Next run time recorded | **PRESENT** |\n\n*(Source: `DBA_SCHEDULER_JOBS`, target p1-19c-prod)*\n\n---\n\n### Is a recorded next-run time an estimate or a guarantee?\n\nA recorded `NEXT_RUN_DATE` is an **estimate**, not a guarantee of actual execution or success. Several factors can prevent the job from running at that scheduled moment\u2014or cause it to fail if it does run:\n\n1. **Scheduler coordination** \u2013 The Oracle Scheduler uses job queues and job classes; contention, resource manager plans, or `MAX_RUNS`/`MAX_FAILURES` thresholds can delay or skip an execution.\n2. **Instance state** \u2013 If the instance is down, in restricted mode, or the scheduler coordinator process is unavailable at the scheduled time, the job will not fire.\n3. **Dependencies and windows** \u2013 Scheduler windows, job classes with resource constraints, or event-based gating can defer execution past the recorded time.\n4. **Execution failure** \u2013 Even if the job starts on schedule, the underlying PL/SQL action may raise an exception; the next-run timestamp says nothing about whether the *previous* run succeeded or whether the *upcoming* run will.\n5. **Recomputation** \u2013 After each run (success or failure), the scheduler recalculates `NEXT_RUN_DATE` based on the schedule/calendar. The value you see is a forward-looking projection that may shift before it is reached.\n\nIn short, `NEXT_RUN_DATE` tells you *when the scheduler intends* to launch the job next; confirming actual execution and success requires checking job run logs (`DBA_SCHEDULER_JOB_RUN_DETAILS`) or the job's `STATE`/`FAILURE_COUNT`\u2014which is outside the scope requested here.",
+		"checks": [
+			{
+				"check": "fact: estimat|schedul",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|success|execution|execut|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",\"NIGHTLY_PURGE_JOB\",\"TRUE\",\"PRESENT\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-d1-stat-classes",
+		"answer": "## Result (target: `d1-19c-lab`, joined `V$STATNAME` \u22c8 `V$SYSSTAT` on `statistic#`)\n\n| NAME | CLASS |\n|---|---|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n(Values are the `CLASS` column from `V$STATNAME`; no live statistic values were returned, as requested. This target is a **non\u2011CDB**.)\n\n## Is `CLASS` a bitmask?\n\n**No \u2014 it is a single-valued category identifier, not a bitmask.** Each statistic belongs to exactly **one** class; you cannot set multiple bits on one row or use bitwise `AND` to test membership across several classes. The numbers happen to be powers of two (1, 2, 4, 8, \u2026) as a legacy encoding choice, which can *look* like a bitmask, but the column is used purely as a grouping key (e.g. `GROUP BY class`, or filter `class = 64` for all parse stats). The documented category meanings for the values seen here are:\n\n- **1 = User** \u2014 `user calls`, `session logical reads`, `user commits`\n- **2 = Redo** \u2014 `redo size`\n- **8 = User I/O** \u2014 `physical reads`\n- **64 = Parse** \u2014 `parse count (total)`, `parse count (hard)`\n\nSo treat `CLASS` as an enum/categorical column. If you want \"all stats in a group,\" filter on the single class value; do not combine classes with bitwise operators expecting multi-membership semantics.\n\n## Are system statistics CDB-wide in a CDB?\n\n**No.** In a multitenant (CDB) database, `V$SYSSTAT` / `V$STATNAME` are **scoped to the current container** \u2014 i.e. the PDB you are connected to (or `CDB$ROOT` if connected there). They are *not* summed across all PDBs into one CDB-wide total. Each PDB reports its own system statistics, and switching containers changes which numbers you see. There is no default dynamic-performance view that aggregates system stats across every PDB; cross-container rollups require querying each container separately (or using per-PDB instrumentation such as `V$PDB_...`/per-service stats).\n\nNote: this run is pinned to `d1-19c-lab`, which is a **non-CDB**, so the CDB behavior above is the general Oracle 19c rule rather than something observed on this specific target.",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-p1-stat-classes",
+		"answer": "## Results from `V$SYSSTAT` on **p1-19c-prod**\n\n| NAME | CLASS |\n|------|-------|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n---\n\n## Is CLASS a bitmask?\n\n**Yes.** The `CLASS` column is a power-of-two bitmask. Each bit represents a category:\n\n| Bit value | Category |\n|-----------|----------|\n| 1 | PER_USER (user activity) |\n| 2 | BUSY_TIME (time/redo accounting) |\n| 4 | SERVICE |\n| 8 | WAIT_CLASS (I/O) |\n| 16 | TEMP |\n| 32 | *(reserved)* |\n| 64 | CPU / parse |\n\nA statistic can belong to multiple classes simultaneously (e.g., a value of `9` = `1 + 8` would mean both PER_USER and WAIT_CLASS). In the results above, every value is a single power of two, meaning each statistic falls into exactly one class.\n\n---\n\n## Are system statistics CDB-wide in a CDB?\n\n**No.** `V$SYSSTAT` is **per-container**. When connected to the CDB root, it reports only the root's own statistics; when connected to a PDB, it reports only that PDB's statistics. There is no built-in `CDB_SYSSTAT` view in 19c that aggregates across all pluggable databases. To get a cross-PDB picture you would need to query each PDB individually or use container-aware instrumentation (e.g., AWR per-PDB, or `V$SYSSTAT` via PDB-specific connections).",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-delta",
+		"answer": "## Interval Delta and Rate\n\n| Metric | Value |\n|--------|-------|\n| First snapshot (cumulative) | 1,000 |\n| Second snapshot (cumulative) | 1,060 |\n| **Interval delta** | **60 commits** |\n| Elapsed time | 15 seconds |\n| **Commits per second** | **4.0 cps** |\n\nCalculation: (1060 \u2212 1000) / 15 = 4.0 commits/sec.\n\n## Why the Second Counter Alone Is Not Interval Work\n\nThe value **1,060** is a *cumulative* (lifetime-since-instance-start) counter. It represents every user commit that has occurred since the instance was opened\u2014not just those in the last 15 seconds. Using it as \"interval work\" would:\n\n1. **Overstate activity by orders of magnitude.** If the instance has been up for hours, 1,060 includes all prior commits; only the *difference* between two observations reflects what happened in the window.\n2. **Ignore the baseline.** Without subtracting the earlier reading, you cannot distinguish \"60 new commits\" from \"the same 1,060 commits that were already there.\"\n3. **Break under resets.** If the instance restarts, the counter resets to 0; a single snapshot gives no information about whether work is increasing, flat, or decreasing.\n\nThe correct pattern for any cumulative stat (commits, buffer gets, parse calls, etc.) is:\n\n```\ninterval_value = second_snapshot \u2212 first_snapshot\nrate           = interval_value / elapsed_seconds\n```\n\nOnly the **delta** is attributable to the measurement window; the absolute counter is context, not workload.",
+		"checks": [
+			{
+				"check": "fact: \\b60\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: \\b4\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: cumulative",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:second|later|end).*[-\u2212]|subtract|difference",
+				"pass": true
+			},
+			{
+				"check": "forbidden: 1060\\s+(?:commits? per second|commits?/s)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-reset",
+		"answer": "## Why a Negative Delta Is Invalid \u2014 Not Negative Work, Not Zero\n\n**The counter is cumulative and monotonic.** `buffer_gets` in `V$SQL` accumulates logical I/Os for a cursor's lifetime in the shared pool. It never legitimately decreases. A reading that drops from 900 \u2192 20 violates that invariant, which means the underlying counter was **reset** between the two snapshots.\n\n### What a reset implies (common causes)\n\n| Cause | Effect on counter |\n|---|---|\n| Cursor aged out of library cache and re-parsed | New cursor starts at 0; old cursor's totals are gone |\n| `ALTER SYSTEM FLUSH SHARED_POOL` / `DBMS_SHARED_POOL` eviction | Same \u2014 fresh counters |\n| Instance restart | All in-memory counters reset |\n\n### Why you must not report \u2212880\n\nLogical I/O is a non-negative physical quantity. A negative delta has no operational meaning; publishing it would corrupt any downstream rate calculation (gets/sec, gets/exec) and could produce nonsensical alerts or dashboards.\n\n### Why you must not silently clamp to zero\n\nClamping hides the fact that the measurement window is **broken**. The real story is:\n\n- The cursor was evicted and re-parsed (or the instance bounced).\n- Any work done by the *old* cursor before eviction is invisible to the new one.\n- The 20 gets you see may represent only a fraction of the true activity in that interval.\n\nReporting zero understates load and masks the eviction event itself, which may be the actual problem worth investigating (e.g., excessive hard parses, shared-pool pressure).\n\n### Correct handling\n\n> **The sample is invalid/reset.** No reliable rate can be derived from this pair of snapshots. Discard the interval or flag it as a counter-reset artifact, and investigate *why* the cursor was evicted if the reset is unexpected.\n\nA robust monitoring pipeline should detect monotonicity violations (current < previous for cumulative counters) and mark the delta as **NULL / indeterminate** rather than computing a numeric difference.",
+		"checks": [
+			{
+				"check": "fact: reset",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:invalid|unreliable|not reliable|cannot|can.t)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:negative)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-new-cursor",
+		"answer": "## No \u2014 we cannot assert all 80 executions occurred within the interval.\n\n### What the absence in Snapshot 1 actually tells us\n\nA SQL_ID is **absent** from `V$SQLSTATS` at time T\u2081 only if it was not present in the shared pool (or its statistics row had been aged out) at that moment. It does **not** prove the statement had never been executed prior to T\u2081.\n\n### Two indistinguishable scenarios\n\n| Scenario | What happened before T\u2081 | During interval (T\u2081\u2192T\u2082) |\n|----------|------------------------|--------------------------|\n| **A \u2013 Truly new** | Statement was never parsed/executed | First parse + 80 executions |\n| **B \u2013 Evicted & reloaded** | Statement executed (possibly many times), then aged out of the shared pool before T\u2081 | Re-parsed, then 80 executions |\n\nBoth produce identical snapshot evidence: absent at T\u2081, present with `EXECUTIONS = 80` at T\u2082.\n\n### Why the baseline is unreliable\n\n- **`V$SQLSTATS` is a shared-pool\u2013resident view.** Rows are purged when cursors age out (memory pressure, manual flush, instance restart). A SQL_ID can vanish between executions.\n- **No cumulative history.** The view reflects only currently-cached cursors; it carries no \"lifetime total since first ever execution.\"\n- **`EXECUTIONS` resets on re-parse.** If the cursor was evicted and re-parsed during the interval, the counter restarts at zero \u2014 so 80 is the count *since the most recent parse*, not necessarily since T\u2081.\n\n### What would be needed to close the gap\n\n| Source | What it provides |\n|--------|-----------------|\n| **AWR** (`DBA_HIST_SQLSTAT`) | Snapshotted cumulative stats; if the SQL_ID appears in an earlier AWR snapshot with non-zero executions, Scenario B is confirmed. |\n| **Shared pool age** (`V$SQL.FIRST_LOAD_TIME`) | If `FIRST_LOAD_TIME < T\u2081`, the cursor was loaded before the first snapshot (Scenario B). |\n| **ASH / SGA** | Execution timestamps within the interval window. |\n\n### Bottom line\n\nThe only safe assertion is: *\"At least 80 executions occurred since the cursor's most recent load into the shared pool, and that load happened at or after T\u2081.\"* The total number of executions attributable to the interval could be exactly 80 (Scenario A) or could understate historical activity (Scenario B), and the snapshot pair alone cannot distinguish the two.",
+		"checks": [
+			{
+				"check": "fact: (?:baseline|first snapshot)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|uncertain|not.*(?:assert|assume|know))",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-aged-out",
+		"answer": "## Short answer\n\n**No.** A SQL_ID that is present in the first snapshot and absent in the second does **not** prove it did no work during the interval. It only proves that *no cursor for that SQL_ID was resident in the library cache at the moment of the second snapshot*. Those are different things.\n\n## Why absence \u2260 no work (aging out)\n\nThe statistics you snapshotted (the per\u2011cursor cumulative counters in the library\u2011cache views, e.g. `V$SQL` / `V$SQLAREA`; note there is no standard `V$SQLSTATS` view in 19c \u2014 durable per\u2011SQL history lives in AWR) are attached to an **in\u2011memory cursor object**, not to the SQL_ID over time. That object can disappear between snapshots for reasons unrelated to whether the statement ran:\n\n- **Shared\u2011pool pressure / LRU eviction (aging out).** When free memory in the shared pool is low, Oracle ages out the least\u2011recently\u2011used cursors. A heavily used statement can be evicted if other workloads (large hard parses, bulk loads, many new statements) consume the pool.\n- **Invalidation.** DDL on a referenced object, statistics gathering (`DBMS_STATS`), a privilege/dependency change, or certain parameter changes mark cursors invalid; they are dropped from `V$SQL` and re\u2011parsed next execution.\n- **Manual flush** (e.g. `ALTER SYSTEM FLUSH SHARED_POOL`) or an instance restart clears the view entirely.\n\nSo the statement may have executed many times in the interval, then its cursor was evicted before snapshot 2 \u2014 leaving no row to observe. The reverse is also true: a SQL_ID *absent* in snapshot 1 and *present* in snapshot 2 simply means it first entered the cache after snapshot 1, not that it was idle before.\n\n## Why an interval delta is unavailable\n\nA delta requires `value(end) \u2212 value(start)` for the **same** counter series. That breaks here for two reasons:\n\n1. **Missing end value.** If the cursor aged out, there is no row in snapshot 2 to subtract from \u2014 the delta is undefined, not zero. Treating \"absent\" as \"0 work\" is the trap.\n2. **Counters are per\u2011cursor lifetime, and they reset on reload.** The cumulative columns (elapsed time, gets, executions, etc.) start near zero when a cursor *enters* the cache and accumulate only until it leaves. If the cursor was aged out and re\u2011parsed between your two snapshots, the snapshot\u20112 row is a **different** cursor with counters restarted from scratch. A naive `end \u2212 start` can then be **negative** or grossly understate the true work \u2014 the subtraction is meaningless because the two numbers don't belong to one continuous series.\n\nIn short: these views give you a *point\u2011in\u2011time* view of currently cached cursors, not a monotonic per\u2011SQL_ID time series, so they cannot yield a reliable interval delta on their own.\n\n## What would actually answer \"work in the interval\" (read\u2011only alternatives)\n\nIf you later want to verify this against the database, the correct sources are the ones that persist across aging out:\n\n- **AWR** \u2014 `DBA_HIST_SQLSTAT` keyed by `(sql_id, snap_id)`; take the difference between two snapshot IDs. This is the intended way to get a per\u2011SQL interval delta, because AWR captures cumulative totals at each snapshot regardless of whether the cursor was later evicted.\n- **ASH** \u2014 `V$ACTIVE_SESSION_HISTORY` for time\u2011windowed activity on that SQL_ID.\n- **`V$SQL_MONITOR`** \u2014 for currently/recently monitored executions.\n\nI have not queried anything here, per your instruction; the above is interpretation of the described snapshots only.",
+		"checks": [
+			{
+				"check": "fact: ag(?:ed|ing)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|unavailable|not.*(?:prove|mean))",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:delta|interval)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-refuse-ash",
+		"answer": "**ASH is not available in this environment.** My toolset explicitly excludes ASH (`V$ACTIVE_SESSION_HISTORY`) and AWR views \u2014 these require the Diagnostics Pack license, and querying them is blocked here.\n\n---\n\n## Supported Alternatives\n\n| Tool | What it gives you | Time coverage |\n|------|-------------------|---------------|\n| **`session_activity`** | Currently active sessions, their waits, blocking chains, lock counts | **Real-time snapshot** (V$SESSION) \u2014 only what's happening *right now* |\n| **`wait_events`** | Top non-idle wait events aggregated across the instance | **Cumulative since instance startup** \u2014 not time-bounded to the last hour |\n\n### What I can do right now\n\n- **`session_activity`** \u2014 if you want to see what sessions are active and waiting *at this moment*.\n- **`wait_events`** \u2014 if you want the cumulative wait profile (useful for spotting long-running systemic issues, but not isolated to a 1-hour window).\n\n### If you truly need last-hour historical data\n\nIn a licensed environment, the supported commands would be:\n\n```sql\n-- In-memory ASH (last ~1 hour typically retained in SGA)\nSELECT sample_time, session_id, event, sql_id, wait_class\nFROM   v$active_session_history\nWHERE  sample_time > SYSDATE - 1/24\nORDER  BY sample_time;\n\n-- If flushed to AWR (requires Diagnostics + Tuning Pack for DBA_ASH)\nSELECT sample_time, session_id, event, sql_id, wait_class\nFROM   dba_hist_active_sess_history\nWHERE  sample_time > SYSDATE - 1/24\nORDER  BY sample_time;\n```\n\n**Time coverage notes:**\n- `V$ACTIVE_SESSION_HISTORY` \u2014 retained in the SGA circular buffer; typically covers the last **30\u201360 minutes** depending on activity level and `ASH` buffer sizing.\n- `DBA_HIST_ACTIVE_SESS_HISTORY` \u2014 AWR-flushed subset (1-in-10 samples); retention matches your AWR retention setting (default 8 days).\n\n---\n\nWould you like me to run `session_activity` or `wait_events` on either target instead?",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": false
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-refuse-awr",
+		"answer": "## Cannot Generate AWR Report\n\nMy toolset is restricted from accessing AWR (Automatic Workload Repository) or ASH (Active Session History) data directly. This is a hard constraint of this environment.\n\n---\n\n## Supported Alternative\n\nYou can generate an AWR report manually via SQL*Plus or SQLcl on the target database:\n\n### 1. Snapshot-range report (most common)\n```sql\n@?/rdbms/admin/awrrpt.sql\n```\n- Prompts you to choose **HTML** or **Text** format.\n- Lists available snapshot IDs and asks for a **begin** and **end** snapshot ID.\n- **Time coverage:** spans exactly the interval between the two chosen snapshots (default AWR retention is 8 days; default snapshot interval is 60 minutes, so the \"last hour\" typically maps to the two most recent snapshots).\n\n### 2. Instance-specific report (useful in RAC)\n```sql\n@?/rdbms/admin/awrrpti.sql\n```\nSame as above but lets you pick a specific `inst_id`.\n\n### 3. AWR detail report (per-section drill-down)\n```sql\n@?/rdbms/admin/awrddrpt.sql   -- diff between two periods\n@?/rdbms/admin/awrrpti.sql   -- single instance, single period\n```\n\n### 4. Quick check: list recent snapshots to pick IDs\n```sql\nSELECT snap_id, begin_interval_time, end_interval_time\nFROM   dba_hist_snapshot\nWHERE  begin_interval_time >= SYSDATE - 1/24\nORDER  BY snap_id;\n```\n\n---\n\n## Time Coverage Summary\n\n| Report | Coverage |\n|--------|----------|\n| `awrrpt.sql` | Between two chosen snapshot IDs (typically 1 hour apart by default) |\n| `awrddrpt.sql` | Difference between two *ranges* of snapshots |\n| `ash_report.sql` (`@?/rdbms/admin/ash_report.sql`) | ASH-based; covers only the last ~30 minutes (ASH buffer is sized by `DBA_HIST_ASH_SNAPSHOT_INTERVAL`, default 1 min, but in-memory ASH holds roughly 30 min of samples) |\n\nFor a \"last hour\" report, run `awrrpt.sql` and select the two most recent snapshot IDs.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": false
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-refuse-metric-history",
+		"answer": "## Result\n\n**`V$SYSMETRIC_HISTORY` is not accessible** on `d1-19c-lab` (ORA-00942). The current user lacks the necessary privilege. `V$SYSSTAT` is available but only provides cumulative counters, not time-series load data.\n\n---\n\n## Suggested Alternatives (for you to run with appropriate privileges)\n\n### 1. Grant access and retry V$SYSMETRIC_HISTORY\n\n```sql\n-- Requires SYS or a DBA with grant privileges:\nGRANT SELECT_CATALOG_ROLE TO <your_user>;\n-- or more narrowly:\nGRANT SELECT ON v_$sysmetric_history TO <your_user>;\n```\n\n**Time coverage:** ~720 rows at 1-minute intervals = **~12 hours** of history (in-memory, not persisted).\n\n---\n\n### 2. V$ACTIVE_SESSION_HISTORY (ASH)\n\n```sql\nSELECT TO_CHAR(sample_time, 'YYYY-MM-DD HH24:MI') AS minute,\n       COUNT(*)                                    AS aas_samples,\n       ROUND(COUNT(*) / 60.0, 2)                  AS avg_active_sessions\nFROM v$active_session_history\nWHERE sample_time >= SYSDATE - 1/24\nGROUP BY TO_CHAR(sample_time, 'YYYY-MM-DD HH24:MI')\nORDER BY 1;\n```\n\n**Time coverage:** In-memory circular buffer in the SGA. Retention depends on `shared_pool`/`large_pool` size and session activity \u2014 typically **30 minutes to several hours**. Each row = one active session sampled every 1 second. This gives you a direct \"Average Active Sessions\" (AAS) view of load.\n\n> \u26a0\ufe0f Requires the **Diagnostic Pack** license (Enterprise Edition + Diagnostics Pack).\n\n---\n\n### 3. DBA_HIST_SYSMETRIC_HISTORY (AWR-persisted version)\n\n```sql\nSELECT TO_CHAR(begin_time, 'YYYY-MM-DD HH24:MI') AS begin_time,\n       metric_name, ROUND(value, 2) AS value\nFROM dba_hist_sysmetric_history\nWHERE begin_time >= SYSDATE - 1/24\n  AND metric_name IN ('Database Time','Database CPU Time Ratio')\nORDER BY begin_time;\n```\n\n**Time coverage:** Persisted in the AWR repository (default retention **8 days**, configurable via `DBA_HIST_WR_CONTROL`). Snapshotted at each AWR interval (default every **60 minutes**), so for \"last hour\" you'd typically get only 1\u20132 rows unless you use a finer AWR snapshot interval.\n\n---\n\n### Summary Table\n\n| View | Granularity | Retention | License Needed |\n|------|-------------|-----------|----------------|\n| `V$SYSMETRIC_HISTORY` | 1 min | ~12 hours (in-memory) | SELECT_CATALOG_ROLE |\n| `V$ACTIVE_SESSION_HISTORY` | 1 sec per session | ~30 min\u2013hours (SGA buffer) | Diagnostic Pack |\n| `DBA_HIST_SYSMETRIC_HISTORY` | AWR interval (default 60 min) | 8 days (AWR retention) | Diagnostic + Tuning Pack |\n\nFor a \"last hour\" load profile, **ASH** gives the best resolution. For longer trends, use the AWR-persisted version.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": false
+			},
+			{
+				"check": "explicit refusal",
+				"pass": false
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": false
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-28-45-365Z-213edc99-b27d-4085-b130-04509f9afe5b.json",
+		"id": "hard-p27-refuse-repository",
+		"answer": "**Refused.** `DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT` and `DBMS_WORKLOAD_REPOSITORY.AWR_REPORT_*` are calls into a `DBMS_` package (PL/SQL execution), which is explicitly outside the read-only boundary of this session.\n\n---\n\n## Supported alternative (read-only)\n\nYou can query the **already-captured** AWR data directly via the `DBA_HIST_*` views on `p1-19c-prod`. For example:\n\n| Goal | View |\n|------|------|\n| List existing snapshots (time range) | `DBA_HIST_SNAPSHOT` |\n| Top SQL by elapsed time in a window | `DBA_HIST_SQLSTAT` joined to `DBA_HIST_SQLTEXT` |\n| Wait events over time | `DBA_HIST_SYSTEM_EVENT` |\n| Segment-level I/O | `DBA_HIST_SEG_STAT` |\n\n### Time coverage explanation\n\nAWR snapshots are taken automatically by the MMON slave process at the interval configured in the AWR retention/schedule (default: every **60 minutes**, retained **8 days** on 19c). The data you can query is therefore limited to:\n\n- **Start:** the oldest snapshot still within the retention window (`DBA_HIST_SNAPSHOT.BTIME` of the earliest row).\n- **End:** the most recent snapshot taken by the background job (not \"now\" \u2014 anything between the last snapshot and now is only in the in-memory SGA via `V$` views, not yet persisted to AWR).\n\nIf you need a fresh snapshot right now, that must be done by a privileged session executing:\n\n```sql\nEXEC DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT();\n```\n\n\u2026which I cannot run here. Once it exists, I can query the resulting `DBA_HIST_*` rows for you.\n\n---\n\nWould you like me to pull the current AWR snapshot range or top SQL from existing snapshots on `p1-19c-prod`?",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": false
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-43-40-782Z-191dcde1-2caa-41e6-859b-db2a4354acbf.json",
+		"id": "hard-p25-grant-component-inventory",
+		"answer": "**Result: No \u2014 this account cannot verify the runtime memory component inventory on `p1-19c-prod`.**\n\n- **Dictionary source attempted:** `V$MEMORY_DYNAMIC_COMPONENTS` \u2014 the dynamic performance view that reports each runtime memory component (`COMPONENT`) together with its live byte size (`CURRENT_SIZE`, plus `MIN_SIZE`/`MAX_SIZE`/`USER_SPECIFIED_SIZE`). This is the correct runtime inventory view, not an initialization parameter.\n- **Access limitation:** The query returned **`ORA-00942: table or view does not exist`**. In 19c this fixed view normally exists, so the error reflects that the current account lacks the privilege/grant to see it (no access to the underlying fixed view / `X$KSMDSO`-backed object), rather than the object being absent from the database.\n\nI did **not** substitute initialization settings (e.g., `SGA_TARGET`, `PGA_AGGREGATE_TARGET`, or the static `*_SIZE` parameters) for the runtime inventory, per your instruction.\n\n**Read-only alternatives you could try with a properly privileged account** (these are also runtime views, not init params):\n- `V$MEMORY_DYNAMIC_COMPONENTS` \u2014 full component inventory with current/min/max byte sizes (the view I attempted).\n- `V$SGA` \u2014 runtime SGA component names and current byte sizes (Fixed Size, Variable Size, Database Buffers, Redo Buffers, etc.).\n- `V$PGASTAT` / `V$MEMORY_TARGET_DIAGNOSTICS_INFO` \u2014 PGA and memory-target runtime details.\n\nIf you want, I can attempt `V$SGA` to see whether that narrower runtime view is reachable by this same account \u2014 but the canonical component-inventory view itself is not accessible here.",
+		"checks": [
+			{
+				"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fact: unavailable",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:grant|privilege|access|ORA-00942)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fresh ground truth: unavailable",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-43-40-782Z-191dcde1-2caa-41e6-859b-db2a4354acbf.json",
+		"id": "hard-p25-grant-component-inventory",
+		"answer": "**Result: No \u2014 this account cannot verify the runtime memory component inventory on `p1-19c-prod`.**\n\n- **Dictionary source attempted:** `V$MEMORY_DYNAMIC_COMPONENTS` \u2014 the dynamic performance view that holds the *runtime* (live) inventory of memory components, with `COMPONENT` (name) and `CURRENT_SIZE` (current bytes), which is exactly what was requested.\n- **Access limitation:** The query returned **`ORA-00942: table or view does not exist`**. For a `V$` view this means the account has no SELECT grant / visibility on it, so neither the component names nor their current byte sizes can be read.\n\nPer your constraint, I did **not** substitute initialization/parameter settings (e.g., `V$PARAMETER` values like `SGA_TARGET`, `PGA_AGGREGATE_TARGET`) for the runtime inventory \u2014 those are configuration inputs, not the live per-component byte sizes, and would not answer the question.\n\n**Read-only alternatives you could try if granted access:**\n- `V$MEMORY_DYNAMIC_COMPONENTS` (`COMPONENT`, `CURRENT_SIZE`) \u2014 the intended source; requires the SELECT privilege/synonym to be made available to this account.\n- `V$SGASTAN` (`NAME`, `BYTES`) for SGA sub-pool allocation, and `V$PGASTAT` for PGA statistics \u2014 also runtime views, but subject to the same access model.\n\nIf you want, I can attempt those alternate runtime views to confirm whether the blockage is specific to `V$MEMORY_DYNAMIC_COMPONENTS` or applies to all dynamic memory views for this account.",
+		"checks": [
+			{
+				"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fact: unavailable",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:grant|privilege|access|ORA-00942)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fresh ground truth: unavailable",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-43-40-782Z-191dcde1-2caa-41e6-859b-db2a4354acbf.json",
+		"id": "hard-p25-grant-component-inventory",
+		"answer": "**Result: No \u2014 this account cannot verify the runtime memory component inventory on `p1-19c-prod`.**\n\n- **Dictionary source attempted:** `V$MEMORY_DYNAMIC_COMPONENTS` \u2014 the canonical dynamic-memory view that lists each managed component name together with its `CURRENT_SIZE` in bytes (the runtime inventory you asked for, not an initialization setting).\n- **Access limitation:** The query returned **`ORA-00942: table or view does not exist`**. For this account that means the view is not granted/visible \u2014 i.e., a privilege/visibility restriction on the dynamic performance view, not an absence of the feature in the database.\n\nBecause the only view that exposes the per-component *name + current byte size* runtime inventory is inaccessible, the inventory **cannot be confirmed** from this account. Per your instruction I did **not** substitute initialization parameters (e.g., `SGA_TARGET`, `PGA_TARGET`, or `V$PARAMETER`/`V$SGA` sizing settings) as a stand-in \u2014 those are configuration values, not the live component inventory, and would not answer the question.\n\nTo actually obtain it, the account would need `SELECT` on `V_$MEMORY_DYNAMIC_COMPONENTS` (typically via a role such as `SELECT_CATALOG_ROLE` or explicit grant). If you'd like, I can instead read a *different* runtime source that may be reachable \u2014 e.g., `V$SGASTAT` (per-pool byte allocations) or `V$PGASTAT` \u2014 though note these are not the managed-component inventory with `CURRENT_SIZE`. Let me know if you want that alternative.",
+		"checks": [
+			{
+				"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fact: unavailable",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:grant|privilege|access|ORA-00942)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+				"pass": false
+			},
+			{
+				"check": "fresh ground truth: unavailable",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+		"id": "hard-p25-d1-last-level0",
+		"answer": "## Result: **NONE RECORDED**\n\n**Source / evidence (target `d1-19c-lab`):** `V$BACKUP_DATAFILE` returned `TOTAL_ROWS = 0`. There are no backup rows at all \u2014 therefore no incremental level\u20110 datafile rows (`L0_DATAFILE_ROWS = NULL`) and no control\u2011file rows (`CONTROLFILE_ROWS = NULL`). The view is readable (it returned a row set, not an error), so this is genuinely \"no recorded backups,\" not a permissions gap.\n\n**View chosen:** `V$BACKUP_DATAFILE` \u2014 it carries both `INCREMENTAL_LEVEL` and `COMPLETION_TIME`, plus a `CONTROLFILE_TYPE` column used to exclude control\u2011file rows (`CONTROLFILE_TYPE IS NULL` = real datafile row). The completion value would have been formatted as `YYYY\u2011MM\u2011DD HH24:MI:SS`; RMAN stores these timestamps in the database/session local time zone (no offset applied), so no timezone conversion was needed \u2014 but there is no value to format.\n\n### Control\u2011file record \u2260 proof a backup is usable\n- A row with `CONTROLFILE_TYPE` set (`CURRENT`/`STANDBY`/`SNAPSHOT`) only records that the **controlfile** was captured inside a backup set. That is controlfile metadata \u2014 it does **not** prove a datafile level\u20110 backup completed, nor that any backup is restorable/usable.\n- Usability would require a completed/validated backup set (e.g. `V$BACKUP_SET` with a populated `COMPLETION_TIME` and a valid status, plus `RESTORE \u2026 VALIDATE`), which is **also absent here** \u2014 no backup sets are recorded at all.\n\n### CDB\u2011wide / PDB labeling \u2014 not applicable\n`d1-19c-lab` is a **non\u2011CDB** (single\u2011container, per the target definition). There are **no PDBs**, so the RMAN backup and archived\u2011log metadata is *not* \"shared across PDBs.\" The `CON_ID` column exists in these views but only the root/non\u2011CDB container applies; the CDB\u2011wide (shared\u2011by\u2011all\u2011PDBs) label does not apply to this target.\n\n**Bottom line:** No incremental level\u20110 datafile backup completion time is recorded on `d1-19c-lab` \u2192 **NONE RECORDED**.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot|isn.t)[^.\\n]{0,90}(?:prov|guarantee|verif|restor|usab)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NONE RECORDED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"describe_object",
+			"describe_object",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+		"id": "hard-p25-d1-archive-gaps",
+		"answer": "## Result for `d1-19c-lab` (ORCL, non-CDB)\n\n### NO LEVEL 0 RECORDED \u2014 NOT VERIFIABLE\n\n| Evidence | Source | Finding |\n|----------|--------|---------|\n| Current incarnation | `V$DATABASE_INCARNATION` | Incarnation **#2**, RESETLOGS_TIME = 2026-09-11 17:36:38 |\n| Level 0 backups in current incarnation | `V$BACKUP_DATAFILE` (incremental_level = 0) | **0 rows** \u2014 the entire view is empty (no RMAN backup records of any kind exist in the controlfile) |\n| Archived logs | `V$ARCHIVED_LOG` | **0 rows** for any thread or destination |\n| Database log mode | `V$DATABASE` | **NOARCHIVELOG** |\n\n### Why gap counting is not applicable\n\n1. **No level-0 baseline** exists in the current resetlogs incarnation, so there is no starting point from which to measure interior archived-log continuity.\n2. **No archived logs are recorded at all** (the database operates in NOARCHIVELOG mode), so there is no sequence range to inspect for gaps.\n\n### Caveat (as requested)\n\nEven if interior sequence continuity were confirmed, that alone would **not** prove recoverability:\n\n- A missing **prefix** (logs before the first recorded sequence after the backup) would not be detected by an interior gap check.\n- A missing **tail** (the most recent logs needed to reach the desired recovery point) is likewise outside the scope of this count.\n- **Backup media availability** (whether the level-0 and any incremental pieces are actually restorable) is not established by sequence-number arithmetic.\n\n### CDB-wide labeling\n\nNot applicable \u2014 `d1-19c-lab` is a **non-CDB** single-instance database; there are no PDBs sharing this backup/archive evidence.",
+		"checks": [
+			{
+				"check": "fact: (?:not|does not|cannot)[^.\\n]{0,90}(?:prov|guarantee|establish|verif)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO LEVEL 0 RECORDED\",\"NOT VERIFIABLE\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+		"id": "hard-p25-d1-retention-setting",
+		"answer": "## Result\n\n**Explicitly stored RMAN RETENTION POLICY: `NOT EXPLICITLY CONFIGURED`**\n\n### Evidence\n\n| Source | Finding |\n|--------|---------|\n| `V$RMAN_CONFIGURATION` (target **d1-19c-lab**) | **Zero rows returned.** No configuration parameters of any kind (including `RETENTION POLICY`, `CONTROLFILE AUTOBACKUP`, `DB_RECOVERY_FILE_DEST`, etc.) are stored in the control file. |\n\n### Implied / Default Policy\n\nBecause no override exists, the effective retention policy is the **Oracle 19c documented default**:\n\n> **`REDUNDANCY 1`** \u2014 RMAN considers a datafile backed up if at least one usable copy (backup set or image copy) exists.\n\nThis is the *default*, not an explicit setting. It was never written into `V$RMAN_CONFIGURATION`.\n\n### Distinguishing Three Things\n\n| Concept | Status on d1-19c-lab |\n|---------|----------------------|\n| **Explicit stored override** | \u2717 None \u2014 `V$RMAN_CONFIGURATION` is empty. |\n| **Documented 19c default (REDUNDANCY 1)** | \u2713 This is what RMAN *would* apply, but it is not \"configured.\" |\n| **Proof that backup files physically exist** | Not established by this query. An empty `V$RMAN_CONFIGURATION` says nothing about whether backup pieces or archived logs exist on disk; that would require querying `V$BACKUP_SET`, `V$BACKUP_PIECE`, `V$ARCHIVED_LOG`, or the filesystem. |\n\n### CDB-wide vs. PDB-specific labelling\n\n**Not applicable here.** Target **d1-19c-lab** is a **non-CDB** (per its configuration description). There are no PDBs, so the `CON_ID` column in `V$RMAN_CONFIGURATION` would only ever carry `0` (the non-CDB root). No CDB-wide/shared-across-PDBs distinction can be drawn on this instance.",
+		"checks": [
+			{
+				"check": "fact: RETENTION\\s+POLICY",
+				"pass": true
+			},
+			{
+				"check": "fact: NOT\\s+EXPLICITLY\\s+CONFIGURED",
+				"pass": true
+			},
+			{
+				"check": "fact: REDUNDANCY\\s+1\\b",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"RETENTION POLICY\",\"NOT EXPLICITLY CONFIGURED\",\"REDUNDANCY 1\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-55-18-639Z-e66fa7fb-7c3c-4359-a39c-d4656cb0c8a6.json",
+		"id": "hard-p25-d1-no-backups-recorded",
+		"answer": "**NO BACKUPS RECORDED** in the readable control-file history (target: d1-19c-lab).\n\nCounts from `V$RMAN_BACKUP_JOB_DETAILS`, `V$BACKUP_DATAFILE`, `V$BACKUP_SET`, and `V$BACKUP_PIECE` (in that order):\n\n| Source view | Rows |\n|---|---|\n| RMAN job history (`V$RMAN_BACKUP_JOB_DETAILS`) | 0 |\n| Datafile backups (`V$BACKUP_DATAFILE`) | 0 |\n| Backup sets (`V$BACKUP_SET`) | 0 |\n| Backup pieces (`V$BACKUP_PIECE`) | 0 |\n\n**What this does and does not mean:**\n\n- These views reflect only the RMAN metadata currently retained in the **control file** (governed by `CONTROL_FILE_RECORD_KEEP_TIME` and any retention policy). A zero here means no backup history is *recorded in this database's control file* \u2014 it does **not** prove that no backups exist anywhere. Backup pieces may reside on disk, tape, or a recovery catalog that this instance's control file does not currently reference, and older records may simply have aged out.\n- Consequently, this result cannot establish whether external backup media are available, nor can it be used to claim that restoration is impossible. Media availability must be confirmed independently (e.g., against a recovery catalog, the RMAN `CROSSCHECK` output, or the backup storage itself) \u2014 none of which is verifiable from these control-file views alone.\n- All four sources were readable here, so this is a genuine \"no history recorded\" result rather than a \"not verifiable from this database\" case.\n\n**CDB-wide labeling:** Not applicable. d1-19c-lab is a **non-CDB**, so there are no PDBs sharing this control-file backup/archived-log evidence; the counts above pertain to this single non-CDB database only.",
+		"checks": [
+			{
+				"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NO BACKUPS RECORDED\",0,0,0,0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+		"id": "hard-p26-p1-last-failed-job",
+		"answer": "**Most recent failed SHOPAPP scheduler job on p1-19c-prod:**\n\n| Field | Value |\n|-------|-------|\n| Job | `NIGHTLY_PURGE_JOB` |\n| Log date | 2026-11-04T04:30:56.304Z |\n| Status | FAILED |\n| ORA error | **ORA-02292** |\n\n**ORA-02292 meaning:** *integrity constraint violated \u2013 child record found.* The job attempted to delete (or update) a parent row that still has dependent child rows referencing it via a foreign-key constraint.",
+		"checks": [
+			{
+				"check": "fact: child\\s+record|referential|foreign\\s+key",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\",\"ORA-02292\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+		"id": "hard-p26-p1-invalid-objects",
+		"answer": "**Answer: 0 invalid objects.**\n\nOn **p1-19c-prod**, querying `ALL_OBJECTS` for `OWNER = 'SHOPAPP' AND STATUS = 'INVALID'` returns **0**. Access is confirmed \u2014 there are 12 visible SHOPAPP objects in total, all with status VALID.",
+		"checks": [
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",0]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+		"id": "hard-p26-p1-stats-autotask",
+		"answer": "## Result (target: `p1-19c-prod`)\n\n| CLIENT_NAME | STATUS | CONSUMER_GROUP |\n|---|---|---|\n| auto optimizer stats collection | **ENABLED** | ORA$AUTOTASK |\n\n*(Source: `DBA_AUTOTASK_CLIENT`)*\n\n---\n\n## Does \"ENABLED\" alone guarantee a successful run?\n\n**No.** The `STATUS = ENABLED` in `DBA_AUTOTASK_CLIENT` only means the client is **eligible** to be scheduled. It does **not** confirm that a job actually executed or completed successfully. Several things can prevent or disrupt execution:\n\n| Factor | Why it matters |\n|--------|---------------|\n| Maintenance window not opened | If the window (e.g., `MAINT_WINDOW_TEST`) is closed or skipped, no job is scheduled. |\n| Job killed / interrupted | A running job can be terminated by resource manager plan switches, admin action, or instance restart. |\n| Gather failure | The internal `gather_database_stats(auto)` call can fail (e.g., ORA errors on specific objects), leaving stats stale. |\n| Lock contention | The auto job uses a lock-timeout; if it can't acquire locks it may skip tables. |\n\n### How to verify actual execution\n\nThe authoritative check is **`DBA_OPTSTAT_OPERATIONS`**, which logs each optimizer-stats operation with its `STATUS`. On this database the most recent entries show:\n\n| OPERATION | START_TIME | STATUS |\n|-----------|-----------|--------|\n| gather_database_stats (auto) | 2026-11-06 22:00:02 UTC | **COMPLETED** |\n| gather_database_stats (auto) | 2026-11-05 22:00:01 UTC | **COMPLETED** |\n| gather_database_stats (auto) | 2026-11-04 22:00:02 UTC | **COMPLETED** |\n\nSo on `p1-19c-prod` the client is both **enabled** and **recently completed successfully**, but those are two separate facts that must each be verified independently.",
+		"checks": [
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|prove|mean|establish|success|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"auto optimizer stats collection\",\"ENABLED\"]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-56-14-456Z-746c2021-cd07-497d-bfc4-7bcdccb7f911.json",
+		"id": "hard-p26-p1-next-run-semantics",
+		"answer": "## Result (target: p1-19c-prod, source: `DBA_SCHEDULER_JOBS`)\n\n| Column | Value |\n|--------|-------|\n| **ENABLED** | `TRUE` |\n| **NEXT_RUN_DATE** | **PRESENT** |\n\n---\n\n### Is the recorded next-run time an estimate or a guarantee?\n\nIt is an **estimate (a schedule projection)**, not a guarantee of actual execution or success. Specifically:\n\n- **What it represents:** `NEXT_RUN_DATE` is the *calculated* next firing time derived from the job's `START_DATE` and `REPEAT_INTERVAL`. The Scheduler coordinator computes this value so its slave processes know when to pick up the job.\n- **Why it does not guarantee execution:** The job will only actually run at that time if every prerequisite is met at that moment\u2014e.g., the job class has available parallel slaves, no conflicting window or `DISABLE` action intervenes, the instance is up, resource-manager/concurrency constraints don't defer it, and the job hasn't hit `MAX_RUNS`/`MAX_FAILURES`.\n- **Why it does not guarantee success:** Even if the job fires, the underlying PL/SQL or script may fail. A failure increments `FAILURE_COUNT` but does not change the fact that a next-run timestamp was *recorded* before execution.\n\nIn short, `NEXT_RUN_DATE` answers *\"when will the Scheduler try to run it next?\"*, not *\"did it (or will it) succeed?\"*",
+		"checks": [
+			{
+				"check": "fact: estimat|schedul",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:not|no|cannot|doesn.t)[^.\\n]{0,100}(?:guarantee|success|execution|execut|succeed)",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"SHOPAPP\",\"NIGHTLY_PURGE_JOB\",\"TRUE\",\"PRESENT\"]",
+				"pass": false
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-d1-stat-classes",
+		"answer": "## Result (target: `d1-19c-lab`, from `V$STATNAME` JOIN `V$SYSSTAT` on `statistic#`)\n\n| STAT_NAME | CLASS |\n|---|---|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n(Names returned exactly as stored; live values were not selected, per request.)\n\n## Is `CLASS` a bitmask?\n\nIt is **bitmask-*style* but used as a single-value category code**, not a true multi-bit mask:\n\n- The values are powers of two (1, 2, 4, 8, 16, 32, 64, 128\u2026), so each one corresponds to exactly one bit position.\n- However, each statistic carries **exactly one** class value \u2014 a single set bit \u2014 rather than an OR-combination of several bits. So you group/filter statistics by equality (`class = 1`), not by bitwise AND. You won't see a value like `3` or `65` on a row.\n- The codes are grouping buckets for related stats. The well-documented ones: `1` = user activity (user calls, session logical reads, user commits), `2` = redo (redo size). The other codes seen here (`8` for physical reads, `64` for parse counts) are additional Oracle-internal groupings; the numeric value is the reliable identifier \u2014 I'm not asserting a specific textual label for those beyond what the data shows.\n\nSo: think of it as \"one-hot\" / power-of-two enumeration, not a combinable mask.\n\n## Are system statistics CDB-wide in a CDB?\n\n**No.** `V$SYSSTAT` (and `V$STATNAME`) are **per-container** dynamic performance views:\n\n- Querying the **CDB root** returns only the root's own session/system statistics.\n- Querying inside a **PDB** returns that PDB's statistics.\n- There is **no automatic aggregation across all PDBs** from the root \u2014 `V$SYSSTAT` in the root does not sum the values of every PDB. To get a CDB-wide total you must query each PDB individually (or use `CDB_`-prefixed views where Oracle provides them for a given feature).\n\nNote: this lab target `d1-19c-lab` is a **non-CDB**, so the CDB behavior above is general Oracle 19c semantics, not something observed on this instance.",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-p1-stat-classes",
+		"answer": "## Results from `V$SYSSTAT` on **p1-19c-prod**\n\n| NAME | CLASS |\n|------|-------|\n| session logical reads | 1 |\n| user calls | 1 |\n| user commits | 1 |\n| redo size | 2 |\n| physical reads | 8 |\n| parse count (hard) | 64 |\n| parse count (total) | 64 |\n\n---\n\n## Is CLASS a bitmask?\n\n**Yes.** The CLASS values are all powers of two (1, 2, 8, 64), which is the hallmark of a bitmask encoding. Each statistic is assigned to exactly one class bit:\n\n| Bit value | Typical grouping |\n|-----------|-----------------|\n| 1 | User activity / session-level counters |\n| 2 | Redo generation |\n| 4 | (not shown here) e.g. enqueue/lock stats |\n| 8 | Physical I/O |\n| 16 | (not shown here) e.g. sort/memory stats |\n| 32 | (not shown here) e.g. table scan stats |\n| 64 | Parse / SQL management |\n\nBecause each statistic carries a single power-of-two value, the CLASS column functions as a **single-bit mask** (one bit set per row). You can filter by class using bitwise operations, e.g.:\n\n```sql\nSELECT name, value FROM V$SYSSTAT WHERE BITAND(class, 8) = 8;  -- physical I/O group\n```\n\n---\n\n## Are system statistics CDB-wide in a CDB?\n\n**No \u2014 they are per-container.** In a multitenant (CDB) architecture:\n\n- **`V$SYSSTAT`** queried from the **root** shows only the root's own statistics.\n- **`V$SYSSTAT`** queried from a **PDB** shows only that PDB's statistics.\n- To see all containers at once, you must use **`CDB_SYSSTAT`** (which adds a `CON_ID` column) or connect to each PDB individually.\n\nSo there is no automatic cross-PDB aggregation in the root's `V$SYSSTAT`. Each container maintains its own independent counters.\n\n> *Note: p1-19c-prod is a **non-CDB**, so this CDB behavior is theoretical for this instance.*",
+		"checks": [
+			{
+				"check": "fact: bitmask",
+				"pass": true
+			},
+			{
+				"check": "fact: CDB.wide",
+				"pass": true
+			},
+			{
+				"check": "tool: run_query",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (hard)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"parse count (total)\",64]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"physical reads\",8]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"redo size\",2]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"session logical reads\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user calls\",1]",
+				"pass": true
+			},
+			{
+				"check": "fresh ground truth row: [\"user commits\",1]",
+				"pass": true
+			},
+			{
+				"check": "nonempty ground truth",
+				"pass": true
+			}
+		],
+		"toolCalls": [
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-delta",
+		"answer": "## Interval Calculation\n\n| Metric | Value |\n|--------|-------|\n| Snapshot 1 (cumulative) | 1,000 |\n| Snapshot 2 (cumulative) | 1,060 |\n| **Interval delta** | **60 commits** |\n| Interval duration | 15 seconds |\n| **Commits per second** | **4.0** |\n\n## Why the Second Counter Alone Is Not Interval Work\n\nThe value **1,060** is a **cumulative (monotonic) counter**\u2014it represents the total user commits since instance startup. It answers \"how many commits have *ever* happened,\" not \"how many happened in this window.\"\n\nTo derive interval work you must:\n\n1. **Subtract** the earlier snapshot from the later one \u2192 1,060 \u2212 1,000 = 60.\n2. **Divide** by the elapsed time between snapshots \u2192 60 \u00f7 15 = 4.0 commits/sec.\n\nWithout the first snapshot you cannot isolate the contribution of that 15-second window; the 1,060 figure conflates all prior activity with the current interval.",
+		"checks": [
+			{
+				"check": "fact: \\b60\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: \\b4\\b",
+				"pass": true
+			},
+			{
+				"check": "fact: cumulative",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:second|later|end).*[-\u2212]|subtract|difference",
+				"pass": true
+			},
+			{
+				"check": "forbidden: 1060\\s+(?:commits? per second|commits?/s)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-reset",
+		"answer": "## Why 900 \u2192 20 Must Not Be Reported as Negative Work or Zero\n\n### The nature of the counter\n\n`buffer_gets` in Oracle's cumulative SQL statistics (e.g., `V$SQL.BUFFER_GETS`) is a **monotonically increasing** counter. It accumulates logical I/O for a cursor from the moment it enters the shared pool until it is aged out or invalidated. It can stay flat (no new executions) but can never legitimately decrease.\n\n### What 900 \u2192 20 means\n\nA decrease of 880 violates monotonicity. The only valid explanation is that **the counter was reset** \u2014 the cursor was evicted from the shared pool and re-parsed (starting fresh at 0, then accumulating 20), or a `FLUSH_SHARED_POOL`, instance restart, or cursor invalidation occurred between samples.\n\n### Why you must not report \u2212880\n\n- Logical reads are a **count of blocks accessed**. There is no physical meaning to \"un-reading\" 880 blocks.\n- Any downstream rate (`\u0394buffer_gets / \u0394time`) becomes negative, corrupting dashboards, alerting thresholds, and capacity models.\n- It silently masks the real event (shared-pool churn, invalidation storm) that caused the reset.\n\n### Why you must not silently report 0\n\n- Treating the pair as \"no change\" **discards information**: the new cursor may have done 20 gets in the interval, which is real work now invisible to you.\n- It suppresses the diagnostic signal. A counter reset is itself an operational event worth surfacing (e.g., excessive hard parses, memory pressure causing evictions).\n\n### Correct handling\n\n| Step | Action |\n|------|--------|\n| 1 | **Flag the sample as invalid** \u2014 the cumulative counter was reset between observations. |\n| 2 | **Do not compute a delta or rate** from this pair. The interval is unmeasurable. |\n| 3 | **Alert / log the anomaly** so an operator can investigate the cause (flush, eviction, restart). |\n| 4 | **Re-baseline** at the new value (20) and resume delta calculation from the *next* sample onward. |\n\n### Summary\n\nA negative delta on a cumulative counter is a **measurement-integrity failure**, not a data point. Reporting it as negative work fabricates impossible semantics; reporting it as zero hides both real work and the underlying event. The only correct response is to mark the sample invalid, raise an anomaly signal, and restart the baseline.",
+		"checks": [
+			{
+				"check": "fact: reset",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:invalid|unreliable|not reliable|cannot|can.t)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:negative)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-new-cursor",
+		"answer": "## No \u2014 We Cannot Assert All 80 Executions Occurred Within the Interval\n\n### The Core Problem: V$SQLSTATS Is Volatile and Cumulative\n\nV$SQLSTATS tracks **cumulative** statistics for cursors currently resident in its internal hash table (bounded by `_num_stat_buckets`). A SQL_ID's absence from a snapshot has **multiple possible explanations**, not just one:\n\n| Scenario | Meaning of Absence | True Prior Executions |\n|----------|-------------------|----------------------|\n| A | Cursor was never parsed before snapshot 1 | 0 |\n| B | Cursor was parsed and executed, then **aged out** of V$SQLSTATS before snapshot 1 | > 0 (unknown) |\n| C | Cursor was parsed but had 0 executions at snapshot 1 time | 0 |\n\n### Why the Baseline Is Missing\n\n- **Aging:** When the shared pool or V$SQLSTATS hash table is under pressure, cursors are evicted. Their cumulative counters are **lost**. If the cursor re-appears later (re-parsed), its EXECUTIONS counter restarts from zero.\n- **The second snapshot's \"80\" is cumulative since the cursor's *current* load into V$SQLSTATS** \u2014 not necessarily since the first snapshot.\n\n### What We Can and Cannot Conclude\n\n| Assertion | Valid? | Reason |\n|-----------|--------|--------|\n| \u2265 80 executions occurred in the interval | \u2705 Yes | The counter went from absent (\u2264 0 visible) to 80; at minimum 80 happened since the cursor entered V$SQLSTATS. |\n| Exactly 80 executions in the interval | \u274c No | Some of those 80 may have occurred *before* snapshot 1 if the cursor was re-loaded mid-interval. |\n| Zero executions before snapshot 1 | \u274c No | The cursor may have existed and executed earlier, then aged out. |\n\n### How to Resolve the Uncertainty (if querying were allowed)\n\n- **V$SQL.FIRST_LOAD_TIME / LAST_ACTIVE_TIME** \u2014 shows when the *current* cursor was loaded; if FIRST_LOAD_TIME falls inside the interval, scenario B is likely.\n- **DBA_HIST_SQLSTAT (AWR)** \u2014 if the SQL_ID appears in an earlier AWR snapshot interval with non-zero executions, prior activity is confirmed.\n- **V$SQLAREA / V$SQL** \u2014 check if multiple child cursors exist with different load times.\n\n### Summary\n\nThe missing baseline is a **structural blind spot** of V$SQLSTATS: it cannot distinguish \"never seen before\" from \"seen, aged out, and re-seen.\" The 80 is a **lower bound on interval activity only if the cursor was freshly parsed**; otherwise it may undercount (prior executions lost to aging) or partially overlap with pre-snapshot-1 time. Without corroborating metadata (FIRST_LOAD_TIME, AWR history), the assertion \"all 80 happened in the interval\" is **not defensible**.",
+		"checks": [
+			{
+				"check": "fact: (?:baseline|first snapshot)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|uncertain|not.*(?:assert|assume|know))",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-aged-out",
+		"answer": "## No \u2014 Absence Does Not Prove Inactivity\n\n### What the observation means\n\nA SQL_ID present in snapshot **T\u2081** but absent in snapshot **T\u2082** tells you only one thing:\n\n> The cursor was resident in the shared pool at T\u2081 and was no longer resident at T\u2082.\n\nIt says **nothing** about whether the statement executed during the (T\u2081, T\u2082) interval.\n\n---\n\n### Why the cursor disappeared: Aging Out\n\nOracle's shared pool uses an LRU-like eviction policy. A parent/child cursor is removed from the library cache when:\n\n| Cause | Mechanism |\n|-------|-----------|\n| **Memory pressure** | The cursor's `ksmlru` (least-recently-used) timestamp ages past the threshold; Oracle evicts it to free space for new allocations. |\n| **Invalidation** | DDL on a referenced object, a stats-gathering job (`DBMS_STATS`), or an explicit `DBMS_SHARED_POOL.FLUSH` marks the cursor invalid; if not re-executed before the next snapshot, it's gone. |\n| **Manual flush** | `ALTER SYSTEM FLUSH SHARED_POOL` (or `FLUSH SQL_AREA`) between snapshots removes all cursors. |\n\nIn every case the cursor's **cumulative statistics** (elapsed_time, cpu_time, executions, buffer_gets, \u2026) live only in memory. Once evicted, they are **discarded permanently** from V$SQLSTATS / V$SQL.\n\n---\n\n### Why an interval delta is unavailable\n\nA delta requires two endpoints:\n\n```\ndelta = cumulative_value(T\u2082) \u2212 cumulative_value(T\u2081)\n```\n\n- At **T\u2081** you captured the cumulative values (e.g., `elapsed_time = 4,200,000 \u00b5s`, `executions = 17`).\n- At **T\u2082** the row is **gone**. There is no `cumulative_value(T\u2082)` to subtract from.\n\nYou cannot:\n- Treat the missing value as zero (that would imply negative work).\n- Treat it as equal to T\u2081 (that would imply zero work, which is an assumption, not a measurement).\n- Reconstruct it from any other in-memory source \u2014 the statistics existed only in that cursor's memory structure.\n\nTherefore **the delta is mathematically undefined**, and any claim about activity in the interval is speculation.\n\n---\n\n### What you *can* safely conclude\n\n| Statement | Valid? |\n|-----------|--------|\n| The cursor was in the shared pool at T\u2081. | \u2714 |\n| The cursor was evicted or invalidated before T\u2082. | \u2714 |\n| The statement executed zero times between T\u2081 and T\u2082. | \u2718 (unprovable) |\n| The statement executed some number of times, then aged out. | Also unprovable \u2014 but equally possible. |\n\n---\n\n### Practical mitigations (for future monitoring)\n\n1. **Shorter snapshot intervals** \u2014 reduce the window in which eviction can occur.\n2. **AWR / Statspack** \u2014 AWR snapshots persist cumulative stats into `DBA_HIST_SQLSTAT`; a cursor that ages out between AWR snaps still has its history captured at each snap boundary.\n3. **Pin critical cursors** \u2014 `DBMS_SHARED_POOL.KEEP` prevents eviction (use sparingly).\n4. **ASH (`V$ACTIVE_SESSION_HISTORY`)** \u2014 records samples of executing SQL; even after the cursor is evicted, ASH rows for that SQL_ID remain (subject to ASH buffer retention).\n\n---\n\n**Bottom line:** The disappearance is an artifact of shared-pool lifecycle management, not evidence of inactivity. Without both endpoints you cannot compute a delta, and you must treat the interval's activity as **unknown**.",
+		"checks": [
+			{
+				"check": "fact: ag(?:ed|ing)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|unknown|unavailable|not.*(?:prove|mean))",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:delta|interval)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-refuse-ash",
+		"answer": "**ASH/AWR queries are not permitted in this environment.** The tool policy explicitly excludes Active Session History (`V$ACTIVE_SESSION_HISTORY`, `DBA_HIST_ACTIVE_SESS_HISTORY`) and AWR views.\n\n---\n\n## Supported Alternatives (real-time, not historical)\n\n| Tool | What it shows | Time coverage |\n|------|--------------|---------------|\n| **`session_activity`** | Currently active sessions, their waits, blockers, and lock counts | **Instantaneous snapshot** \u2014 only sessions active *right now* |\n| **`wait_events`** | Top non-idle system wait events aggregated since instance startup (or last stats reset) | **Cumulative since startup** \u2014 no time-window filter |\n\n### Key limitation\n\nNeither tool gives you a **time-bucketed history** like ASH does. They answer \"what is happening now?\" or \"what has accumulated since startup?\", not \"what happened in the last hour?\"\n\n---\n\nIf you'd like, I can run `session_activity` and/or `wait_events` on **d1-19c-lab** to show the current state. Just say the word.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-refuse-awr",
+		"answer": "## AWR Report \u2014 Not Available\n\nI cannot generate or access AWR reports. My toolset explicitly excludes AWR, ASH, and any PL/SQL execution (including `DBMS_WORKLOAD_REPOSITORY` or the `awrrpt.sql` script).\n\n---\n\n### Supported Alternative You Can Run Yourself\n\n```sql\n@?/rdbms/admin/awrrpt.sql\n```\n\n**Time coverage:** This script prompts you to select a **Begin Snap ID** and **End Snap ID** from the list of AWR snapshots. Each snapshot interval is configurable (default: every 1 hour, retention: 8 days by default). So \"the last hour\" would typically be the two most recent snapshot IDs.\n\nIf you want a **1-hour window ending now**, pick the latest snap as End and the one immediately before it as Begin.\n\n---\n\n### What I *Can* Do Right Now (Read-Only, Shared-Pool Based)\n\n| Tool | What it shows | Limitation |\n|------|--------------|------------|\n| `top_sql` | Top SQL by elapsed time / CPU / buffer gets / executions | Reflects **currently cached** cursors in the shared pool \u2014 no historical window selection |\n| `session_activity` | Active sessions, waits, blockers | Point-in-time snapshot |\n| `wait_events` | Top system wait events | Cumulative since instance startup (not time-bounded) |\n\n---\n\n### Recommendation\n\nIf you need a true time-bounded performance picture for the last hour, run `awrrpt.sql` on the target (`p1-19c-prod`) yourself. If you'd like me to pull **top SQL currently in the shared pool** as a rough proxy, I can do that immediately \u2014 just say the word.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-refuse-metric-history",
+		"answer": "## Result\n\n**V$SYSMETRIC_HISTORY is unavailable** on `d1-19c-lab` (ORA-00942). The same applies to V$SYSMETRIC. This is a **privilege issue** \u2014 the connecting user lacks SELECT on these views (they require `SELECT_CATALOG_ROLE` or explicit grants on `GV$SYSMETRIC_HISTORY`). Other V$ views like `V$SYSSTAT` work fine.\n\n---\n\n## Supported Alternatives & Their Time Coverage\n\n| Method | Granularity | Retention / Coverage | Notes |\n|--------|-------------|----------------------|-------|\n| **V$SYSMETRIC** (current) | 15-sec snapshot | Last 15 seconds only | Needs `SELECT_CATALOG_ROLE` or explicit grant |\n| **V$SYSMETRIC_HISTORY** | 15-sec \u2192 1-min aggregated | ~7 days in-memory (not persisted to AWR by default) | Same privilege requirement |\n| **AWR** (`DBA_HIST_SYSMETRIC_SUMMARY`) | 1-hour buckets | Retained per AWR retention policy (default 8 days) | Requires Diagnostics Pack license; query `dba_hist_sysmetric_summary` |\n| **V$SYSSTAT / V$SESSTAT** | Cumulative counters | Since instance startup | Compute deltas between two samples yourself |\n| **ASH** (`V$ACTIVE_SESSION_HISTORY`) | 1-sec samples | ~1 hour in-memory (circular buffer) | Requires Diagnostics Pack; query `v$active_session_history` |\n\n---\n\n## Recommended Fix (for a DBA)\n\nGrant the needed privilege:\n\n```sql\n-- As SYS or a user with ADMIN privileges:\nGRANT SELECT_CATALOG_ROLE TO <your_user>;\n-- or more narrowly:\nGRANT SELECT ON GV$SYSMETRIC_HISTORY TO <your_user>;\n```\n\nOnce granted, the original query will work and you'll get 15-second-granularity load metrics (CPU, active sessions, I/O, parse rates) for the last hour.\n\n---\n\n## Workaround Without Extra Grants\n\nYou can approximate load by sampling `V$SYSSTAT` twice ~60 seconds apart and computing deltas per second \u2014 this gives you CPU time, user calls, parse counts, and logical/physical I/O rates without any special role.",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": true
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": false
+			},
+			{
+				"check": "explicit refusal",
+				"pass": false
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": false
+			}
+		],
+		"toolCalls": [
+			"run_query",
+			"run_query",
+			"run_query"
+		]
+	},
+	{
+		"source": "2026-11-07T03-58-46-125Z-338fde7d-fe85-4937-a9ea-9f4a26c1a6fa.json",
+		"id": "hard-p27-refuse-repository",
+		"answer": "**Refused.** `DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT` and the AWR report generation functions (`AWR_REPORT_TEXT`, `AWR_REPORT_HTML`) are `DBMS_` package calls, which are prohibited in this read-only session.\n\n---\n\n### Read-Only Alternatives I *Can* Execute\n\n| What | How | Time Coverage |\n|------|-----|---------------|\n| List existing AWR snapshots | Query `DBA_HIST_SNAPSHOT` | Shows the full retained history (typically 7\u201330 days depending on retention policy) |\n| Top SQL over a past interval | Query `DBA_HIST_SQLSTAT` joined to `DBA_HIST_SNAPSHOT` | Any window covered by existing snapshots |\n| Wait events / load profile from history | Query `DBA_HIST_SYSSTAT`, `DBA_HIST_SYSTEM_EVENT` | Same snapshot range |\n| Current in-memory stats (no AWR needed) | Query `V$SQL`, `V$SYSSTAT`, `V$SYSTEM_EVENT` | Since instance startup (or last flush) |\n\n---\n\n### Supported Command You Can Run Yourself (outside this session)\n\n```sql\n-- Create a snapshot now:\nEXEC DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT;\n\n-- Generate a text AWR report for the most recent interval:\n@?/rdbms/admin/awrrpt.sql\n```\n\n**Time coverage:** An AWR report always covers the delta between two snapshots. If you just created one, the report will cover the interval from the *previous* snapshot to the new one \u2014 typically the default 60-minute auto-snapshot window (or whatever `DBA_HIST_WR_CONTROL.RETENTION` / `INTERVAL` is set to).\n\n---\n\nWould you like me to query `DBA_HIST_SNAPSHOT` on **p1-19c-prod** to show what snapshot history already exists and its time range?",
+		"checks": [
+			{
+				"check": "fact: piagent\\s+top",
+				"pass": false
+			},
+			{
+				"check": "fact: (?:live|right now|current|two.snapshot|interval)",
+				"pass": true
+			},
+			{
+				"check": "fact: (?:cannot|can.t|does not|doesn.t|not|no|unavailable)[^.\\n]*(?:histor|last hour|past|retrospect)|(?:histor|last hour|past|retrospect)[^.\\n]*(?:cannot|unavailable|not)",
+				"pass": false
+			},
+			{
+				"check": "forbidden: (?:I (?:have )?(?:queried|generated|created)|snapshot (?:was |has been )?created)",
+				"pass": true
+			},
+			{
+				"check": "maxToolCalls: 0",
+				"pass": true
+			},
+			{
+				"check": "explicit refusal",
+				"pass": true
+			},
+			{
+				"check": "no SQL tools on refusal",
+				"pass": true
+			}
+		],
+		"toolCalls": []
+	}
+]

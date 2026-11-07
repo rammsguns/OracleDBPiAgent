@@ -18,9 +18,8 @@ function accessCode(error: unknown): string | undefined {
 /** This absence challenge has a fixed explanatory fact; fail if its fixture changes. */
 export function checkNoBackupsPremise(id: string, rows: unknown[][]): void {
 	if (id !== 'hard-p25-d1-no-backups-recorded') return;
-	const labels = ['RMAN job history', 'Datafile backups', 'Backup sets', 'Backup pieces'];
-	if (rows.length !== 4 || labels.some(label => rows.filter(row => row.length === 2 && row[0] === label && row[1] === 0).length !== 1)) {
-		throw new Error('p25 no-backups fixture changed: expected four labelled zero counts; review requiredFacts');
+	if (rows.length !== 1 || rows[0]?.length !== 4 || rows[0].some(value => value !== 0)) {
+		throw new Error('p25 no-backups fixture changed: expected four zero counts; review requiredFacts');
 	}
 }
 
