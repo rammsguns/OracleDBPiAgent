@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { classify, worst, exitCode, parseCheckConfig, loadCheckConfig, thresholdsFor, DEFAULTS, runChecks, collectors, renderCheckMarkdown, redact } from '../../src/check/index.js';
+import { classify, worst, exitCode, parseCheckConfig, loadCheckConfig, thresholdsFor, DEFAULTS, CHECK_NAMES, displayValue, defaultPasswordAccounts, evidenceReason, runChecks, collectors, renderCheckMarkdown, redact } from '../../src/check/index.js';
 import { appendCheckRun, runCheck } from '../../src/check/cli.js';
 import type { ToolContext } from '../../src/contracts.js';
 import { readFile } from 'node:fs/promises';
@@ -13,7 +13,7 @@ describe('check thresholds and exits', () => {
 	for (const [value,status] of [[15,'OK'],[14,'WARN'],[3,'CRIT'],[-1,'CRIT']] as const) it(`expiry ${value}`, () => expect(classify(value,DEFAULTS.expiry,true)).toBe(status));
 	for (const key of ['space','recovery','blocking','backupAge','failedJobs','alertErrors','maintenance'] as const) it(`${key} inclusive limits`, () => { expect(classify(DEFAULTS[key].warn,DEFAULTS[key])).toBe('WARN'); if (DEFAULTS[key].crit !== null) expect(classify(DEFAULTS[key].crit,DEFAULTS[key])).toBe('CRIT'); });
 	for (const [status,code] of [['OK',0],['WARN',1],['CRIT',2],['UNKNOWN',3]] as const) it(`exit ${status}`, () => { expect(exitCode(status)).toBe(code); expect(exitCode(status,'warn')).toBe(code); expect(exitCode(status,'crit')).toBe(status === 'WARN' ? 0 : code); });
-	it('UNKNOWN dominates; then CRIT then WARN', () => { expect(worst(['CRIT','UNKNOWN'])).toBe('UNKNOWN'); expect(worst(['OK','CRIT','WARN'])).toBe('CRIT'); expect(worst(['OK','WARN'])).toBe('WARN'); });
+	it('max_state_alt precedence is CRIT > WARN > UNKNOWN > OK', () => { expect(worst(['CRIT','UNKNOWN'])).toBe('CRIT'); expect(worst(['UNKNOWN','WARN'])).toBe('WARN'); expect(worst(['OK','UNKNOWN'])).toBe('UNKNOWN'); expect(worst(['SKIPPED'])).toBe('OK'); expect(worst(['OK','CRIT','WARN'])).toBe('CRIT'); expect(worst(['OK','WARN'])).toBe('WARN'); });
 	it('uses defaults and overrides without cross-target mutation', () => { const c = parseCheckConfig({version:1, defaults:{space:{warn:70,crit:90}},targets:{lab:{space:{warn:60,crit:80}}}},['lab','other']); expect(thresholdsFor(c,'lab').space.warn).toBe(60); expect(thresholdsFor(c,'other').space.warn).toBe(70); expect(DEFAULTS.space.warn).toBe(85); });
 	for (const raw of [null,[],{}, {version:2}, {version:1,password:'secret'}, {version:1,defaults:{bad:1}}, {version:1,targets:{unknown:{}}}, {version:1,defaults:{space:{warn:95,crit:85}}}, {version:1,defaults:{space:{warn:80,crit:101}}}, {version:1,defaults:{space:{warn:80,crit:90,extra:1}}}, {version:1,defaults:{windowHours:0}}, {version:1,defaults:{windowHours:721}}, {version:1,defaults:{expiry:{warn:3,crit:14}}}]) it(`rejects invalid config ${JSON.stringify(raw)}`, () => expect(() => parseCheckConfig(raw,['lab'])).toThrow());
 	it('requires mode 0600 and refuses symlinks, malformed or oversized files', () => {
@@ -120,3 +120,59 @@ it('opens one underlying session per target and propagates configuration errors'
 	await runChecks(context,['lab','other'],undefined,readers as unknown as typeof collectors,now);expect(opens).toBe(2);
 	const {SafeConfigError}=await import('../../src/config/safeErrors.js');context.sessions.get=async()=>{throw new SafeConfigError('Invalid password file');};await expect(runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now)).rejects.toThrow('Invalid password file');
 });
+for (const [value,unit,display] of [[3.7128466,'%','3.7 %'],[123.2044,'days','123.2 days'],[60.6,'seconds','61 seconds'],[26.12345,'hours','26.1 hours'],[5,'accounts','5 accounts'],[null,'days','UNKNOWN']] as const) it(`rounds ${unit} display without changing numeric value`,()=>expect(displayValue(value,unit)).toBe(display));
+it('formats raw JSON values and terminal Markdown with counts, pipes and backticks',async()=>{
+	const {context,readers}=fake(), space=readers.space;
+	readers.space=async()=>{const r=await space();r.sections.tablespaces.rows[0]!.usedPercentMax=3.712846619056;r.sections.tablespaces.rows[0]!.name='A|B`C';return r;};
+	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now), check=r.targets[0]!.checks[0]!;
+	expect(check.value).toBe(3.712846619056);expect(check.display).toBe('3.7 %');const text=renderCheckMarkdown(r);expect(text.split('\n')[0]).toBe('# Check: OK — 0 CRIT, 0 WARN, 0 UNKNOWN, 13 OK (lab)');expect(text).toContain('A\\|B\\`C');expect(text).toContain('> 0 = CRIT');expect(text).not.toContain('&gt;');expect(text).not.toContain('3.712846');
+});
+it('reports exact max_state_alt aggregate and exits for mixed findings',async()=>{
+	const {context,readers}=fake(), jobs=readers.jobs, security=readers.security;
+	readers.alerts=async()=>({status:'unavailable',view:'V$DIAG_ALERT_EXT',rows:[],truncated:false,attempts:[{code:'ORA-00942'}]}) as never;
+	readers.jobs=async()=>{const r=await jobs();r.sections.runs!.rows=[{STATUS:'FAILED'}];return r;};
+	let r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.status).toBe('WARN');expect(exitCode(r.status)).toBe(1);
+	readers.security=async()=>{const r=await security();r.checks[1]!.findings=[{subject:'SCOTT'}] as never;return r;};
+	r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.status).toBe('CRIT');expect(exitCode(r.status)).toBe(2);expect(renderCheckMarkdown(r)).toContain('# Check: CRIT — 1 CRIT, 1 WARN, 1 UNKNOWN, 10 OK (lab)');expect(r.targets[0]!.checks.find(x=>x.id==='defaultPasswords')!.note).toBe('Accounts: SCOTT.');
+});
+for (const code of ['ORA-00942','ORA-01031','ORA-65040']) it(`retains missing view and ${code} reason in collector results`,async()=>{
+	const {context,readers}=fake();readers.alerts=async()=>({status:'unavailable',view:'V$DIAG_ALERT_EXT',rows:[],truncated:false,attempts:[{view:'V$DIAG_ALERT_EXT',code}]}) as never;
+	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now), c=r.targets[0]!.checks.find(x=>x.id==='alertErrors')!;expect(c.status).toBe('UNKNOWN');expect(c.note).toContain('V$DIAG_ALERT_EXT');expect(c.note).toContain(code);expect(c.note).toContain(code==='ORA-65040'?'this PDB':'missing grant');
+});
+it('distinguishes configured-area absence, unreadable views, empty backup history and NOARCHIVELOG',async()=>{
+	const {context,readers}=fake(), space=readers.space, backup=readers.backup;
+	readers.space=async()=>{const r=await space();r.sections.recovery.rows=[];return r;};
+	readers.backup=async()=>{const r=await backup();r.files=[];for(const e of Object.values(r.evidence))e.rows=[];r.evidence.database!.rows=[{LOG_MODE:'NOARCHIVELOG'}];return r;};
+	let r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);let checks=r.targets[0]!.checks;
+	expect(checks.find(x=>x.id==='recovery')!.note).toContain('DB_RECOVERY_FILE_DEST unset');expect(checks.find(x=>x.id==='backupAge')!.note).toContain('No backups recorded in the visible control-file history; external catalogs');expect(checks.find(x=>x.id==='archiveGaps')!.note).toContain('NOARCHIVELOG');
+	readers.space=async()=>{const r=await space();Object.assign(r.sections.recovery.evidence,{status:'unavailable',view:'V$RECOVERY_FILE_DEST',attempts:[{code:'ORA-01031'}]});r.sections.recovery.status='unavailable';r.sections.recovery.rows=[];return r;};
+	r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);checks=r.targets[0]!.checks;expect(checks.find(x=>x.id==='recovery')!.note).toContain('V$RECOVERY_FILE_DEST');expect(checks.find(x=>x.id==='recovery')!.note).toContain('ORA-01031');expect(checks.find(x=>x.id==='recovery')!.note).not.toContain('unset');
+});
+it('explains PDB-hidden backup and recovery evidence',async()=>{
+	const {context,readers}=fake(), space=readers.space, backup=readers.backup, get=context.sessions.get;
+	context.sessions.get=async()=>{const s=await get();s.identity.isCdb=true;return s;};readers.space=async()=>{const r=await space();r.sections.recovery.rows=[];return r;};readers.backup=async()=>{const r=await backup();r.files=[];return r;};
+	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);for(const id of ['backupAge','recovery'])expect(r.targets[0]!.checks.find(x=>x.id===id)!.note).toContain('PDB-hidden');
+});
+for(const invalid of [{disable:['typo']},{disable:['backupAge','backupAge']},{disable:'backupAge'},{checks:{typo:{unknownAs:'ok'}}},{checks:{backupAge:{unknownAs:'maybe'}}},{checks:{backupAge:{unknownAs:['ok']}}},{checks:{backupAge:{unknownAs:'ok',extra:true}}},{checks:{backupAge:{}}}])it(`strictly rejects invalid policy ${JSON.stringify(invalid)}`,()=>expect(()=>parseCheckConfig({version:1,targets:{lab:invalid}},['lab'])).toThrow());
+it('merges default and target policies with target overrides and disable replacement',()=>{
+	const c=parseCheckConfig({version:1,defaults:{disable:['backupAge'],checks:{recovery:{unknownAs:'warn'},archiveGaps:{unknownAs:'crit'}}},targets:{lab:{disable:[],checks:{recovery:{unknownAs:'ok'}}}}},['lab']);
+	expect(thresholdsFor(c,'lab').disable).toEqual([]);expect(thresholdsFor(c,'lab').checks).toEqual({recovery:{unknownAs:'ok'},archiveGaps:{unknownAs:'crit'}});expect(thresholdsFor(c,'other').disable).toEqual(['backupAge']);
+});
+for(const unknownAs of ['ok','warn','crit','unknown'] as const)it(`unknownAs=${unknownAs} preserves raw UNKNOWN and reason`,async()=>{
+	const {context,readers}=fake();readers.alerts=async()=>({status:'unavailable',view:'V$DIAG_ALERT_EXT',rows:[],truncated:false,attempts:[{code:'ORA-00942'}]}) as never;
+	const settings=thresholdsFor(parseCheckConfig({version:1,targets:{lab:{checks:{alertErrors:{unknownAs}}}}},['lab']),'lab');
+	const r=await runChecks(context,['lab'],()=>settings,readers as unknown as typeof collectors,now),check=r.targets[0]!.checks.find(x=>x.id==='alertErrors')!;
+	expect(check.status).toBe(unknownAs.toUpperCase());expect(check.value).toBeNull();expect(check.display).toBe('UNKNOWN');expect(check.note).toContain('V$DIAG_ALERT_EXT');if(unknownAs!=='unknown'){expect(check.observedStatus).toBe('UNKNOWN');expect(check.note).toContain(`unknownAs=${unknownAs}`);}expect(r.status).toBe(unknownAs.toUpperCase());
+});
+it('disabled checks are SKIPPED and excluded even with unknownAs=crit',async()=>{
+	const {context,readers}=fake();let backupCalls=0;readers.backup=async()=>{backupCalls++;throw new Error('must not run');};
+	const t={...DEFAULTS,disable:['backupAge','archiveGaps'] as const,checks:{backupAge:{unknownAs:'crit' as const}}};
+	const r=await runChecks(context,['lab'],()=>({...t,disable:[...t.disable]}),readers as unknown as typeof collectors,now);expect(backupCalls).toBe(0);expect(r.status).toBe('OK');expect(exitCode(r.status)).toBe(0);for(const id of t.disable){const c=r.targets[0]!.checks.find(x=>x.id===id)!;expect(c.status).toBe('SKIPPED');expect(c.display).toBe('SKIPPED');}expect(renderCheckMarkdown(r)).toContain('0 UNKNOWN, 11 OK (lab)');
+});
+it('all-disabled checks cause no connection and all named families can be disabled',async()=>{
+	const {context,readers}=fake();context.sessions.get=async()=>{throw new Error('must not open');};const r=await runChecks(context,['lab'],()=>({...DEFAULTS,disable:[...CHECK_NAMES]}),readers as unknown as typeof collectors,now);expect(r.status).toBe('OK');expect(r.targets[0]!.checks).toHaveLength(CHECK_NAMES.length);expect(r.targets[0]!.checks.every(c=>c.status==='SKIPPED')).toBe(true);expect(renderCheckMarkdown(r)).toContain('0 CRIT, 0 WARN, 0 UNKNOWN, 0 OK');
+});
+it('default password usernames use only simple identifiers, max 10 and +N more',()=>{
+	const names=Array.from({length:12},(_,i)=>`USER${String(i).padStart(2,'0')}`);const note=defaultPasswordAccounts([...names,'USER00','bad user','password=secret','A'.repeat(129)]);expect(note).toContain('USER09 +2 more');expect(note).not.toContain('USER10');expect(note).not.toContain('secret');expect(defaultPasswordAccounts(['SCOTT','C##APP','A_$#'])).toBe('Accounts: A_$#, C##APP, SCOTT.');
+});
+it('truncated and missing evidence explain why without generic UNKNOWN text',()=>{expect(evidenceReason({status:'ok',view:'DBA_USERS',truncated:true})).toContain('DBA_USERS: row cap');expect(evidenceReason(undefined)).toContain('not returned');});
