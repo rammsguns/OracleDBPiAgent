@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, it } from 'vitest';
 import { needsPackRefusalCorrection as detect } from '../../src/agent/packRefusal.js';
 
@@ -74,4 +75,32 @@ for (const separator of ['; ', ', so ', ' so you can ', '; therefore ', ', there
 it('accepts a bracketed chat command without confusing longer slash paths', () => {
 	expect(detect('Show ASH history', 'I cannot query ASH. Use [/top] for live deltas.', 0, true)).toBe(false);
 	expect(detect('Show ASH history', 'I cannot query ASH. Use [/topic].', 0, true)).toBe(true);
+});
+
+it('accepts the exact first smoke answer with its supported live alternative', () => {
+	const smoke = readFileSync(new URL('../../docs/wp-2527l-smoke-ask-awr.md', import.meta.url), 'utf8');
+	const first = smoke.slice(0, smoke.indexOf("I can't generate an AWR report.", 1));
+	expect(first).toContain('piagent top --target lab-p1 --seconds 30');
+	expect(detect('Generate an AWR report for the last hour on this database.', first, 0, true)).toBe(false);
+});
+for (const description of [
+	'outside the read-only scope', 'out of scope', 'restricted', 'prohibited',
+	'disallowed', 'blocked', 'not allowed', 'not permitted',
+	'requires the Diagnostics Pack', 'require the Diagnostics Pack',
+	'rely on the Diagnostics Pack', 'relies on the Diagnostics Pack',
+]) {
+	it(`accepts descriptive pack restrictions: ${description}`, () => {
+		expect(detect('Show AWR history', `AWR reports via DBMS_WORKLOAD_REPOSITORY are ${description}. Use piagent top.`, 0, true)).toBe(false);
+	});
+}
+it('accepts a descriptive dependency followed by the supported live alternative', () => {
+	expect(detect('Show AWR history', 'AWR reports require Diagnostics Pack, use piagent top.', 0, true)).toBe(false);
+});
+it('still catches direct recommendations with dependency wording', () => {
+	for (const text of [
+		'Run @?/rdbms/admin/awrrpt.sql on the host; use piagent top.',
+		'I cannot query AWR, but run awrrpt.sql; use piagent top.',
+		'Run awrrpt.sql, which requires Diagnostics Pack; use piagent top.',
+		'AWR reports require Diagnostics Pack, so run awrrpt.sql; use /top.',
+	]) expect(detect('Show AWR history', text, 0, true)).toBe(true);
 });

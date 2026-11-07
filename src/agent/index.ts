@@ -59,7 +59,7 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 	const starts = new Map<string, number>();
 	const record = (kind: Parameters<typeof ctx.audit.record>[0]["kind"], extra = {}) => ctx.audit.record({ at: new Date().toISOString(), runId: ctx.runId, kind, ...extra });
 	const streamFn: StreamFn = (model, context, options) => llm.streamFn(model, context, { ...options, signal: AbortSignal.any([...(options?.signal ? [options.signal] : []), AbortSignal.timeout(ctx.config.llm.requestTimeoutSeconds * 1000)]) });
-	const agent: Agent & { unverified: string[] } = Object.assign(new Agent({
+	const agent: Agent & { unverified: string[]; isCorrectionMessage: (message: AgentMessage) => boolean } = Object.assign(new Agent({
 		initialState: { systemPrompt: systemPrompt(ctx), model: llm.model, tools, thinkingLevel: ctx.config.llm.thinking },
 		streamFn, identity: { attribution: null }, toolExecution: "sequential",
 		transformContext: async messages => pruneContext((ctx.config.llm as TunableLlmConfig).dropPriorThinking ? dropPriorThinking(messages) : messages, ctx.config.llm.contextWindow),
@@ -143,7 +143,11 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 			if (finalScheduled) return { action: "end" };
 			return undefined;
 		},
-	}), { unverified: [] as string[] });
+	}), {
+		unverified: [] as string[],
+		// Consumers can identify revision boundaries without knowing correction text.
+		isCorrectionMessage: (message: AgentMessage) => message.role === "user" && typeof message.content === "string" && correctionMessages.has(message.content),
+	});
 	agent.subscribe(async event => {
 		if (event.type === "agent_start") {
 			calls = 0; successfulCalls = 0; started = Date.now(); exhausted = false; finalScheduled = false; correctionScheduled = false; packCorrectionScheduled = false; agent.unverified = [];
