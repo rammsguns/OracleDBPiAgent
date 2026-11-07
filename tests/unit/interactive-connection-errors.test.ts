@@ -21,7 +21,7 @@ it('chat handles a /triage connection failure then /exit without a trailing erro
 	expect(mocks.prepare).toHaveBeenCalledOnce();
 	expect(mocks.question).toHaveBeenCalledTimes(2);
 	expect(mocks.prompt).not.toHaveBeenCalled();
-	expect(stderr).toHaveBeenCalledExactlyOnceWith('Triage failed; check local database availability');
+	expect(stderr).toHaveBeenCalledExactlyOnceWith('ORA-12541: listener unreachable; check the host, port and listener availability');
 	expect(process.exitCode).toBe(0);
 	expect(mocks.close).toHaveBeenCalledOnce();
 	expect(mocks.closeAll).toHaveBeenCalledOnce();
@@ -57,4 +57,16 @@ it.each(['/top', '  /top --seconds 10  '])('cancels %s on readline SIGINT, retur
 	expect(mocks.top).toHaveBeenCalledOnce(); expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.prompt).not.toHaveBeenCalled();
 	expect(stderr).toHaveBeenCalledExactlyOnceWith('Top sample cancelled.');
 	expect(mocks.question).toHaveBeenCalledTimes(2); expect(mocks.close).toHaveBeenCalledOnce(); expect(mocks.closeAll).toHaveBeenCalledOnce();
+});
+
+it.each(['top', 'triage'])('chat /%s displays a safe setup error and remains usable', async command => {
+	const { PasswordFileError } = await import('../../src/oracle/connectionErrors.js');
+	const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+	const error = new PasswordFileError('d1-19c-lab', 'd1_lab.pw');
+	mocks.question.mockResolvedValueOnce('/' + command).mockResolvedValueOnce('/exit');
+	(command === 'top' ? mocks.top : mocks.prepare).mockRejectedValueOnce(error);
+	await main(['node', 'piagent', 'chat']).catch(handleCliError);
+	expect(stderr).toHaveBeenCalledExactlyOnceWith((command === 'top' ? 'Top: ' : '') + error.message);
+	expect(process.exitCode).toBe(0);
+	expect(mocks.prompt).not.toHaveBeenCalled();
 });

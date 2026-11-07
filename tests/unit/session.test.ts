@@ -1,7 +1,7 @@
 import { it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({ connect: vi.fn(), read: vi.fn() }));
 vi.mock('oracledb',()=>({default:{thin:true,getConnection:mocks.connect,OUT_FORMAT_ARRAY:4001}}));
-vi.mock('node:fs/promises',()=>({readFile:mocks.read}));
+vi.mock('node:fs/promises',()=>({open:async()=>({stat:async()=>({isFile:()=>true,mode:0o600}),readFile:mocks.read,close:async()=>{}})}));
 import { createSessionProvider, previewValue } from '../../src/oracle/index.js';
 import type { AppConfig } from '../../src/contracts.js';
 const config = {defaultTarget:'d1-19c-lab', secretDir:'/secrets',targets:[{name:'d1-19c-lab',host:'localhost',port:1522,serviceName:'ORCL',username:'HARNESS_LAB',passwordFile:'d1_lab.pw',defaultSchema:'HR',environment:'development',description:'Test'}],limits:{maxRows:2,statementTimeoutSeconds:3}} as AppConfig;

@@ -58,7 +58,7 @@ it.each(cases)('maps %s safely in targets, doctor and the shared command error h
 	handleCliError(error);expect(stderr).toHaveBeenLastCalledWith(mapped);
 	log.mockClear();stderr.mockClear();
 	await main(['node','piagent','targets','check','--target','d1-19c-lab','--json'],{createSessions:()=>sessions});
-	expect(JSON.parse(String(log.mock.calls[0]![0])).error).toBe(mapped);expect(stderr).not.toHaveBeenCalled();
+	expect(JSON.parse(String(log.mock.calls[0]![0])).error).toBe(mapped);expect(stderr).toHaveBeenCalledExactlyOnceWith(mapped);
 });
 it('keeps unexpected connection errors generic and preserves swallowed failures for all commands',async()=>{
 	expect(connectionGuidance(new Error('ORA-99999: private-password'))).toBeUndefined();
