@@ -85,6 +85,10 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   directory, names the target and the fix instead of a generic failure.
   Every database command exits 1 on these errors, and `report` exits 1
   when it cannot connect.
+- `report`, `triage`, `drift`, `ask` and `chat` reject an unknown target
+  before connecting. The message names the target and lists the configured
+  targets. An unknown `report --sections` name lists the valid sections.
+  Both exit 2, like the other evidence commands.
 - The phase 25–27 eval truth rows no longer require labels the question
   supplied, and refusal checks accept more negation forms. A replay of
   over 14,000 archived eval records found no unrelated score changes.
