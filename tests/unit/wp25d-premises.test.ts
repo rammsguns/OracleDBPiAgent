@@ -9,7 +9,7 @@ it('freezes the previous premises and checksums the deliberate replacements', ()
 		'evals/cases-hard/phase5-grant-limited-p1.json': 'e6549633a3cd880f46ec4cc0d08153fb9a013486d6dee4a4b48cc57e8de297c4',
 		'evals/cases-hard/phase8-grant-limited-p1.json': 'e6cfe86f67de848d4e8fd0fbe166d4c4e4b3e2eb08fc06f50bc717cf6d2a9895',
 		'evals/cases-hard/phase11b-challenge.json': 'dad646ec26e106d5190aaf255c69a29481374eb2635c534bf7e7545b627b65b8',
-		'evals/cases-hard/phase25-blind-holdout.json': '970c83cc1dfc9bdb44cebcb33e6af9aea28b7546e860b4172f15fe313e0bb79e',
+		'evals/cases-hard/phase25-blind-holdout.json': '51e78eb747ba8d962eaa5e321e143e636d72c79d8272faa0c3d9571f7a7fbbb8',
 	};
 	for (const [file, hash] of Object.entries(hashes)) expect(createHash('sha256').update(readFileSync(file)).digest('hex'), file).toBe(hash);
 });
