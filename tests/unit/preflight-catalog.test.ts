@@ -25,10 +25,37 @@ function literals(source: string): string[] {
 	return [source.replace(/^.*\b(?:import|export)\b[^\n]*\bfrom\s+['"][^'"\n]+['"];?$/gm, '')];
 }
 function references(source: string): string[] {
-	return literals(source).flatMap(sql => [
-		...Array.from(sql.matchAll(/\b(?:FROM|JOIN)\s+((?:[A-Z_][A-Z0-9_$#]*\.)?[A-Z_][A-Z0-9_$#]*)/gi), m => m[1]!.toUpperCase().replace(/^SYS\./, '')),
-		...Array.from(sql.matchAll(/['"`]((?:V\$|DBA_|ALL_|USER_)[A-Z][A-Z0-9_#]*)['"`]/gi), m => m[1]!.toUpperCase()),
-	]);
+	// Resolve finite identifier fragments conservatively. Include every quoted
+	// dictionary name below as well: runtime-selected views must be covered too.
+	const values = new Map<string, string[]>();
+	for (const m of source.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*(['"])([A-Z][A-Z0-9_$#]*)\2/g)) values.set(m[1]!, [m[3]!]);
+	for (const m of source.matchAll(/\[([^\]\n]+)\]\.map\(\s*(\w+)\s*=>/g)) {
+		values.set(m[2]!, [...m[1]!.matchAll(/['"]([A-Z][A-Z0-9_$#]*)['"]/g)].map(v => v[1]!));
+	}
+	let expanded = source;
+	for (const template of source.matchAll(/`([^`]+)`/g)) {
+		let variants = [template[1]!];
+		for (const [name, options] of values) {
+			if (template[1]!.includes('${' + name + '}')) variants = variants.flatMap(text => options.map(option => text.split('${' + name + '}').join(option)));
+		}
+		expanded += '\n' + variants.join('\n');
+	}
+	const identifier = '(?:"[A-Z_][A-Z0-9_$#]*"|[A-Z_][A-Z0-9_$#]*)';
+	const relation = `(${identifier}(?:\\s*\\.\\s*${identifier})?)(?![A-Z0-9_$#{])`;
+	return literals(expanded).flatMap(raw => {
+		const sql = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+		const normalize = (name: string) => name.replace(/["\s]/g, '').toUpperCase().replace(/^SYS\./, '');
+		const direct = [...sql.matchAll(new RegExp(`\\b(?:FROM|JOIN)\\s+${relation}`, 'gi'))].map(m => normalize(m[1]!));
+		// Scan comma relations only within FROM clauses, never SELECT lists or
+		// function arguments. Nested subqueries are scanned independently too.
+		const comma: string[] = [];
+		const fromList = new RegExp(`\\bFROM\\s+${relation}(?:\\s+(?!WHERE\\b|JOIN\\b|GROUP\\b|ORDER\\b)[A-Z_][A-Z0-9_]*)?((?:\\s*,\\s*${identifier}(?:\\s*\\.\\s*${identifier})?(?:\\s+(?!WHERE\\b|JOIN\\b|GROUP\\b|ORDER\\b)[A-Z_][A-Z0-9_]*)?)+)`, 'gi');
+		for (const clause of sql.matchAll(fromList)) {
+			for (const m of clause[2]!.matchAll(new RegExp(`,\\s*${relation}`, 'gi'))) comma.push(normalize(m[1]!));
+		}
+		const named = [...sql.matchAll(/['"`]((?:V\$|DBA_|ALL_|USER_)[A-Z][A-Z0-9_#]*)['"`]/gi)].map(m => m[1]!.toUpperCase());
+		return [...direct, ...comma, ...named];
+	});
 }
 // Only file-scoped non-view names are permitted. Never add dictionary views here.
 // Prose/comment tokens, regex fragments and TABLE(...) function syntax found
@@ -46,9 +73,9 @@ const NON_VIEWS: Record<string, readonly string[]> = {
 	'report/queries.ts': ['TOOLS'],
 	'sessions/index.ts': ['BLOCKER'],
 	'space/index.ts': ['THIS'],
-	'sqlperf/index.ts': ['TABLE'],
+	'sqlperf/index.ts': ['TABLE', 'WHERE'],
 	'tools/index.ts': ['COMPLETE', 'INNER', 'LIST', 'LISTS', 'TABLE', 'WHERE'],
-	'tools/overview.ts': ['CONNECTION'],
+	'tools/overview.ts': ['CONNECTION', 'OTHER'],
 	'triage/alerts.ts': ['ALERT', 'BOUNDED', 'COMPLETING'],
 	'triage/history.ts': ['THE'],
 	'triage/index.ts': ['ALERT', 'BOUNDED', 'ITS', 'THE', 'V$DIAG'],
@@ -62,7 +89,7 @@ const NON_VIEWS: Record<string, readonly string[]> = {
 const configuredTables = new Set<string>((JSON.parse(readFileSync(new URL('../../config/targets.json', import.meta.url), 'utf8'))
 	.targets as { logTables?: { table: string }[] }[]).flatMap(target => target.logTables?.map(log => log.table.toUpperCase()) ?? []));
 const MODULE_FEATURE: Record<string, string> = {
-	report: 'report', sessions: 'sessions', space: 'space', security: 'security',
+	backup: 'backup', jobs: 'jobs', report: 'report', sessions: 'sessions', space: 'space', security: 'security',
 	sqlperf: 'sql', alertlog: 'alertlog', plsql: 'plsql', triage: 'triage',
 	tools: 'ask', oracle: 'connection', drift: 'drift', top: 'top',
 };
@@ -122,4 +149,22 @@ it('grant template covers every grantable catalog base object', () => {
 	const missing = [...new Set(Object.values(FEATURE_VIEWS).flat())]
 		.filter(view => !NO_GRANT_VIEWS.has(view) && !grants.has(grantObject(view)));
 	expect(missing).toEqual([]);
+});
+
+it.each([
+	['comma joins', 'SELECT * FROM FIRST_VIEW a, SYS.SECOND_VIEW b WHERE a.id=b.id', ['FIRST_VIEW', 'SECOND_VIEW']],
+	['quoted identifiers', 'SELECT * FROM "SYS" . "NEW_VIEW" JOIN "OTHER_VIEW" ON 1=1', ['NEW_VIEW', 'OTHER_VIEW']],
+	['optimizer hints', 'SELECT /*+ FULL(a) */ * FROM /*+ NO_MERGE */ NEW_VIEW a JOIN /* hint */ OTHER_VIEW b ON 1=1', ['NEW_VIEW', 'OTHER_VIEW']],
+	['interpolated constant', "const view = 'NEW_VIEW'; const sql = `SELECT * FROM ${view}`", ['NEW_VIEW']],
+	['interpolated fragments', "const prefix = 'DBA'; const suffix = 'NEW_VIEW'; const sql = `SELECT * FROM ${prefix}_${suffix}`", ['DBA_NEW_VIEW']],
+	['interpolated family', "['DBA', 'ALL'].map(p => `SELECT * FROM ${p}_NEW_VIEW`)", ['DBA_NEW_VIEW', 'ALL_NEW_VIEW']],
+])('detects %s for catalog and grant coverage', (_label, source, expected) => {
+	expect(references(source)).toEqual(expect.arrayContaining(expected));
+	const catalog = new Set<string>();
+	expect([...new Set(references(source))].filter(view => !catalog.has(view))).toEqual(expect.arrayContaining(expected));
+});
+
+it('does not treat SELECT/function commas or hints as relation names', () => {
+	const found = references('SELECT a, FAKE_COLUMN, COALESCE(x, FAKE_ARG) FROM REAL_VIEW WHERE x IN (1, FAKE_VALUE) /* JOIN FAKE_HINT */');
+	expect(found).toEqual(['REAL_VIEW']);
 });

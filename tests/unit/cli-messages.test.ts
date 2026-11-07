@@ -51,7 +51,7 @@ globalThis.fetch = deny;
 syncBuiltinESMExports();
 `);
 	const child = spawnSync(process.execPath, ["--import", "tsx", "--import", guard, "src/cli/index.ts", ...(scenario === "placeholder" ? ["ask", "test"] : ["init"])], {
-		env: { PATH: process.env.PATH, HOME: root, PIAGENT_HOME: home }, encoding: "utf8", timeout: 15000,
+		env: { PATH: process.env.PATH, HOME: root, PIAGENT_HOME: home, PIAGENT_SECRET_DIR: join(root, "unused-secrets") }, encoding: "utf8", timeout: 15000,
 	});
 	expect(child.error).toBeUndefined();
 	expect(child.status).toBe(1);

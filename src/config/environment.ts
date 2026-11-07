@@ -64,3 +64,10 @@ export function assertConfiguredLlmKeyFile(file: string): void {
 		throw new SafeConfigError();
 	}
 }
+
+/** Reject init's secret-directory placeholder before any database setup. */
+export function assertConfiguredSecretDir(directory: string): void {
+	if (directory === '/absolute/path/to/db-secrets') {
+		throw new SafeConfigError("PIAGENT_SECRET_DIR still holds the init placeholder /absolute/path/to/db-secrets. Edit your private .env or export PIAGENT_SECRET_DIR to your private database password directory.");
+	}
+}
