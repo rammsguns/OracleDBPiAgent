@@ -1,7 +1,8 @@
 import { formatBytes } from '../space/index.js';
 
 // Match the jobs/report Markdown cell escaping, including embedded row breaks.
-export const cell = (value: unknown): string => (value instanceof Date ? value.toISOString() : typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, '<br>');
+export const cell = (value: unknown): string => (value instanceof Date ? value.toISOString() : typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? 'none')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, '<br>');
+export const markdownNumber = (value: number): string => Number.isFinite(value) ? String(Number(value.toFixed(3))) : 'unknown';
 const byteColumn = (name: string) => /bytes/i.test(name) || ['SPACE_LIMIT', 'SPACE_USED', 'SPACE_RECLAIMABLE'].includes(name);
 export function markdownTable(input: object[], limit = 100): string {
 	const rows = input as Record<string, unknown>[];
@@ -10,7 +11,7 @@ export function markdownTable(input: object[], limit = 100): string {
 	return [
 		'| ' + columns.map(cell).join(' | ') + ' |',
 		'| ' + columns.map(() => '---').join(' | ') + ' |',
-		...rows.slice(0, limit).map(row => '| ' + columns.map(key => cell(byteColumn(key) && typeof row[key] === 'number' ? formatBytes(row[key]) : row[key])).join(' | ') + ' |'),
+		...rows.slice(0, limit).map(row => '| ' + columns.map(key => cell(byteColumn(key) && typeof row[key] === 'number' ? formatBytes(row[key]) : typeof row[key] === 'number' ? markdownNumber(row[key]) : row[key])).join(' | ') + ' |'),
 		...(rows.length > limit ? ['', `${rows.length - limit} more rows; use --json`] : []),
 	].join('\n');
 }

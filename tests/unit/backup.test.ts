@@ -96,9 +96,11 @@ it('renders all backup evidence as tables or None without changing the report', 
 	const before = JSON.stringify(report);
 	const md = renderBackupMarkdown(report);
 	expect(md).toContain('## Evidence backups (V$BACKUP_DATAFILE): ok');
-	expect(md).toContain('## Archive gaps:\n\nNone.');
+	expect(md).toContain('## Archive gaps\n\nNone.');
 	expect(md).toContain('| FILE# |');
 	expect(md).not.toMatch(/\|\n\n\|/);
 	expect(md).not.toContain('[{');
+	expect(md).not.toMatch(/^## .*:\s*$/m);
+	expect(renderBackupMarkdown(await readBackup(session({ datafiles: [{ 'FILE#': 1 }] }), now))).toContain('| 1 | none | none | none |');
 	expect(JSON.stringify(report)).toBe(before);
 });

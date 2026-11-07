@@ -2,7 +2,7 @@
 
 Database-wide (non-CDB).
 
-Captured 2026-11-07T02:35:44.116Z. Sequential bounded SELECT snapshots.
+Captured 2026-11-07T02:48:18.178Z. Sequential bounded SELECT snapshots.
 
 ## Restore-to-time estimate
 Status: Not verifiable with the available evidence.
@@ -15,20 +15,20 @@ The database is in NOARCHIVELOG mode: point-in-time recovery is not possible. On
 
 high: No backups recorded at all in the visible control-file history; external catalogs and aged-out records are not checked. Evidence: backups, jobs, sets. For a human DBA: review the cited metadata and validate the restore plan and backup media using RMAN in an approved recovery environment.
 
-## Per-datafile backups:
+## Per-datafile backups
 
 | file | level0 | incremental | checkpointScn |
 | --- | --- | --- | --- |
-| 1 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 7 |  |  |  |
+| 1 | none | none | none |
+| 3 | none | none | none |
+| 4 | none | none | none |
+| 7 | none | none | none |
 
-## Archive gaps:
+## Archive gaps
 
 None.
 
-## Recovery-area balance (bytes):
+## Recovery-area balance (bytes)
 
 None.
 
@@ -172,7 +172,7 @@ None.
 
 | NAME | STATUS | IS_RECOVERY_DEST_FILE |
 | --- | --- | --- |
-| /opt/oracle/oradata/ORCL/control01.ctl |  | NO |
+| /opt/oracle/oradata/ORCL/control01.ctl | none | NO |
 
 ## Evidence configuration (V$RMAN_CONFIGURATION): ok — No explicit control-file autobackup setting visible; effective default not inferred (depends on database configuration).
 
@@ -194,4 +194,4 @@ None.
 
 | DBID | NAME | LOG_MODE | RESETLOGS_CHANGE# | CURRENT_SCN |
 | --- | --- | --- | --- | --- |
-| 1771485732 | ORCL | NOARCHIVELOG | 1920977 | 6486526 |
+| 1771485732 | ORCL | NOARCHIVELOG | 1920977 | 6489311 |

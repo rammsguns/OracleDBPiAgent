@@ -82,10 +82,11 @@ describe('jobs read-only evidence', () => {
 	it('covers every view in preflight', () => { for (const def of Object.values(jobQueries)) expect(FEATURE_VIEWS.jobs).toContain(def.view); });
 	it('renders every section with contiguous tables, single spacing and UTC timestamp columns', async () => {
 		const f = fixture();
-		f.query.mockResolvedValue({ columns: ['LOG_DATE', 'NEXT_RUN_DATE', 'ADDITIONAL_INFO', 'RUN_DURATION'], rows: [['2026-11-06T01:30:00.000-05:00', '2026-11-07T02:30:00.000+02:00', 'line one\nline two | <value>', { days: 0, hours: 0, minutes: 0, seconds: 0, fseconds: 123000000 }]], truncated: false, elapsedMs: 1 });
+		f.query.mockResolvedValue({ columns: ['LOG_DATE', 'NEXT_RUN_DATE', 'ADDITIONAL_INFO', 'RUN_DURATION', 'NULL_VALUE', 'FRACTION'], rows: [['2026-11-06T01:30:00.000-05:00', '2026-11-07T02:30:00.000+02:00', 'line one\nline two | <value>', { days: 0, hours: 0, minutes: 0, seconds: 0, fseconds: 123000000 }, null, 0.06000001]], truncated: false, elapsedMs: 1 });
 		const result = await readJobs(f.ctx, 'd1-19c-lab');
 		const md = renderJobs(result);
 		expect(result.sections.jobs!.rows[0]!.LOG_DATE).toBe('2026-11-06T01:30:00.000-05:00');
+		expect(md).toContain('| none | 0.06 |'); expect(md).not.toMatch(/^## .*:\s*$/m);
 		expect(md).toContain('0:00:00.123'); expect(md).not.toContain('fseconds');
 		expect(md).toContain('2026-11-06T06:30:00.000Z');
 		expect(md).toContain('2026-11-07T00:30:00.000Z');

@@ -4,49 +4,39 @@ Database-wide (non-CDB)
 
 Sequential live reads, not atomic snapshots. New, aged-out and reset counters have unknown deltas and are excluded in rankings. Sampling includes observer overhead. SQL cache statistics may lag execution.
 
-## sql: ok; 5.756s
+## sql: ok; 5.873s
 
 Current instance cursor cache
 
 ### elapsedUs
 
-| name | delta | perSecond | state | command |
+| SQL_ID | delta | perSecond | state | command |
 | --- | --- | --- | --- | --- |
-| dcs11f9gutsbh | 633213 | 110009.64130449855 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
-| 2rs36av3juhnr | 47434 | 8240.824691908701 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
-| 3u99narb2a5dq | 3995 | 694.0611089972438 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
-| 2m0auxz017ukb | 1120 | 194.5803359391522 | measured | piagent sql --target p1-19c-prod --sql-id 2m0auxz017ukb |
-| 72cnnbdaw0bu2 | 746 | 129.6044023308996 | measured | piagent sql --target p1-19c-prod --sql-id 72cnnbdaw0bu2 |
-| 896y3kr66cfdm | 578 | 100.41735194002676 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
-| 9zg9qd9bm4spu | 290 | 50.3824084128162 | measured | piagent sql --target p1-19c-prod --sql-id 9zg9qd9bm4spu |
-| 0k8522rmdzg4k | 226 | 39.26353207343607 | measured | piagent sql --target p1-19c-prod --sql-id 0k8522rmdzg4k |
-| 5dqz0hqtp9fru | 180 | 31.271839704506604 | measured | piagent sql --target p1-19c-prod --sql-id 5dqz0hqtp9fru |
-| f0h5rpzmhju11 | 177 | 30.75064237609816 | measured | piagent sql --target p1-19c-prod --sql-id f0h5rpzmhju11 |
+| dcs11f9gutsbh | 672053 | 114426.263 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
+| 2rs36av3juhnr | 38106 | 6488.07 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
+| 3u99narb2a5dq | 8024 | 1366.196 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
+| 72cnnbdaw0bu2 | 1292 | 219.981 | measured | piagent sql --target p1-19c-prod --sql-id 72cnnbdaw0bu2 |
+| 772s25v1y0x8k | 677 | 115.269 | measured | piagent sql --target p1-19c-prod --sql-id 772s25v1y0x8k |
+| 896y3kr66cfdm | 552 | 93.986 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
+| aykvshm7zsabd | 386 | 65.722 | measured | piagent sql --target p1-19c-prod --sql-id aykvshm7zsabd |
+| 5yv7yvjgjxugg | 259 | 44.098 | measured | piagent sql --target p1-19c-prod --sql-id 5yv7yvjgjxugg |
 
 ### cpuUs
 
-| name | delta | perSecond | state | command |
+| SQL_ID | delta | perSecond | state | command |
 | --- | --- | --- | --- | --- |
-| dcs11f9gutsbh | 615352 | 106906.60614359748 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
-| 2rs36av3juhnr | 46677 | 8109.309232706971 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
-| 3u99narb2a5dq | 2446 | 424.94955509568416 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
-| 2m0auxz017ukb | 568 | 98.68002751199862 | measured | piagent sql --target p1-19c-prod --sql-id 2m0auxz017ukb |
-| 896y3kr66cfdm | 391 | 67.92938513590046 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
-| 9zg9qd9bm4spu | 290 | 50.3824084128162 | measured | piagent sql --target p1-19c-prod --sql-id 9zg9qd9bm4spu |
-| 0k8522rmdzg4k | 227 | 39.43726451623888 | measured | piagent sql --target p1-19c-prod --sql-id 0k8522rmdzg4k |
-| 5dqz0hqtp9fru | 180 | 31.271839704506604 | measured | piagent sql --target p1-19c-prod --sql-id 5dqz0hqtp9fru |
-| f0h5rpzmhju11 | 177 | 30.75064237609816 | measured | piagent sql --target p1-19c-prod --sql-id f0h5rpzmhju11 |
-| f4ym3gp21dar9 | 117 | 20.326695807929294 | measured | piagent sql --target p1-19c-prod --sql-id f4ym3gp21dar9 |
+| dcs11f9gutsbh | 654924 | 111509.816 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
+| 2rs36av3juhnr | 38071 | 6482.111 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
+| 3u99narb2a5dq | 6935 | 1180.779 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
+| 72cnnbdaw0bu2 | 605 | 103.01 | measured | piagent sql --target p1-19c-prod --sql-id 72cnnbdaw0bu2 |
+| 772s25v1y0x8k | 467 | 79.513 | measured | piagent sql --target p1-19c-prod --sql-id 772s25v1y0x8k |
+| 896y3kr66cfdm | 405 | 68.957 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
+| aykvshm7zsabd | 387 | 65.892 | measured | piagent sql --target p1-19c-prod --sql-id aykvshm7zsabd |
+| 5yv7yvjgjxugg | 258 | 43.928 | measured | piagent sql --target p1-19c-prod --sql-id 5yv7yvjgjxugg |
 
 ### bufferGets
 
-| name | delta | perSecond | state | command |
-| --- | --- | --- | --- | --- |
-| 0k8522rmdzg4k | 5 | 0.8686622140140723 | measured | piagent sql --target p1-19c-prod --sql-id 0k8522rmdzg4k |
-| 9zg9qd9bm4spu | 4 | 0.6949297712112579 | measured | piagent sql --target p1-19c-prod --sql-id 9zg9qd9bm4spu |
-| 5dqz0hqtp9fru | 2 | 0.34746488560562894 | measured | piagent sql --target p1-19c-prod --sql-id 5dqz0hqtp9fru |
-| 5x2x7y2umr3y7 | 2 | 0.34746488560562894 | measured | piagent sql --target p1-19c-prod --sql-id 5x2x7y2umr3y7 |
-| 865qwpcdyggkk | 2 | 0.34746488560562894 | measured | piagent sql --target p1-19c-prod --sql-id 865qwpcdyggkk |
+none in this interval
 
 ### physicalReads
 
@@ -54,18 +44,16 @@ none in this interval
 
 ### executions
 
-| name | delta | perSecond | state | command |
+| SQL_ID | delta | perSecond | state | command |
 | --- | --- | --- | --- | --- |
-| 896y3kr66cfdm | 21 | 3.648381298859104 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
-| dcs11f9gutsbh | 17 | 2.953451527647846 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
-| 0k8522rmdzg4k | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 0k8522rmdzg4k |
-| 2m0auxz017ukb | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 2m0auxz017ukb |
-| 2rs36av3juhnr | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
-| 3u99narb2a5dq | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
-| 5dqz0hqtp9fru | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 5dqz0hqtp9fru |
-| 5x2x7y2umr3y7 | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 5x2x7y2umr3y7 |
-| 72cnnbdaw0bu2 | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 72cnnbdaw0bu2 |
-| 865qwpcdyggkk | 1 | 0.17373244280281447 | measured | piagent sql --target p1-19c-prod --sql-id 865qwpcdyggkk |
+| 896y3kr66cfdm | 19 | 3.235 | measured | piagent sql --target p1-19c-prod --sql-id 896y3kr66cfdm |
+| dcs11f9gutsbh | 16 | 2.724 | measured | piagent sql --target p1-19c-prod --sql-id dcs11f9gutsbh |
+| 2rs36av3juhnr | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id 2rs36av3juhnr |
+| 3u99narb2a5dq | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id 3u99narb2a5dq |
+| 5yv7yvjgjxugg | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id 5yv7yvjgjxugg |
+| 72cnnbdaw0bu2 | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id 72cnnbdaw0bu2 |
+| 772s25v1y0x8k | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id 772s25v1y0x8k |
+| aykvshm7zsabd | 1 | 0.17 | measured | piagent sql --target p1-19c-prod --sql-id aykvshm7zsabd |
 
 new: 0
 
@@ -73,45 +61,45 @@ aged-out: 0
 
 reset: 0
 
-## load: ok; 5.755s
+## load: ok; 5.875s
 
 Database-wide (non-CDB)
 
 | statistic | delta | perSecond | state |
 | --- | --- | --- | --- |
-| parse count (hard) | 0 | 0.000 | measured |
-| parse count (total) | 13 | 2.259 | measured |
-| physical reads | 0 | 0.000 | measured |
-| redo size | 676 | 117.456 | measured |
-| session logical reads | 16 | 2.780 | measured |
-| user calls | 108 | 18.765 | measured |
-| user commits | 0 | 0.000 | measured |
+| parse count (hard) | 0 | 0 | measured |
+| parse count (total) | 1 | 0.17 | measured |
+| physical reads | 0 | 0 | measured |
+| redo size | 124 | 21.108 | measured |
+| session logical reads | 0 | 0 | measured |
+| user calls | 92 | 15.661 | measured |
+| user commits | 0 | 0 | measured |
 
-## host: ok; 5.755s
+## host: ok; 5.876s
 
 Database-wide (non-CDB)
 
 | statistic | delta | perSecond | state |
 | --- | --- | --- | --- |
-| BUSY_TIME | 7262 | 1261.886 | measured |
-| IDLE_TIME | 11074 | 1924.280 | measured |
-| IOWAIT_TIME | 15 | 2.606 | measured |
-| NICE_TIME | 0 | 0.000 | measured |
-| RSRC_MGR_CPU_WAIT_TIME | 0 | 0.000 | measured |
-| SYS_TIME | 226 | 39.271 | measured |
-| USER_TIME | 7030 | 1221.572 | measured |
+| BUSY_TIME | 8578 | 1459.852 | measured |
+| IDLE_TIME | 10123 | 1722.789 | measured |
+| IOWAIT_TIME | 25 | 4.255 | measured |
+| NICE_TIME | 0 | 0 | measured |
+| RSRC_MGR_CPU_WAIT_TIME | 0 | 0 | measured |
+| SYS_TIME | 374 | 63.649 | measured |
+| USER_TIME | 8199 | 1395.352 | measured |
 | VM_IN_BYTES | 0 B | 0 B/s | measured |
 | VM_OUT_BYTES | 0 B | 0 B/s | measured |
 
-Host CPU busy: 39.61%
+Host CPU busy: 45.87%
 
 | statistic | value |
 | --- | --- |
-| FREE_MEMORY_BYTES | 1.94 GiB |
+| FREE_MEMORY_BYTES | 1.67 GiB |
 | GLOBAL_RECEIVE_SIZE_MAX | 4194304 |
 | GLOBAL_SEND_SIZE_MAX | 4194304 |
-| INACTIVE_MEMORY_BYTES | 94.65 GiB |
-| LOAD | 17.189453125 |
+| INACTIVE_MEMORY_BYTES | 94.79 GiB |
+| LOAD | 14.729 |
 | NUM_CPUS | 32 |
 | NUM_CPU_CORES | 16 |
 | NUM_CPU_SOCKETS | 1 |

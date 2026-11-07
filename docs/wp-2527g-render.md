@@ -55,3 +55,31 @@ The integration command names the four files directly because the npm script
 already includes the entire integration directory. No LLM calls were requested
 by these four integration files or the CLI captures. Browser tests use mocked
 chat responses. Captures/logs have terminal trailing blank lines removed.
+
+## Coordinator capture review follow-up
+
+Removed trailing colons from the three backup section headings. Null cells now
+say `none` in backup and Jobs Markdown, including missing level0, incremental
+and checkpointScn values. Top retains `unknown` for unmeasured deltas.
+SQL ranking columns now say `SQL_ID`; load and host columns say `statistic`.
+Markdown numeric cells round to at most three decimal places and omit trailing
+zeroes, including ranking rates, load rates and host gauge values. Timestamp
+precision and interval fractional seconds are retained. JSON evidence is
+unchanged; regression tests compare serialized evidence before/after rendering.
+
+Regenerated all six after-captures on both approved labs using the same commands.
+Checked their table cells and headings: no raw numeric floats longer than three
+decimal places and no headings ending in a colon. Empty application strings may
+still appear blank; database nulls explicitly render `none`.
+
+Follow-up checks:
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=2`: 120 files, 2,213 tests passed.
+- `npm run test:browser`: 83 passed, 7 opt-in live tests skipped (44.0 seconds).
+- All six requested live CLI after-captures completed successfully.
+
+No SQL, findings, redaction, caps, JSON shapes or web rendering changed in this
+follow-up. No contract changes are needed. Integration tests were not rerun for
+this formatting-only follow-up; the initial 9-test live result above is retained.
+No LLM calls were made for the follow-up.

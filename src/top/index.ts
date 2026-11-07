@@ -1,5 +1,5 @@
 import { formatBytes } from '../space/index.js';
-import { markdownTable } from '../backup/markdown.js';
+import { markdownTable, markdownNumber } from '../backup/markdown.js';
 import { setTimeout } from 'node:timers/promises';
 import type { OracleSession } from '../contracts.js';
 export const SQL = {
@@ -79,14 +79,14 @@ export function renderTop(result: Awaited<ReturnType<typeof sampleTop>>): string
 		if (key === 'sql') {
 			for (const metric of METRICS) {
 				const rows = result.sql.rankings[metric];
-				lines.push(`### ${metric}`, rows.length ? markdownTable(rows) : 'none in this interval');
+				lines.push(`### ${metric}`, rows.length ? markdownTable(rows.map(r => ({ SQL_ID: r.name, delta: r.delta, perSecond: r.perSecond, state: r.state, command: r.command }))) : 'none in this interval');
 			}
 			for (const state of ['new','aged-out','reset']) {
 				const names = new Set(Object.values(result.sql.counters).flatMap(rows => rows.filter(r => r.state === state).map(r => r.name)));
 				lines.push(`${state}: ${names.size}`);
 			}
 		} else {
-			lines.push(markdownTable(section.rows.map(r => ({ statistic: r.name, delta: r.delta === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.delta) : r.delta, perSecond: r.perSecond === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.perSecond) + '/s' : r.perSecond.toFixed(3), state: r.state }))));
+			lines.push(markdownTable(section.rows.map(r => ({ statistic: r.name, delta: r.delta === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.delta) : r.delta, perSecond: r.perSecond === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.perSecond) + '/s' : markdownNumber(r.perSecond), state: r.state }))));
 		}
 	}
 	lines.push(`Host CPU busy: ${result.host.cpuPercent === null ? 'unavailable' : result.host.cpuPercent.toFixed(2) + '%'}`,

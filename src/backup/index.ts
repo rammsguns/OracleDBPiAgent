@@ -104,6 +104,6 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 export function renderBackupMarkdown(r: BackupReport): string {
 	return [`# Backup — ${r.target}`,r.scope,`Captured ${r.capturedAt}. Sequential bounded SELECT snapshots.`, `## Restore-to-time estimate\nStatus: ${r.restoreEstimate.status === 'candidate' ? 'Candidate recovery window' : 'Not verifiable with the available evidence'}.\n\n- From: ${r.restoreEstimate.from ?? 'not established'}.\n- Through: ${r.restoreEstimate.through ?? 'not established'}.\n- Evidence: ${r.restoreEstimate.evidence.join(', ')}.\n\n${r.restoreEstimate.detail}`,
 		...r.findings.map(f=>`${f.severity}: ${f.detail} Evidence: ${f.evidence.join(', ')}. ${f.advice}`),
-		`## Per-datafile backups:\n\n${markdownTable(r.files)}`,`## Archive gaps:\n\n${markdownTable(r.gaps)}`,`## Recovery-area balance (bytes):\n\n${markdownTable(r.recoveryArea)}`,
+		`## Per-datafile backups\n\n${markdownTable(r.files)}`,`## Archive gaps\n\n${markdownTable(r.gaps)}`,`## Recovery-area balance (bytes)\n\n${markdownTable(r.recoveryArea)}`,
 		...Object.entries(r.evidence).map(([id,e])=>`## Evidence ${id} (${e.view}): ${e.status}${e.note?' — '+e.note:''}\n\n${markdownTable(e.rows)}${e.truncated ? '\n\nRow cap reached; evidence incomplete; use --json.' : ''}`)].join('\n\n')+'\n';
 }
