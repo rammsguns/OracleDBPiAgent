@@ -4,11 +4,11 @@ import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/e
 import { createOracleAgent } from '../../src/agent/index.js';
 import { loadConfig } from '../../src/config/index.js';
 
-async function fixture(replies: string[], enabled = true, maxCalls = 20, toolCalls?: { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }[]) {
+async function fixture(replies: string[], enabled = true, maxCalls = 20, toolCalls?: { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }[], pinnedTarget?: string) {
 	const config = loadConfig({ PIAGENT_GROUNDING_CHECK: enabled ? '1' : '0', PIAGENT_MAX_TOOL_CALLS: String(maxCalls) });
 	config.targets[0]!.description = 'PROMOTIONS 3313394.74';
 	const audit: any[] = [], contexts: any[] = [];
-	const agent = await createOracleAgent({ config, runId: 'grounding-test', sessions: { get: async () => { throw Error('No DB'); }, closeAll: async () => {} }, audit: { record: async e => { audit.push(e); } } }, {
+	const agent = await createOracleAgent({ config, pinnedTarget, runId: 'grounding-test', sessions: { get: async () => { throw Error('No DB'); }, closeAll: async () => {} }, audit: { record: async e => { audit.push(e); } } }, {
 		model: { id: 'test', name: 'test', api: 'openai-completions', provider: 'strata', baseUrl: config.llm.baseUrl, reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 10000, maxTokens: 1000 },
 		streamFn: (_m, context) => {
 			contexts.push(structuredClone(context));
@@ -133,3 +133,49 @@ for (const key of ['schema', 'owner']) {
 		expect(contexts[2].messages.at(-1).content).toContain('99999');
 	});
 }
+
+it('revises zero-tool pack refusals once, even with grounding disabled, and removes tools', async () => {
+	for (const enabled of [true, false]) {
+		const { agent, contexts, audit } = await fixture(['AWR is unavailable.', 'AWR is unavailable.'], enabled);
+		await agent.prompt('Show AWR for the last hour.');
+		expect(contexts).toHaveLength(2);
+		const correction = contexts[1].messages.at(-1).content;
+		expect(correction).toContain(`piagent top --target ${loadConfig({}).defaultTarget} --seconds N`);
+		expect(correction).toContain('one live 5-120 second interval now (default 15)');
+		expect(correction).toContain('no history');
+		expect(contexts[1].messages.filter((m: any) => m.role === 'system').flatMap((m: any) => m.tools ?? [])).toEqual([]);
+		expect(audit.filter(e => e.kind === 'tool_call')).toEqual([]);
+	}
+});
+
+it('shares the correction allowance with numbers, preserving residual grounding', async () => {
+	const { agent, contexts } = await fixture(['TOOL', 'Count 99,999', 'AWR is unavailable. Count 88,888']);
+	await agent.prompt('Find the count.');
+	expect(contexts).toHaveLength(3);
+	expect(agent.unverified).toContain('88,888');
+});
+
+it('does not correct a compliant pack refusal or let a revision invoke tools', async () => {
+	const compliant = await fixture(['AWR is unavailable. Use piagent top.']);
+	await compliant.agent.prompt('AWR history?');
+	expect(compliant.contexts).toHaveLength(1);
+	const blocked = await fixture(['AWR is unavailable.', 'TOOL', 'Use piagent top.']);
+	await blocked.agent.prompt('AWR history?');
+	expect(blocked.audit.filter(e => e.kind === 'tool_call')).toEqual([]);
+	expect(blocked.contexts.length).toBeLessThanOrEqual(3);
+});
+
+it('uses the pinned target and resets the pack allowance on the next run', async () => {
+	const { agent, contexts } = await fixture(['ASH unavailable.', 'Use /top.', 'ASH unavailable.', 'Use /top.'], true, 20, undefined, 'p1-19c-prod');
+	await agent.prompt('Show ASH history.');
+	await agent.prompt('Show ASH history again.');
+	expect(contexts).toHaveLength(4);
+	for (const i of [1, 3]) expect(contexts[i].messages.at(-1).content).toContain('piagent top --target p1-19c-prod --seconds N');
+});
+
+it('does not schedule a numbers follow-up after a pack revision', async () => {
+	const { agent, contexts } = await fixture(['TOOL', 'AWR unavailable.', 'Use piagent top. Count 88,888']);
+	await agent.prompt('Show AWR history.');
+	expect(contexts).toHaveLength(3);
+	expect(agent.unverified).toContain('88,888');
+});
