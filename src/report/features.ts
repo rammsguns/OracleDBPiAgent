@@ -13,7 +13,7 @@ export async function readFeatureReport(ctx: ToolContext, target: string, name: 
 			if (e.note) note += ` ${id}: ${e.note}`;
 			if (e.truncated) note += ` ${id}: row limit reached.`;
 		}
-		rows.push(['findings', r.findings.length, complete ? 'ok' : 'unavailable', JSON.stringify(r.findings)], ['archive_gaps', r.gaps.length, complete ? 'ok' : 'unavailable', JSON.stringify(r.gaps)], ['restore_estimate', null, 'ok', JSON.stringify(r.restoreEstimate)]);
+		rows.push(['findings', r.findings.length, complete ? 'ok' : 'unavailable', JSON.stringify(r.findings)], ['archive_gaps', r.files.length > 0 && r.files.every(f => f.level0) ? r.gaps.length : null, complete ? 'ok' : 'unavailable', JSON.stringify(r.gaps)], ['restore_estimate', null, 'ok', JSON.stringify(r.restoreEstimate)]);
 		const times = r.files.map(f => f.level0 ? Date.parse(f.level0) : NaN);
 		rows.push(['oldest_full_age_hours', times.length && times.every(Number.isFinite) ? (Date.parse(r.capturedAt) - Math.min(...times)) / 3600000 : null, complete ? 'ok' : 'unavailable', 'Available full / level 0 metadata; no media validation.']);
 	} else {

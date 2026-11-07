@@ -82,7 +82,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		scopes.push({ name, ...(qualified ? { owner: qualified.owner } : {}) });
 	}
 	const runs = await collectRunHistory(reader, scopes, hours, options.since ?? '24h');
-	const jobEvidence = needsJobs(options.issue ?? '') || jobs.rows.length > 0 || parsed.jobs.some(name => /[_$#0-9]|JOB$/.test(name)) || discovery.jobs.length > 0 ? await readJobs(ctx, target.name, { since: options.since ?? '24h', ...(scopes.length && unique(scopes.map(s => s.owner)).length === 1 && scopes[0]!.owner ? { owner: scopes[0]!.owner } : {}) }) : undefined;
+	const jobEvidence = needsJobs(options.issue ?? '') || matches?.rows.some(row => row[1] === 'JOB') || parsed.jobs.some(name => /[_$#0-9]|JOB$/.test(name)) || discovery.jobs.length > 0 ? await readJobs(ctx, target.name, { since: options.since ?? '24h', ...(scopes.length && unique(scopes.map(s => s.owner)).length === 1 && scopes[0]!.owner ? { owner: scopes[0]!.owner } : {}) }) : undefined;
 	if (jobEvidence) {
 		for (const id of Object.keys(jobEvidence.sections)) if (!['jobs', 'lastErrors', 'runs'].includes(id)) delete jobEvidence.sections[id];
 	}

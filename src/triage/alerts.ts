@@ -99,13 +99,14 @@ export async function discoverAlertJobs(ctx: ToolContext, target: string, hours:
 	const read = await optionalRead(target, 'V$DIAG_ALERT_EXT', window, () => readAlertLog(ctx, target, { ...window, codes: ['ORA-12012'] }));
 	const words = new Set(issue.toUpperCase().match(/[A-Z]{4,}/g) ?? []);
 	const mentionsJob = /\bORA-12012\b|\bjobs?\b[\s\S]{0,100}\b(?:failed|failure|error|broken)\b|\b(?:failed|failing|broken)\s+job\b/i.test(issue);
+	const failureContext = /\b(?:fail(?:ed|ing|ure|ures)?|errors?|broken|ORA-12012)\b/i.test(issue);
 	const jobs: { owner: string; name: string }[] = [], entries: AlertRow[] = [];
 	for (const row of read.rows) {
 		const matches = [...row.messageText.matchAll(/ORA-12012:[\s\S]*?auto execute of job\s+"([A-Z][\w$#]{0,127})"\s*\.\s*"([A-Z][\w$#]{0,127})"/gi)];
 		let matched = false;
 		for (const m of matches) {
 			const owner = m[1]!.toUpperCase(), name = m[2]!.toUpperCase();
-			if (!mentionsJob && !name.split(/[_$#0-9]+/).some(w => w.length >= 4 && words.has(w))) continue;
+			if (!mentionsJob && (!failureContext || !name.split(/[_$#0-9]+/).some(w => w.length >= 4 && words.has(w)))) continue;
 			if (!jobs.some(j => j.owner === owner && j.name === name)) jobs.push({ owner, name });
 			matched = true;
 		}

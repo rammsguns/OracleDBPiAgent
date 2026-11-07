@@ -80,3 +80,12 @@ it('links a named failed job to redacted errors and its stack object', async () 
 	expect(issue.excerpts.some(e => e.object === 'APP.PKG' && e.line === 3)).toBe(true);
 	expect(JSON.stringify(issue)).not.toContain('synthetic-sensitive-value');
 });
+it('does not collect jobs merely because a mentioned object has referencing jobs', async () => {
+	const ctx = context(async sql => {
+		if (sql.startsWith('WITH candidates')) return { ...empty, rows: [[0, 'OBJECT', 'SH', 'SALES']] };
+		if (sql.includes('INSTR(UPPER(JOB_ACTION)')) return { ...empty, rows: [['SH', 'SALES_JOB', 'STORED_PROCEDURE', 'SH.SALES']] };
+		return empty;
+	});
+	const r = (await triage(ctx, { target: 'd1-19c-lab', issue: 'describe SH.SALES' })).issues[0]!;
+	expect(r.jobEvidence).toBeUndefined(); expect(r.backup).toBeUndefined(); expect(r.top).toBeUndefined();
+});
