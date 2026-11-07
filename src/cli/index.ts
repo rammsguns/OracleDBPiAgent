@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseTopCommand, runChatTop } from './chatTop.js';
 import { connectionGuidance, withConnectionFailures, clearConnectionFailure, withoutConnectionFailures } from '../oracle/connectionErrors.js';
 import { renderFeatureSummary } from '../preflight/render.js';
 import { targetsSource } from '../config/targets.js';
@@ -194,7 +195,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	plsql.command("doc").description("Document a PL/SQL object").requiredOption("--target <target>").requiredOption("--object <OWNER.NAME>").option("--json").option("--out <dir>").action(async options => {
 		const { runPlsql } = await import("../plsql/cli.js"); await runPlsql("doc", options);
 	});
-	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security or space); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
+	program.command("drift").description("Compare two approved targets (parameters, schema, objects, security, space or backup); read-only, exit 3 on drift").requiredOption("--left <target>").requiredOption("--right <target>").requiredOption("--scope <scope>").option("--json").option("--out <dir>").action(async options => {
 		const { runDrift } = await import("../drift/cli.js");
 		await runDrift(options);
 	});
@@ -249,6 +250,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		try {
 			const agent = await createOracleAgent(ctx);
 			let toolCalls: { name: string; id: string }[] = [];
+			let activeTop: AbortController | undefined;
 			agent.subscribe(event => {
 				if (event.type === "tool_execution_start") toolCalls.push({ name: event.toolName, id: event.toolCallId });
 				if (!options.json && event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") process.stdout.write(event.assistantMessageEvent.delta);
@@ -258,6 +260,17 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 				const offset = agent.state.messages.length;
 				let prepared = q;
 				if (question === undefined) {
+					try {
+						if (parseTopCommand(q)) {
+							const controller = new AbortController();
+							activeTop = controller;
+							const cancel = () => controller.abort();
+							process.once('SIGINT', cancel);
+							try { console.log(await runChatTop(ctx, q, controller.signal)); }
+							finally { activeTop = undefined; process.removeListener('SIGINT', cancel); }
+							return;
+						}
+					} catch (error) { console.error(error instanceof Error && error.name === 'AbortError' ? 'Top sample cancelled.' : 'Top: ' + (error instanceof Error && error.name === 'TopUsageError' || error instanceof Error && error.message.startsWith('Usage:') ? error.message : 'failed; check local database availability')); return; }
 					let command: ReturnType<typeof parseTriageCommand>;
 					try {
 						command = parseTriageCommand(q);
@@ -285,6 +298,8 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			if (question !== undefined) await ask(question);
 			else {
 				const rl = createInterface({ input: process.stdin, output: process.stdout });
+				// Terminal readline consumes Ctrl-C instead of emitting process SIGINT.
+				rl.on('SIGINT', () => { if (activeTop) activeTop.abort(); else rl.close(); });
 				try { while (true) { let q: string; try { q = await rl.question("piagent> "); } catch { break; } if (["exit", "quit", "/exit"].includes(q.trim())) break; if (q.trim()) await ask(q); } }
 				finally { rl.close(); }
 			}

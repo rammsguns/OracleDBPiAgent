@@ -96,6 +96,9 @@ it('discovers job names and frames from alert text before reading history, even 
 	const { discoverAlertJobs } = await import('../../src/triage/alerts.js');
 	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'purge failed', false)).jobs).toHaveLength(1);
 	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'unrelated outage', false)).jobs).toHaveLength(0);
+	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'how many nightly orders?', false)).jobs).toHaveLength(0);
+	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'job opportunities', false)).jobs).toHaveLength(0);
+	expect((await discoverAlertJobs(ctx, 'p1-19c-prod', 48, 'ORA-12012', false)).jobs).toHaveLength(1);
 });
 it('labels capped unmatched recent evidence and omits an empty trace diagram', async () => {
 	const result = await triage(context(), { target: 'd1-19c-lab', issue: 'something went wrong' });

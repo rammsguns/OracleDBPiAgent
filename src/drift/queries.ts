@@ -1,3 +1,4 @@
+import { SQL as backupSql } from '../backup/index.js';
 export interface DriftQuery { name: string; source: string; sql: string; keys: number; grouped?: boolean }
 const owner = ' WHERE owner = :owner';
 const ordered = (sql: string, order: string) => `${sql} ORDER BY ${order}`;
@@ -20,4 +21,10 @@ FROM all_indexes i LEFT JOIN all_ind_columns ic ON ic.index_owner=i.owner AND ic
 LEFT JOIN all_ind_expressions ie ON ie.index_owner=ic.index_owner AND ie.index_name=ic.index_name AND ie.column_position=ic.column_position
 WHERE i.table_owner=:owner ORDER BY i.table_name, i.index_name, ic.column_position` },
 	...objectQueries.filter(q => q.name !== 'objects'),
+];
+
+/** Configuration only: no backup history, file paths, timestamps or workload counters. */
+export const backupQueries: DriftQuery[] = [
+	{ name: 'rman_configuration', source: 'SYS.V_$RMAN_CONFIGURATION', keys: 1, sql: backupSql.configuration },
+	{ name: 'log_mode', source: 'SYS.V_$DATABASE', keys: 1, sql: "SELECT 'LOG_MODE' NAME, LOG_MODE FROM V$DATABASE" },
 ];

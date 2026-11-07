@@ -1,3 +1,5 @@
+import { collectBackup, collectTop, needsBackup, needsJobs, needsTop } from './features.js';
+import { readJobs, safeJobText } from '../jobs/index.js';
 import { collectSessions, needsSessions, sessionHypotheses, sessionWaitContext } from './sessions.js';
 import { renderSessionsMarkdown } from '../sessions/index.js';
 import { formatIncidentStatus } from '../alertlog/index.js';
@@ -18,7 +20,7 @@ import { parseIssue, sinceHours, type Frame } from './parse.js';
 import { errorGuide } from './guide.js';
 import { TriageReader, displaySql, type Check } from './read.js';
 export { parseIssue, sinceHours } from './parse.js';
-export interface TriageOptions { target: string; issue?: string; since?: string }
+export interface TriageOptions { target: string; issue?: string; since?: string; signal?: AbortSignal }
 export interface Excerpt { object: string; line: number; subprogram: string; statement: string; source: SourceRow[]; status: string; view: string; truncated: boolean; attempts: { view: string; code: string }[] }
 export interface Hypothesis { rank: number; title: string; evidence: string[]; verifyNext?: { sql: string; binds: Record<string, unknown> } }
 const asText = (v: unknown) => v == null ? '' : String(v);
@@ -28,6 +30,10 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	if (!target || (ctx.pinnedTarget && ctx.pinnedTarget !== target.name)) throw new Error('Unknown or unpinned triage target');
 	const hours = sinceHours(options.since), reader = new TriageReader(ctx, target.name), dictionary = new Dictionary(ctx, target.name, redactCredentials);
 	const parsed = parseIssue(options.issue ?? '');
+	const backup = needsBackup(options.issue ?? '') ? await collectBackup(ctx, target.name) : undefined;
+	const top = needsTop(options.issue ?? '') ? await collectTop(ctx, target.name, 15, options.signal) : undefined;
+	if (backup) for (const [id, e] of Object.entries(backup.evidence)) reader.checks.push({ label: `Backup ${id}: ${backup.scope}${e.note ? ' ' + e.note : ''}`, sql: e.sql, binds: {}, status: e.status, view: e.view, columns: e.columns, rows: e.rows.map(r => e.columns.map(c => r[c.toUpperCase()])), truncated: e.truncated, attempts: [] });
+	if (top) reader.checks.push({ label: 'Live top sample: ' + top.note, sql: '', binds: {}, status: top.status === 'failed' ? 'unavailable' : 'ok', view: 'sampleTop', columns: ['SAMPLE'], rows: [[JSON.stringify(top)]], truncated: top.status === 'partial', attempts: [] });
 	const explicitObjects = [...parsed.objects], discoveredObjects: string[] = [];
 	const candidates = nameCandidates(options.issue ?? '');
 	const matches = await lookupNames(reader, candidates);
@@ -76,6 +82,21 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		scopes.push({ name, ...(qualified ? { owner: qualified.owner } : {}) });
 	}
 	const runs = await collectRunHistory(reader, scopes, hours, options.since ?? '24h');
+	const jobEvidence = needsJobs(options.issue ?? '') || matches?.rows.some(row => row[1] === 'JOB') || parsed.jobs.some(name => /[_$#0-9]|JOB$/.test(name)) || discovery.jobs.length > 0 ? await readJobs(ctx, target.name, { since: options.since ?? '24h', ...(scopes.length && unique(scopes.map(s => s.owner)).length === 1 && scopes[0]!.owner ? { owner: scopes[0]!.owner } : {}) }) : undefined;
+	if (jobEvidence) {
+		for (const id of Object.keys(jobEvidence.sections)) if (!['jobs', 'lastErrors', 'runs'].includes(id)) delete jobEvidence.sections[id];
+	}
+	if (jobEvidence) for (const [id, e] of Object.entries(jobEvidence.sections).filter(([id]) => ['jobs', 'lastErrors', 'runs'].includes(id))) {
+		const rows = scopes.length ? e.rows.filter(row => scopes.some(s => s.name === row.JOB_NAME && (!s.owner || s.owner === row.OWNER))) : e.rows;
+		e.rows = rows;
+		const columns = unique(rows.flatMap(row => Object.keys(row)));
+		reader.checks.push({ label: `Jobs ${id}: ${jobEvidence.note}${e.note ? ' ' + e.note : ''}`, sql: e.sql, binds: {}, status: e.status, view: e.view, columns, rows: rows.map(r => columns.map(c => r[c])), truncated: e.truncated, attempts: [] });
+	}
+	if (jobEvidence) {
+		parsed.text = safeJobText(parsed.text).text;
+		for (const row of runs.rows) if (typeof row[5] === 'string') row[5] = safeJobText(row[5]).text;
+		for (const check of reader.checks.filter(c => /run history|Latest scheduler runs/i.test(c.label))) check.rows = check.rows.map(row => row.map(value => typeof value === 'string' ? safeJobText(value).text : value));
+	}
 	const combined = parseIssue([options.issue ?? '', discovery.matchedText, ...runs.rows.map(r => `${Number(r[3]) ? `ORA-${String(r[3]).padStart(5, '0')}` : ''} ${asText(r[5])}`)].join('\n'));
 	const owners = unique([...[...explicitObjects, ...discoveredObjects].map(o => objectName(o).owner), ...combined.frames.flatMap(f => f.owner ? [f.owner] : []), ...jobs.rows.map(r => asText(r[0])), ...runs.rows.map(r => asText(r[0]))]);
 	if (!owners.length) owners.push(target.defaultSchema);
@@ -148,16 +169,22 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		const evidence = await collectSql(ctx, target.name, id, hours, []);
 		blockerSql.push(evidence); reader.checks.push(...evidence.checks);
 	}
+	const topSql = [];
+	for (const row of top?.sql.rankings.elapsedUs.slice(0, 1) ?? []) {
+		options.signal?.throwIfAborted();
+		const evidence = await collectSql(ctx, target.name, row.name, hours, []);
+		topSql.push(evidence); reader.checks.push(...evidence.checks);
+	}
 	const sql = await collectSql(ctx, target.name, options.issue ?? '', hours, parsed.objects);
 	reader.checks.push(...sql.checks);
 	const diagnosis = await diagnosePredicates(excerpts, sourceCache, constraints, reader, dictionary);
 	diagnosis.suggestions.push(...alertSuggestions(alertLog));
-	const hypotheses: Hypothesis[] = [...sqlHypotheses(sql), ...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
+	const hypotheses: Hypothesis[] = [...(backup?.findings.map(f => ({ rank: 0, title: f.detail, evidence: [backup.scope, 'Backup evidence: ' + f.evidence.join(', '), backup.restoreEstimate.detail] })) ?? []), ...topSql.flatMap(sqlHypotheses), ...sqlHypotheses(sql), ...diagnosis.hypotheses, ...alertHypotheses(alertLog)];
 	for (const constraint of constraints.filter(c => c.rows.length)) {
 		const row = constraint.rows[0]!;
 		hypotheses.unshift({ rank: 0, title: combined.codes.includes('ORA-02292') ? 'A child foreign key still references the parent rows being deleted.' : 'A key value violates the resolved constraint.', evidence: [`${constraint.binds.owner}.${constraint.binds.name}: table ${row[0]}.${row[3]}, type ${row[2]}.`, ...excerpts.map(e => `${e.object} line ${e.line} inside ${e.subprogram}: ${e.statement}`)] });
 	}
-	const limitations: string[] = [...runs.notes, ...discovery.jobs.map(j => `${j.owner}.${j.name}: discovered from alert log (ORA-12012).`), ...(discovery.alert.checks.some(c => c.label.startsWith('Recent errors')) ? ['Recent errors in the window, not matched to the issue; no causal association is established.'] : [])];
+	const limitations: string[] = [...(backup ? [backup.scope, backup.restoreEstimate.detail] : []), ...(top ? [top.note, ...top.sql.notes, ...top.load.notes, ...top.host.notes] : []), ...runs.notes, ...discovery.jobs.map(j => `${j.owner}.${j.name}: discovered from alert log (ORA-12012).`), ...(discovery.alert.checks.some(c => c.label.startsWith('Recent errors')) ? ['Recent errors in the window, not matched to the issue; no causal association is established.'] : [])];
 	for (const candidate of missingNames) {
 		limitations.push(`not found: ${candidate.name} - check spelling, owner visibility, or whether it was dropped${matches?.status === 'unavailable' || matches?.truncated ? ' (lookup unavailable or partial)' : ''}`);
 	}
@@ -167,6 +194,8 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 	}
 	for (const excerpt of excerpts.filter(e => /RAISE_APPLICATION_ERROR/i.test(e.statement))) hypotheses.push({ rank: 0, title: 'The application explicitly raises an error from its guard or failure path.', evidence: [`${excerpt.object} ${excerpt.subprogram} line ${excerpt.line}: ${excerpt.statement}`, ...combined.codes.filter(c => /^ORA-20/.test(c))] });
 	for (const check of reader.checks.filter(c => /Compile errors|Invalid objects/.test(c.label) && c.rows.length)) hypotheses.push({ rank: 0, title: 'An invalid or uncompilable object may explain the failure; correlate it with the failing call.', evidence: [check.label, ...check.rows.slice(0, 3).map(r => r.join(' | '))] });
+	if (backup && !hypotheses.length) hypotheses.push({ rank: 0, title: 'Backup metadata reviewed; recoverability still requires media validation.', evidence: [backup.restoreEstimate.detail] });
+	if (top && !hypotheses.length) hypotheses.push({ rank: 0, title: 'One live sample was collected; no SQL cause is established.', evidence: [top.note, `Sample status: ${top.status}; SQL: ${top.sql.status}.`] });
 	if (!hypotheses.length) {
 		const evidence = [...combined.codes, ...alertLog.entries.map(r => r.messageText), ...runs.rows.slice(0, 3).map(r => `${r[0]}.${r[1]} ${r[2]} ${r[4]}`), ...excerpts.map(e => `${e.object} line ${e.line}: ${e.statement}`)].filter(e => e.trim());
 		if (evidence.length) hypotheses.push({ rank: 0, title: 'The recorded run or error is visible, but the cause is not yet established.', evidence });
@@ -212,7 +241,7 @@ export async function triageIssue(ctx: ToolContext, options: TriageOptions) {
 		for (const job of runs.rows.filter(r => correlation.kind === 'jobRun' && correlation.label.includes(`${r[0]}.${r[1]} `))) edge(node(`job:${job[0]}.${job[1]}`, 'job', `${job[0]}.${job[1]}`), alert);
 	}
 	graph.edges = [...new Map(graph.edges.map(e => [JSON.stringify(e), e])).values()];
-	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, sql, ...(sessions ? { sessions, blockerSql } : {}), checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
+	return { schemaVersion: 1 as const, target: target.name, since: options.since ?? '24h', issue: parsed, codes: combined.codes, times: unique([...parsed.times, ...combined.times]), hypotheses, suggestions: diagnosis.suggestions, concurrency: diagnosis.concurrency, limitations, excerpts, alertLog, sql, ...(backup ? { backup } : {}), ...(jobEvidence ? { jobEvidence } : {}), ...(top ? { top, topSql } : {}), ...(sessions ? { sessions, blockerSql } : {}), checks: reader.checks, guide: combined.codes.flatMap(c => errorGuide(c) ?? []), graph, mermaid: renderMermaid(graph) };
 }
 async function columns(reader: TriageReader, owner: string, name: string) {
 	const existing = reader.checks.find(c => c.label === `Columns for ${owner}.${name}`); if (existing) return existing;
@@ -258,6 +287,7 @@ export function renderTriageMarkdown(result: TriageResult): string {
 		`## Issue ${i + 1}`, safe(issue.issue.text), `Window: ${safe(issue.since)}. Codes: ${issue.codes.join(', ') || 'none'}. Reported times: ${issue.times.map(safe).join(', ') || 'none'}.`,
 		...(issue.alertLog ? ['### Alert log', renderTriageAlerts(issue.alertLog)] : []),
 		...(issue.sql ? renderTriageSql(issue.sql) : []),
+		...(issue.topSql ?? []).flatMap(renderTriageSql),
 		...(issue.sessions ? ['### Sessions evidence', issue.sessions.activity ? embedSnapshotMarkdown(renderSessionsMarkdown(issue.sessions.activity)) : safe(issue.sessions.reason), ...(issue.blockerSql ?? []).flatMap(renderTriageSql)] : []),
 		'### Ranked hypotheses', ...issue.hypotheses.map(h => `${h.rank}. ${safe(h.title)}\n\n${h.evidence.filter(e => e.trim()).map(e => '- ' + evidenceText(e)).join('\n')}${h.verifyNext ? '\n\nVerify next (not executed):\n\n' + block('sql', h.verifyNext.sql) + '\nBinds: ' + safe(JSON.stringify(h.verifyNext.binds)) : ''}`),
 		'### Limitations', ...(issue.limitations.length ? issue.limitations.map(safe) : ['No additional limitations identified; view failures and caps are reported below.']), '### Concurrency review', ...(issue.concurrency.length ? issue.concurrency.map(safe) : ['No supported concurrent child-insert path identified from the available source and job evidence.']), '### Suggested fixes (not executed)', 'Suggestions for a developer; no changes were run.', ...(issue.suggestions.length ? issue.suggestions.map(s => '- ' + safe(s)) : ['Inspect the unavailable source and raising condition before choosing a remediation; preserve exception/backtrace logging without credentials.']), '### Frame excerpts', ...issue.excerpts.map(e => `${safe(e.object)} line ${e.line} inside ${safe(e.subprogram)}; ${e.status}; ${safe(e.view)}${e.truncated ? '; source cap reached' : ''}${e.attempts.map(a => `; ${a.view} ${a.code}`).join('')}.\n\nStatement (heuristic): ${inline(e.statement)}\n\n${e.source.length ? block('plsql', e.source.map(s => `${s.line}: ${s.text.trimEnd()}`).join('\n')) : 'Source unavailable; historical job_action and raising condition cannot be inspected.'}`),

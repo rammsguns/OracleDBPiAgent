@@ -1,3 +1,4 @@
+import { readFeatureReport } from './features.js';
 import { formatBytes } from '../space/index.js';
 import { readReportSpace } from './space.js';
 import { readReportSessions } from './sessions.js';
@@ -17,7 +18,7 @@ export interface ReportSection {
 }
 export interface DatabaseReport { target: string; generatedAt: string; sections: ReportSection[] }
 export interface ReportOptions { target?: string; owner?: string; sections?: string[]; historyDirectory?: string }
-export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions', 'space'];
+export const sectionNames = [...reportQueries.map(q => q.name), 'security', 'sessions', 'space', 'backup', 'jobs'];
 const groups: Record<string, string[]> = { backups: ['backups', 'archive_switches'], scheduler_jobs: ['scheduler_jobs', 'scheduler_failures'], index_health: ['index_health', 'index_partitions', 'index_subpartitions'] };
 /** Deliberately allowlisted diagnostics, matching the CLI's suppression of raw driver errors. */
 function safeReason(error: unknown, grant: string): string {
@@ -101,13 +102,20 @@ export async function generateReport(ctx: ToolContext, options: ReportOptions = 
 			report.sections.push({ name: 'space', status: 'unavailable', source: 'readSpaceUsage', columns: [], rows: [], note: `not available: ${safeReason(error, 'space metadata or saved history')}` });
 		}
 	}
+	for (const name of ['backup', 'jobs'] as const) if (selected?.has(name)) {
+		try { report.sections.push(await readFeatureReport(ctx, target, name)); }
+		catch (error) {
+			if (error instanceof UnsupportedVersionError) throw error;
+			report.sections.push({ name, status: 'unavailable', source: name === 'backup' ? 'readBackup' : 'readJobs', columns: [], rows: [], note: `not available: ${safeReason(error, name + ' metadata')}` });
+		}
+	}
 	return report;
 }
 const cell = (value: unknown): string => String(value === null || value === undefined ? 'NULL' : value instanceof Date ? value.toISOString() : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, ' ');
 export function renderMarkdown(report: DatabaseReport): string {
 	const sections = report.sections.map(s => {
 		const blocks = [`## ${s.name}`, `Source: ${s.source}`, s.note];
-		if (s.status === 'ok' || s.name === 'security' && s.rows.length > 0) {
+		if (s.status === 'ok' || ['security', 'backup', 'jobs'].includes(s.name) && s.rows.length > 0) {
 			if (s.rows.length) {
 				const lines = [
 					`| ${s.columns.map(cell).join(' | ')} |`,

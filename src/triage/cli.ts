@@ -37,8 +37,10 @@ export async function runTriage(options: { target: string; issue?: string; issue
 	const config = loadConfig();
 	if (!config.targets.some(t => t.name === options.target)) throw new Error('Unknown triage target');
 	const sessions = createSessionProvider(config);
+	const controller = new AbortController(), cancel = () => controller.abort();
+	process.once('SIGINT', cancel);
 	try {
-		const result = await triage({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, issue, since: options.since });
+		const result = await triage({ config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() }, { target: options.target, issue, since: options.since, signal: controller.signal });
 		let markdown = renderTriageMarkdown(result);
 		let summary: Awaited<ReturnType<typeof summarizeTriage>> | undefined;
 		if (options.summarize) {
@@ -49,5 +51,5 @@ export async function runTriage(options: { target: string; issue?: string; issue
 		const output = summary ? { ...result, summary } : result;
 		if (options.out) await saveTriage(options.out, output, markdown);
 		console.log(options.json ? JSON.stringify(output) : markdown);
-	} finally { await sessions.closeAll(); }
+	} finally { process.removeListener('SIGINT', cancel); await sessions.closeAll(); }
 }
