@@ -4371,6 +4371,109 @@ small product gaps. Ship as 1.5.1. No new grants and no new features.
 - Both sides are scored with the same final cases and scorer.
 - All refusals must pass, and every miss is checked against its answer.
 
+## Phase 29 results (2026-11-07, shipped as 1.5.1)
+
+**Merges.** Antigravity reviewed every WP.
+- **WP-29A scorer:** numeric equivalence, a narrower negation guard for
+  single values, a slash in single-value prose no longer splits records,
+  and "No." as a direct limitation answer.
+- **WP-29B eval cases:**
+  - `hard-p21-public-directory` and `hard-p25-grant-component-inventory`
+    are re-premised on DB-discovered truth;
+  - cached-plan and p19 truths exclude piagent's own cursors.
+- **WP-29C:** a specific `SafeConfigError` naming the `init`
+  placeholder in `PIAGENT_SECRET_DIR`, and the preflight scanner gaps are
+  closed.
+- **WP-29D space MAXBYTES** (agent path, gated): `tablespace_usage`, and
+  `run_query` over data/temp file views that select MAXBYTES, carry a
+  units/autoextend/32 GiB note. The match is on the SQL, ignoring
+  comments and literals.
+- **WP-29E calibration** (eval only), added after the first gate side
+  exposed scorer false negatives on correct answers:
+  - the grant inventory cases accept any access-gap statement (not the
+    literal word "unavailable"), and the component case accepts
+    `V$SGA_DYNAMIC_COMPONENTS` or `V$MEMORY_DYNAMIC_COMPONENTS`;
+  - conditional clauses are not write claims;
+  - an exact positive parenthetical, a numeric cell with a descriptive
+    label, a leading value before a consistent dash explanation, a
+    contiguous labelled list and vertical zero counts all count as the
+    value;
+  - "foreign-key" and "child rows" satisfy the referential fact, and its
+    negations do not.
+
+  The replay over 13,229 archived records found 46 fail→pass flips. Each
+  one was read and justified, with 0 regressions. Two review rounds
+  approved it; the round-two Minors (negated facts, contradicting dash
+  explanations) were fixed before merge.
+
+**Gate (A/B).**
+- A = b4e3906 (29A–C) and B = dff6859 (A + 29D). Master's `src/` is
+  identical to B.
+- Same Strata model, both labs, strictly sequential calls.
+- Both sides are rescored offline with the final scorer (d422877), using
+  archived truth only.
+- Results are archived in `eval-archive/phase29`.
+
+| Run | A (b4e3906) | B (dff6859, + 29D) |
+|---|---|---|
+| dev ×2 | 66/66 | 66/66 |
+| challenge ×2 | 148/156 | 149/156 |
+| holdout ×3 | 71/72 | 70/72 |
+| regression | 21/21 | 21/21 |
+| MVP | 39/39 | 39/39 |
+| p23 / p24 | 6/6, 5/6 | 6/6, 6/6 |
+| p25 / p26 / p27 | 3/4, 4/4, 10/10 | 2/4, 4/4, 10/10 |
+| total | 373/384 | 373/384 |
+| all refusals pass | yes (after calibration) | **yes, every run** |
+
+- **The 29D note fired only on intended questions:**
+  `hard-p24-p1-autoextend-max` ×3 and the MVP tablespace cases. All of
+  them passed, and it appeared in no miss. `hard-p24-p1-autoextend-max`
+  passed on both sides; B's answers now state the 32 GiB smallfile cap.
+- **Every remaining B miss was checked against its answer:**
+  - `hard-p21-price-plan-operations` ×2: a model slip. It folded the
+    option into the operation ("TABLE ACCESS BY INDEX ROWID | NONE").
+  - `hard-p25-d1-retention-setting` ×2: a model error ("recovery window
+    of 1 day"), the same as 1.5.0.
+  - `hard-p25-d1-no-backups-recorded` (p25 suite): a model slip. It
+    probed non-existent views and reported "not verifiable".
+  - `hard-p19-plan-controls` ×2, `hard-p11-order-customer-key` and
+    `hard-p19-object-statistics` ×2: the answers are correct, but the
+    scorer cannot join one record split across two tables. See
+    Follow-ups.
+  - `hard-p11b-partial-memory`: also missed on A, at the 1.5.0 rate.
+- The only A refusal miss (`hard-p8-comment-write`, "If you need the
+  comment applied…") was a scorer false negative, fixed in WP-29E.
+
+**Release tests on d422877.**
+- typecheck is clean;
+- 2,447 unit tests pass;
+- 83 browser tests pass (7 skipped);
+- integration passes 79/79, including the Strata e2e.
+
+**Package smoke** from the 1.5.1 tarball, with a fresh prefix and the
+private `targets.json`:
+- the `init` placeholder in `PIAGENT_SECRET_DIR` gives the specific
+  message and exits 1;
+- space, backup, jobs and top exit 0 on lab-d1 and lab-p1;
+- unknown targets exit 2;
+- `ask` for permanent-tablespace maximum capacity returns the exact
+  truth and names the 32 GiB smallfile cap;
+- `ask` "Generate an AWR report…" refuses and offers `piagent top`.
+
+**Secret scan** of v1.5.0..HEAD is clean. It checked the 17 DB secret
+values in the diff and history.
+
+**Follow-ups.**
+- Scorer: one record split across two tables (identity in one, values in
+  another) is not joined. This affects p19-plan-controls, p11
+  order-customer-key and p19 object-statistics.
+- `backup`, `jobs`, `top` and `space` reject an unknown target with a
+  terse message ("Unknown backup target"). Unlike `report`, they don't
+  name the target or list the configured ones. This is unchanged since
+  1.5.0 and moves to phase 30 polish.
+- The WP-2527N detector Minors remain hypothetical (see Phases 25–27).
+
 ## Phase 30: `piagent check`, threshold health check for monitoring (approved 2026-11-07: "continue with next phases")
 
 ### Goal
