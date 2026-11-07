@@ -1,0 +1,23 @@
+{
+	"base": "6fd2971",
+	"existingCaseCount": 189,
+	"changedExistingCases": [],
+	"scorerBeforeSha256": "6dcf172c1cef41e5edd6d249dee08a6294489f7aaf433be6323aef272e27a14f",
+	"scorerAfterSha256": "5753f65dbf20b04a5727c766685aec469f60a9efb23e5d3460947d3eaf1b907d",
+	"roots": [
+		{
+			"root": "../eval-archive",
+			"files": 496,
+			"records": 11157,
+			"unknownRecords": 113
+		},
+		{
+			"root": "../needlefish/evals/results",
+			"files": 139,
+			"records": 3186,
+			"unknownRecords": 0
+		}
+	],
+	"flips": [],
+	"checkDifferences": []
+}
