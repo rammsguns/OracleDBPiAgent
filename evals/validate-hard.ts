@@ -82,12 +82,28 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const jobs = cases.filter(test => test.id.startsWith('hard-p26-'));
+	if (jobs.length) checkP26Cases(jobs);
+
 	const backup = cases.filter(test => test.category === 'backup');
 	if (backup.length) checkP25Cases(backup);
 
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+export function checkP26Cases(cases: EvalCase[], liveTruth?: { id: string; target: string; rows: unknown[][] }): void {
+	// Explanation facts assume the p1 fixture error; never silently grade a different failure.
+	if (liveTruth?.target === 'p1-19c-prod' && liveTruth.id === 'hard-p26-p1-last-failed-job' &&
+		(liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[1] !== 'ORA-02292')) throw new Error('p26 p1 failure fixture changed: expected ORA-02292; review requiredFacts');
+	if (cases.length !== 4 || new Set(cases.map(test => test.id)).size !== 4) throw new Error('Expected four distinct p26 jobs cases');
+	for (const test of cases) {
+		if (test.target !== 'p1-19c-prod' || test.category !== 'jobs' || test.split !== 'challenge' || test.groundTruth?.mode !== 'rowCells') throw new Error('p26 requires p1 challenge rowCells truth');
+		classifySql(test.groundTruth.sql);
+		if (/\b(?:run_query|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question ?? '')) throw new Error('p26 questions must not name tools or views');
+		if (/\b(?:ADDITIONAL_INFO|ERRORS|JOB_ACTION|RUN_COUNT|FAILURE_COUNT)\b/i.test(test.groundTruth.sql)) throw new Error('p26 truth must exclude free text and moving counters');
+	}
 }
 
 export function checkP25Cases(cases: EvalCase[]): void {
@@ -154,6 +170,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
+				if (test.id.startsWith('hard-p26-')) checkP26Cases(cases.filter(candidate => candidate.id.startsWith('hard-p26-')), { id: test.id, target: test.target, rows });
 				if (test.category === 'partial-grants') {
 					const view = test.id === 'hard-p11b-partial-memory' ? 'V_$SGASTAT' : 'V_$SGA_DYNAMIC_COMPONENTS';
 					await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${view} WHERE ROWNUM=1`));

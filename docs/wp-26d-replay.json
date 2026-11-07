@@ -1,0 +1,177 @@
+{
+	"commit": "d25f1cb3e613572db3195dee9d6bd931b1af7d40",
+	"roots": [
+		"../eval-archive",
+		"../needlefish/evals/results"
+	],
+	"files": 635,
+	"records": 14343,
+	"flips": 0,
+	"existingCases": 179,
+	"definitions": [
+		{
+			"file": "evals/cases/chat-budget.json",
+			"sha256": "e148b10027d487b9fdb0447a0476e14aea570905e19ca40dadbedc6f1657ab7a"
+		},
+		{
+			"file": "evals/cases/oracle19c.json",
+			"sha256": "d8932ce319d4a0bf81772e7c0a60a7f3f2c07751e4af60acc3eb67a11a6a0ef2"
+		},
+		{
+			"file": "evals/cases-hard/analytical.json",
+			"sha256": "aa9b146065eed35f667c370132066b7e4f558f15b27ab272e202565a6171f404"
+		},
+		{
+			"file": "evals/cases-hard/cached-plan.json",
+			"sha256": "1ba4459cd88e55e324947088771f1f0a7820ee0794e23563ca92bdd92f6a6fb3"
+		},
+		{
+			"file": "evals/cases-hard/diagnosis.json",
+			"sha256": "be0316f6a5cd135e138b6146eb3138fdac5dad4818a708c623995ea4a605f089"
+		},
+		{
+			"file": "evals/cases-hard/follow-up.json",
+			"sha256": "9eca41354639c267c179b846d1ace847f0512e377897f7fb1cd94c89c2bed0f1"
+		},
+		{
+			"file": "evals/cases-hard/fresh-holdout.json",
+			"sha256": "4a7c2fff913ef0849d4893023bdab9ad8064db7487edb58f76ae189bd63803ea"
+		},
+		{
+			"file": "evals/cases-hard/phase11-ambiguity.json",
+			"sha256": "075e0a2080124aab4ca3af8598f835ba2a7bbdabe919b5cb4db7a842b2c0b357"
+		},
+		{
+			"file": "evals/cases-hard/phase11-column-traps.json",
+			"sha256": "4c296788debe1339db0c8282a6b2806f966b9c8c717d19323c7e0631d524f9fb"
+		},
+		{
+			"file": "evals/cases-hard/phase11-false-premises.json",
+			"sha256": "1e42629bc796311f7f515a7d9430bb405f73241c701db3cca44eb5d24716bfb9"
+		},
+		{
+			"file": "evals/cases-hard/phase11-multi-step-diagnosis.json",
+			"sha256": "489d629637ceec9a6bc37c4c762471205fffa1cd8abc71db53daac5840f01ff2"
+		},
+		{
+			"file": "evals/cases-hard/phase11-multi-turn-dependency.json",
+			"sha256": "a1bdab321c73cf43c6b79269564d71eb297c7ffbe265e3365dd230f8061e9075"
+		},
+		{
+			"file": "evals/cases-hard/phase11-wide-exact.json",
+			"sha256": "9911949311047ae900913267aa93b79d56df9d36d5e5d8e14950fa2061b6280c"
+		},
+		{
+			"file": "evals/cases-hard/phase11b-challenge.json",
+			"sha256": "dad646ec26e106d5190aaf255c69a29481374eb2635c534bf7e7545b627b65b8"
+		},
+		{
+			"file": "evals/cases-hard/phase16-plsql.json",
+			"sha256": "b14457ecd67fcd4d3b4466b92bf4880ea7e4b89606c60054685fb209740d6381"
+		},
+		{
+			"file": "evals/cases-hard/phase18-alertlog.json",
+			"sha256": "1500064a5a406d62ba112b6814fa5dbfd114e4b48316f9fd893e91cfb556b6b2"
+		},
+		{
+			"file": "evals/cases-hard/phase19-sqlperf.json",
+			"sha256": "d5fc36325fa950b9f0521754d5055988d34e30c6125500e3831c8e5cce3c9c7b"
+		},
+		{
+			"file": "evals/cases-hard/phase20-security.json",
+			"sha256": "d98879cdf2297b281d33c8bb73fc26fe05e741d85843c584e5ea124f5ed6d449"
+		},
+		{
+			"file": "evals/cases-hard/phase21-holdout.json",
+			"sha256": "ac32ba3f873c1cf1a151392d5e1344d372493c1b50a00d1eac616cd2ca8fa061"
+		},
+		{
+			"file": "evals/cases-hard/phase23-sessions.json",
+			"sha256": "365d119d0faa7049d5799e697e54f835fe138af9bb564b24fab3935ced854927"
+		},
+		{
+			"file": "evals/cases-hard/phase24-space.json",
+			"sha256": "447e178cc1d4dfa6ceb25b5825dc5dfcda09a4171882ed7a9996edfc45fa7de7"
+		},
+		{
+			"file": "evals/cases-hard/phase25-backup.json",
+			"sha256": "63847ca35ce61b5761b8b1590baa090fc0cfde18d8f17d94c4d2699e1a94f1b9"
+		},
+		{
+			"file": "evals/cases-hard/phase25-blind-holdout.json",
+			"sha256": "c56077c1eef265e455082161103798377a48adf62b4023068be4aa8f1812e47f"
+		},
+		{
+			"file": "evals/cases-hard/phase5-grant-limited-p1.json",
+			"sha256": "e6549633a3cd880f46ec4cc0d08153fb9a013486d6dee4a4b48cc57e8de297c4"
+		},
+		{
+			"file": "evals/cases-hard/phase5-name-fidelity.json",
+			"sha256": "38755d61b6b8b7cbe813b191d7a922b1d5014989735eca5b6f5f0b0a6b7bfc2a"
+		},
+		{
+			"file": "evals/cases-hard/phase5-numeric-precision.json",
+			"sha256": "80447e11dd5d627ca4480b56d21c1a747f5699204756e65a5b1d1410f5524598"
+		},
+		{
+			"file": "evals/cases-hard/phase5-refusal-follow-ups.json",
+			"sha256": "d0e73f1738e820aed26f7fea2ba13c1fad6836b3a83f7e444320e13a478d98bb"
+		},
+		{
+			"file": "evals/cases-hard/phase5-unit-conversion.json",
+			"sha256": "7ae0cca4660232dff46450f9d1faca0b98fb83c4a17c4a0e73ea780dde13a2b2"
+		},
+		{
+			"file": "evals/cases-hard/phase8-analytical.json",
+			"sha256": "18ed6e90a288cdd7c40698f3b80e03f44e12f71578db456f0da75d0daa482043"
+		},
+		{
+			"file": "evals/cases-hard/phase8-cached-plan.json",
+			"sha256": "2f3317357bf82ddb5c9c27c0534273507b796ca1caf2b0bd8945991768a50e22"
+		},
+		{
+			"file": "evals/cases-hard/phase8-diagnosis.json",
+			"sha256": "22875651c6c3267687395a0df08e77c30c6cd9cb6e69bedb73c21d55e112dff9"
+		},
+		{
+			"file": "evals/cases-hard/phase8-follow-up.json",
+			"sha256": "3f5d2d68030953f3aa585a6fc0afacf1dca24b5ca82e3032864a338904ee5d14"
+		},
+		{
+			"file": "evals/cases-hard/phase8-grant-limited-p1.json",
+			"sha256": "e6cfe86f67de848d4e8fd0fbe166d4c4e4b3e2eb08fc06f50bc717cf6d2a9895"
+		},
+		{
+			"file": "evals/cases-hard/phase8-name-fidelity.json",
+			"sha256": "fcb8ac42b72eec241c61dbb8fe40df68ad49b6b1eb3dfc591f2f8969292cf310"
+		},
+		{
+			"file": "evals/cases-hard/phase8-numeric-precision.json",
+			"sha256": "3449751bc440e81e65e4ed07d61da0f34f679da03128425ffb0eda5ff152540f"
+		},
+		{
+			"file": "evals/cases-hard/phase8-refusal-follow-ups.json",
+			"sha256": "aae7a5fcb47af6a3fc283e840744225f51f3ed0aef2c18cbb05a945ec60b2cba"
+		},
+		{
+			"file": "evals/cases-hard/phase8-refusal.json",
+			"sha256": "9439df28fb9becba7c17bb5e093c5ea31e1935e812a66f25aada80cd371604a4"
+		},
+		{
+			"file": "evals/cases-hard/phase8-relationships.json",
+			"sha256": "c572e1cd60ea20a2b3f286e8ef35d7183d7989b7ee260c93949a330c9dbcabea"
+		},
+		{
+			"file": "evals/cases-hard/phase8-unit-conversion.json",
+			"sha256": "33fbdd91f77aa064cace79b39649a0623db5d17f9b76d1f4de1095ee8f9de0cb"
+		},
+		{
+			"file": "evals/cases-hard/refusal.json",
+			"sha256": "9585cb4d258f365ef4b48597abb6f3f4f459dea13ac31da244059db8befffeab"
+		},
+		{
+			"file": "evals/cases-hard/relationships.json",
+			"sha256": "26d22f60489a40b6060df7dcad6c039e30052e924fdebf553f129b36d1f534e9"
+		}
+	]
+}

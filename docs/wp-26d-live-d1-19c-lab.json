@@ -1,0 +1,66 @@
+{
+	"target": "d1-19c-lab",
+	"validatedAt": "2026-11-07T02:04:49.959Z",
+	"scope": "Current container visible scheduler and maintenance metadata",
+	"container": {
+		"id": 0,
+		"name": "ORCL"
+	},
+	"note": "Retained visible history only; a scheduled next run is an estimate, not a guarantee.",
+	"views": [
+		{
+			"view": "DBA_SCHEDULER_JOBS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_SCHEDULER_JOB_RUN_DETAILS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_OBJECTS",
+			"status": "readable"
+		},
+		{
+			"view": "DBA_AUTOTASK_CLIENT",
+			"status": "readable"
+		}
+	],
+	"records": [
+		{
+			"id": "hard-p26-p1-last-failed-job",
+			"status": "readable",
+			"rows": [
+				[
+					"NONE RECORDED",
+					"NO ERROR RECORDED"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-invalid-objects",
+			"status": "readable",
+			"rows": [
+				[
+					"SHOPAPP",
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-stats-autotask",
+			"status": "readable",
+			"rows": [
+				[
+					"auto optimizer stats collection",
+					"ENABLED"
+				]
+			]
+		},
+		{
+			"id": "hard-p26-p1-next-run-semantics",
+			"status": "readable",
+			"rows": [],
+			"note": "No rows visible; no absence outside this scope inferred."
+		}
+	]
+}
