@@ -1,0 +1,99 @@
+# WP-2527G: release 1.5.0 rendering polish
+
+Backup Markdown now renders per-datafile backups, archive gaps, recovery-area
+balances and all named evidence sections as contiguous escaped tables. Empty
+sets say `None.`. Display tables show at most 100 rows and report the exact
+number omitted with `N more rows; use --json`. Existing query caps and partial
+evidence warnings remain in force. Byte columns use binary human units.
+
+Jobs Markdown and the web Jobs timeline and evidence tables display Oracle
+INTERVAL DAY TO SECOND objects as compact durations, including days, negative
+values and fractional seconds (nanoseconds, with trailing zeroes removed).
+Formatting applies to any interval object, rather than only RUN_DURATION;
+JSON evidence remains intact.
+
+Top now derives load/host scope from the same isCdb identity flag as backup:
+`Database-wide (non-CDB)` on both labs and `CDB-wide (shared by all PDBs)`
+for PDB identity. Web Top consumes those scope fields unchanged. Chat `/top`
+uses the shared Markdown renderer, verified by the live integration test.
+Text output has a heading, scope, contiguous ranking/load/host tables, explicit
+`none in this interval` for empty rankings, human byte units and SQL drill-down
+commands. Counter rules, findings, SQL, redaction and data caps are unchanged.
+
+## Changed files
+
+- `src/backup/index.ts`, `src/backup/markdown.ts`: Markdown rendering and escaped table helper.
+- `src/jobs/index.ts`, `src/jobs/duration.ts`: display-only interval formatting.
+- `src/top/index.ts`: identity-based scope and Markdown text rendering.
+- `src/web/static/operations.js`: Jobs display-only interval formatting.
+- Unit backup/jobs/render-polish tests, browser operations fixtures/assertions,
+  and integration-features chat scope assertions.
+- This report and `docs/wp-2527g-render/` captures and test logs.
+
+## Verification
+
+Before/after captures in `wp-2527g-render/` use the requested CLI commands on
+d1-19c-lab and p1-19c-prod: backup, jobs --since 7d, top --seconds 5.
+Captures are independent live samples, so times, job runs and deltas differ.
+The captures demonstrate display caps, empty rankings, host memory units and
+interval display. Top reports partial SQL evidence when its existing snapshot
+cap is reached; actual elapsed intervals can exceed the requested five seconds
+because sequential snapshot reads take time.
+
+No shared contract changes are needed. No live CDB/PDB is available; PDB scope
+is covered by existing unit tests. Browser tests use fake services by default;
+live browser tests skip unless explicitly enabled.
+
+Final checks:
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=2`: 120 files, 2,211 tests passed.
+- `npm run test:browser`: 83 passed, 7 opt-in live tests skipped.
+- `PIAGENT_SECRET_DIR=… npx vitest run tests/integration/backup.test.ts tests/integration/jobs.test.ts tests/integration/top.test.ts tests/integration/integration-features.test.ts --no-file-parallelism`: 4 files, 9 tests passed (146.21 seconds), no skips.
+
+The integration command names the four files directly because the npm script
+already includes the entire integration directory. No LLM calls were requested
+by these four integration files or the CLI captures. Browser tests use mocked
+chat responses. Captures/logs have terminal trailing blank lines removed.
+
+## Coordinator capture review follow-up
+
+Removed trailing colons from the three backup section headings. Null cells now
+say `none` in backup and Jobs Markdown, including missing level0, incremental
+and checkpointScn values. Top retains `unknown` for unmeasured deltas.
+SQL ranking columns now say `SQL_ID`; load and host columns say `statistic`.
+Markdown numeric cells round to at most three decimal places and omit trailing
+zeroes, including ranking rates, load rates and host gauge values. Timestamp
+precision and interval fractional seconds are retained. JSON evidence is
+unchanged; regression tests compare serialized evidence before/after rendering.
+
+Regenerated all six after-captures on both approved labs using the same commands.
+Checked their table cells and headings: no raw numeric floats longer than three
+decimal places and no headings ending in a colon. Empty application strings may
+still appear blank; database nulls explicitly render `none`.
+
+Follow-up checks:
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=2`: 120 files, 2,213 tests passed.
+- `npm run test:browser`: 83 passed, 7 opt-in live tests skipped (44.0 seconds).
+- All six requested live CLI after-captures completed successfully.
+
+No SQL, findings, redaction, caps, JSON shapes or web rendering changed in this
+follow-up. No contract changes are needed. Integration tests were not rerun for
+this formatting-only follow-up; the initial 9-test live result above is retained.
+No LLM calls were made for the follow-up.
+
+## Approved review Minor: Jobs header escaping
+
+Addressed the sole Minor in `docs/review-wp-2527g-render.md` on branch
+`review-wp-2527g-render`: `renderJobs` now uses `columns.map(escape)` for
+Markdown table headers, matching body-cell escaping. Added a Jobs unit test
+with a column alias containing a pipe, HTML delimiters, ampersand and CR/LF;
+it checks identical header/body escaping and unchanged serialized evidence.
+
+- `npm run typecheck`: passed.
+- `npx vitest run tests/unit/jobs.test.ts --maxWorkers=2`: 1 file, 46 tests passed.
+
+Changed only `src/jobs/index.ts`, `tests/unit/jobs.test.ts` and this report.
+No contract changes or additional live verification are needed for this fix.

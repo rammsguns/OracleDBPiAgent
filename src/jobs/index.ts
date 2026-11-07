@@ -1,3 +1,5 @@
+import { markdownNumber } from '../backup/markdown.js';
+import { formatDuration } from './duration.js';
 import { createHash } from 'node:crypto';
 import type { ToolContext, DatabaseIdentity } from '../contracts.js';
 import { sinceHours } from '../triage/parse.js';
@@ -86,8 +88,8 @@ export async function readJobs(ctx: ToolContext, target: string, options: JobsOp
 		return result;
 	} finally { await session.close(); }
 }
-const escape = (v: unknown) => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, '<br>');
-// Only timestamp columns are normalized; durations and free-form job text stay intact.
+const escape = (v: unknown) => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? 'none')).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/[\r\n]+/g, '<br>');
+// Only timestamp columns are normalized; JSON durations and free-form job text stay intact; intervals are formatted only below.
 const timestampColumns = new Set(['LOG_DATE', 'ACTUAL_START_DATE', 'LAST_START_DATE', 'NEXT_RUN_DATE', 'NEXT_START_DATE', 'WINDOW_START_TIME', 'JOB_START_TIME', 'START_TIME', 'END_TIME']);
 function utcTimestamp(value: unknown): unknown {
 	if (value == null) return value;
@@ -100,7 +102,7 @@ export function renderJobs(result: JobsResult): string {
 		lines.push('', `## ${name} (${section.view}): ${section.status}`);
 		if (section.note) lines.push(section.note);
 		if (!section.rows.length) lines.push(section.status === 'ok' ? 'No rows returned within visible scope.' : 'Evidence unavailable.');
-		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(timestampColumns.has(c) ? utcTimestamp(row[c]) : row[c])).join(' | ') + ' |'); }
+		else { const columns = [...new Set(section.rows.flatMap(r => Object.keys(r)))]; lines.push('| ' + columns.map(escape).join(' | ') + ' |', '| ' + columns.map(() => '---').join(' | ') + ' |'); for (const row of section.rows) lines.push('| ' + columns.map(c => escape(timestampColumns.has(c) ? utcTimestamp(row[c]) : typeof row[c] === 'number' ? markdownNumber(row[c]) : formatDuration(row[c]))).join(' | ') + ' |'); }
 		if (section.truncated) lines.push('', 'Row cap reached; partial evidence.');
 	}
 	return lines.join('\n') + '\n';

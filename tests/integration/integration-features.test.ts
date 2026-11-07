@@ -20,7 +20,7 @@ for (const target of ['d1-19c-lab', 'p1-19c-prod']) it('integrates backup/jobs/t
 		expect(job.checks.some(c => /scheduler run history/i.test(c.label) && c.rows.length > 0)).toBe(true);
 		const top = (await triage(ctx, { target, issue: 'slow right now' })).issues[0]!;
 		expect(top.top?.requestedSeconds).toBe(15); expect(top.top?.status).not.toBe('failed'); expect(top.top?.load.status).toBe('ok'); expect(top.top?.host.status).toBe('ok'); expect(top.backup).toBeUndefined();
-		const chat = await runChatTop({ ...ctx, pinnedTarget: target }, '/top --seconds 5'); expect(chat).toContain('requested 5s');
+		const chat = await runChatTop({ ...ctx, pinnedTarget: target }, '/top --seconds 5'); expect(chat).toContain('requested 5s'); expect(chat).toContain('Database-wide (non-CDB)'); expect(chat).not.toContain('CDB-wide');
 		console.log(JSON.stringify({ target, report: report.sections.map(s => [s.name, s.status, s.rows.length, /row limit reached/i.test(s.note)]), backup: { status: backup.backup?.status, findings: backup.backup?.findings.map(f => f.id), restore: backup.backup?.restoreEstimate.status }, jobs: { name: jobName, codes: job.codes, objects: job.excerpts.map(e => e.object), sections: Object.keys(job.jobEvidence?.sections ?? {}) }, top: { status: top.top?.status, seconds: top.top?.requestedSeconds, sqlIds: top.top?.sql.rankings.elapsedUs.map(r => r.name), sqlEvidence: top.topSql?.map(s => s.status) }, chat: chat?.split('\n')[0] }));
 	} catch (error) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|ORA-01034|ORA-27101/.test(String(error))) { test.skip('Approved lab unavailable: ' + target); return; }
