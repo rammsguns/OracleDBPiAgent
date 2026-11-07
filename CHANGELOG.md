@@ -74,7 +74,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   metric history, advisors, ADDM), the agent refuses and offers
   `piagent top` or `/top` for a live interval. It no longer suggests
   AWR reports, snapshots or other writes as workarounds. It also no
-  longer guesses RMAN defaults. This change was A/B gated against the
+  longer guesses RMAN defaults. If a refusal still omits `piagent top` or
+  names a pack script or package, the agent asks the model once for a
+  revised answer without tools. These changes were A/B gated against the
   1.5.0 candidate.
 - Backup, jobs and top text output uses Markdown tables. Jobs show
   INTERVAL values as durations. Top labels a non-CDB as
@@ -90,8 +92,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   targets. An unknown `report --sections` name lists the valid sections.
   Both exit 2, like the other evidence commands.
 - The phase 25–27 eval truth rows no longer require labels the question
-  supplied, and refusal checks accept more negation forms. A replay of
-  over 14,000 archived eval records found no unrelated score changes.
+  supplied, and refusal and limitation checks accept more negation forms
+  and table headers. Replays of over 15,000 archived eval records found no
+  unrelated score changes.
 
 ## [1.4.0] - 2026-11-06
 
