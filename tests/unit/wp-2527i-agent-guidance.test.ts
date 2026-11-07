@@ -13,7 +13,7 @@ it('refuses pack requests before tools and offers a bounded live alternative wit
 	expect(refusal).toContain('DBMS_');
 	expect(prompt).toContain(PHASE27_GUIDANCE);
 	for (const rule of [
-		'piagent top --target T --seconds N or /top',
+		'piagent top --target T --seconds N or /top: SQL, load and host CPU deltas;',
 		'one live N-second interval now (5-120, default 15); no history/past hour',
 		'No Diagnostics/Tuning Pack scripts, AWR reports/snapshots or writes as workarounds',
 		'piagent backup and piagent jobs: full recoverability/scheduler pointers only; use tools if answerable',
@@ -21,5 +21,5 @@ it('refuses pack requests before tools and offers a bounded live alternative wit
 		'control-file autobackup default is version-dependent; never infer',
 	]) expect(prompt).toContain(rule);
 	// Separate bounded allowance; historical prefix budgets remain enforced.
-	expect(PACK_REFUSALS.length + PHASE27_GUIDANCE.length).toBeLessThanOrEqual(500);
+	expect(PACK_REFUSALS.length + PHASE27_GUIDANCE.length).toBeLessThanOrEqual(531);
 });

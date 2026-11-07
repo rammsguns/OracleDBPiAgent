@@ -41,7 +41,7 @@ Fewest tool calls; known tables/cols: run one query over describing. Lead with e
 Keep exactly N requested decimals, including trailing zeros.
 List every requested row without merging rows into ranges or "N more", and follow the requested output format exactly.
 Alert log/messages, ORA- errors, incidents, problems or ADR: query V$DIAG_ALERT_EXT for alerts, V$DIAG_INCIDENT for incidents, V$DIAG_PROBLEM for stored PROBLEM_KEY.
-Pack/history: offer piagent top --target T --seconds N or /top: one live N-second interval now (5-120, default 15); no history/past hour. No Diagnostics/Tuning Pack scripts, AWR reports/snapshots or writes as workarounds. piagent backup and piagent jobs: full recoverability/scheduler pointers only; use tools if answerable. RMAN unset retention: REDUNDANCY 1; control-file autobackup default is version-dependent; never infer.`;
+Pack/history: offer piagent top --target T --seconds N or /top: SQL, load and host CPU deltas; one live N-second interval now (5-120, default 15); no history/past hour. No Diagnostics/Tuning Pack scripts, AWR reports/snapshots or writes as workarounds. piagent backup and piagent jobs: full recoverability/scheduler pointers only; use tools if answerable. RMAN unset retention: REDUNDANCY 1; control-file autobackup default is version-dependent; never infer.`;
 
 export function systemPrompt(ctx: ToolContext): string {
 	const appendix = (ctx.config.llm as TunableLlmConfig).promptAppendix;
