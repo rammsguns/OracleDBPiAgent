@@ -1,3 +1,14 @@
+function formatDuration(value) {
+	if (!value || typeof value !== 'object') return value;
+	const interval = value;
+	const keys = ['days', 'hours', 'minutes', 'seconds', 'fseconds'];
+	if (!keys.every(key => typeof interval[key] === 'number' && Number.isFinite(interval[key]))) return value;
+	const [days, hours, minutes, seconds, nanos] = keys.map(key => interval[key]);
+	const negative = [days, hours, minutes, seconds, nanos].some(n => n < 0);
+	const fraction = Math.abs(nanos).toString().padStart(9, '0').replace(/0+$/, '');
+	return `${negative ? '-' : ''}${days ? Math.abs(days) + 'd ' : ''}${days ? String(Math.abs(hours)).padStart(2, '0') : Math.abs(hours)}:${String(Math.abs(minutes)).padStart(2, '0')}:${String(Math.abs(seconds)).padStart(2, '0')}${fraction ? '.' + fraction : ''}`;
+}
+
 import { setupPanel } from './panel.js';
 import { updateTableHints } from './tableHints.js';
 const display = value => value != null && typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -50,12 +61,12 @@ export function renderJobs(content, r) {
 	if (allRuns.length > 100) content.append(el('p', `Timeline shows first 100 of ${allRuns.length} returned runs; display capped.`));
 	const runs = allRuns.slice(0, 100), names = [...new Set(runs.map(row => `${row.OWNER}.${row.JOB_NAME}`))];
 	if (r.sections.runs.status !== 'ok') card(content, 'Per-job run timeline').append(el('p', 'Not verifiable with available evidence.'));
-	else timeline(card(content, 'Per-job run timeline'), names.map(name => ({ name, events: runs.filter(row => `${row.OWNER}.${row.JOB_NAME}` === name).map(row => ({ start: row.ACTUAL_START_DATE || row.LOG_DATE, label: `${row.STATUS} · duration ${row.RUN_DURATION == null ? 'unknown' : display(row.RUN_DURATION)} · error ${row['ERROR#'] ?? 'none'}`, failed: row.STATUS === 'FAILED' })) })));
+	else timeline(card(content, 'Per-job run timeline'), names.map(name => ({ name, events: runs.filter(row => `${row.OWNER}.${row.JOB_NAME}` === name).map(row => ({ start: row.ACTUAL_START_DATE || row.LOG_DATE, label: `${row.STATUS} · duration ${row.RUN_DURATION == null ? 'unknown' : display(formatDuration(row.RUN_DURATION))} · error ${row['ERROR#'] ?? 'none'}`, failed: row.STATUS === 'FAILED' })) })));
 	for (const [id, s] of Object.entries(r.sections).sort(([a], [b]) => Number(['invalidObjects', 'indexes', 'indexPartitions', 'indexSubpartitions', 'staleStatistics'].includes(b)) - Number(['invalidObjects', 'indexes', 'indexPartitions', 'indexSubpartitions', 'staleStatistics'].includes(a)))) {
 		const debt = ['invalidObjects', 'indexes', 'indexPartitions', 'indexSubpartitions', 'staleStatistics'].includes(id);
 		const node = card(content, `${debt ? 'Maintenance debt · ' : ''}${id} · ${s.status}`);
 		if (s.note) node.append(el('p', s.note)); if (s.truncated) node.append(el('p', 'Row cap reached; evidence incomplete.'));
-		if (s.status !== 'ok') node.append(el('p', 'Not verifiable with available evidence.')); else table(node, s.rows, id);
+		if (s.status !== 'ok') node.append(el('p', 'Not verifiable with available evidence.')); else table(node, s.rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, formatDuration(value)]))), id);
 	}
 }
 export function renderTop(content, r) {

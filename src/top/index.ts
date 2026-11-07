@@ -1,3 +1,5 @@
+import { formatBytes } from '../space/index.js';
+import { markdownTable } from '../backup/markdown.js';
 import { setTimeout } from 'node:timers/promises';
 import type { OracleSession } from '../contracts.js';
 export const SQL = {
@@ -65,23 +67,30 @@ export async function sampleTop(session: OracleSession, seconds = 15, runtime = 
 	const cpuPercent = busy != null && idle != null && busy + idle > 0 ? busy / (busy + idle) * 100 : null;
 	return { target: session.target.name, containerName: session.identity.containerName, capturedAt, requestedSeconds: seconds,
 		status: [sql,load,host].every(s => s.status === 'unavailable') ? 'failed' : [sql,load,host].some(s => s.status !== 'ok') ? 'partial' : 'ok',
-		scope: { sql: session.identity.isCdb ? 'Current PDB visibility; empty rows do not prove absence.' : 'Current instance cursor cache', load: 'CDB-wide (shared by all PDBs)', host: 'CDB-wide (shared by all PDBs)' },
+		scope: { sql: session.identity.isCdb ? 'Current PDB visibility; empty rows do not prove absence.' : 'Current instance cursor cache', load: session.identity.isCdb ? 'CDB-wide (shared by all PDBs)' : 'Database-wide (non-CDB)', host: session.identity.isCdb ? 'CDB-wide (shared by all PDBs)' : 'Database-wide (non-CDB)' },
 		sql: { ...sql, rankings, counters: Object.fromEntries(METRICS.map((metric, i) => [metric, sql.status === 'unavailable' ? [] : deltas(first.sql.rows, second.sql.rows, i + 1, sql.intervalSeconds)])) }, load, host: { ...host, gauges: hostGauges, cpuPercent },
 		note: 'Sequential live reads, not atomic snapshots. New, aged-out and reset counters have unknown deltas and are excluded in rankings. Sampling includes observer overhead. SQL cache statistics may lag execution.' };
 }
 export function renderTop(result: Awaited<ReturnType<typeof sampleTop>>): string {
-	const lines = [`Top — ${result.target}: ${result.status}; requested ${result.requestedSeconds}s`, result.note];
+	const lines = [`# Top — ${result.target}: ${result.status}; requested ${result.requestedSeconds}s`, result.scope.load, result.note];
 	for (const key of ['sql','load','host'] as const) {
 		const section = result[key];
-		lines.push(`\n${key}: ${section.status}; ${section.intervalSeconds.toFixed(3)}s; ${result.scope[key]}`, ...section.notes);
+		lines.push(`## ${key}: ${section.status}; ${section.intervalSeconds.toFixed(3)}s`, result.scope[key], ...section.notes);
 		if (key === 'sql') {
-			for (const metric of METRICS) { lines.push(metric + ':'); for (const r of result.sql.rankings[metric]) lines.push(`${r.name} delta=${r.delta} — ${r.command}`); }
+			for (const metric of METRICS) {
+				const rows = result.sql.rankings[metric];
+				lines.push(`### ${metric}`, rows.length ? markdownTable(rows) : 'none in this interval');
+			}
 			for (const state of ['new','aged-out','reset']) {
 				const names = new Set(Object.values(result.sql.counters).flatMap(rows => rows.filter(r => r.state === state).map(r => r.name)));
 				lines.push(`${state}: ${names.size}`);
 			}
-		} else for (const r of section.rows) lines.push(`${r.name}: delta=${r.delta ?? 'unknown'}; /s=${r.perSecond?.toFixed(3) ?? 'unknown'} (${r.state})`);
+		} else {
+			lines.push(markdownTable(section.rows.map(r => ({ statistic: r.name, delta: r.delta === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.delta) : r.delta, perSecond: r.perSecond === null ? 'unknown' : /bytes/i.test(r.name) ? formatBytes(r.perSecond) + '/s' : r.perSecond.toFixed(3), state: r.state }))));
+		}
 	}
-	lines.push(`Host CPU busy: ${result.host.cpuPercent === null ? 'unavailable' : result.host.cpuPercent.toFixed(2) + '%'}`, ...result.host.gauges.map(r => `${r.name}: ${r.value}`));
-	return lines.join('\n');
+	lines.push(`Host CPU busy: ${result.host.cpuPercent === null ? 'unavailable' : result.host.cpuPercent.toFixed(2) + '%'}`,
+		markdownTable(result.host.gauges.map(r => ({ statistic: r.name, value: /bytes/i.test(r.name) ? formatBytes(r.value) : r.value }))),
+		'SQL drill-down: piagent sql --target ' + result.target + ' --sql-id <SQL_ID>');
+	return lines.join('\n\n') + '\n';
 }

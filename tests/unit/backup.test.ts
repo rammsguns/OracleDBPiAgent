@@ -90,3 +90,15 @@ describe('backup evidence',()=>{
 	});
 	it('propagates unexpected errors',async()=>{await expect(readBackup(session({},false,'ORA-00600'))).rejects.toThrow('ORA-00600');});
 });
+
+it('renders all backup evidence as tables or None without changing the report', async () => {
+	const report = await readBackup(session(base), now);
+	const before = JSON.stringify(report);
+	const md = renderBackupMarkdown(report);
+	expect(md).toContain('## Evidence backups (V$BACKUP_DATAFILE): ok');
+	expect(md).toContain('## Archive gaps:\n\nNone.');
+	expect(md).toContain('| FILE# |');
+	expect(md).not.toMatch(/\|\n\n\|/);
+	expect(md).not.toContain('[{');
+	expect(JSON.stringify(report)).toBe(before);
+});

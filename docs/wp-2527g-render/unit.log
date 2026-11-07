@@ -1,0 +1,15 @@
+
+> oracledb-pi-agent@1.5.0 test
+> vitest run tests/unit --maxWorkers=2
+
+
+ RUN  v5.1.0 /home/kiwi/orca/workspaces/OracleDBPiAgent/wp-2527g-render
+
+
+ Test Files  120 passed (120)
+      Tests  2211 passed (2211)
+   Start at  20:36:25
+   Duration  36.09s (tests 79%, import 20%, worker 1%, transform 1%)
+
+    Isolate  120 workers spawned · ~116ms startup each (spawn + environment, per file)
+             at least ~6.83s faster with isolate: false — reuses workers across files instead of one per file
