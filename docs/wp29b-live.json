@@ -1,0 +1,478 @@
+{
+	"validatedAt": "2026-11-07T19:04:28.351Z",
+	"records": [
+		{
+			"id": "hard-price-plan",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"INDEX",
+					"UNIQUE SCAN",
+					"SYS_C007655"
+				],
+				[
+					"TABLE ACCESS",
+					"BY INDEX ROWID",
+					"PRODUCTS"
+				]
+			]
+		},
+		{
+			"id": "hard-orders-plan",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"INDEX",
+					"FAST FULL SCAN",
+					"SYS_C007661"
+				]
+			]
+		},
+		{
+			"id": "hard-lines-plan",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"INDEX",
+					"FAST FULL SCAN",
+					"ORDER_LINES_PK"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-cursor-inventory",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					2134003100,
+					2
+				]
+			]
+		},
+		{
+			"id": "hard-p19-object-statistics",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"SHOPAPP",
+					"PRODUCTS",
+					"YES",
+					"PRESENT"
+				],
+				[
+					"SHOPAPP",
+					"SYS_C007655",
+					"YES",
+					"PRESENT"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-bind-metadata",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					":B1",
+					1,
+					"NUMBER",
+					"YES"
+				]
+			]
+		},
+		{
+			"id": "hard-p19-plan-controls",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"f1yj0hbhj9nna",
+					0,
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p21-public-directory",
+			"target": "d1-19c-lab",
+			"rows": [
+				[
+					0
+				]
+			]
+		},
+		{
+			"id": "hard-p21-schema-directory-grants",
+			"target": "d1-19c-lab",
+			"rows": [
+				[
+					"DATA_FILE_DIR",
+					"READ"
+				],
+				[
+					"LOG_FILE_DIR",
+					"READ"
+				],
+				[
+					"LOG_FILE_DIR",
+					"WRITE"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-grant-component-inventory",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"V$SGA_DYNAMIC_COMPONENTS",
+					"unavailable"
+				]
+			]
+		},
+		{
+			"id": "hard-p25-grant-pool-inventory",
+			"target": "p1-19c-prod",
+			"rows": [
+				[
+					"V$SGASTAT",
+					"unavailable"
+				]
+			]
+		}
+	],
+	"labs": [
+		{
+			"target": "d1-19c-lab",
+			"directoryGrants": [
+				[
+					"EXP_FULL_DATABASE",
+					"READ",
+					1
+				],
+				[
+					"EXP_FULL_DATABASE",
+					"WRITE",
+					1
+				],
+				[
+					"IMP_FULL_DATABASE",
+					"READ",
+					1
+				],
+				[
+					"IMP_FULL_DATABASE",
+					"WRITE",
+					1
+				],
+				[
+					"OE",
+					"READ",
+					2
+				],
+				[
+					"OE",
+					"WRITE",
+					2
+				],
+				[
+					"ORACLE_OCM",
+					"READ",
+					2
+				],
+				[
+					"ORACLE_OCM",
+					"WRITE",
+					2
+				],
+				[
+					"PM",
+					"READ",
+					1
+				],
+				[
+					"SH",
+					"READ",
+					2
+				],
+				[
+					"SH",
+					"WRITE",
+					1
+				]
+			],
+			"cursors": [],
+			"access": [
+				{
+					"view": "V$SGA_DYNAMIC_COMPONENTS",
+					"status": "readable"
+				},
+				{
+					"view": "V$SGASTAT",
+					"status": "readable"
+				}
+			],
+			"backupValidator": {
+				"target": "d1-19c-lab",
+				"validatedAt": "2026-11-07T19:04:27.301Z",
+				"scope": "Database-wide (non-CDB)",
+				"container": {
+					"id": 0,
+					"name": "ORCL"
+				},
+				"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
+				"views": [
+					{
+						"view": "V$RMAN_BACKUP_JOB_DETAILS",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_SET",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_PIECE",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_DATAFILE",
+						"status": "readable"
+					},
+					{
+						"view": "V$ARCHIVED_LOG",
+						"status": "readable"
+					},
+					{
+						"view": "V$LOG_HISTORY",
+						"status": "readable"
+					},
+					{
+						"view": "V$CONTROLFILE",
+						"status": "readable"
+					},
+					{
+						"view": "V$RMAN_CONFIGURATION",
+						"status": "readable"
+					},
+					{
+						"view": "V$DATABASE_BLOCK_CORRUPTION",
+						"status": "readable"
+					},
+					{
+						"view": "V$RECOVER_FILE",
+						"status": "readable"
+					}
+				],
+				"records": [
+					{
+						"id": "hard-p25-d1-last-level0",
+						"status": "readable",
+						"rows": [
+							[
+								"NONE RECORDED"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-archive-gaps",
+						"status": "readable",
+						"rows": [
+							[
+								"NO LEVEL 0 RECORDED",
+								"NOT VERIFIABLE"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-retention-setting",
+						"status": "readable",
+						"rows": [
+							[
+								"NOT EXPLICITLY CONFIGURED"
+							],
+							[
+								"REDUNDANCY 1"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-no-backups-recorded",
+						"status": "readable",
+						"rows": [
+							[
+								0,
+								0,
+								0,
+								0
+							]
+						]
+					}
+				]
+			}
+		},
+		{
+			"target": "p1-19c-prod",
+			"directoryGrants": [
+				[
+					"EXP_FULL_DATABASE",
+					"READ",
+					1
+				],
+				[
+					"EXP_FULL_DATABASE",
+					"WRITE",
+					1
+				],
+				[
+					"IMP_FULL_DATABASE",
+					"READ",
+					1
+				],
+				[
+					"IMP_FULL_DATABASE",
+					"WRITE",
+					1
+				],
+				[
+					"ORACLE_OCM",
+					"READ",
+					2
+				],
+				[
+					"ORACLE_OCM",
+					"WRITE",
+					2
+				]
+			],
+			"cursors": [
+				[
+					"HARNESS_RO",
+					"HARNESS_RO",
+					"/home/kiwi/OracleDBHarness-A5/.venv/lib/python3.",
+					"UNSET",
+					1
+				],
+				[
+					"SHOPAPP",
+					"HARNESS_RO",
+					"/home/kiwi/OracleDBHarness-A5/.venv/lib/python3.",
+					"UNSET",
+					5
+				],
+				[
+					"SHOPAPP",
+					"SHOPAPP",
+					"DBMS_SCHEDULER",
+					"PLACE_ORDERS_JOB",
+					2
+				]
+			],
+			"access": [
+				{
+					"view": "V$SGA_DYNAMIC_COMPONENTS",
+					"status": "unavailable",
+					"code": "ORA-00942"
+				},
+				{
+					"view": "V$SGASTAT",
+					"status": "unavailable",
+					"code": "ORA-00942"
+				}
+			],
+			"backupValidator": {
+				"target": "p1-19c-prod",
+				"validatedAt": "2026-11-07T19:04:28.309Z",
+				"scope": "Database-wide (non-CDB)",
+				"container": {
+					"id": 0,
+					"name": "PRODCDB"
+				},
+				"note": "Readable empty control-file history does not prove external backups absent or restoration impossible.",
+				"views": [
+					{
+						"view": "V$RMAN_BACKUP_JOB_DETAILS",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_SET",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_PIECE",
+						"status": "readable"
+					},
+					{
+						"view": "V$BACKUP_DATAFILE",
+						"status": "readable"
+					},
+					{
+						"view": "V$ARCHIVED_LOG",
+						"status": "readable"
+					},
+					{
+						"view": "V$LOG_HISTORY",
+						"status": "readable"
+					},
+					{
+						"view": "V$CONTROLFILE",
+						"status": "readable"
+					},
+					{
+						"view": "V$RMAN_CONFIGURATION",
+						"status": "readable"
+					},
+					{
+						"view": "V$DATABASE_BLOCK_CORRUPTION",
+						"status": "readable"
+					},
+					{
+						"view": "V$RECOVER_FILE",
+						"status": "readable"
+					}
+				],
+				"records": [
+					{
+						"id": "hard-p25-d1-last-level0",
+						"status": "readable",
+						"rows": [
+							[
+								"NONE RECORDED"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-archive-gaps",
+						"status": "readable",
+						"rows": [
+							[
+								"NO LEVEL 0 RECORDED",
+								"NOT VERIFIABLE"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-retention-setting",
+						"status": "readable",
+						"rows": [
+							[
+								"NOT EXPLICITLY CONFIGURED"
+							],
+							[
+								"REDUNDANCY 1"
+							]
+						]
+					},
+					{
+						"id": "hard-p25-d1-no-backups-recorded",
+						"status": "readable",
+						"rows": [
+							[
+								0,
+								0,
+								0,
+								0
+							]
+						]
+					}
+				]
+			}
+		}
+	]
+}

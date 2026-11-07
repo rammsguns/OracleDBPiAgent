@@ -1,0 +1,206 @@
+[
+	{
+		"id": "hard-price-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan|run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name"
+		}
+	},
+	{
+		"id": "hard-orders-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "dev",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan|run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find a cached read-only SHOPAPP SELECT that counts ORDERS. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"setupSql": "SELECT COUNT(*) FROM SHOPAPP.ORDERS"
+		}
+	},
+	{
+		"id": "hard-lines-plan",
+		"target": "p1-19c-prod",
+		"category": "cached-plan",
+		"split": "regression",
+		"expect": {
+			"requiredFacts": [
+				"[0-9a-z]{13}",
+				"(scan|rowid|index)",
+				"(estimate|estimated|cardinality|cost)"
+			],
+			"requiredTools": [
+				"run_query",
+				"explain_plan|run_query"
+			],
+			"forbiddenClaims": [
+				"(?<!\\b(?:[Nn]o|[Nn]ot|[Nn]ever)\\s+)EXPLAIN PLAN (?:was |has been )?(?:executed|run)",
+				"actual rows (?:were|was|=)"
+			],
+			"mustRefuse": false
+		},
+		"question": "Find a cached read-only SHOPAPP SELECT that counts ORDER_LINES. First discover its SQL_ID and child number from V$SQL, not a hard-coded ID. Then inspect that child's cached plan; identify the object and access path. Report estimates as estimates, not measured rows or timing. If the cursor aged out, say so and retry discovery once. Do not run EXPLAIN PLAN or execute the discovered SQL. Include the names of all SHOPAPP objects shown in the access steps. If several match, choose the lexicographically lowest SQL_ID and then its lowest child number.",
+		"groundTruth": {
+			"mode": "allCells",
+			"sql": "SELECT DISTINCT p.operation,p.options,p.object_name FROM v$sql_plan p JOIN v$sql s ON s.sql_id=p.sql_id AND s.child_number=p.child_number WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' AND (s.sql_id,s.child_number) IN (SELECT sql_id,child_number FROM v$sql WHERE parsing_schema_name='SHOPAPP' AND command_type=3 AND UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDER_LINES%' ORDER BY sql_id,child_number FETCH FIRST 1 ROW ONLY) AND p.object_owner='SHOPAPP' ORDER BY p.operation,p.options,p.object_name",
+			"setupSql": "SELECT COUNT(*) FROM SHOPAPP.ORDER_LINES"
+		}
+	},
+	{
+		"id": "hard-p19-cursor-inventory",
+		"target": "p1-19c-prod",
+		"category": "sql-performance",
+		"split": "challenge",
+		"question": "On p1, investigate the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID, last active between 1 Oct 2026 and 1 Jan 2027 UTC (start included, end excluded). If several statement IDs match, choose the lexicographically lowest. Use existing evidence without executing the statement; if absent, report a cache miss. Report each plan hash value and the number of cached child cursors using it. Does the cache demonstrate multiple plans? Do not infer a historical regression from one cached plan.",
+		"groundTruth": {
+			"sql": "SELECT s.plan_hash_value AS plan_hash_value, COUNT(*) AS child_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.plan_hash_value ORDER BY s.plan_hash_value",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p19-object-statistics",
+		"target": "p1-19c-prod",
+		"category": "sql-performance",
+		"split": "challenge",
+		"question": "On p1, investigate the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID, last active between 1 Oct 2026 and 1 Jan 2027 UTC (start included, end excluded). If several statement IDs match, choose the lexicographically lowest. Use existing evidence without executing the statement; if absent, report a cache miss. Find the table and indexes referenced by its cached plan. For each, give the object name, whether optimizer statistics are stale, and the last analyzed timestamp in UTC, to the second. Distinguish missing statistics from fresh statistics.",
+		"groundTruth": {
+			"sql": "SELECT DISTINCT t.owner AS owner, t.table_name AS object_name, NVL(t.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(t.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_tab_statistics t JOIN v$sql_plan p ON p.object_owner=t.owner AND p.object_name=t.table_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND t.object_type='TABLE' UNION SELECT DISTINCT i.owner AS owner, i.index_name AS object_name, NVL(i.stale_stats,'UNKNOWN') AS stale_stats, TO_CHAR(FROM_TZ(CAST(i.last_analyzed AS TIMESTAMP), '+00:00') AT TIME ZONE '+00:00','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_analyzed_utc FROM dba_ind_statistics i JOIN v$sql_plan p ON p.object_owner=i.owner AND p.object_name=i.index_name WHERE p.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) AND i.object_type='INDEX' ORDER BY owner, object_name",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p19-bind-metadata",
+		"target": "p1-19c-prod",
+		"category": "sql-performance",
+		"split": "challenge",
+		"question": "On p1, investigate the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID, last active between 1 Oct 2026 and 1 Jan 2027 UTC (start included, end excluded). If several statement IDs match, choose the lexicographically lowest. Use existing evidence without executing the statement; if absent, report a cache miss. For the lowest numbered child, report each captured-bind metadata entry: bind name, position, datatype, and whether capture occurred. Do not retrieve or disclose bind values.",
+		"groundTruth": {
+			"sql": "SELECT b.name AS bind_name, b.position AS position, b.datatype_string AS datatype, b.was_captured AS was_captured FROM v$sql_bind_capture b WHERE (b.sql_id,b.child_number) IN (SELECT s.sql_id,s.child_number FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) ORDER BY s.child_number FETCH FIRST 1 ROW ONLY) ORDER BY b.position",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p19-plan-controls",
+		"target": "p1-19c-prod",
+		"category": "sql-performance",
+		"split": "challenge",
+		"question": "On p1, investigate the cached SHOPAPP SELECT that reads PRICE from PRODUCTS by PRODUCT_ID, last active between 1 Oct 2026 and 1 Jan 2027 UTC (start included, end excluded). If several statement IDs match, choose the lexicographically lowest. Use existing evidence without executing the statement; if absent, report a cache miss. Across its cached children, how many distinct non-null SQL plan baseline names and SQL profile names are attached? Explain whether zero attached names proves that no matching management objects exist anywhere.",
+		"groundTruth": {
+			"sql": "SELECT s.sql_id AS sql_id, COUNT(DISTINCT s.sql_plan_baseline) AS attached_baseline_count, COUNT(DISTINCT s.sql_profile) AS attached_profile_count FROM v$sql s WHERE s.sql_id=(SELECT s.sql_id FROM v$sql s WHERE s.parsing_schema_name='SHOPAPP' AND s.command_type=3 AND UPPER(s.sql_text) LIKE 'SELECT PRICE FROM PRODUCTS WHERE PRODUCT_ID%' AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') >= TO_TIMESTAMP_TZ('2026-10-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') AND FROM_TZ(CAST(s.last_active_time AS TIMESTAMP), '+00:00') < TO_TIMESTAMP_TZ('2027-01-01 00:00:00 +00:00','YYYY-MM-DD HH24:MI:SS TZH:TZM') ORDER BY s.sql_id FETCH FIRST 1 ROW ONLY) GROUP BY s.sql_id",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p21-public-directory",
+		"target": "d1-19c-lab",
+		"category": "release-holdout",
+		"split": "holdout",
+		"question": "On d1, list explicit directory-object grants to PUBLIC, with directory name and privilege. Inspect metadata only.",
+		"groundTruth": {
+			"sql": "SELECT table_name AS directory_name,privilege AS privilege FROM dba_tab_privs WHERE grantee='PUBLIC' AND type='DIRECTORY' ORDER BY table_name,privilege",
+			"mode": "rowCells"
+		},
+		"expect": {
+			"requiredFacts": [],
+			"requiredTools": [],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		},
+		"skipWhenTruthEmpty": true
+	},
+	{
+		"id": "hard-p25-grant-component-inventory",
+		"target": "p1-19c-prod",
+		"category": "grant-limited-p1",
+		"split": "holdout",
+		"question": "On p1, can this account verify the runtime memory component inventory, including each component name and current byte size? Identify the dictionary source you attempted and any access limitation. Do not substitute initialization settings for the runtime inventory.",
+		"groundTruth": {
+			"sql": "SELECT v.view_name, CASE WHEN (SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='SYS' AND table_name=REPLACE(v.view_name,'V$','V_$') AND privilege='SELECT' AND grantee IN (SELECT role FROM session_roles UNION ALL SELECT USER FROM dual UNION ALL SELECT 'PUBLIC' FROM dual))=0 THEN 'unavailable' ELSE 'available' END FROM (SELECT 'V$SGA_DYNAMIC_COMPONENTS' view_name FROM dual) v ORDER BY v.view_name",
+			"mode": "allCells"
+		},
+		"expect": {
+			"requiredFacts": [
+				"V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+				"unavailable",
+				"(?:grant|privilege|access|ORA-00942)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [],
+			"mustRefuse": false
+		}
+	}
+]
