@@ -19,6 +19,9 @@ product normally queries their `V$...` synonyms.
 | 2026-11-05 / [grants-request-2026-11-05-sqlperf.sql](grants-request-2026-11-05-sqlperf.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.V_$SQL_PLAN_STATISTICS_ALL`, `SYS.V_$SQL_SHARED_CURSOR`, `SYS.V_$SQL_BIND_CAPTURE`, `SYS.DBA_SQL_PLAN_BASELINES`, `SYS.DBA_SQL_PROFILES`, `SYS.DBA_TAB_STATISTICS`, `SYS.DBA_IND_STATISTICS`, `SYS.DBA_TAB_COL_STATISTICS` | Cached plan statistics, cursor mismatch reasons, bind metadata (never values), baselines/profiles and object statistics. |
 | 2026-11-05 / [grants-request-2026-11-05-sessions.sql](grants-request-2026-11-05-sessions.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.V_$SESSION_WAIT`, `SYS.V_$WAIT_CHAINS`, `SYS.V_$TRANSACTION`, `SYS.V_$LOCKED_OBJECT`, `SYS.V_$SYS_TIME_MODEL`, `SYS.V_$EVENT_NAME`, `SYS.DBA_BLOCKERS`, `SYS.DBA_WAITERS` | Session waits, blocking chains, open transactions, locked objects and time model for `piagent sessions` (phase 23). No ASH/AWR. |
 | 2026-11-06 / [grants-request-2026-11-06-space.sql](grants-request-2026-11-06-space.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.DBA_TEMP_FILES`, `SYS.DBA_LOBS`, `SYS.DBA_UNDO_EXTENTS`, `SYS.V_$SORT_USAGE` (V$TEMPSEG_USAGE), `SYS.V_$SORT_SEGMENT`, `SYS.V_$UNDOSTAT`, `SYS.V_$RECOVERY_FILE_DEST`, `SYS.V_$FLASH_RECOVERY_AREA_USAGE`, `SYS.V_$LOG`, `SYS.V_$LOGFILE`, `SYS.V_$TEMPFILE`, `SYS.V_$DATAFILE` | Tablespace, temp, undo, redo and recovery-area capacity for `piagent space` (phase 24). No DBA_EXTENTS. |
+| 2026-11-06 / [grants-request-2026-11-06-backup.sql](grants-request-2026-11-06-backup.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.V_$RMAN_BACKUP_JOB_DETAILS`, `SYS.V_$BACKUP_SET`, `SYS.V_$BACKUP_PIECE`, `SYS.V_$DATAFILE`, `SYS.V_$BACKUP_DATAFILE`, `SYS.V_$ARCHIVED_LOG`, `SYS.V_$LOG_HISTORY`, `SYS.V_$CONTROLFILE`, `SYS.V_$RMAN_CONFIGURATION`, `SYS.V_$RECOVERY_FILE_DEST`, `SYS.V_$DATABASE_BLOCK_CORRUPTION`, `SYS.V_$RECOVER_FILE`, `SYS.V_$DATABASE` | Recoverability, RMAN inventory/configuration, archived-log continuity, corruption and recovery files. Applied 2026-11-06. |
+| 2026-11-06 / [grants-request-2026-11-06-jobs.sql](grants-request-2026-11-06-jobs.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.DBA_SCHEDULER_JOB_LOG`, `SYS.DBA_SCHEDULER_WINDOWS`, `SYS.DBA_AUTOTASK_CLIENT`, `SYS.DBA_AUTOTASK_JOB_HISTORY`, `SYS.DBA_OPTSTAT_OPERATIONS`, `SYS.DBA_INDEXES`, `SYS.DBA_IND_PARTITIONS`, `SYS.DBA_IND_SUBPARTITIONS` | Scheduler failures, autotask/windows, statistics operations and maintenance debt. Applied 2026-11-06. |
+| 2026-11-06 / [grants-request-2026-11-06-top.sql](grants-request-2026-11-06-top.sql) | p1-19c-prod (`localhost:1523/PRODCDB`); `HARNESS_RO` | `SYS.V_$SYSSTAT`, `SYS.V_$OSSTAT` | Live SQL/load sampler (V$SQLSTATS was already granted). Applied 2026-11-06. |
 
 The 2026-10-26 request was applied on 2026-10-27 (31 grants). The phase 16
 PL/SQL request was applied with owner authorization on 2026-11-04; it includes
@@ -50,112 +53,49 @@ was available, not that the database is secure or that all possible grants were 
 ## Fresh PDB inventory (phase 28)
 
 Use [the owner guide](real-targets.md) and [PDB template](grants-template-pdb.sql)
-for a new account. The seven historical request files are incremental lab deltas.
-Their union contains **59 distinct SYS views**, plus **20 HR/OE/CO base tables**;
-those sample tables are deliberately omitted from the PDB template.
+for a new account. The template is the explicit grant inventory; historical
+request files are incremental lab deltas, not a provisioning sequence. HR/OE/CO
+sample-data grants are deliberately omitted from the PDB template.
 
-Comparison made against the fixed SQL in `src/` on 2026-11-06:
+The owner approved “Apply all” for phases 25–27. On 2026-11-06 the p1 grants
+were applied after checking PRODCDB, version 19.9.1.0.0 and HARNESS_RO:
+13 backup, eight jobs and two top grants (23 total). WP-25D re-premised the
+affected backup evals first; afterwards `validate-hard` and `validate-p25` passed
+as recorded in PLAN.md. Original SQL request headers still describe proposals;
+this application record supersedes their pending wording. Grants may later be
+revoked, so use preflight to check current access.
 
-```bash
-rg -n -i '\b(from|join)\s+(sys\.)?[a-z_][a-z0-9_$]*' src
-rg -n '^GRANT SELECT ON ' docs/grants-request*.sql
-rg -n 'this.read|reader.read|stats\(|jobs\(|runs\(|prefix|suffix' src/plsql src/triage src/report src/sqlperf src/tools
-```
+## Backup, jobs and top readiness
 
-Normalize `V$X` to `SYS.V_$X`; `V$TEMPSEG_USAGE` maps to `SYS.V_$SORT_USAGE`.
-Inspect query builders as well as literal FROM/JOIN matches: PL/SQL and triage
-expand fixed DBA/ALL suffixes; reports expand stats/jobs/runs; SQL insight expands
-TAB/IND statistics and baselines/profiles; tools
-replace ALL with DBA for fixed describe/source fallbacks.
-Do not treat policy denylists or arbitrary `run_query` text as fixed feature
-queries. The bounded dictionary-hint catalog is also included in readiness
-probes and grants. This is a reviewed source inventory, not a SQL
-parser or a claim that every view is visible inside every PDB.
+`targets check --target T` probes the groups below with zero-row SELECTs;
+`--all` lists each view, `--json` emits structured results and `--grants-sql`
+prints suggestions without applying grants. Readability does not prove complete
+history or establish that an empty PDB result means absence.
 
-The resolved fixed-query set has **104 views**. Its **54 additions** over
-the historical SYS grant union are listed below (SYS owner; underlying names):
+| Feature group | Queried views |
+| --- | --- |
+| `backup` | `V$RMAN_BACKUP_JOB_DETAILS`, `V$BACKUP_SET`, `V$BACKUP_PIECE`, `V$DATAFILE`, `V$BACKUP_DATAFILE`, `V$ARCHIVED_LOG`, `V$LOG_HISTORY`, `V$CONTROLFILE`, `V$RMAN_CONFIGURATION`, `V$RECOVERY_FILE_DEST`, `V$DATABASE_BLOCK_CORRUPTION`, `V$RECOVER_FILE`, `V$DATABASE` |
+| `jobs` | `DBA_SCHEDULER_JOBS`, `DBA_SCHEDULER_JOB_RUN_DETAILS`, `DBA_SCHEDULER_JOB_LOG`, `DBA_SCHEDULER_WINDOWS`, `DBA_AUTOTASK_CLIENT`, `DBA_AUTOTASK_JOB_HISTORY`, `DBA_OPTSTAT_OPERATIONS`, `DBA_OBJECTS`, `DBA_INDEXES`, `DBA_IND_PARTITIONS`, `DBA_IND_SUBPARTITIONS`, `DBA_TAB_STATISTICS` |
+| `top` | `V$SQLSTATS`, `V$SYSSTAT`, `V$OSSTAT` |
 
-- `ALL_ARGUMENTS`
-- `ALL_CONSTRAINTS`
-- `ALL_CONS_COLUMNS`
-- `ALL_DEPENDENCIES`
-- `ALL_ERRORS`
-- `ALL_INDEXES`
-- `ALL_IND_COLUMNS`
-- `ALL_IND_EXPRESSIONS`
-- `ALL_IND_PARTITIONS`
-- `ALL_IND_STATISTICS`
-- `ALL_IND_SUBPARTITIONS`
-- `ALL_OBJECTS`
-- `ALL_PROCEDURES`
-- `ALL_SCHEDULER_JOBS`
-- `ALL_SCHEDULER_JOB_RUN_DETAILS`
-- `ALL_SOURCE`
-- `ALL_SYNONYMS`
-- `ALL_TABLES`
-- `ALL_TAB_COLUMNS`
-- `ALL_TAB_STATISTICS`
-- `ALL_USERS`
-- `ALL_VIEWS`
-- `DATABASE_PROPERTIES`
-- `DBA_TRIGGERS`
-- `DBA_SCHEDULER_JOB_LOG`
-- `DBA_SCHEDULER_PROGRAMS`
-- `DBA_SCHEDULER_PROGRAM_ARGS`
-- `DBA_SCHEDULER_SCHEDULES`
-- `DBA_CONSTRAINTS`
-- `DBA_CONS_COLUMNS`
-- `DBA_INDEXES`
-- `DBA_IND_COLUMNS`
-- `DBA_SCHEDULER_JOBS`
-- `DBA_SCHEDULER_JOB_RUN_DETAILS`
-- `DBA_TABLES`
-- `DBA_TABLESPACES`
-- `DBA_TABLESPACE_USAGE_METRICS`
-- `DBA_TAB_COLUMNS`
-- `DBA_VIEWS`
-- `DUAL`
-- `NLS_DATABASE_PARAMETERS`
-- `PRODUCT_COMPONENT_VERSION`
-- `ROLE_TAB_PRIVS`
-- `SESSION_PRIVS`
-- `SESSION_ROLES`
-- `USER_TAB_PRIVS_RECD`
-- `V_$ARCHIVED_LOG`
-- `V_$LOCK`
-- `V_$LOG_HISTORY`
-- `V_$RMAN_BACKUP_JOB_DETAILS`
-- `V_$SESSION`
-- `V_$SESSION_LONGOPS`
-- `V_$SQL`
-- `V_$SQL_PLAN`
+The [backup](backup.md), [jobs](jobs.md) and [top](top.md) readers use these
+views. Full `backup` and `jobs` report sections and triage reuse the readers;
+backup drift compares explicit `V$RMAN_CONFIGURATION` settings only. These
+three readiness groups are separate catalog entries: inspect them alongside
+`report`, `triage` and `drift` readiness when using the composed features.
+The top group requests no unused V$SESSTAT or V$STATNAME access.
 
-The **9 historical views below are retained** to preserve the complete
-request union. They are not directly named by the resolved fixed feature SELECTs;
-`V_$SQL_PLAN_STATISTICS_ALL` also supports `DBMS_XPLAN.DISPLAY_CURSOR` internally.
-Other retained views were requested as feature prerequisites or diagnostic access;
-this comparison does not claim the current fixed commands read every one:
+The catalog in `src/preflight/views.ts` also covers `connection`, `ask`, `report`,
+per-section `report:*` groups, `sessions`, `space`, `security`, `sql`, `alertlog`,
+`plsql`, `triage` and `drift`. It includes dictionary fallbacks and cached-plan
+support. The template includes their SELECT dependencies and retained historical
+grants. Its ordered GRANT statements are the exact inventory; no speculative
+future-phase inventory is implied.
 
-- `DBA_BLOCKERS`
-- `DBA_TAB_COL_STATISTICS`
-- `DBA_WAITERS`
-- `PROXY_USERS`
-- `V_$DATAFILE`
-- `V_$EVENT_NAME`
-- `V_$SESSION_WAIT`
-- `V_$SQL_PLAN_STATISTICS_ALL`
-- `V_$TEMPFILE`
-
-The template's **113 explicit SELECT grants** are exactly the union of those
-two sets; its ordered statements are the complete exact inventory. Publicly
-readable ALL/USER/SESSION views, DUAL, PRODUCT_COMPONENT_VERSION and
-NLS_DATABASE_PARAMETERS are included explicitly for review; normally no extra
-grant is needed for those. ALL views still restrict rows to the login's visible
-objects. DBA views expose wider metadata, including source and SQL text: the DBA
-must approve that exposure. No grant implies permission to execute user routines.
-
-Phase 28's new account-check queries are being built by WP-28A. This inventory
-includes existing `USER_TAB_PRIVS_RECD`, `ROLE_TAB_PRIVS`, `SESSION_PRIVS` and
-`SESSION_ROLES`; `USER_TAB_PRIVS` is expected to be public for the new check.
-The coordinator must reconcile the final preflight catalog with this template
-when merging parallel work. Future phases 25–27 are not added speculatively.
+Normalize `V$X` to `SYS.V_$X` for grants, except `V$TEMPSEG_USAGE`, which maps
+to `SYS.V_$SORT_USAGE`. Publicly readable ALL/USER/SESSION views, DUAL,
+PRODUCT_COMPONENT_VERSION and NLS_DATABASE_PARAMETERS are included explicitly
+for review; normally no extra grant is needed for those. ALL views still restrict
+rows to visible objects. DBA views can expose source, SQL text and application
+error text; the DBA must approve that exposure. No grant implies permission to
+execute user routines. Live PDB behavior remains unverified.

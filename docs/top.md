@@ -15,7 +15,7 @@ changes can affect pagination, so this is approximate live evidence.
 
 Each of elapsed microseconds, CPU microseconds, buffer gets, disk reads and
 executions has its own top ten ranking. Every ranked SQL_ID carries the command
-`piagent sql --target T --sql-id ID`. JSON also includes all observed counters
+`piagent sql --target T --sql-id ID`. JSON also includes all metric deltas, rates
 and their states. No SQL text is collected. New SQL_IDs have unknown baselines;
 aged-out SQL_IDs have unknown final values. Decreasing counters indicate a reset.
 These unknown deltas are null and excluded from rankings, rather than inventing
@@ -81,8 +81,10 @@ V$SESSMETRIC, V$SYSMETRIC, V$SYSMETRIC_HISTORY, V$SYSMETRIC_SUMMARY,
 V$WAITCLASSMETRIC and V$WAITCLASSMETRIC_HISTORY. The family rule also refuses
 future matching names. DBA_TABLESPACE_USAGE_METRICS remains allowed.
 
-p1 currently has V$SQLSTATS only. The proposed SELECT-only request is
-`docs/grants-request-2026-11-06-top.sql`; it has not been applied. The PDB template
+The owner approved “Apply all” and the two p1 SELECT grants on V_$SYSSTAT
+and V_$OSSTAT in [the top request](grants-request-2026-11-06-top.sql) were
+applied on 2026-11-06; V$SQLSTATS was already readable. The request
+retains its historical proposed-grant header. The PDB template
 and preflight `top` group include the sampler's three views.
 
 ## Review hardening
@@ -114,3 +116,12 @@ views or the exact allowed DBMS_XPLAN.DISPLAY_CURSOR form.
 Only V$SQLSTATS, V$SYSSTAT and V$OSSTAT are in the top preflight group.
 The grant request and PDB template no longer request unused V$SESSTAT or
 V$STATNAME privileges for this feature.
+
+## Chat, triage and web
+
+Chat `/top [--seconds N]` uses the current target and returns the deterministic
+sample directly without a model turn (15 seconds by default, range 5–120).
+Triage routes “slow right now” issues to a 15-second sample and sends the leading
+elapsed-time SQL_ID, when present, through the SQL evidence path. One sample
+does not establish a cause. The web Top tab has an explicit sample button,
+a progress state and delta tables; it never automatically polls.

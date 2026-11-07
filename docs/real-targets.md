@@ -5,13 +5,10 @@ approves the endpoint and metadata exposure; the DBA provisions access; the CLI
 only reads. Agents and development workers still connect only to `d1-19c-lab`
 and `p1-19c-prod` (plus the dedicated non-19c refusal test).
 
-**Availability:** use a build containing WP-28A and WP-28C before following this
-guide. These phase 28 CLI flags and private-target rules are the agreed interface;
-they are being implemented in parallel and are not verified by this documentation
-branch. An older 1.3.0 binary accepts only the packaged labs. Check the installed
-`piagent --version` and `piagent targets check --help`; the coordinator controls
-the release version. No live PDB has been tested here. The two labs are Oracle
-19.9.1 non-CDBs, including the lab whose service is named PRODCDB.
+**Availability:** private targets and account/view preflight shipped in 1.4.0;
+backup, jobs and top are included in 1.5.0. Check `piagent --version` and
+`piagent targets check --help`. No live PDB has been tested here. The two labs
+are Oracle 19.9.1 non-CDBs, including the service named PRODCDB.
 
 ## 1. Agree the PDB and provision its login (DBA)
 
@@ -147,8 +144,10 @@ piagent targets check --target app-pdb --grants-sql
 
 `targets` lists configured names and the source file. `targets check` connects,
 checks 19c, container, login and privileges, then probes report, sessions, space,
-security, SQL, alertlog, PL/SQL and triage views with zero-row SELECTs. Read the
-reported container and user before proceeding. `--json` selects machine output;
+security, SQL, alertlog, PL/SQL, triage, ask, drift, backup, jobs and top views with zero-row SELECTs. Read the
+reported container and user before proceeding. The default output summarizes
+feature readiness; `--all` lists every feature view. Connection-gate views also
+have their own group. `--json` selects machine output;
 `--grants-sql` prints suggested SELECT grants for missing views and **applies
 nothing**. A DBA must review every suggestion and run approved grants in that PDB,
 then repeat the check. Readable means permission to query, not complete evidence;
@@ -178,18 +177,30 @@ piagent report --target app-pdb --sections identity
 piagent report --target app-pdb
 piagent sessions --target app-pdb
 piagent space --target app-pdb
+piagent backup --target app-pdb
+piagent jobs --target app-pdb --since 24h
+piagent top --target app-pdb --seconds 15
+piagent report --target app-pdb --sections backup,jobs
 piagent security --target app-pdb
 piagent alertlog --target app-pdb --since 24h
 piagent triage --target app-pdb --since 24h
 ```
 
 These commands make bounded read-only DB calls without an LLM; omit `--summarize`.
-Use `piagent plsql --target app-pdb --object APP_OWNER.PACKAGE_NAME` for a real
+Use `piagent plsql doc --target app-pdb --object APP_OWNER.PACKAGE_NAME` for a real
 approved object, or `piagent sql --target app-pdb --sql-id <cached-sql-id>` with an
 ID observed on this target. Missing grants or PDB-inapplicable evidence should
 produce availability notes. Check those notes before interpreting an empty panel
 as healthy. Root/instance facts such as redo or recovery-area capacity are not
 necessarily PDB-local; do not add totals across PDBs.
+
+See [backup](backup.md), [jobs](jobs.md) and [top](top.md) for evidence limits.
+Their view inventories and preflight groups are listed in [grants](grants.md).
+Backup/RMAN, redo, control-file and FRA facts are CDB-wide; SYSSTAT and OSSTAT
+load/host facts are also CDB-wide. Job views and SQLSTATS have current-container
+visibility. Empty PDB rows do not establish absence or whole-CDB recoverability.
+The p1 lab grants were applied on 2026-11-06 with owner approval (“Apply all”);
+a new PDB still needs its own reviewed grants.
 
 Only after DB checks, configure `PIAGENT_LLM_API_KEY_FILE` in the private `.env`
 to the existing Strata key file, and have the operator confirm the existing local
@@ -216,7 +227,7 @@ inside a PDB. Local undo, ADR visibility and CDB-wide views require particular
 attention. Keep sanitized availability results for the coordinator; do not send
 passwords, keys or raw sensitive SQL/source/log text.
 
-- Unknown command: install the merged phase 28 build; these flags are not in 1.3.0.
+- Unknown command: use 1.5.0 for backup/jobs/top; private targets require at least 1.4.0.
 - Root refused: obtain the PDB service, rather than changing containers in the app.
 - ORA-12514/connection failure: DBA checks service registration and network reachability.
 - Login failure: verify account status, PDB service and private password-file basename.

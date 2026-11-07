@@ -7,8 +7,10 @@ This deterministic command only SELECTs dictionary views through the normal
 runs, enables, disables or changes a job and never calls an LLM.
 
 `--since` accepts positive integer minutes, hours or days (`30m`, `12h`, `7d`),
-up to 30 days. History uses the UTC interval `[from, to)`; displayed timestamp
-strings preserve Oracle timezone offsets. Current state and maintenance debt
+up to 30 days. The default is 24h. History uses the UTC interval `[from, to)`; Markdown
+timestamps render in UTC, while JSON row timestamp strings keep the source
+Oracle timezone offset. Unparseable display timestamps remain unchanged.
+Current state and maintenance debt
 are snapshots, independent of this history window. Next-run dates are scheduler
 estimates and may be null; they do not guarantee a future execution.
 
@@ -61,7 +63,12 @@ visibility. Live PDB behavior remains unverified because both approved labs are
 non-CDB databases. No CDB-wide or licensed history views are queried.
 
 Preflight includes the `jobs` group. The PDB grant template covers every view.
-The proposed p1-only grants are in
-`grants-request-2026-11-06-jobs.sql`; they have not been applied. A human DBA and
-coordinator must review the target/version/grantee and grant-limited eval
-premises before applying any SELECT grants.
+The owner approved “Apply all” and the eight p1 SELECT grants in
+[the jobs request](grants-request-2026-11-06-jobs.sql) were applied on 2026-11-06.
+Its proposed-grant header is historical, not the current application status.
+`report --target T --sections jobs` opts into this reader with a rolling 24h
+window. Saved history tracks the visible failed-run count; overlapping windows
+are snapshots, not counts of new failures between reports.
+Scheduler-job triage correlates job/run/error evidence with the alert log and
+related objects when visible. The web Jobs tab shows run timelines with failures
+and maintenance-debt cards.
