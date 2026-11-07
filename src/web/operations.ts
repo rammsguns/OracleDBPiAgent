@@ -25,5 +25,12 @@ export async function readWebOperations(ctx: ToolContext, target: string, path: 
 			return result;
 		} catch (error) { await ctx.audit.record({ ...event, kind: 'tool_error', detail: /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED' }); throw error; }
 	} };
-	return { result: path === '/api/backup' ? await readBackup(session) : await sampleTop(session, Number(data.seconds ?? 15), { now: () => performance.now(), sleep: async ms => { await setTimeout(ms, undefined, { signal }); } }) };
+	if (path === '/api/backup') return { result: await readBackup(session) };
+	return { result: compactWebTop(await sampleTop(session, Number(data.seconds ?? 15), { now: () => performance.now(), sleep: async ms => { await setTimeout(ms, undefined, { signal }); } })) };
+}
+/** Rankings and counts retain the complete sampled evidence; bound drill-down payloads. */
+export function compactWebTop(result: Awaited<ReturnType<typeof sampleTop>>) {
+	const counterSummary = Object.entries(result.sql.counters).flatMap(([metric, rows]) => ['measured', 'new', 'aged-out', 'reset'].map(state => ({ metric, state, count: rows.filter(row => row.state === state).length })));
+	const counters = Object.fromEntries(Object.entries(result.sql.counters).map(([metric, rows]) => [metric, rows.filter(row => row.state !== 'measured').slice(0, 100)]));
+	return { ...result, sql: { ...result.sql, rows: [], counters, counterSummary, notes: [...result.sql.notes, 'Counter details show at most 100 unknown deltas per metric; state counts and rankings use all sampled rows. Measured counter details are omitted.'] } };
 }

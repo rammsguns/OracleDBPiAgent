@@ -254,3 +254,6 @@ td:nth-child(2) { max-width: 24rem; }
 .operations-gaps { border-left: .3rem solid #ff8686; }
 .operations-hint { font-size: .85rem; }
 .operations-card .table-scroll { max-width: 100%; }
+#backup-panel, #jobs-panel, #top-panel { min-width: 0; overflow-wrap: anywhere; }
+.operations-card .table-scroll { width: 100%; min-width: 0; }
+.operations-card table { min-width: 30rem; }

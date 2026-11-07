@@ -24,14 +24,20 @@ test('live read-only Backup Jobs Top captures on both approved targets', async (
 			if (id === 'top') await page.locator('#top-seconds').fill('5');
 			for (const target of ['d1-19c-lab', 'p1-19c-prod']) {
 				await page.locator(`#${id}-target`).selectOption(target);
+				const response = page.waitForResponse(r => new URL(r.url()).pathname === `/api/${id}`);
 				await page.locator(`#${id}-run`).click();
 				await expect(page.locator(`#${id}-status`)).toContainText('Loaded.', { timeout: 60000 });
-				console.log(`${id} ${target}: ` + (await page.locator(`#${id}-content`).innerText()).slice(0, 1700));
+				const result = (await (await response).json()).result;
+				const summary = id === 'backup' ? { status: result.status, estimate: result.restoreEstimate, files: result.files.length, gaps: result.gaps.length, evidence: Object.fromEntries(Object.entries(result.evidence).map(([key, value]) => { const e = value as { status: string; rows: unknown[] }; return [key, { status: e.status, rows: e.rows.length }]; })) }
+					: id === 'jobs' ? { sections: Object.fromEntries(Object.entries(result.sections).map(([key, value]) => { const e = value as { status: string; rows: unknown[]; truncated: boolean }; return [key, { status: e.status, rows: e.rows.length, truncated: e.truncated }]; })), debt: Object.fromEntries(['invalidObjects', 'indexes', 'indexPartitions', 'indexSubpartitions', 'staleStatistics'].map(key => [key, result.sections[key].rows])) }
+					: { status: result.status, requestedSeconds: result.requestedSeconds, intervalSeconds: result.sql.intervalSeconds, counterSummary: result.sql.counterSummary, cpuPercent: result.host.cpuPercent, load: result.load.rows };
+				console.log(`${id} ${target}: ${JSON.stringify(summary)}`);
 				for (const width of [1280, 390]) {
 					await page.setViewportSize({ width, height: width === 1280 ? 1000 : 844 });
 					await page.emulateMedia({ colorScheme: 'dark' });
 					expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-					await page.screenshot({ path: `docs/img/${id}-${target}-dark-${width}.png`, fullPage: true });
+					await page.locator(`#${id}-panel`).evaluate(node => node.scrollIntoView({ block: 'start' }));
+					await page.screenshot({ path: `docs/img/${id}-${target}-dark-${width}.png`, fullPage: false });
 				}
 			}
 		}

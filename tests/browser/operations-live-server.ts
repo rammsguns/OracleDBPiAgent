@@ -23,10 +23,11 @@ const web = createWebServer({ port: 0,
 				gate19c(target.name, String((v.rows?.[0] as unknown[])?.[0]));
 			} catch (error) { await connection.close(); throw error; }
 			let closed = false;
-			const session: OracleSession = { target, identity: { isCdb: false, containerName: target.serviceName } as OracleSession['identity'], close: async () => { if (!closed) { closed = true; await connection.close(); } }, query: async (sql, binds = {}) => {
-				const start = performance.now(), result = await connection.execute(classifySql(sql), binds, { outFormat: oracledb.OUT_FORMAT_ARRAY, maxRows: 10001 });
+			const session: OracleSession = { target, identity: { isCdb: false, containerName: target.serviceName } as OracleSession['identity'], close: async () => { if (!closed) { closed = true; await connection.close(); } }, query: async (sql, binds = {}, options = {}) => {
+				const cap = options.maxRows ?? config.limits.maxRows;
+				const start = performance.now(), result = await connection.execute(classifySql(sql), binds, { outFormat: oracledb.OUT_FORMAT_ARRAY, maxRows: cap + 1 });
 				const rows = (result.rows || []) as unknown[][];
-				return { columns: (result.metaData || []).map(c => c.name), rows: rows.slice(0,10000), truncated: rows.length > 10000, elapsedMs: performance.now()-start };
+				return { columns: (result.metaData || []).map(c => c.name), rows: rows.slice(0,cap), truncated: rows.length > cap, elapsedMs: performance.now()-start };
 			} }; open.push(session); return session;
 		}, closeAll: async () => { for (const s of open.splice(0)) await s.close(); } };
 	},

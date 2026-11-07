@@ -1,6 +1,7 @@
+import { sampleTop } from '../../src/top/index.js';
 import { describe, it, expect } from 'vitest';
 import type { ToolContext } from '../../src/contracts.js';
-import { readWebOperations, validateWebOperations } from '../../src/web/operations.js';
+import { readWebOperations, validateWebOperations, compactWebTop } from '../../src/web/operations.js';
 describe('web operations adapter', () => {
 	it('validates seconds and rejects extra parameters before connecting', () => {
 		for (const seconds of ['4', '121', '5.5', 'abc', '']) expect(() => validateWebOperations('/api/top', { seconds })).toThrow();
@@ -16,4 +17,18 @@ describe('web operations adapter', () => {
 		expect(queries).toBe(3); expect(events).toHaveLength(3);
 		expect(JSON.stringify(events)).toContain('sqlSha256'); expect(JSON.stringify(events)).not.toContain('SELECT');
 	});
+});
+
+it('bounds a full SQL-cache payload while preserving rankings and exact counter state counts', async () => {
+	let pass = 0, clock = 0;
+	const result = await sampleTop({ target: { name: 'd1-19c-lab' }, identity: {}, query: async (sql: string) => {
+		const sqlRows = sql.includes('FROM V$SQLSTATS'); if (sqlRows) pass++;
+		return { rows: sqlRows ? Array.from({ length: 10000 }, (_, i) => [String(i), ...Array(5).fill(pass === 1 ? 10 : i === 0 ? 20 : 5)]) : [], truncated: false };
+	} } as any, 5, { now: () => clock += 1000, sleep: async () => {} });
+	const web = compactWebTop(result);
+	expect(web.sql.rankings).toEqual(result.sql.rankings);
+	expect(web.sql.counterSummary).toContainEqual({ metric: 'elapsedUs', state: 'reset', count: 9999 });
+	expect(web.sql.counterSummary).toContainEqual({ metric: 'elapsedUs', state: 'measured', count: 1 });
+	expect(web.sql.counters.elapsedUs).toHaveLength(100);
+	expect(Buffer.byteLength(JSON.stringify(web))).toBeLessThan(1024 * 1024);
 });
