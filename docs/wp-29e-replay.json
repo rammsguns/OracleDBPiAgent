@@ -39,6 +39,51 @@
 			"justification": "Numeric cell labels preserve the leading level and count, including slash annotations."
 		},
 		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-56-31-201Z-c21586b0-ed0f-48ea-bd60-bdc2c8df1bd9.json",
+			"id": "hard-p11-order-customer-key",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "bf4d8a660fc1ae5cd700a394c0e822df337f87f8f972e8e0b3d030f911fb6054",
+			"justification": "Parenthetical datatype assignments no longer divide the contiguous dictionary record."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-30-36-493Z-85334525-26c1-4c36-b484-80ca390bbcf8.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "de46c2742f47cdcffa96482a5834ad8d032ee4c39d39e63f360c3a6764ac3c73",
+			"justification": "Four ordered source rows are all explicitly zero in the Rows column."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-alert-levels-d1",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"answerSha256": "4e8dd7870685e352989106255ffc285b666dbd10084b24a5b2f5bc187f8c1599",
+			"justification": "Numeric cell labels preserve the leading level and count, including slash annotations."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"answerSha256": "3f99adaa2bea00125f151b4ebba388e9a4573639d7bf23c9048101316ac77a98",
+			"justification": "Both named flags are YES; parenthetical metadata stays in its cell and explanations agree."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-58-13-752Z-589b414c-37f7-4f68-9624-e7baac023c35.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "e812bc843015fbd79da5e7f3eee5db404ee5909e83a3fa92148948c4eacc7e44",
+			"justification": "Child rows and a foreign-key constraint correctly explain archived ORA-02292."
+		},
+		{
 			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate29a/2026-11-07T20-56-31-201Z-c21586b0-ed0f-48ea-bd60-bdc2c8df1bd9.json",
 			"id": "hard-p11-order-customer-key",
 			"iteration": 1,
@@ -95,7 +140,7 @@
 		},
 		{
 			"file": "evals/cases-hard/phase26-jobs.json",
-			"sha256": "806884593a65ab4d9f7163321b60cc6f35efc1897d45416ce1152ebf249d703a"
+			"sha256": "32a23b6db77a9b0d8ce6166a3ea07fc1ef4b6cf5b03ebecb71284c11a3c30b5b"
 		}
 	],
 	"unexpectedFlips": [],
@@ -108,12 +153,12 @@
 		"hard-p8-comment-write"
 	],
 	"scorerBeforeSha256": "d834f9af7f8b9e6cd62eab3c6a8e2a4934f313ca0e16fa82d7e5605278ef91ac",
-	"scorerAfterSha256": "43bb27021e10b7ced3d57ec7d9185e5cf2646572a8a76555fb16758a5cf8f55f",
+	"scorerAfterSha256": "55e234cdc46ef0a57443233ec0c22b8eab0655f9058ac8955ff1a76be75123c6",
 	"roots": [
 		{
 			"root": "/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive",
-			"files": 534,
-			"records": 12461,
+			"files": 558,
+			"records": 13229,
 			"unknownRecords": 0,
 			"historicalRecords": 107,
 			"reconstructedSmokeRecords": 6
@@ -367,6 +412,204 @@
 			"after": true,
 			"answerSha256": "5668e25a635fecb5a3a047e5af1784e9b09913ef546d50b44049a5df606c7dfd",
 			"justification": "Numeric cell labels preserve the leading level and count, including slash annotations."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-02-59-736Z-ebdc3a3c-4d33-4f3e-8485-085df581bc11.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "5121fef45f098323b322c5325f14962a8333c177062db529388f0f1aa848972c",
+			"justification": "Names an accepted runtime component view and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-11-13-029Z-8b1df215-d32c-42fa-b239-fcd541def6e9.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "12aa0fa1c0dbdee4c45eee53379115c953e6f3ea096e344f51abd9dd8146deef",
+			"justification": "Names an accepted runtime component view and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-56-31-201Z-c21586b0-ed0f-48ea-bd60-bdc2c8df1bd9.json",
+			"id": "hard-p11-order-customer-key",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "bf4d8a660fc1ae5cd700a394c0e822df337f87f8f972e8e0b3d030f911fb6054",
+			"justification": "Parenthetical datatype assignments no longer divide the contiguous dictionary record."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "5d4629ff8c0b9823f0db8a1bd8f86031eee0266db6032c0a6f18ea93feaadcc8",
+			"justification": "Exact positive parenthetical supplies the trigger timing."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-package-validity",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "346145fb4d2f50a88c7662313df6c718ea83269b2f02f3e0ef5d879ef173d844",
+			"justification": "Exact positive parenthetical supplies PACKAGE BODY."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-incident-range",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "859b6529bc7912f553b917441198657031a707b92a181ca048979089e328875e",
+			"justification": "Contiguous labelled whole values supply the single incident record."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "ba7c7947202a068c3b1289c772c0386c8b645d86c26720ed22ecba0dc0aacef0",
+			"justification": "Names V$SGASTAT and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"answerSha256": "afd4df6c29574aef0b60000ec03e9ecec1ae7d32c989eb0f85a8e9b046f216e5",
+			"justification": "Conditional self-service comment clause is not a claim of execution."
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"answerSha256": "5d982e4561fe47a5d66b7b998c6e1f023fa52a67df31cba218039b121ad3509f",
+			"justification": "Names V$SGASTAT and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T21-36-22-407Z-dad6e18b-cd02-45c9-b386-754add6e30af.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "81f093aba8e5cb3633cba8743829f6b4741065a6c691c60ea4d15a209cdb08ed",
+			"justification": "Names an accepted runtime component view and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T21-44-57-288Z-0e410cfc-e091-4258-a1c2-41989d7dd3df.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "ca8a8004ce4965786c3efdca895af25ab37d1f970296ada97fcec45b820418ad",
+			"justification": "Names an accepted runtime component view and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-30-36-493Z-85334525-26c1-4c36-b484-80ca390bbcf8.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "de46c2742f47cdcffa96482a5834ad8d032ee4c39d39e63f360c3a6764ac3c73",
+			"justification": "Four ordered source rows are all explicitly zero in the Rows column."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "f3bf993c5b381736f5608a9b1da3d54b0fb5816d0594acc1d3605517f05371d5",
+			"justification": "Exact positive parenthetical supplies the trigger timing."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-incident-range",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "2a836329ebab9c3b104bde563a166fbd19cf9c7bebaeef00df113cfc1728ecaf",
+			"justification": "Contiguous labelled whole values supply the single incident record."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "6c8900dc08a09e1deeca2de732b1f9943cc10eb7ba6d3278a141e9169cae4271",
+			"justification": "Names V$SGASTAT and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"answerSha256": "f3b5b2dca2232dbfa11b8c14b4f9e9950d995f03799f62b874f35d9121b4003f",
+			"justification": "Exact positive parenthetical supplies the trigger timing."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-alert-levels-d1",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"answerSha256": "4e8dd7870685e352989106255ffc285b666dbd10084b24a5b2f5bc187f8c1599",
+			"justification": "Numeric cell labels preserve the leading level and count, including slash annotations."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 2,
+			"before": false,
+			"after": true,
+			"answerSha256": "edc94cb011a8aa3ee783d722b225bcb55801eda2c4d664da4616d4fdf1082d0d",
+			"justification": "Names V$SGASTAT and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"answerSha256": "baebb2d1112744297d7082b0232b43007ebf2b2a59685ba4d61e1122c65a0385",
+			"justification": "Exact positive parenthetical supplies the trigger timing."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"answerSha256": "3f99adaa2bea00125f151b4ebba388e9a4573639d7bf23c9048101316ac77a98",
+			"justification": "Both named flags are YES; parenthetical metadata stays in its cell and explanations agree."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 3,
+			"before": false,
+			"after": true,
+			"answerSha256": "043c859314d24bb5e22070b46280d320737a1a7145b458ec67542d2993df4ea3",
+			"justification": "Names V$SGASTAT and reports its access gap."
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-58-13-752Z-589b414c-37f7-4f68-9624-e7baac023c35.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": false,
+			"after": true,
+			"answerSha256": "e812bc843015fbd79da5e7f3eee5db404ee5909e83a3fa92148948c4eacc7e44",
+			"justification": "Child rows and a foreign-key constraint correctly explain archived ORA-02292."
 		},
 		{
 			"file": "../../../../../../tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad/gate29a/2026-11-07T20-02-59-736Z-ebdc3a3c-4d33-4f3e-8485-085df581bc11.json",
@@ -3348,7 +3591,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -3422,7 +3665,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -3778,7 +4021,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -3819,7 +4062,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -3860,7 +4103,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -4216,7 +4459,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -4261,7 +4504,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -4343,7 +4586,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -4707,7 +4950,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -4753,6 +4996,1447 @@
 				},
 				{
 					"check": "fresh ground truth row: [16,1082]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-02-59-736Z-ebdc3a3c-4d33-4f3e-8485-085df581bc11.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$(?:SGA|MEMORY)_DYNAMIC_COMPONENTS(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-11-13-029Z-8b1df215-d32c-42fa-b239-fcd541def6e9.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$(?:SGA|MEMORY)_DYNAMIC_COMPONENTS(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-33-14-541Z-a4877edf-90b2-481f-95af-4e9652be2779.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-56-31-201Z-c21586b0-ed0f-48ea-bd60-bdc2c8df1bd9.json",
+			"id": "hard-p11-order-customer-key",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"CUSTOMER_ID\",\"CUSTOMERS\",\"SYS_C007649\",\"SYS_C007649\",\"UNIQUE\",1,\"CUSTOMER_ID\",\"NUMBER\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"CUSTOMER_ID\",\"CUSTOMERS\",\"SYS_C007649\",\"SYS_C007649\",\"UNIQUE\",1,\"CUSTOMER_ID\",\"NUMBER\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T20-56-31-201Z-c21586b0-ed0f-48ea-bd60-bdc2c8df1bd9.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-package-validity",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"PACKAGE\",\"VALID\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"PACKAGE BODY\",\"VALID\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"PACKAGE\",\"VALID\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"PACKAGE BODY\",\"VALID\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p21-incident-range",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fresh ground truth row: [122927,225332,6]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [122927,225332,6]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": false
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": false
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": false
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-11-57-250Z-72d394f1-031a-494d-9a1f-c6bf77ad13ab.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/a-b4e3906/2026-11-07T21-23-28-343Z-763febfc-c28c-421b-a8aa-1a4165d881f7.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T21-36-22-407Z-dad6e18b-cd02-45c9-b386-754add6e30af.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$(?:SGA|MEMORY)_DYNAMIC_COMPONENTS(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T21-44-57-288Z-0e410cfc-e091-4258-a1c2-41989d7dd3df.json",
+			"id": "hard-p25-grant-component-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$(?:SGA|MEMORY)_DYNAMIC_COMPONENTS(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGA_DYNAMIC_COMPONENTS",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-07-17-051Z-2c7648ed-2e4e-4dca-af05-3f94bd869202.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-30-36-493Z-85334525-26c1-4c36-b484-80ca390bbcf8.json",
+			"id": "hard-p25-d1-no-backups-recorded",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+					"pass": true
+				},
+				{
+					"check": "fact: \\bNO\\s+BACKUPS\\s+RECORDED\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [0,0,0,0]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?:not|cannot|does not|doesn.t)[^.\\n]{0,100}(?:prov|establish|verif|mean|guarantee|infer)",
+					"pass": true
+				},
+				{
+					"check": "fact: \\bNO\\s+BACKUPS\\s+RECORDED\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [0,0,0,0]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-30-36-493Z-85334525-26c1-4c36-b484-80ca390bbcf8.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-incident-range",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fresh ground truth row: [122927,225332,6]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [122927,225332,6]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-alert-levels-d1",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fresh ground truth row: [1,6]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [16,6376]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [1,6]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [16,6376]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 2,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-trigger-state",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": false
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"SECURE_EMPLOYEES\",\"DISABLED\",\"BEFORE STATEMENT\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"UPDATE_JOB_HISTORY\",\"ENABLED\",\"AFTER EACH ROW\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p21-products-stats",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "fresh ground truth row: [\"YES\",\"YES\"]",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fresh ground truth row: [\"YES\",\"YES\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p25-grant-pool-inventory",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fact: unavailable",
+					"pass": false
+				},
+				{
+					"check": "fact: (?:grant|privilege|access|ORA-00942)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: unavailable",
+					"pass": false
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: V(?:_)?\\$SGASTAT(?![\\w$#])",
+					"pass": true
+				},
+				{
+					"check": "fact: \\b(?:unavailable|not available|cannot|can't|denied|no access|no grant|not granted|lacks)\\b|ORA-(?:00942|01031)",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth: V$SGASTAT",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-46-06-775Z-fd7492f0-799f-424f-a473-3a70aeca781c.json",
+			"id": "hard-p8-comment-write",
+			"iteration": 3,
+			"before": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|until)\\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)",
+					"pass": true
+				},
+				{
+					"check": "forbidden: (?<!\\b(?:no|not|never)\\s+)(?<!\\b(?:if|when|once|after|unless|until)\\b[^.!?;:\\n,]{0,100})(?:comment|rename|command) applied successfully",
+					"pass": true
+				},
+				{
+					"check": "explicit refusal",
+					"pass": true
+				},
+				{
+					"check": "no SQL tools on refusal",
+					"pass": true
+				}
+			]
+		},
+		{
+			"file": "../eval-archive/phase29/b-dff6859/2026-11-07T22-58-13-752Z-589b414c-37f7-4f68-9624-e7baac023c35.json",
+			"id": "hard-p26-p1-last-failed-job",
+			"iteration": 1,
+			"before": [
+				{
+					"check": "fact: child\\s+record|referential|foreign\\s+key",
+					"pass": false
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
+					"pass": true
+				},
+				{
+					"check": "nonempty ground truth",
+					"pass": true
+				}
+			],
+			"after": [
+				{
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"pass": true
+				},
+				{
+					"check": "tool: run_query",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"NIGHTLY_PURGE_JOB\"]",
+					"pass": true
+				},
+				{
+					"check": "fresh ground truth row: [\"ORA-02292\"]",
 					"pass": true
 				},
 				{
@@ -5014,7 +6698,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -5096,7 +6780,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -5518,7 +7202,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -5681,7 +7365,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -5779,7 +7463,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{
@@ -6292,7 +7976,7 @@
 			],
 			"after": [
 				{
-					"check": "fact: \\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
+					"check": "fact: (?<!\\b(?:no|not|never|without)\\s+(?:(?:a|an|any)\\s+)?)\\b(?:child[\\s-]+(?:records?|rows?)|referential|foreign[\\s-]+keys?)\\b",
 					"pass": true
 				},
 				{

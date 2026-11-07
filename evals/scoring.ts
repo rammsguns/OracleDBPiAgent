@@ -42,7 +42,11 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			(_line, label: string, cell: string, value: string) => {
 				const plain = cell.replace(/[`*]/g, '').trim();
 				const explanation = plain.replace(/^(?:YES|NO|UNKNOWN)\s*-\s*/i, '');
-				const contradicted = [...explanation.matchAll(/\b(?:STALE_STATS|GLOBAL_STATS)\s*=\s*(YES|NO|UNKNOWN)\b/gi)].some(match => match[1]!.toUpperCase() !== value.toUpperCase())
+				// GLOBAL_STATS=YES means table-level statistics, rather than an
+				// aggregation from partitions. That detail does not negate the flag.
+				const assertion = /^global/i.test(label) && value.toUpperCase() === 'YES' && /\bGLOBAL_STATS\s*=\s*YES\b/i.test(explanation)
+					? explanation.replace(/\bnot aggregated from partitions\b/gi, '') : explanation;
+				const contradicted = value.toUpperCase() === 'YES' && /\b(?:no|not|never)\b/i.test(assertion) || [...explanation.matchAll(/\b(?:STALE_STATS|GLOBAL_STATS)\s*=\s*(YES|NO|UNKNOWN)\b/gi)].some(match => match[1]!.toUpperCase() !== value.toUpperCase())
 					|| new RegExp(`\\b(?:not|never)\\s+${value}\\b|\\b${value}\\s+(?:is\\s+)?(?:false|incorrect|wrong)\\b|\\b(?:actually|instead)\\s+(?!${value}\\b)(?:YES|NO|UNKNOWN)\\b`, 'i').test(explanation);
 				return `| ${/^stale/i.test(label) ? 'stale_stats' : 'global_stats'} | ${contradicted ? plain : value} |`;
 			})).join('\n');

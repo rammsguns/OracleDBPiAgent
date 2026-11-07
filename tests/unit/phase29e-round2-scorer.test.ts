@@ -43,5 +43,20 @@ it('accepts only bounded singular, plural or hyphenated referential explanations
 	const original = testCase('hard-p26-p1-last-failed-job');
 	const test = { ...original, groundTruth: undefined, expect: { ...original.expect, requiredTools: [] } };
 	for (const phrase of ['child record','child records','child row','child rows','foreign key','foreign-key constraint','foreign-keys','referential integrity']) expect(score(test, result(phrase)).pass, phrase).toBe(true);
-	for (const phrase of ['childish records','foreign keyboard','foreign_key','unreferential','child only','foreign constraint']) expect(score(test, result(phrase)).pass, phrase).toBe(false);
+	for (const phrase of ['childish records','foreign keyboard','foreign_key','unreferential','child only','foreign constraint','There is no foreign key constraint','not a foreign-key violation','without child rows','no child records','not any referential integrity','never a foreign key']) expect(score(test, result(phrase)).pass, phrase).toBe(false);
+});
+
+it('rejects natural-language negation after either statistics flag', () => {
+	const test = testCase('hard-p21-products-stats');
+	const table = (stale: string, global = 'YES — GLOBAL_STATS = YES') => `| Attribute | Value |\n|---|---|\n| Stale? | ${stale} |\n| Global statistics? | ${global} |`;
+	for (const explanation of ['but not stale', 'STALE_STATS is NO', 'no', 'NO', 'never stale', 'not', 'not YES', 'YES is not correct', 'not stale (STALE_STATS = YES)']) {
+		expect(score(test, result(table(`YES — ${explanation}`)), [['YES','YES']]).pass, explanation).toBe(false);
+	}
+	for (const explanation of ['but not global', 'GLOBAL_STATS is NO', 'no', 'not', 'never', 'GLOBAL_STATS = YES (not global)', 'not aggregated from partitions']) {
+		expect(score(test, result(table('YES — STALE_STATS = YES', `YES — ${explanation}`)), [['YES','YES']]).pass, explanation).toBe(false);
+	}
+	// A consistent negative flag remains a valid whole value.
+	expect(score(test, result(table('NO — STALE_STATS = NO')), [['NO','YES']]).pass).toBe(true);
+	// The archived parenthetical describes table-level collection, not a denial of YES.
+	expect(score(test, result(table('YES — STALE_STATS = YES', 'YES — GLOBAL_STATS = YES (not aggregated from partitions)')), [['YES','YES']]).pass).toBe(true);
 });

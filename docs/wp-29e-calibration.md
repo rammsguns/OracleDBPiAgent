@@ -11,6 +11,12 @@ Round 2:
 - The backup-count case accepts a Source (view)/Rows table only when four recognized sources occur in the requested order with exactly matching values. Ordinals, missing rows, split tables and not-verifiable cells do not supply counts. The failing B-side p25-suite answer remains a failure.
 - The failed-job fact accepts bounded child record(s)/row(s) and foreign key(s), including hyphen separators. It does not accept substrings such as foreign keyboard.
 
+Review-2 Minors follow-up:
+
+- The failed-job fact now uses a negation lookbehind, including optional articles: `no foreign key`, `not a foreign-key violation`, and `without child rows` no longer satisfy it. Correct archived explanations still pass.
+- A leading YES in products-stats is not reduced when the explanation contains standalone NO/not/never, including natural-language denials of stale/global. Consistent `NO — GLOBAL_STATS = NO` remains valid. The affirmative `GLOBAL_STATS = YES` collection detail “not aggregated from partitions” remains valid because it explains table-level collection rather than negating the flag; a bare negated explanation or a denial such as “not global” still fails.
+- Added adversarial and preservation assertions. The final replay has the same **46 unique (case, iteration, answer hash, before/after) flips** as the approved round-2 report, and the original file-specific flip set is unchanged. During verification the coordinator copied the phase-29 gates into eval-archive: 22 additional occurrences are duplicates of already-reviewed hashes, not new flips.
+
 Validation (no LLM calls):
 
 ```text
@@ -19,8 +25,8 @@ PASS (exit 0)
 
 npm test -- --maxWorkers=2
 Test Files  133 passed (133)
-Tests       2430 passed (2430)
-Duration    89.64s
+Tests       2431 passed (2431)
+Duration    88.91s
 
 PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx tsx evals/validate-hard.ts
 Validated 127 ground-truth queries for 156 hard cases; row counts recorded.
@@ -30,11 +36,11 @@ Truth queries and unavailable-view probes ran sequentially on the two configured
 
 Replay: `npx tsx docs/wp-29e-replay.ts`. All truth comes from archived checks. Only the removed grant status cell is projected away on the after side; the earlier WP-2527J count-only backup projection remains identical on both sides. Retired definitions and six smoke cases are reconstructed as in WP-29A. Each approved answer is pinned by SHA-256; new hashes require review.
 
-Replay covers 13,229 records: **46 cumulative fail-to-pass flips, 0 pass-to-fail flips, 0 unjustified flips, 0 unknown IDs, and 0 regressions against round 1**. Of the 16 newly documented flips, seven are the review's later B-side hashes already fixed by round 1, and nine result from round 2 (four requested gate misses plus five related historical records). Both p23/p24 directories were present at this snapshot; replay contains all available JSON.
+Replay covers **13,997 records**: **46 unique fail-to-pass flips (68 occurrences, including duplicate archive copies), 0 pass-to-fail flips, 0 unjustified flips, 0 unknown IDs, and 0 regressions against round 1**. The unique flip set is unchanged by the review fixes. Both p23/p24 directories were present; replay contains all available JSON. The approved 46 unique flips comprise the original 30, seven later B-side hashes already fixed by round 1, and nine from round 2. The additional copies under `eval-archive/phase29` account for the 22 duplicate occurrences.
 
 | Source | Files | Records |
 |---|---:|---:|
-| eval-archive | 534 | 12461 |
+| eval-archive | 558 | 13229 |
 | gate29a | 10 | 372 |
 | gate29a-p2324 | 2 | 12 |
 | gate29b | 10 | 372 |
@@ -52,7 +58,7 @@ Round 2 changes from the round-1 scorer:
 | hard-p21-products-stats | 1 | Both named flags are YES; parenthetical metadata stays in its cell and explanations agree. |
 | hard-p26-p1-last-failed-job | 1 | Child rows and a foreign-key constraint correctly explain archived ORA-02292. |
 
-Every cumulative flip is listed below. The JSON contains full paths, iterations, exact reviewed answer hashes, checks before/after and the separate round-2 comparison. These case checks certify requested facts; answers can contain unrelated inaccuracies.
+Every unique cumulative flip is listed below (duplicate archive copies appear separately in the JSON). The JSON contains full paths, iterations, exact reviewed answer hashes, checks before/after and the separate round-2 comparison. These case checks certify requested facts; answers can contain unrelated inaccuracies.
 
 | Record | Case ID | Iteration | Round | Justification |
 |---|---|---:|---|---|
