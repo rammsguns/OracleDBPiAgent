@@ -4,7 +4,7 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-11-06
+## [1.5.0] - 2026-11-07
 
 ### Added
 
@@ -76,8 +76,9 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
   AWR reports, snapshots or other writes as workarounds. It also no
   longer guesses RMAN defaults. If a refusal still omits `piagent top` or
   names a pack script or package, the agent asks the model once for a
-  revised answer without tools. These changes were A/B gated against the
-  1.5.0 candidate.
+  revised answer without tools. `ask` and `chat` print a
+  `--- Revised answer ---` line before any revised answer. These changes
+  were A/B gated against the 1.5.0 candidate.
 - Backup, jobs and top text output uses Markdown tables. Jobs show
   INTERVAL values as durations. Top labels a non-CDB as
   "Database-wide (non-CDB)" and says "none in this interval" for empty
