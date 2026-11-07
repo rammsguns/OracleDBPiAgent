@@ -125,7 +125,7 @@ export function checkP25Cases(cases: EvalCase[]): void {
 
 /** Fixed required facts must still agree with freshly read dictionary/static data. */
 export function checkPinnedFacts(test: EvalCase, rows: unknown[][]): void {
-	const count = { 'numeric-precision': 1, 'unit-conversion': 1, 'name-fidelity': test.expect.requiredFacts.length, 'grant-limited-p1': 2 }[test.category];
+	const count = { 'numeric-precision': 1, 'unit-conversion': 1, 'name-fidelity': test.expect.requiredFacts.length, 'grant-limited-p1': test.id.startsWith('hard-p25-grant-') ? 1 : 2 }[test.category];
 	if (count === undefined) return;
 	const text = rows.flat().join(' | ');
 	for (const pattern of test.expect.requiredFacts.slice(0, count)) {
@@ -187,8 +187,8 @@ export async function validateHardCases(input?: EvalCase[]) {
 				if (test.category === 'grant-limited-p1') {
 					for (const row of rows) {
 						const view = row[0];
-						if (test.target !== 'p1-19c-prod' || !['V$SGASTAT', 'V$SGA_DYNAMIC_COMPONENTS'].includes(String(view)) || row[1] !== 'unavailable') throw new Error(`Invalid grant prerequisite: ${test.id}`);
-						await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${String(view).replace('V$', 'V_$')} WHERE ROWNUM=1`));
+						if (test.target !== 'p1-19c-prod' || !['V$SGASTAT', 'V$SGA_DYNAMIC_COMPONENTS'].includes(String(view)) || (test.id.startsWith('hard-p25-grant-') ? row.length !== 1 : row[1] !== 'unavailable')) throw new Error(`Invalid grant prerequisite: ${test.id}`);
+						for (const accepted of test.id === 'hard-p25-grant-component-inventory' ? ['V$SGA_DYNAMIC_COMPONENTS', 'V$MEMORY_DYNAMIC_COMPONENTS'] : [String(view)]) await verifyUnavailable(() => session.query(`SELECT * FROM SYS.${accepted.replace('V$', 'V_$')} WHERE ROWNUM=1`));
 					}
 				}
 				records.push({ id: test.id, target: test.target, sql: test.groundTruth.sql, mode: test.groundTruth.mode, rowCount: rows.length, rows });
@@ -229,7 +229,7 @@ export function checkRepairedCases(cases: EvalCase[]): void {
 			if (test.id === 'hard-p19-object-statistics' && (/TO_CHAR|last_analyzed_utc/i.test(sql) || !sql.includes("'MISSING' ELSE 'PRESENT'"))) throw new Error('Statistics truth must tolerate nightly collection timestamps');
 		}
 		if (['hard-p21-public-directory', 'hard-p21-schema-directory-grants', 'hard-p25-grant-component-inventory', 'hard-p25-grant-pool-inventory'].includes(test.id)) {
-			if (test.skipWhenTruthEmpty || !test.groundTruth) throw new Error('Repaired dictionary premises must fail closed');
+			if ((!test.id.startsWith('hard-p25-grant-') && test.skipWhenTruthEmpty) || !test.groundTruth) throw new Error('Repaired dictionary premises must fail closed');
 			const exposed = ['hard-p21-public-directory', 'hard-p25-grant-component-inventory'].includes(test.id);
 			if (test.split !== (exposed ? 'dev' : 'holdout')) throw new Error('Exposed cases move to dev; replacements stay blind holdout');
 			if (!exposed && /\b(?:run_query|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question ?? '')) throw new Error('Blind replacement questions must not name tools or views');

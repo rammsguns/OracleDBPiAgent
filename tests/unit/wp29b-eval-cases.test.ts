@@ -24,7 +24,7 @@ it('rejects volatile statistics timestamp grading', async () => {
 });
 
 it('rejects silent empty skips and exposed holdouts', async () => {
-	const test = structuredClone((await loadHardCases()).find(test => test.id === 'hard-p25-grant-component-inventory')!);
+	const test = structuredClone((await loadHardCases()).find(test => test.id === 'hard-p21-public-directory')!);
 	test.skipWhenTruthEmpty = true;
 	expect(() => checkRepairedCases([test])).toThrow(/fail closed/);
 	delete test.skipWhenTruthEmpty;

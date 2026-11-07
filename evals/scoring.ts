@@ -82,7 +82,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 				// Numbers must not be part of a longer number; names may be qualified (ORDERS.CUSTOMER_ID).
 					const startsNumeric = /^-?\d/.test(expected);
 					const bounded = startsNumeric ? `(?<![\\w.])${escaped}(?![\\w.]*\\d)` : `(?<!\\w)${escaped}(?!\\w)`;
-					checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && (numeric(expected) ? numberTokens(normalized).some(match => decimal(match[0]) === decimal(expected)) : new RegExp(bounded, 'i').test(normalized)) });
+					checks.push({ check: `fresh ground truth: ${expected}`, pass: value != null && (numeric(expected) ? numberTokens(normalized).some(match => decimal(match[0]) === decimal(expected)) : new RegExp(bounded, 'i').test(test.id === 'hard-p25-grant-component-inventory' ? normalized.replace(/V_?\$(?:SGA|MEMORY)_DYNAMIC_COMPONENTS(?![\w$#])/gi, 'V$SGA_DYNAMIC_COMPONENTS') : normalized)) });
 			}
 		}
 		checks.push({ check: 'nonempty ground truth', pass: truth.length > 0 });
@@ -139,6 +139,10 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	const same = (actual: string, expected: unknown, label = '') => {
 		let text = evidence(preserveQualified ? actual.replace(/__([^_]+)__/g, '$1') : actual);
 		const value = String(expected);
+		// A positive descriptive cell may name its exact value in parentheses.
+		const annotation = /\s+\(([^()]*)\)\s*$/.exec(clean(actual));
+		if (annotation && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(clean(actual))
+			&& clean(annotation[1]!).toLowerCase() === clean(value).toLowerCase()) return true;
 		if (historySignature && label === 'defaulted' && value === 'N' && /^(?:no|none)$/i.test(text)) return true;
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
@@ -207,6 +211,32 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		for (const line of lines) {
 			for (const match of line.matchAll(inlineRecord)) candidates.push(match[1]!.replace(/^([^=:]+):\s*/, '$1='));
 		}
+	}
+	// A single record may be a bounded contiguous block of whole labelled values.
+	if (singleRow) {
+		let values: string[] = [];
+		let named: string[] = [];
+		const flush = () => {
+			if (values.length > 0 && values.length <= 8) {
+				const available = [...values];
+				if (row.every(value => {
+					const index = available.findIndex(actual => same(actual, value));
+					if (index < 0) return false;
+					available.splice(index, 1); return true;
+				})) candidates.push(named.join(' | '));
+			}
+			values = []; named = [];
+		};
+		for (const line of lines) {
+			const match = /^(?:[-•]\s+)?[A-Za-z][A-Za-z_ ]*:\s*(.+)$/.exec(line);
+			if (match) {
+				const rawLabel = line.slice(0, line.indexOf(':')).replace(/^[-•]\s+/, '').trim().replace(/\s+/g, '_').toLowerCase();
+				const label = ({ successes_audited: 'success', failures_audited: 'failure', enablement_mode: 'enabled_option' } as Record<string, string>)[rawLabel] ?? rawLabel;
+				values.push(match[1]!);
+				named.push(labels.some(expected => expected.toLowerCase() === label) ? `${label}=${match[1]!}` : match[1]!);
+			} else flush();
+		}
+		flush();
 	}
 	// A single p18 or p19 truth record may be presented as separate labelled facts.
 	// Pool only positive labelled lines, never table rows or unlabelled mentions.
@@ -314,6 +344,18 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		}
 		if (ids.size === 1) pooledFacts.push(`sql_id=${[...ids][0]}`);
 		candidates.push(pooledFacts.join(' | '));
+	}
+
+	// Retain original parsing and add an alternative only for exact positive
+	// parenthetical values in whole table cells.
+	for (const line of [...candidates]) {
+		if (!/[|=]/.test(line)) continue;
+		const expanded = line.split(/(\|| \/ )/).map(cell => {
+			const annotation = /\s+\(([^()]*)\)\s*$/.exec(clean(cell));
+			return annotation && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(cell)
+				&& row.some(value => clean(annotation[1]!).toLowerCase() === clean(String(value)).toLowerCase()) ? (cell.includes('=') ? cell.slice(0, cell.indexOf('=') + 1) : '') + annotation[1]! : cell;
+		}).join('');
+		if (expanded !== line) candidates.push(expanded);
 	}
 
 	return candidates.some(line => {

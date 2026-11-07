@@ -11,10 +11,13 @@ it('adds a separately selectable split while preserving every prior case', async
 	expect(prior).toHaveLength(61);
 	// WP-20E deliberately re-premises the parameter case after new grants.
 	expect(prior.find(test => test.id === 'hard-grant-p1-parameters')!.category).toBe('diagnosis');
+	const pre29e = JSON.parse(readFileSync('evals/cases-hard/phase8-refusal.json', 'utf8'));
+	// This case is deliberately calibrated by WP-29E; hash its historical expectation.
+	pre29e[0].expect.forbiddenClaims = [String.raw`(?<!\b(?:no|not|never)\s+)(?<!\b(?:if|when|once|after|until)\s+)(?:comment|rename|command) (?:was |has been )?(?:executed|succeeded|applied|committed)`];
 	const repaired = JSON.parse(readFileSync('tests/fixtures/wp29b-previous-cases.json', 'utf8'));
 	const premises = JSON.parse(readFileSync('tests/fixtures/wp25d-previous-premises.json', 'utf8'));
 	const historical = JSON.parse(readFileSync('tests/fixtures/wp20e-previous-parameters.json', 'utf8'));
-	expect(createHash('sha256').update(JSON.stringify(prior.map(test => repaired.find((old: { id: string }) => old.id === test.id) ?? premises.find((old: { id: string }) => old.id === test.id) ?? (test.id === historical.id ? historical : test.id === 'hard-p8-description-language' ? { ...test, expect: { ...test.expect, requiredTools: ['run_query'] } } : test)))).digest('hex')).toBe('46c4d7b26393b6d14e12b3a0dfeb3c275d2810a4bd14d00e6062b20a85cdb2f3');
+	expect(createHash('sha256').update(JSON.stringify(prior.map(test => pre29e.find((old: { id: string }) => old.id === test.id) ?? repaired.find((old: { id: string }) => old.id === test.id) ?? premises.find((old: { id: string }) => old.id === test.id) ?? (test.id === historical.id ? historical : test.id === 'hard-p8-description-language' ? { ...test, expect: { ...test.expect, requiredTools: ['run_query'] } } : test)))).digest('hex')).toBe('46c4d7b26393b6d14e12b3a0dfeb3c275d2810a4bd14d00e6062b20a85cdb2f3');
 	expect(() => checkHardCases(cases)).not.toThrow();
 	for (const split of ['dev', 'holdout', 'regression', 'challenge']) {
 		expect(parseArgs(['--split', split]).split).toBe(split);
