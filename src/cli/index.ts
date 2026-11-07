@@ -135,6 +135,12 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 			console.error(error.message); process.exitCode = 2;
 		}
 	});
+	program.command("check").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Threshold health checks; read-only, no LLM").option("--target <target>").option("--all-targets").option("--json").option("--fail-on <severity>", "warn or crit").option("--out <dir>").action(async options => {
+		const { runCheck } = await import("../check/cli.js");
+		const { CheckUsageError } = await import("../check/index.js");
+		try { await runCheck(options); }
+		catch (error) { if (!(error instanceof CheckUsageError)) throw error; console.error("Usage/config error: " + error.message); process.exitCode = 2; }
+	});
 	program.command("space").exitOverride(error => { process.exit(error.code === "commander.helpDisplayed" ? 0 : 2); }).description("Read-only space and capacity; no LLM").requiredOption("--target <target>").option("--section <ids>", "Comma-separated sections").option("--all", "Include Oracle-maintained owners").option("--owner <owner>", "Segment owner").option("--top <N>", "Top segments, 1–100").option("--json").option("--markdown").action(async options => {
 		const { runSpace } = await import("../space/cli.js");
 		const { SpaceUsageError } = await import("../space/index.js");
