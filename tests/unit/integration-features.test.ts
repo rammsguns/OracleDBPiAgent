@@ -23,7 +23,9 @@ it.each(['how many orders are there?', 'explain SH.SALES', 'SQL was slow last we
 });
 it('parses /top strictly and leaves ordinary turns alone', async () => {
 	expect(parseTopCommand('/top')).toEqual({ seconds: 15 }); expect(parseTopCommand('/top --seconds 5')).toEqual({ seconds: 5 });
-	for (const q of ['/topical', 'what is /top', 'hello']) expect(await runChatTop(context(), q)).toBeUndefined();
+	for (const q of ['  /top --seconds 10', '/top --seconds 10  ', '\t /top --seconds 10 \n']) expect(parseTopCommand(q)).toEqual({ seconds: 10 });
+	expect(parseTopCommand('  /top  ')).toEqual({ seconds: 15 });
+	for (const q of ['/topical', '/topx', '  /topx  ', '', '   ', '\t\n', 'what is /top', 'hello']) expect(await runChatTop(context(), q)).toBeUndefined();
 	for (const q of ['/top --seconds 4', '/top --seconds 121', '/top --seconds 5.5', '/top --seconds 1e2', '/top --target other', '/top extra']) expect(() => parseTopCommand(q)).toThrow();
 });
 it('cancels the live wait, closes its session and never takes a second snapshot', async () => {

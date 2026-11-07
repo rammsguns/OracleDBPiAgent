@@ -45,9 +45,9 @@ it('isolates any REPL operation while preserving one-shot failure propagation', 
 	await expect(withConnectionFailures(async () => { recordConnectionFailure(new Error('ORA-12541')); })).rejects.toThrow('ORA-12541: listener unreachable');
 });
 
-it('cancels /top on readline SIGINT, returns to the REPL and never prompts the agent', async () => {
+it.each(['/top', '  /top --seconds 10  '])('cancels %s on readline SIGINT, returns to the REPL and never prompts the agent', async question => {
 	const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
-	mocks.question.mockResolvedValueOnce('/top').mockResolvedValueOnce('/exit');
+	mocks.question.mockResolvedValueOnce(question).mockResolvedValueOnce('/exit');
 	mocks.top.mockImplementation(async (_ctx: unknown, _question: string, signal: AbortSignal) => {
 		const interrupt = mocks.on.mock.calls.find(([event]) => event === 'SIGINT')?.[1] as () => void;
 		expect(interrupt).toBeTypeOf('function'); interrupt();

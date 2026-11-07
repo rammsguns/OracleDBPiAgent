@@ -2,6 +2,7 @@ import type { ToolContext } from '../contracts.js';
 import { collectTop } from '../triage/features.js';
 import { renderTop, validateSeconds } from '../top/index.js';
 export function parseTopCommand(question: string): { seconds: number } | undefined {
+	question = question.trim();
 	if (!/^\/top(?:\s|$)/.test(question)) return undefined;
 	const match = /^\/top(?:\s+--seconds\s+(\d+))?\s*$/.exec(question);
 	if (!match) throw new Error('Usage: /top [--seconds N] (5–120; default 15)');
