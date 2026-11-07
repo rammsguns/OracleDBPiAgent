@@ -2,7 +2,8 @@
 
 Implemented a deterministic `finishTurn` decision before the zero-successful-tool
 and refusal grounding exits. A pure exported `needsPackRefusalCorrection` helper
-recognizes pack/history sources in user questions or the final answer. It asks
+recognizes explicit pack/history sources in the current user question only.
+It also requires either `isRefusal(answer)` or zero successful tool calls. It asks
 for one complete replacement when the live alternative is missing or the answer
 suggests pack scripts, packages, reports or snapshot creation.
 
@@ -19,13 +20,32 @@ The pack check also operates when optional factual grounding is disabled.
 No system prompt text changed. No contracts, dependencies or eval files changed.
 The coordinator must run the gated A/B before promotion.
 
-Detection intentionally accepts incidental AWR mentions as source context: an
-extra live-alternative suggestion is acceptable under the requested scope.
-Ordinary application snapshots do not trigger it. Workaround detection uses
-clause-level prohibition matching to distinguish an explicit ban from a
-recommendation, including contrast clauses such as “cannot query AWR, but run
-awrrpt.sql”. This is a bounded lexical check, not a guarantee of understanding
-all paraphrases or of model compliance after the single revision.
+The review revision removes bare “advisor” and “snapshot” source matches and
+ignores pack words introduced only in answers or previous user turns. Successful,
+non-refusal answers are ineligible even when the question mentions AWR.
+Workaround detection still distinguishes prohibitions from recommendations.
+No system prompt changes or additional corrections were introduced.
+
+Read-only replay: `docs/wp-2527l-fire-replay.mts` adapts the coordinator's
+`fire.mts`, loading case questions from `../coord-score` when run there. It
+passes the count of `toolDetails` entries with `isError === false` (falling back
+to tool-call count when details are absent) and the existing `isRefusal` result.
+Across `gate150`, `gate150b`, and `gate150b-p2324` in the supplied scratchpad:
+
+- 748 records examined; 595 records have `pass=true` and tools > 0.
+- **Zero** of those 595 passing tool-using records trigger a correction.
+- 14 failing `hard-p27-refuse-*` records lack top or mention awrrpt.sql;
+  11 trigger, including every eligible record and the awrrpt.sql workaround.
+- Three `hard-p27-refuse-metric-history` records in `gate150` are excluded:
+  `03-03-09-679Z`, `03-28-45-365Z`, and `03-58-46-125Z`. Each has one
+  successful tool call and `isRefusal(answer) === false`.
+
+The requested “every failing record” acceptance conflicts with condition (2)
+for those three stored answers. The implementation preserves condition (2);
+the replay exits 1 and prints these exclusions so the acceptance gap remains
+visible. Catching them requires changing the eligibility rule or the shared
+refusal classifier; neither was expanded here. The coordinator's live gated A/B
+is still needed to verify revised model answers.
 
 Unit coverage includes the named source families, scripts/packages/reports,
 explicit prohibitions, compliant refusals, ordinary snapshots, zero-tool
@@ -33,5 +53,5 @@ responses, disabled grounding, pinned/default targets, per-run reset, shared
 numbers allowance in both orders, residual grounding, and attempted tools.
 
 Validation: `npm run typecheck` passed. `npm test -- --maxWorkers=2` passed
-(126 files, 2,323 tests). No DB or LLM calls were made; integration tests and
+(126 files, 2,340 tests). No DB or LLM calls were made; integration tests and
 live A/B were intentionally left to the coordinator as requested.

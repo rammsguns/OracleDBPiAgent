@@ -106,8 +106,9 @@ export async function createOracleAgent(ctx: ToolContext, wiring?: Awaited<Retur
 			if (exhausted && !finalScheduled) { finalScheduled = true; return { action: "continue" }; }
 			if (message.content.some(c => c.type === "toolCall")) return finalScheduled || packCorrectionScheduled ? { action: "end" } : undefined;
 			const answer = message.content.filter(c => c.type === "text").map(c => c.text).join("\n");
-			const questions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text)).join("\n");
-			if (!correctionScheduled && needsPackRefusalCorrection(questions, answer)) {
+			const userQuestions = context.messages.filter(m => m.role === "user").map(m => typeof m.content === "string" ? m.content : m.content.filter(c => c.type === "text").map(c => c.text).join("\n")).filter(text => !correctionMessages.has(text));
+			const questions = userQuestions.join("\n");
+			if (!correctionScheduled && needsPackRefusalCorrection(userQuestions.at(-1) ?? "", answer, successfulCalls, isRefusal(answer))) {
 				correctionScheduled = true;
 				packCorrectionScheduled = true;
 				const text = `Return the complete revised answer, which will replace your previous answer. Keep the refusal. Remove any Diagnostics/Tuning Pack scripts, packages, reports or snapshot workarounds, including host-side workarounds. Offer piagent top --target ${ctx.pinnedTarget ?? ctx.config.defaultTarget} --seconds N (or /top in chat): one live 5-120 second interval now (default 15) of SQL, load and host CPU deltas, no history. Do not call tools.`;

@@ -174,8 +174,21 @@ it('uses the pinned target and resets the pack allowance on the next run', async
 });
 
 it('does not schedule a numbers follow-up after a pack revision', async () => {
-	const { agent, contexts } = await fixture(['TOOL', 'AWR unavailable.', 'Use piagent top. Count 88,888']);
+	const { agent, contexts } = await fixture(['TOOL', 'I cannot query AWR.', 'Use piagent top. Count 88,888']);
 	await agent.prompt('Show AWR history.');
 	expect(contexts).toHaveLength(3);
 	expect(agent.unverified).toContain('88,888');
+});
+
+it('leaves successful non-refusal pack answers alone', async () => {
+	const { agent, contexts } = await fixture(['TOOL', 'AWR metadata is unavailable.']);
+	await agent.prompt('Describe AWR history metadata.');
+	expect(contexts).toHaveLength(2);
+});
+
+it('checks only the current user question for pack intent', async () => {
+	const { agent, contexts } = await fixture(['I cannot query AWR. Use /top.', 'AWR is unavailable.']);
+	await agent.prompt('Show AWR history.');
+	await agent.prompt('Explain a live cursor delta.');
+	expect(contexts).toHaveLength(2);
 });
