@@ -4,6 +4,73 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-06
+
+### Added
+
+- **`piagent backup --target T [--json]`: backup and recoverability
+  evidence from control-file metadata.** It never runs RMAN. It reports:
+  - backup sets and pieces, and full, level-0 and incremental coverage
+    for each datafile;
+  - gaps in the archived-log sequence for each thread, in the current
+    incarnation;
+  - control-file autobackup, block corruption, files that need recovery,
+    and the recovery area balance;
+  - a conservative restore-to-time estimate. It is metadata only and
+    clearly bounded.
+
+  Under NOARCHIVELOG it says that point-in-time recovery is not possible.
+  See [backup](docs/backup.md).
+- **`piagent jobs --target T [--since] [--owner] [--failed-only] [--json]`:
+  scheduler and maintenance evidence.** It covers:
+  - jobs, recent runs, and the latest failure for each job;
+  - scheduler windows, autotask history and statistics operations;
+  - maintenance debt: invalid objects, unusable indexes and stale
+    statistics.
+
+  Every string is credential-redacted and length-capped. Display
+  timestamps are in UTC; JSON keeps the source time zone. See
+  [jobs](docs/jobs.md).
+- **`piagent top --target T [--seconds N] [--json]`: what the database is
+  doing now.** It takes two bounded snapshots 5–120 seconds apart and
+  reports:
+  - the top 10 SQL by elapsed time, CPU, buffer gets, disk reads and
+    executions;
+  - load rates and host CPU.
+
+  SQL text is never fetched. A counter that is new, aged out or reset is
+  shown as unknown, never as work done in the interval. See
+  [top](docs/top.md).
+- **The new evidence in other commands:**
+  - Triage routes backup and RMAN or ORA-19xxx issues to the backup
+    evidence, and failed scheduler jobs or ORA-12012 to the jobs evidence.
+  - Triage turns "slow right now" into one 15-second top sample and drills
+    into the heaviest SQL.
+  - `report --sections backup,jobs` adds the new sections, with history
+    trends.
+  - `drift --scope backup` compares RMAN settings and log mode.
+  - Chat has `/top [--seconds N]`, which Ctrl-C cancels and which never
+    calls the LLM.
+- **Web Backup, Jobs and Top tabs.**
+  - Backup and Jobs show UTC timelines, with failures and sequence gaps
+    marked.
+  - Top samples only when you press Sample. Its duration is bounded, it
+    can be cancelled, and its response size is capped.
+- The `targets check` preflight groups and
+  [`docs/grants-template-pdb.sql`](docs/grants-template-pdb.sql) cover the
+  backup, jobs and top views.
+- New eval cases for phases 25–27 (backup, jobs, top). Each has a
+  validator: `evals/validate-p25.ts`, `validate-p26.ts` and
+  `validate-p27.ts`.
+  Ground truth comes only from the database.
+
+### Changed
+
+- The SQL policy refuses ASH, AWR, metric, advisor and other Diagnostics
+  and Tuning Pack sources, including the multitenant `CDB_HIST`, `AWR_*`
+  and `V$ALL_ACTIVE_SESSION_HISTORY` variants. This covers
+  agent-generated SQL too.
+
 ## [1.4.0] - 2026-11-06
 
 ### Added
