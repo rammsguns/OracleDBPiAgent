@@ -4518,6 +4518,7 @@ grants.
 | WP-30A engine and CLI | `wp-30a-check` | Codex | `src/check/`, `check` command, thresholds config, docs/check.md, tests |
 | WP-30B web and agent tool | `wp-30b-check-web-agent` | Codex | Web Check tab, `health_check` tool and its guidance, tests (after 30A) |
 | WP-30C evals | `wp-30c-check-evals` | Codex | p30 cases with DB-derived truth and a validator (after 30A) |
+| WP-30D target usage | `wp-30d-target-usage` | Codex | Every `--target` command rejects an unknown target with the shared message, listing configured targets, exit 2 (1.5.1 smoke follow-up) |
 
 ### Rules
 The phase 25–27 rules apply: real CDB/PDB labelling, degrading per view,
