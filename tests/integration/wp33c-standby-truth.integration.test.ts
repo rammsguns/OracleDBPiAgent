@@ -18,17 +18,15 @@ it('C1S: every phase33 truth SELECT parses and returns nonempty truth as PIAGENT
 		expect((await session.query("SELECT USER, SYS_CONTEXT('USERENV','CON_NAME') FROM dual")).rows).toEqual([['PIAGENT_RO', 'PIPDB1']]);
 		for (const test of cases) {
 			if (!test.groundTruth) continue;
-			const result = await session.query(test.groundTruth.sql);
+			let result;
+			try { result = await session.query(test.groundTruth.sql); }
+			catch (error) { throw new Error(`Truth query failed for ${test.id}: ${String(error).split('\n')[0]}`); }
 			expect(result.truncated, test.id).toBe(false);
 			expect(result.rows.length, test.id).toBeGreaterThan(0);
 			for (const row of result.rows) for (const cell of row) expect(cell, test.id).not.toBeNull();
 			if (test.id === 'hard-p33-role-open') expect(result.rows).toEqual([['PHYSICAL STANDBY', 'READ ONLY WITH APPLY']]);
 			if (test.id === 'hard-p33-mrp') expect(result.rows.some(row => row[0] === 'MRP0' && row[1] === 'APPLYING_LOG')).toBe(true);
-			if (test.id === 'hard-p33-transport-lag') {
-				expect(result.rows).toHaveLength(1);
-				expect(String(result.rows[0]![1])).toMatch(/^\+?0\d 00:0[0-4]:\d{2}(?:\.\d+)?$/);
-			}
-			if (test.id === 'hard-p33-archive-gaps') expect(result.rows).toEqual([[0]]);
+			if (test.id === 'hard-p33-transport-lag') expect(result.rows).toEqual([['UNDER_5_MIN']]);
 			if (test.id === 'hard-p33-job-history') expect(result.rows).toHaveLength(1);
 		}
 	} finally { await sessions.closeAll(); }

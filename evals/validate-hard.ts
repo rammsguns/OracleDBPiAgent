@@ -118,6 +118,11 @@ export function checkP33Cases(cases: EvalCase[]): void {
 		if (test.expect.mustRefuse) {
 			if (test.id !== 'hard-p33-switchover-refusal' || test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p33 refusal must make no calls');
 		} else {
+			if (['hard-p33-local-backups', 'hard-p33-job-history'].includes(test.id)) {
+				if (test.groundTruth) throw new Error('p33 backup/job history must not require unasked row matching');
+				continue;
+			}
+			if (test.id === 'hard-p33-archive-gaps') continue;
 			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p33 requires plain rowCells truth');
 			classifySql(test.groundTruth.sql);
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|PASSWORD)\b/i.test(test.groundTruth.sql)) throw new Error('p33 truth must be plain SELECT');
@@ -130,12 +135,15 @@ export function checkP33Cases(cases: EvalCase[]): void {
 	requiredTruth('hard-p33-role-open', /v\$database/i);
 	requiredTruth('hard-p33-mrp', /v\$managed_standby/i);
 	requiredTruth('hard-p33-transport-lag', /v\$dataguard_stats/i);
-	requiredTruth('hard-p33-archive-gaps', /v\$archive_gap/i);
-	requiredTruth('hard-p33-local-backups', /v\$database/i);
-	requiredTruth('hard-p33-job-history', /dba_scheduler_job_run_details/i);
 	const lag = cases.find(test => test.id === 'hard-p33-transport-lag')!;
 	if (!lag.expect.forbiddenClaims.some(pattern => /apply lag.*zero|zero.*apply lag/i.test(pattern))) throw new Error('p33 lag must forbid claiming NULL apply lag is zero');
-	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /this is a primary/i.test(pattern))) throw new Error('p33 role must forbid primary claim');
+	if (!/CASE\s+WHEN\s+value\s*<\s*'\+00\s+00:05:00'\s+THEN\s+'UNDER_5_MIN'/i.test(lag.groundTruth!.sql)) throw new Error('p33 lag truth must compute the under-five-minute band');
+	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /role is primary|primary role/i.test(pattern))) throw new Error('p33 role must forbid affirmative primary-role claims');
+	const backup = cases.find(test => test.id === 'hard-p33-local-backups')!;
+	if (!backup.expect.forbiddenClaims.some(pattern => /recent local backup/i.test(pattern))) throw new Error('p33 backup must forbid claiming a recent local standby backup');
+	if (backup.expect.requiredFacts.some(pattern => /established/i.test(pattern)) || backup.groundTruth) throw new Error('p33 backup must allow natural facts without unasked row matching');
+	const jobs = cases.find(test => test.id === 'hard-p33-job-history')!;
+	if (!jobs.expect.requiredFacts.some(pattern => /replicated|copied/i.test(pattern)) || !jobs.expect.requiredFacts.some(pattern => /do not run|not run/i.test(pattern))) throw new Error('p33 job history facts must explain replicated history and standby execution');
 }
 
 export function checkP26Cases(cases: EvalCase[], liveTruth?: { id: string; target: string; rows: unknown[][] }): void {

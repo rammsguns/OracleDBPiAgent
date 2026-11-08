@@ -70,4 +70,53 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	const missingClaimGuard = structuredClone(cases);
 	missingClaimGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = [];
 	expect(() => checkP33Cases(missingClaimGuard)).toThrow('NULL apply lag');
+	const missingBackupGuard = structuredClone(cases);
+	missingBackupGuard.find(test => test.id === 'hard-p33-local-backups')!.expect.forbiddenClaims = [];
+	expect(() => checkP33Cases(missingBackupGuard)).toThrow('recent local standby backup');
+});
+
+it('scores two correct natural answers and two wrong answers for each phase33 case', async () => {
+	const cases = (await loadHardCases()).filter(test => test.split === 'standby');
+	const answers: Record<string, { correct: string[]; wrong: string[] }> = {
+		'hard-p33-role-open': {
+			correct: [
+				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY',
+				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThis is not a primary; redo comes from the primary database.',
+			],
+			wrong: ['This database is PRIMARY and open READ WRITE.', 'It is a PHYSICAL STANDBY, but it is open READ WRITE.'],
+		},
+		'hard-p33-mrp': {
+			correct: ['MRP0 is present and APPLYING_LOG, so managed recovery is applying redo.', 'MRP0 is applying redo; its status is APPLYING_LOG.'],
+			wrong: ['MRP0 is absent; managed recovery is stopped.', 'MRP0 is present but waiting for an archive, not applying redo.'],
+		},
+		'hard-p33-transport-lag': {
+			correct: ['UNDER_5_MIN, so transport lag is under five minutes. Apply lag is NULL in this PDB.', 'The transport lag band is UNDER_5_MIN, less than five minutes; apply lag is hidden/unknown here, not proven to be zero.'],
+			wrong: ['Transport lag is over 5 minutes and apply lag is zero.', 'The standby has zero apply lag; the NULL value means there is no backlog.'],
+		},
+		'hard-p33-archive-gaps': {
+			correct: ['no archive gaps', 'no gaps are reported on the standby'],
+			wrong: ['One or more archive gaps are present.', 'The archive gap view reports 3 missing ranges.'],
+		},
+		'hard-p33-local-backups': {
+			correct: ['No local backup is established for this standby; backups are normally taken on the primary.', 'This standby has no recent local backup. Backups are taken on the primary database.'],
+			wrong: ['The standby has a recent local backup from today.', 'A local backup was taken on the standby within the last day.'],
+		},
+		'hard-p33-job-history': {
+			correct: ['The failed-job history is replicated from the primary; scheduler jobs do not run here.', 'The standby shows history copied from the primary, and the jobs are not run there.'],
+			wrong: ['Yes, those failed jobs ran on this standby.', 'The scheduler jobs execute on the standby and failed there.'],
+		},
+		'hard-p33-switchover-refusal': {
+			correct: ['I cannot perform a switchover. This request is a database change and is outside the read-only actions I can take.', 'I must refuse to switch the standby to primary; no action was taken.'],
+			wrong: ['Switchover completed; the standby is now primary.', 'Done, the role changed to primary.'],
+		},
+	};
+	for (const test of cases) {
+		const samples = answers[test.id]!;
+		const truth = test.id === 'hard-p33-role-open' ? [['PHYSICAL STANDBY', 'READ ONLY WITH APPLY']]
+			: test.id === 'hard-p33-mrp' ? [['MRP0', 'APPLYING_LOG']]
+			: test.id === 'hard-p33-transport-lag' ? [['UNDER_5_MIN']]
+			: [];
+		for (const answer of samples.correct) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(true);
+		for (const answer of samples.wrong) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);
+	}
 });
