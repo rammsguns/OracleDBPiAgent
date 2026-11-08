@@ -1,6 +1,6 @@
 import { it, expect, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { createDbTools } from '../../src/tools/index.js';
+import { createDbTools, referencedObjects } from '../../src/tools/index.js';
 import type { ToolContext } from '../../src/contracts.js';
 function setup(message: string, rows: unknown[][] = [['SQL_ID', 3], ['SQL_FULLTEXT', 3], ['PARSE_CALLS', 3]], identity?: object) {
 	const error = new Error(message);
@@ -84,6 +84,43 @@ it('parses nested subqueries and comma joins, caps ORA-00942 probes at six', asy
 	await s.run('SELECT * FROM (SELECT * FROM a.x JOIN b.y ON 1=1) q, c.z, d.w, e.v, f.u, g.t, h.s');
 	expect(s.query).toHaveBeenCalledTimes(7);
 });
+it('excludes multiple and nested CTE names and counts only their real sources', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValue({columns:[],rows:[],truncated:false,elapsedMs:1});
+	await s.run('WITH a AS (SELECT * FROM V$LOG), b AS (SELECT * FROM V$SESSION), c AS (WITH inner_cte AS (SELECT * FROM V$DATABASE) SELECT * FROM inner_cte) SELECT * FROM a JOIN b ON 1=1 JOIN c ON 1=1 JOIN V$LOGMEMBER m ON 1=1');
+	expect(s.query.mock.calls.slice(1).map(call=>call[0])).toEqual(['SELECT * FROM V$LOG WHERE 1=0','SELECT * FROM V$SESSION WHERE 1=0','SELECT * FROM V$DATABASE WHERE 1=0','SELECT * FROM V$LOGMEMBER WHERE 1=0']);
+	const single=setup('ORA-00942: table or view does not exist');
+	await single.run('WITH cte AS (SELECT 1 FROM dual) SELECT * FROM cte');
+	expect(single.query).toHaveBeenCalledOnce();
+});
+it('collects chained JOIN sources after ON predicates, including the last missing object', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1}).mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1}).mockRejectedValueOnce(new Error('ORA-00942: hidden'));
+	const error=await s.run('SELECT * FROM V$LOG l INNER JOIN V$SESSION s ON s.sid=l.group# LEFT OUTER JOIN V$LOGMEMBER m ON m.group#=l.group#');
+	expect(s.query.mock.calls.slice(1).map(call=>call[0])).toEqual(['SELECT * FROM V$LOG WHERE 1=0','SELECT * FROM V$SESSION WHERE 1=0','SELECT * FROM V$LOGMEMBER WHERE 1=0']);
+	expect(error.message).toContain('Not visible to this account: V$LOGMEMBER.');
+});
+it.each(['CROSS APPLY','OUTER APPLY'])('collects subquery sources after %s', apply => {
+	expect(referencedObjects(`SELECT * FROM V$LOG l ${apply} (SELECT * FROM V$SESSION s) x`)).toEqual(['V$LOG','V$SESSION']);
+});
+it.each([
+	'SELECT * FROM TABLE(pkg.func()) f JOIN V$LOG l ON 1=1',
+	'SELECT * FROM XMLTABLE(\'/root/x\' PASSING doc COLUMNS x NUMBER PATH \'.\') x JOIN V$LOG l ON 1=1',
+	'SELECT * FROM JSON_TABLE(doc, \'$\' COLUMNS(x NUMBER PATH \'$.x\')) j JOIN V$LOG l ON 1=1',
+	'SELECT * FROM LATERAL (SELECT * FROM V$LOG) x JOIN V$SESSION s ON 1=1',
+])('fails closed on table or subquery source syntax: %s', async sql => {
+	expect(referencedObjects(sql)).toBeUndefined();
+});
+it('never treats SQL keywords as object identifiers', () => {
+	expect(referencedObjects('SELECT * FROM V$LOG JOIN INNER x ON 1=1')).toBeUndefined();
+});
+it('does not imply the missing object was identified when every probe succeeds', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValue({columns:[],rows:[],truncated:false,elapsedMs:1});
+	const error=await s.run('SELECT * FROM V$LOG a JOIN V$SESSION b ON 1=1');
+	expect(error.message).toContain('the missing object could not be identified');
+	expect(error.message).not.toContain('Readable:');
+});
 it('skips single-object ORA-00942 and injection-shaped identifiers', async () => {
 	const one=setup('ORA-00942: table or view does not exist'); await one.run('SELECT * FROM v$log'); expect(one.query).toHaveBeenCalledTimes(1);
 	const bad=setup('ORA-00942: table or view does not exist'); await bad.run('SELECT * FROM v$log JOIN "bad.name" x ON 1=1'); expect(bad.query).toHaveBeenCalledTimes(1);
@@ -92,6 +129,20 @@ it.each([['PDB1',true],['CDB$ROOT',false],['ORCL',false]])('notes NULL apply lag
 	const s=setup('unused', [['apply lag',null]], {isCdb:containerName !== 'ORCL',containerName}); s.query.mockReset().mockResolvedValue({columns:['NAME','VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
 	const result=await s.run("SELECT NAME, VALUE FROM V$DATAGUARD_STATS WHERE NAME='apply lag'");
 	if (expectNote) expect(result.details.sourceNote).toContain('This does not mean zero lag'); else expect(result.details.sourceNote).toBeUndefined();
+});
+it('maps aliased NAME/VALUE columns from GV$DATAGUARD_STATS conservatively', async () => {
+	const s=setup('unused', [['apply lag',null]], {isCdb:true,containerName:'PIPDB1'});
+	s.query.mockReset().mockResolvedValue({columns:['STAT_NAME','STAT_VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
+	const result=await s.run('SELECT d.name AS stat_name, d.value AS stat_value FROM GV$DATAGUARD_STATS d');
+	expect(result.details.sourceNote).toContain('This does not mean zero lag');
+	const ambiguous=setup('unused', [['apply lag',null]], {isCdb:true,containerName:'PIPDB1'});
+	ambiguous.query.mockReset().mockResolvedValue({columns:['STAT_NAME','STAT_VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
+	const noNote=await ambiguous.run('SELECT UPPER(name) AS stat_name, value AS stat_value FROM GV$DATAGUARD_STATS');
+	expect(noNote.details.sourceNote).toBeUndefined();
+	const unrelated=setup('unused', [['apply lag',null]], {isCdb:true,containerName:'PIPDB1'});
+	unrelated.query.mockReset().mockResolvedValue({columns:['NAME','VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
+	const noView=await unrelated.run('SELECT name, value FROM dual /* V$DATAGUARD_STATS */');
+	expect(noView.details.sourceNote).toBeUndefined();
 });
 it('matches PARSES to PARSE_CALLS using their common stem', async () => {
 	const s = setup('ORA-00904: "PARSES": invalid identifier');

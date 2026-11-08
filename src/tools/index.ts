@@ -392,35 +392,110 @@ function closeColumns(columns: string[], candidates: string[]): string[] {
 }
 
 const strictObjectPart = /^(?:[A-Za-z_][A-Za-z0-9_$#]*|"[A-Za-z_][A-Za-z0-9_$#]*")$/;
-function referencedObjects(sql: string): string[] {
-	const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}_$#]*|[^\s]/gu)].map(m => m[0]);
-	const code = tokens.filter(t => !t.startsWith('--') && !t.startsWith('/*') && !t.startsWith("'"));
-	const found: string[] = [];
-	const boundaries = new Set(['WHERE','GROUP','ORDER','CONNECT','START','HAVING','UNION','MINUS','INTERSECT','FETCH','MODEL','PIVOT','SET','ON']);
-	let fromDepths = new Set<number>(), depth = 0, expectTable = false;
-	for (let i=0;i<code.length;i++) {
-		const token=code[i]!; const upper=token.toUpperCase();
-		if (token === '(') { if (expectTable) expectTable=false; depth++; continue; }
-		if (token === ')') { fromDepths.delete(depth); depth=Math.max(0,depth-1); expectTable=false; continue; }
-		if (upper === 'FROM') { fromDepths.add(depth); expectTable=true; continue; }
-		if (upper === 'JOIN' && fromDepths.has(depth)) { expectTable=true; continue; }
-		if (boundaries.has(upper)) { fromDepths.delete(depth); expectTable=false; continue; }
-		if (token === ',' && fromDepths.has(depth)) { expectTable=true; continue; }
-		if (!expectTable) continue;
-		expectTable=false;
-		if (!strictObjectPart.test(token)) continue;
-		let parts=[token];
-		while (code[i+1] === '.' && strictObjectPart.test(code[i+2] ?? '')) { parts.push(code[i+2]!); i+=2; }
-		const object=parts.map(part=>part.startsWith('"')?part:part.toUpperCase()).join('.');
-		if (parts.length <= 2 && /^[A-Za-z_$#"]/.test(object)) found.push(object);
+function sqlTokens(sql: string): string[] {
+	return [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}_$#]*|[^\s]/gu)]
+		.map(m => m[0]).filter(token => !token.startsWith('--') && !token.startsWith('/*') && !token.startsWith("'"));
+}
+
+function identifierValue(token: string): string {
+	return token.startsWith('"') ? token.slice(1, -1).replaceAll('""', '"') : token.toUpperCase();
+}
+
+function collectCteNames(tokens: string[]): Set<string> | undefined {
+	const names = new Set<string>();
+	const matchingClose = (open: number): number => {
+		let depth=0;
+		for (let i=open;i<tokens.length;i++) {
+			if (tokens[i] === '(') depth++;
+			else if (tokens[i] === ')' && --depth === 0) return i;
+		}
+		return -1;
+	};
+	for (let i=0;i<tokens.length;i++) {
+		if (tokens[i]!.toUpperCase() !== 'WITH' || (tokens[i-1] !== undefined && !['(', ';'].includes(tokens[i-1]!))) continue;
+		let cursor=i+1;
+		if (tokens[cursor]?.toUpperCase() === 'RECURSIVE') cursor++;
+		for (;;) {
+			const name=tokens[cursor];
+			if (!name || !strictObjectPart.test(name)) return;
+			names.add(identifierValue(name)); cursor++;
+			if (tokens[cursor] === '(') { const close=matchingClose(cursor); if (close<0) return; cursor=close+1; }
+			if (tokens[cursor]?.toUpperCase() !== 'AS') return;
+			cursor++;
+			if (tokens[cursor]?.toUpperCase() === 'MATERIALIZED' || tokens[cursor]?.toUpperCase() === 'NOT') return;
+			if (tokens[cursor] !== '(') return;
+			const close=matchingClose(cursor); if (close<0) return; cursor=close+1;
+			if (tokens[cursor] !== ',') break;
+			cursor++;
+		}
+	}
+	return names;
+}
+
+/** Returns undefined whenever a source construct cannot be classified safely. */
+export function referencedObjects(sql: string): string[] | undefined {
+	const tokens=sqlTokens(sql), ctes=collectCteNames(tokens);
+	if (!ctes) return;
+	const found: string[]=[];
+	const endsFrom = new Set(['WHERE','GROUP','ORDER','CONNECT','START','HAVING','UNION','MINUS','INTERSECT','FETCH','MODEL','PIVOT','QUALIFY']);
+	const sourceKeywords = new Set(`SELECT WITH RECURSIVE AS ON USING JOIN INNER LEFT RIGHT FULL OUTER CROSS NATURAL APPLY LATERAL TABLE XMLTABLE JSON_TABLE WHERE GROUP ORDER CONNECT START HAVING UNION MINUS INTERSECT FETCH ALL ANY BETWEEN BY CASE CUBE DISTINCT ELSE END EXISTS FIRST FOLLOWING FOR GROUPING IN INTERVAL IS LIKE LOCK MATCH_RECOGNIZE NEXT NO NULL NULLS OF OFFSET OR OVER PARTITION PIVOT PRECEDING RANGE ROW ROWS SIBLINGS SOME SUBPARTITION THEN TO UNBOUNDED UNIQUE UNPIVOT WHEN WITHIN ONLY SAMPLE THE ACCESS ADD ALTER AUDIT CHAR CHECK CLUSTER COLUMN COMMENT COMPRESS CREATE CURRENT DATE DECIMAL DEFAULT DELETE DESC DROP EXCLUSIVE FILE FLOAT GRANT IDENTIFIED IMMEDIATE INCREMENT INDEX INITIAL INSERT INTEGER INTO LEVEL LONG MAXEXTENTS MLSLABEL MODIFY NOWAIT NUMBER OFFLINE ONLINE OPTION PCTFREE PRIOR PRIVILEGES PUBLIC RAW RENAME RESOURCE REVOKE ROWID ROWNUM SESSION SHARE SIZE SMALLINT SUCCESSFUL SYNONYM SYSDATE TRIGGER UID UPDATE USER VALIDATE VALUES VARCHAR VARCHAR2 VIEW WHENEVER`.split(/\s+/));
+	const fromDepths=new Set<number>(); let depth=0, expectSource=false;
+	for (let i=0;i<tokens.length;i++) {
+		const token=tokens[i]!, upper=token.toUpperCase();
+		if (token==='(') { if(expectSource && !['SELECT','WITH'].includes(tokens[i+1]?.toUpperCase()??'')) return; if(expectSource) expectSource=false; depth++; continue; }
+		if (token===')') { fromDepths.delete(depth); depth=Math.max(0,depth-1); expectSource=false; continue; }
+		if (upper==='FROM') { fromDepths.add(depth); expectSource=true; continue; }
+		if (upper==='JOIN' && fromDepths.has(depth)) { expectSource=true; continue; }
+		if (upper==='APPLY' && fromDepths.has(depth)) { expectSource=true; continue; }
+		if (endsFrom.has(upper)) { fromDepths.delete(depth); expectSource=false; continue; }
+		if (token===',' && fromDepths.has(depth)) { expectSource=true; continue; }
+		if (!expectSource) continue;
+		expectSource=false;
+		if (upper==='LATERAL') return;
+		if (!strictObjectPart.test(token)) return;
+		if (sourceKeywords.has(upper)) return;
+		let parts=[token], end=i;
+		while(tokens[end+1]==='.' && strictObjectPart.test(tokens[end+2]??'')) { parts.push(tokens[end+2]!); end+=2; }
+		const next=tokens[end+1];
+		if (next==='@' || next==='(') return;
+		if(parts.length>2) return;
+		const object=parts.map(identifierValue).join('.');
+		if(!ctes.has(identifierValue(parts.at(-1)!))) found.push(object);
+		i=end;
 	}
 	return [...new Set(found)];
 }
 
+function selectedColumnIndexes(sql: string, result: QueryResult): {name:number;value:number} | undefined {
+	const tokens=sqlTokens(sql); let depth=0; const selectPositions:number[]=[], fromPositions:number[]=[];
+	for(let i=0;i<tokens.length;i++) { const upper=tokens[i]!.toUpperCase(); if(tokens[i]==='(')depth++; else if(tokens[i]===')')depth--; else if(depth===0&&upper==='SELECT')selectPositions.push(i); else if(depth===0&&upper==='FROM')fromPositions.push(i); }
+	if(selectPositions.length!==1||fromPositions.length!==1||fromPositions[0]!<=selectPositions[0]!)return;
+	const projections:string[][]=[];let item:string[]=[],level=0;
+	for(const token of tokens.slice(selectPositions[0]!+1,fromPositions[0]!)) { if(token==='(')level++; else if(token===')')level--; if(token===','&&level===0){projections.push(item);item=[];}else item.push(token); }
+	projections.push(item);
+	const indexes:{name:number;value:number}={name:-1,value:-1};
+	for(let i=0;i<projections.length;i++) {
+		const p=projections[i]!, aliasAt=p.findIndex(t=>t.toUpperCase()==='AS');
+		let source:string[], alias:string|undefined;
+		if(aliasAt>=0) { if(aliasAt!==1&&aliasAt!==3)return; source=p.slice(0,aliasAt); if(p.length!==aliasAt+2)return; alias=p.at(-1); }
+		else if(p.length===1||p.length===3&&p[1]==='.') source=p;
+		else if(p.length===2&&strictObjectPart.test(p[0]!)&&strictObjectPart.test(p[1]!)) { source=[p[0]!]; alias=p[1]; }
+		else if(p.length===4&&p[1]==='.'&&strictObjectPart.test(p[0]!)&&strictObjectPart.test(p[2]!)&&strictObjectPart.test(p[3]!)) { source=p.slice(0,3); alias=p[3]; }
+		else return;
+		const column=source.at(-1)!;
+		if(!strictObjectPart.test(column)||source.length!==1&&!(source.length===3&&strictObjectPart.test(source[0]!)&&source[1]==='.'))return;
+		const semantic=identifierValue(column).toUpperCase(), output=alias?identifierValue(alias):semantic;
+		if(result.columns[i]!==output&&result.columns[i]!==output.toUpperCase())return;
+		if(semantic==='NAME')indexes.name=i; if(semantic==='VALUE')indexes.value=i;
+	}
+	return indexes.name>=0&&indexes.value>=0?indexes:undefined;
+}
+
 function isNullApplyLag(sql: string, result: QueryResult): boolean {
-	if (!/\bV\$DATAGUARD_STATS\b/i.test(sql)) return false;
-	const name=result.columns.findIndex(c=>c.toUpperCase()==='NAME'), value=result.columns.findIndex(c=>c.toUpperCase()==='VALUE');
-	return name>=0 && value>=0 && result.rows.some(row=>['apply lag','apply finish time'].includes(String(row[name]).toLowerCase()) && row[value] == null);
+	const objects=referencedObjects(sql);
+	if (!objects?.some(object=>/^(?:G?V\$DATAGUARD_STATS)$/i.test(object.split('.').at(-1)!))) return false;
+	const indexes=selectedColumnIndexes(sql,result); if(!indexes)return false;
+	return result.rows.some(row=>['apply lag','apply finish time'].includes(String(row[indexes.name]).toLowerCase()) && row[indexes.value] == null);
 }
 
 async function queryErrorHint(error: unknown, sql: string, session: OracleSession, ctx: ToolContext): Promise<unknown> {
@@ -443,17 +518,22 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 				throw failure;
 			}
 		};
+		const oraObjects = error.message.startsWith("ORA-00942:") ? referencedObjects(sql) : undefined;
 		if (error.message.startsWith("ORA-00935:")) hint = "Hint: aggregates cannot nest in one SELECT level; aggregate in a subquery, then aggregate its result.";
-		else if (error.message.startsWith("ORA-00942:") && referencedObjects(sql).length > 1) {
-			const objects = referencedObjects(sql);
+		else if (error.message.startsWith("ORA-00942:") && oraObjects && oraObjects.length > 1) {
+			const objects = oraObjects;
 			const readable: string[] = [], hidden: string[] = [];
+			let unknownFailures=0;
 			for (const object of objects.slice(0, 6)) {
 				try { await lookup(`SELECT * FROM ${object} WHERE 1=0`, {}, ctx.config.limits.statementTimeoutSeconds); readable.push(object); }
-				catch (failure) { if (/ORA-(00942|01031)/.test(String(failure))) hidden.push(object); }
+				catch (failure) { if (/ORA-(00942|01031)/.test(String(failure))) hidden.push(object); else unknownFailures++; }
 			}
 			const sections = [];
-			if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
-			if (hidden.length) sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+			if (hidden.length) {
+				if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
+				sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+			} else sections.push(unknownFailures ? "No ungranted object was confirmed; the missing object could not be identified." : "All probed objects were readable; the missing object could not be identified.");
+			if (unknownFailures) sections.push(`${unknownFailures} probe(s) failed for another reason; visibility is unknown.`);
 			if (objects.length > 6) sections.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);
 			if (sections.length) hint = `Source: ${sections.join(" ")}`;
 		}
@@ -462,7 +542,7 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 			const parts: string[] = [];
 			for (const view of views) {
 				if (error.message.startsWith("ORA-00942:")) {
-					if (!view.startsWith("DBA_")) continue;
+					if (oraObjects?.length !== 1 || oraObjects[0] !== view || !view.startsWith("DBA_")) continue;
 					const alternative = view.replace(/^DBA_/, "ALL_");
 					const result = await lookup("SELECT column_name FROM all_tab_columns WHERE owner=:owner AND table_name=:name AND ROWNUM=1", { owner: "SYS", name: alternative });
 					parts.push(`${view} is not granted; ${alternative} is ${result.rows.length ? "available (shows only objects this login can see)" : "not visible to this login"}.`);
