@@ -44,14 +44,41 @@ it('attributes the readable V$LOG and hidden V$LOGMEMBER view on d1-19c-lab', as
 	} finally { await provider.closeAll(); }
 },30000);
 
-it('notes Oracle-hidden NULL apply lag from V$DATAGUARD_STATS on c1s-19c-stby', async context => {
+it('fails closed on d1 when a CTE name matches a schema-qualified table', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const config=liveConfig('d1-19c-lab'), provider=createSessionProvider(config), events:unknown[]=[];
+	try {
+		const verify=await provider.get('d1-19c-lab');
+		await verify.query('SELECT * FROM HR.EMPLOYEES WHERE 1=0');
+		await verify.close();
+		const tool=createDbTools({config,sessions:provider,audit:{record:async event=>{events.push(event);}},runId:'wp33a-d1-cte'}).find(t=>t.name==='run_query')!;
+		for (const sql of [
+			'WITH employees AS (SELECT 1 AS id FROM DUAL) SELECT * FROM HR.EMPLOYEES e JOIN V$LOGMEMBER m ON 1=1',
+			'WITH helper AS (SELECT 1 AS id FROM DUAL) SELECT * FROM helper h JOIN V$LOG l ON 1=1 JOIN V$LOGMEMBER m ON 1=1',
+		]) {
+			events.length=0;
+			const error=await tool.execute('live',{sql}).then(()=>{throw new Error('Expected ORA-00942');},e=>e as Error);
+			expect(error.message).toMatch(/^ORA-00942:/);
+			expect(error.message).not.toContain('Source:');
+			expect(events).toHaveLength(1);
+		}
+	} catch (e) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('d1 Oracle listener unavailable'); return; }
+		throw e;
+	} finally { await provider.closeAll(); }
+},30000);
+
+it('notes Oracle-hidden NULL apply lag from wildcard V$DATAGUARD_STATS on c1s-19c-stby', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
 	const config=liveConfig('c1s-19c-stby'), provider=createSessionProvider(config);
 	try {
 		const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'wp33a-c1s'}).find(t=>t.name==='run_query')!;
-		const result=await tool.execute('live',{sql:"SELECT NAME, VALUE FROM V$DATAGUARD_STATS WHERE NAME IN ('apply lag', 'apply finish time')"});
-		const rows=(result.details as {rows:unknown[][]}).rows;
-		if (rows.some(row=>row[1]===null)) expect(result.details.sourceNote).toContain('This does not mean zero lag');
+		const result=await tool.execute('live',{sql:"SELECT * FROM V$DATAGUARD_STATS WHERE NAME IN ('apply lag', 'apply finish time')"});
+		const details=result.details as {columns:string[];rows:unknown[][]};
+		const name=details.columns.findIndex(column=>column.toUpperCase()==='NAME'), value=details.columns.findIndex(column=>column.toUpperCase()==='VALUE');
+		const apply=details.rows.find(row=>String(row[name]).toLowerCase()==='apply lag');
+		expect(apply).toBeDefined(); expect(apply?.[value]).toBeNull();
+		expect(result.details.sourceNote).toContain('This does not mean zero lag');
 	} catch (e) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('c1s Oracle listener unavailable'); return; }
 		throw e;

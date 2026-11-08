@@ -391,7 +391,7 @@ function closeColumns(columns: string[], candidates: string[]): string[] {
 	}).filter(match => Number.isFinite(match.rank)).sort((a, b) => a.rank - b.rank || a.index - b.index).slice(0, 3).map(match => match.column);
 }
 
-const strictObjectPart = /^(?:[A-Za-z_][A-Za-z0-9_$#]*|"[A-Za-z_][A-Za-z0-9_$#]*")$/;
+const strictObjectPart = /^(?:[A-Za-z_][A-Za-z0-9_$#]*|"[A-Za-z_](?:[A-Za-z0-9_$#]|"")*")$/;
 function sqlTokens(sql: string): string[] {
 	return [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}_$#]*|[^\s]/gu)]
 		.map(m => m[0]).filter(token => !token.startsWith('--') && !token.startsWith('/*') && !token.startsWith("'"));
@@ -401,41 +401,12 @@ function identifierValue(token: string): string {
 	return token.startsWith('"') ? token.slice(1, -1).replaceAll('""', '"') : token.toUpperCase();
 }
 
-function collectCteNames(tokens: string[]): Set<string> | undefined {
-	const names = new Set<string>();
-	const matchingClose = (open: number): number => {
-		let depth=0;
-		for (let i=open;i<tokens.length;i++) {
-			if (tokens[i] === '(') depth++;
-			else if (tokens[i] === ')' && --depth === 0) return i;
-		}
-		return -1;
-	};
-	for (let i=0;i<tokens.length;i++) {
-		if (tokens[i]!.toUpperCase() !== 'WITH' || (tokens[i-1] !== undefined && !['(', ';'].includes(tokens[i-1]!))) continue;
-		let cursor=i+1;
-		if (tokens[cursor]?.toUpperCase() === 'RECURSIVE') cursor++;
-		for (;;) {
-			const name=tokens[cursor];
-			if (!name || !strictObjectPart.test(name)) return;
-			names.add(identifierValue(name)); cursor++;
-			if (tokens[cursor] === '(') { const close=matchingClose(cursor); if (close<0) return; cursor=close+1; }
-			if (tokens[cursor]?.toUpperCase() !== 'AS') return;
-			cursor++;
-			if (tokens[cursor]?.toUpperCase() === 'MATERIALIZED' || tokens[cursor]?.toUpperCase() === 'NOT') return;
-			if (tokens[cursor] !== '(') return;
-			const close=matchingClose(cursor); if (close<0) return; cursor=close+1;
-			if (tokens[cursor] !== ',') break;
-			cursor++;
-		}
-	}
-	return names;
-}
-
 /** Returns undefined whenever a source construct cannot be classified safely. */
 export function referencedObjects(sql: string): string[] | undefined {
-	const tokens=sqlTokens(sql), ctes=collectCteNames(tokens);
-	if (!ctes) return;
+	const tokens=sqlTokens(sql);
+	// CTE bodies and scopes need full query-block resolution. Decline attribution
+	// for every WITH statement rather than probing a CTE alias or missing a real source.
+	if(tokens.some(token=>token.toUpperCase()==='WITH')) return;
 	const found: string[]=[];
 	const endsFrom = new Set(['WHERE','GROUP','ORDER','CONNECT','START','HAVING','UNION','MINUS','INTERSECT','FETCH','MODEL','PIVOT','QUALIFY']);
 	const sourceKeywords = new Set(`SELECT WITH RECURSIVE AS ON USING JOIN INNER LEFT RIGHT FULL OUTER CROSS NATURAL APPLY LATERAL TABLE XMLTABLE JSON_TABLE WHERE GROUP ORDER CONNECT START HAVING UNION MINUS INTERSECT FETCH ALL ANY BETWEEN BY CASE CUBE DISTINCT ELSE END EXISTS FIRST FOLLOWING FOR GROUPING IN INTERVAL IS LIKE LOCK MATCH_RECOGNIZE NEXT NO NULL NULLS OF OFFSET OR OVER PARTITION PIVOT PRECEDING RANGE ROW ROWS SIBLINGS SOME SUBPARTITION THEN TO UNBOUNDED UNIQUE UNPIVOT WHEN WITHIN ONLY SAMPLE THE ACCESS ADD ALTER AUDIT CHAR CHECK CLUSTER COLUMN COMMENT COMPRESS CREATE CURRENT DATE DECIMAL DEFAULT DELETE DESC DROP EXCLUSIVE FILE FLOAT GRANT IDENTIFIED IMMEDIATE INCREMENT INDEX INITIAL INSERT INTEGER INTO LEVEL LONG MAXEXTENTS MLSLABEL MODIFY NOWAIT NUMBER OFFLINE ONLINE OPTION PCTFREE PRIOR PRIVILEGES PUBLIC RAW RENAME RESOURCE REVOKE ROWID ROWNUM SESSION SHARE SIZE SMALLINT SUCCESSFUL SYNONYM SYSDATE TRIGGER UID UPDATE USER VALIDATE VALUES VARCHAR VARCHAR2 VIEW WHENEVER`.split(/\s+/));
@@ -459,11 +430,16 @@ export function referencedObjects(sql: string): string[] | undefined {
 		const next=tokens[end+1];
 		if (next==='@' || next==='(') return;
 		if(parts.length>2) return;
-		const object=parts.map(identifierValue).join('.');
-		if(!ctes.has(identifierValue(parts.at(-1)!))) found.push(object);
+		const object=parts.map(renderIdentifier).join('.');
+		found.push(object);
 		i=end;
 	}
 	return [...new Set(found)];
+}
+
+function renderIdentifier(token: string): string {
+	if(!token.startsWith('"')) return token;
+	return `"${identifierValue(token).replaceAll('"','""')}"`;
 }
 
 function selectedColumnIndexes(sql: string, result: QueryResult): {name:number;value:number} | undefined {
@@ -491,10 +467,20 @@ function selectedColumnIndexes(sql: string, result: QueryResult): {name:number;v
 	return indexes.name>=0&&indexes.value>=0?indexes:undefined;
 }
 
+function wildcardColumnIndexes(sql: string, result: QueryResult): {name:number;value:number} | undefined {
+	const tokens=sqlTokens(sql); let depth=0, select=-1, from=-1, selects=0, froms=0;
+	for(let i=0;i<tokens.length;i++) { const upper=tokens[i]!.toUpperCase(); if(tokens[i]==='(')depth++; else if(tokens[i]===')')depth--; else if(depth===0&&upper==='SELECT'){select=i;selects++;} else if(depth===0&&upper==='FROM'){from=i;froms++;} }
+	if(selects!==1||froms!==1||from<=select)return;
+	const projection=tokens.slice(select+1,from);
+	if(!(projection.length===1&&projection[0]==='*'||projection.length===3&&strictObjectPart.test(projection[0]!)&&projection[1]==='.'&&projection[2]==='*'))return;
+	const name=result.columns.findIndex(c=>c.toUpperCase()==='NAME'), value=result.columns.findIndex(c=>c.toUpperCase()==='VALUE');
+	return name>=0&&value>=0?{name,value}:undefined;
+}
+
 function isNullApplyLag(sql: string, result: QueryResult): boolean {
 	const objects=referencedObjects(sql);
 	if (!objects?.some(object=>/^(?:G?V\$DATAGUARD_STATS)$/i.test(object.split('.').at(-1)!))) return false;
-	const indexes=selectedColumnIndexes(sql,result); if(!indexes)return false;
+	const indexes=selectedColumnIndexes(sql,result)??wildcardColumnIndexes(sql,result); if(!indexes)return false;
 	return result.rows.some(row=>['apply lag','apply finish time'].includes(String(row[indexes.name]).toLowerCase()) && row[indexes.value] == null);
 }
 
@@ -542,7 +528,8 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 			const parts: string[] = [];
 			for (const view of views) {
 				if (error.message.startsWith("ORA-00942:")) {
-					if (oraObjects?.length !== 1 || oraObjects[0] !== view || !view.startsWith("DBA_")) continue;
+					const parsedView=oraObjects?.length===1 ? oraObjects[0]!.replace(/^SYS\./i, '').toUpperCase() : undefined;
+					if (parsedView !== view || !view.startsWith("DBA_")) continue;
 					const alternative = view.replace(/^DBA_/, "ALL_");
 					const result = await lookup("SELECT column_name FROM all_tab_columns WHERE owner=:owner AND table_name=:name AND ROWNUM=1", { owner: "SYS", name: alternative });
 					parts.push(`${view} is not granted; ${alternative} is ${result.rows.length ? "available (shows only objects this login can see)" : "not visible to this login"}.`);

@@ -72,11 +72,11 @@ it('attributes multi-object ORA-00942 with bounded audited probes', async () => 
 		.mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1})
 		.mockRejectedValueOnce(new Error('ORA-01031: insufficient privileges'));
 	const e=await s.run('SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#');
-	expect(e.message).toContain('Readable: V$LOG. Not visible to this account: V$LOGMEMBER.');
-	expect(s.query.mock.calls.map(call=>call[0])).toEqual(['SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#','SELECT * FROM V$LOG WHERE 1=0','SELECT * FROM V$LOGMEMBER WHERE 1=0']);
+	expect(e.message).toContain('Readable: v$log. Not visible to this account: v$logmember.');
+	expect(s.query.mock.calls.map(call=>call[0])).toEqual(['SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#','SELECT * FROM v$log WHERE 1=0','SELECT * FROM v$logmember WHERE 1=0']);
 	expect(s.query.mock.calls[1]![2]).toEqual({maxRows:100,timeoutSeconds:15});
 	expect(s.record).toHaveBeenCalledTimes(3);
-	expect(s.record.mock.calls[0]![0]).toMatchObject({sqlText:'SELECT * FROM V$LOG WHERE 1=0',sqlSha256:createHash('sha256').update('SELECT * FROM V$LOG WHERE 1=0').digest('hex')});
+	expect(s.record.mock.calls[0]![0]).toMatchObject({sqlText:'SELECT * FROM v$log WHERE 1=0',sqlSha256:createHash('sha256').update('SELECT * FROM v$log WHERE 1=0').digest('hex')});
 });
 it('parses nested subqueries and comma joins, caps ORA-00942 probes at six', async () => {
 	const s=setup('ORA-00942: table or view does not exist');
@@ -84,11 +84,10 @@ it('parses nested subqueries and comma joins, caps ORA-00942 probes at six', asy
 	await s.run('SELECT * FROM (SELECT * FROM a.x JOIN b.y ON 1=1) q, c.z, d.w, e.v, f.u, g.t, h.s');
 	expect(s.query).toHaveBeenCalledTimes(7);
 });
-it('excludes multiple and nested CTE names and counts only their real sources', async () => {
-	const s=setup('ORA-00942: table or view does not exist');
-	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValue({columns:[],rows:[],truncated:false,elapsedMs:1});
-	await s.run('WITH a AS (SELECT * FROM V$LOG), b AS (SELECT * FROM V$SESSION), c AS (WITH inner_cte AS (SELECT * FROM V$DATABASE) SELECT * FROM inner_cte) SELECT * FROM a JOIN b ON 1=1 JOIN c ON 1=1 JOIN V$LOGMEMBER m ON 1=1');
-	expect(s.query.mock.calls.slice(1).map(call=>call[0])).toEqual(['SELECT * FROM V$LOG WHERE 1=0','SELECT * FROM V$SESSION WHERE 1=0','SELECT * FROM V$DATABASE WHERE 1=0','SELECT * FROM V$LOGMEMBER WHERE 1=0']);
+it('fails closed on CTE scope, including schema-qualified names matching CTEs', async () => {
+	const sql='WITH employees AS (SELECT * FROM dual), other AS (WITH nested AS (SELECT 1 FROM V$DATABASE) SELECT * FROM nested) SELECT * FROM HR.EMPLOYEES e JOIN V$LOGMEMBER m ON 1=1';
+	expect(referencedObjects(sql)).toBeUndefined();
+	const s=setup('ORA-00942: table or view does not exist'); await s.run(sql); expect(s.query).toHaveBeenCalledOnce();
 	const single=setup('ORA-00942: table or view does not exist');
 	await single.run('WITH cte AS (SELECT 1 FROM dual) SELECT * FROM cte');
 	expect(single.query).toHaveBeenCalledOnce();
@@ -121,6 +120,13 @@ it('does not imply the missing object was identified when every probe succeeds',
 	expect(error.message).toContain('the missing object could not be identified');
 	expect(error.message).not.toContain('Readable:');
 });
+it('probes and reports quoted schema and object identifiers without changing case or escaping', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1}).mockRejectedValueOnce(new Error('ORA-00942: hidden'));
+	const error=await s.run('SELECT * FROM "MySchema"."my""table" x JOIN V$LOG l ON 1=1');
+	expect(s.query.mock.calls.slice(1).map(call=>call[0])).toEqual(['SELECT * FROM "MySchema"."my""table" WHERE 1=0','SELECT * FROM V$LOG WHERE 1=0']);
+	expect(error.message).toContain('Readable: "MySchema"."my""table".');
+});
 it('skips single-object ORA-00942 and injection-shaped identifiers', async () => {
 	const one=setup('ORA-00942: table or view does not exist'); await one.run('SELECT * FROM v$log'); expect(one.query).toHaveBeenCalledTimes(1);
 	const bad=setup('ORA-00942: table or view does not exist'); await bad.run('SELECT * FROM v$log JOIN "bad.name" x ON 1=1'); expect(bad.query).toHaveBeenCalledTimes(1);
@@ -143,6 +149,12 @@ it('maps aliased NAME/VALUE columns from GV$DATAGUARD_STATS conservatively', asy
 	unrelated.query.mockReset().mockResolvedValue({columns:['NAME','VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
 	const noView=await unrelated.run('SELECT name, value FROM dual /* V$DATAGUARD_STATS */');
 	expect(noView.details.sourceNote).toBeUndefined();
+});
+it('uses result NAME/VALUE columns for wildcard Data Guard stats queries', async () => {
+	const s=setup('unused', [['apply lag',null]], {isCdb:true,containerName:'PIPDB1'});
+	s.query.mockReset().mockResolvedValue({columns:['NAME','VALUE','TIME_COMPUTED'],rows:[['apply lag',null,'now']],truncated:false,elapsedMs:1});
+	const result=await s.run("SELECT * FROM GV$DATAGUARD_STATS WHERE NAME='apply lag'");
+	expect(result.details.sourceNote).toContain('This does not mean zero lag');
 });
 it('matches PARSES to PARSE_CALLS using their common stem', async () => {
 	const s = setup('ORA-00904: "PARSES": invalid identifier');
