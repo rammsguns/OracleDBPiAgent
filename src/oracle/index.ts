@@ -1,4 +1,4 @@
-import { registerTopSnapshot, TOP_SQL } from '../top/snapshot.js';
+import { registerTopSnapshot, isTopSnapshot } from '../top/snapshot.js';
 import { oracleAction } from './observability.js';
 import { recordConnectionFailure, PasswordFileError } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
@@ -86,9 +86,10 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				};
 				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
 				await connection.rollback();
-				async function query(sql: string, binds = {}, options: QueryOptions = {}, rowCeiling = config.limits.maxRows): Promise<QueryResult> {
+				async function query(sql: string, binds = {}, options: QueryOptions = {}): Promise<QueryResult> {
 					const statement = classifySql(sql);
 					if (closed || busy) throw new Error("Session is closed or busy");
+					const rowCeiling = isTopSnapshot(sql, options) ? 10000 : config.limits.maxRows;
 					const maxRows = options.maxRows ?? config.limits.maxRows;
 					const timeout = options.timeoutSeconds ?? config.limits.statementTimeoutSeconds;
 					if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > rowCeiling || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new SafeConfigError("Invalid query limits");
@@ -128,7 +129,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 					query,
 					async close() { if (!closed) { closed = true; sessions.delete(session); await connection.close(); } },
 				};
-				registerTopSnapshot(session, () => query(TOP_SQL, {}, { maxRows: 10000 }, 10000));
+				registerTopSnapshot(session);
 				sessions.add(session); return session;
 			} catch (error) { await connection.close(); throw error; }
 		},

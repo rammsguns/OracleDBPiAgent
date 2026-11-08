@@ -43,7 +43,7 @@ export async function measure(target: string, name: string) {
 				case 'check': return runChecks(ctx,[target]);
 				case 'backup': return one(s=>readBackup(s));
 				case 'jobs': return readJobs(ctx,target);
-				case 'top': return one(s=>sampleTop(s,5));
+				case 'top': return one(raw=>sampleTop({...raw,query:async(...args:Parameters<OracleSession['query']>)=>{const result=await raw.query(...args);await ctx.audit.record({at:new Date().toISOString(),runId:tag,target,kind:'tool_call',tool:'top:read',rows:result.rows.length});return result;}},5));
 				case 'space': return one(s=>readSpaceUsage(s));
 				case 'sessions': return one(s=>readSessionActivity(s));
 				case 'security': return one(s=>readSecurityPosture(s));
