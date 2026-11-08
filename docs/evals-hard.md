@@ -1745,8 +1745,8 @@ The broad-health case requires DB-discovered failed-job and invalid-object names
 plus failed-job and maintenance descriptions. Its negation-aware forbidden-claim
 guard rejects an unqualified healthy verdict, including one after unrelated
 negation. Unit tests exercise qualified, negated, component and contradictory
-verdicts. The live test independently checks `failedJobs` and `maintenance` WARN
-or CRIT from the health engine. More problems may legitimately be reported.
+verdicts. The live test independently checks maintenance WARN or CRIT and compares
+`failedJobs` to SQL over the health collector's exact lookback window. More problems may legitimately be reported.
 All ten truth queries must return nonempty, non-null, untruncated evidence;
 there are no empty-truth skips or intended-empty queries in this split.
 

@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { loadHardCases, checkP31Cases } from '../../evals/validate-hard.js';
 import { loadConfig } from '../../src/config/index.js';
 import { createSessionProvider } from '../../src/oracle/index.js';
-import { runChecks } from '../../src/check/index.js';
+import { runChecks, collectors, classify, DEFAULTS } from '../../src/check/index.js';
 
 it('C1: every phase31 truth SELECT parses and runs as PIAGENT_RO with nonempty truth', async ctx => {
 	if (!process.env.PIAGENT_SECRET_DIR) { ctx.skip('PIAGENT_SECRET_DIR unset; C1 unavailable'); return; }
@@ -28,7 +28,27 @@ it('C1: every phase31 truth SELECT parses and runs as PIAGENT_RO with nonempty t
 				expect(result.rows).toEqual(expect.arrayContaining([['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]));
 			}
 		}
-		const check = await runChecks({ config, sessions, audit: { record: async () => {} }, runId: 'p31-truth' }, ['c1-19c-pdb']);
-		for (const id of ['failedJobs', 'maintenance']) expect(check.targets[0]!.checks.find(c => c.id === id)?.status).toMatch(/WARN|CRIT/);
+		let failureWindow: { from: string; to: string } | undefined;
+		const check = await runChecks({ config, sessions, audit: { record: async () => {} }, runId: 'p31-truth' }, ['c1-19c-pdb'], undefined, {
+			...collectors,
+			jobs: async (...args) => {
+				const result = await collectors.jobs(...args);
+				failureWindow = result.window;
+				return result;
+			},
+		});
+		expect(check.targets[0]!.checks.find(c => c.id === 'maintenance')?.status).toMatch(/WARN|CRIT/);
+		expect(failureWindow).toBeDefined();
+		// Seed failures remain in retained truth after they leave the health check's one-hour window.
+		// Compare the windowed health measurement to independent SQL over the exact collector window.
+		const failures = await session.query(`SELECT COUNT(*) FROM dba_scheduler_job_run_details
+			WHERE status='FAILED'
+			AND log_date>=FROM_TZ(TO_TIMESTAMP(:from_time,'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),'UTC')
+			AND log_date<FROM_TZ(TO_TIMESTAMP(:to_time,'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),'UTC')`,
+			{ from_time: failureWindow!.from, to_time: failureWindow!.to });
+		const failedCount = Number(failures.rows[0]![0]);
+		expect(check.targets[0]!.checks.find(c => c.id === 'failedJobs')).toMatchObject({
+			value: failedCount, status: classify(failedCount, DEFAULTS.failedJobs),
+		});
 	} finally { await sessions.closeAll(); }
 }, 120000);

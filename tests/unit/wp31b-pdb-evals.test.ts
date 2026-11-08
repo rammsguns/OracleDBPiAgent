@@ -28,7 +28,7 @@ const grade = (verdict: string) => score(health, {
 	toolCalls: ['health_check'], usage: { input: 0, output: 0 },
 }, [['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]).pass;
 it.each([
-	'The database is healthy.', 'Overall: healthy.', '**Healthy**.',
+	'The database is healthy.', 'Overall: healthy.', 'Status: healthy.',
 	'The backup is not verified. The database is fully healthy.',
 	'No restore was tested; c1 is healthy.', 'Verdict: completely healthy.',
 	'The database is not unhealthy; the database is healthy.',
@@ -61,4 +61,39 @@ it.each(['Autoextend is OFF', 'Autoextend: NO', 'Autoextend is disabled', 'The f
 it.each(['Autoextend is enabled', 'Autoextend is not disabled', 'Autoextend is not OFF'])('rejects wrong autoextend evidence: %s', fact => {
 	const test = cases.find(c => c.id.endsWith('headroom'))!;
 	expect(score(test, { answer: `OVER 128 MIB. ${fact}.`, toolCalls: [], usage: { input: 0, output: 0 } }, [['OVER 128 MIB']]).pass).toBe(false);
+});
+
+it.each([
+	'- Backup: healthy (recent level-0 backup present)\n- Space: healthy (headroom > 128 MiB)\nOverall: WARN.',
+	'1. Healthy: no, the database has scheduled job failures and invalid views.',
+	'Backup: healthy; Space: healthy; Overall: WARN.',
+	'Components: Backup: healthy: Space: healthy: Overall: WARN.',
+	'1. Backup: healthy\n2. Space: healthy\n3. Overall: WARN.',
+	'- Backup status: healthy\n- Space status: healthy\n- Overall: WARN.',
+	'Overall: Healthy: no, the database has failures.',
+	'Verdict: healthy? No, it has failures.',
+	'1. Status: healthy: false.',
+	'**Healthy**.',
+])('accepts review component lists and answer-word negations: %s', verdict => expect(grade(verdict)).toBe(true));
+it.each([
+	'- Overall: healthy.', '1. Verdict: healthy.', 'Summary: Overall: healthy.',
+	'Backup: healthy: The database is healthy.', 'This database is healthy.',
+	'Overall: healthy: no doubt.',
+])('still rejects explicit whole-database verdicts in colon/list layouts: %s', verdict => expect(grade(verdict)).toBe(false));
+const failedJob = cases.find(c => c.id === 'hard-p31-failed-job')!;
+const jobGrade = (answer: string, test = failedJob) => score(test, {
+	answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 },
+}, [['REPORT_EXPORT_JOB', 'ORA-20001']]).pass;
+it.each([
+	'| REPORT_EXPORT_JOB | 20001 |', '| REPORT_EXPORT_JOB | ORA-20001 |',
+	'Job: REPORT_EXPORT_JOB\nError code: 20001',
+	'Job: REPORT_EXPORT_JOB\nError#: 20001',
+])('accepts exact prefixed or numeric error-code cells: %s', answer => expect(jobGrade(answer)).toBe(true));
+it.each([
+	'| REPORT_EXPORT_JOB | 20002 |', '| OTHER_JOB | 20001 |',
+	'| REPORT_EXPORT_JOB | 120001 |', '| REPORT_EXPORT_JOB | not 20001 |',
+	'| job_name | error_code |\n| 20001 | REPORT_EXPORT_JOB |', '| REPORT_EXPORT_JOB | TNS-20001 |',
+])('keeps wrong or misassociated error evidence failing: %s', answer => expect(jobGrade(answer)).toBe(false));
+it('keeps the numeric error-code exception local to the failed-job case', () => {
+	expect(jobGrade('| REPORT_EXPORT_JOB | 20001 |', { ...failedJob, id: 'unrelated-case' })).toBe(false);
 });
