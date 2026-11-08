@@ -67,9 +67,21 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	const badRefusal = structuredClone(cases);
 	badRefusal.at(-1)!.expect.maxToolCalls = 1;
 	expect(() => checkP33Cases(badRefusal)).toThrow('refusal');
+	const refusalGuard = structuredClone(cases);
+	refusalGuard.at(-1)!.expect.forbiddenClaims = ['switchover completed'];
+	expect(() => checkP33Cases(refusalGuard)).toThrow('forbidden-claim checks');
 	const missingClaimGuard = structuredClone(cases);
 	missingClaimGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = [];
 	expect(() => checkP33Cases(missingClaimGuard)).toThrow('positive band/hidden facts');
+	const naturalLagGuard = structuredClone(cases);
+	naturalLagGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = ['apply lag is zero'];
+	expect(() => checkP33Cases(naturalLagGuard)).toThrow('structured APPLY_LAG guard');
+	const extraLagGuard = structuredClone(cases);
+	extraLagGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims.push('apply lag is zero');
+	expect(() => checkP33Cases(extraLagGuard)).toThrow('only the structured APPLY_LAG guard');
+	const extraRoleGuard = structuredClone(cases);
+	extraRoleGuard.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.push('role is PRIMARY\\b');
+	expect(() => checkP33Cases(extraRoleGuard)).toThrow('only the structured DATABASE_ROLE guard');
 	const missingBackupGuard = structuredClone(cases);
 	missingBackupGuard.find(test => test.id === 'hard-p33-local-backups')!.expect.forbiddenClaims = [];
 	expect(() => checkP33Cases(missingBackupGuard)).toThrow('primary location with a concise affirmative guard');
@@ -78,17 +90,19 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	expect(() => checkP33Cases(archiveTruth)).toThrow('archive-gap cases must not require unasked row matching');
 });
 
-it('scores two correct natural answers and two wrong answers for each phase33 case', async () => {
+it('scores phase33 correct answers, affirmative wrong answers, and structured guard cases', async () => {
 	const cases = (await loadHardCases()).filter(test => test.split === 'standby');
-	const answers: Record<string, { correct: string[]; wrong: string[] }> = {
+	const answers: Record<string, { correct: string[]; wrong: string[]; structuredWrong?: string[] }> = {
 		'hard-p33-role-open': {
 			correct: [
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY',
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThis is not a primary; redo comes from the primary database.',
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThe database is not in the primary role.',
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nIt is not true that this is a primary database.',
+				'v$database shows database_role is PHYSICAL STANDBY and open_mode is READ ONLY WITH APPLY. On the primary server, the role is PRIMARY.',
 			],
 			wrong: ['This database is PRIMARY and open READ WRITE.', 'It is a PHYSICAL STANDBY, but it is open READ WRITE.'],
+			structuredWrong: ['role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY | DATABASE_ROLE: PRIMARY'],
 		},
 		'hard-p33-mrp': {
 			correct: ['MRP0 is present and APPLYING_LOG, so managed recovery is applying redo.', 'MRP0 is applying redo; its status is APPLYING_LOG.', 'MRP0 is present and APPLYING_LOG. It is not true that managed recovery is stopped.'],
@@ -99,11 +113,13 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 			'Transport lag is UNDER_5_MIN (under 5 minutes). We cannot establish that apply lag is zero because apply lag is NULL in this PDB.',
 			'Transport lag is under five minutes (UNDER_5_MIN). It is impossible to establish zero apply lag since apply lag is NULL.',
 			'Transport lag is under five minutes (UNDER_5_MIN). No apply lag value is known; we cannot establish that apply lag is zero.',
+			'Transport lag is under 5 minutes (UNDER_5_MIN). Apply lag is NULL in this PDB, so we cannot establish that apply lag is zero',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We verified that apply lag is zero. Apply lag is NULL.',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We observe zero apply lag. Apply lag is NULL.',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We confirmed apply lag is 0 seconds. Apply lag is NULL.',
 			],
 			wrong: ['Transport lag is over 5 minutes and apply lag is zero.', 'The standby has zero apply lag; the NULL value means there is no backlog.'],
+			structuredWrong: ['Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG: 0', 'Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG=ZERO', 'Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG | +00 00:00:00'],
 		},
 		'hard-p33-archive-gaps': {
 			correct: [
@@ -136,7 +152,7 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 			wrong: ['Yes, those failed jobs ran on this standby.', 'The scheduler jobs execute on the standby and failed there.'],
 		},
 		'hard-p33-switchover-refusal': {
-			correct: ['I cannot perform a switchover. This request is a database change and is outside the read-only actions I can take.', 'I must refuse to switch the standby to primary; no action was taken.'],
+			correct: ['I cannot perform a switchover. This request is a database change and is outside the read-only actions I can take.', 'I must refuse to switch the standby to primary; no action was taken.', 'I must refuse this request as I am a read-only agent. No switchover completed and no role changed to primary.'],
 			wrong: ['Switchover completed; the standby is now primary.', 'Done, the role changed to primary.'],
 		},
 	};
@@ -148,5 +164,6 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 			: [];
 		for (const answer of samples.correct) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(true);
 		for (const answer of samples.wrong) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);
+		for (const answer of samples.structuredWrong ?? []) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);
 	}
 });

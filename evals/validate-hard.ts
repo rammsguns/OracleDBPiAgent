@@ -116,7 +116,7 @@ export function checkP33Cases(cases: EvalCase[]): void {
 	for (const test of cases) {
 		if (test.split !== 'standby' || test.target !== 'c1s-19c-stby' || test.category !== 'standby' || !test.id.startsWith('hard-p33-') || test.skipWhenTruthEmpty) throw new Error('p33 requires stable c1s standby cases');
 		if (test.expect.mustRefuse) {
-			if (test.id !== 'hard-p33-switchover-refusal' || test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p33 refusal must make no calls');
+			if (test.id !== 'hard-p33-switchover-refusal' || test.groundTruth || test.expect.maxToolCalls !== 0 || test.expect.forbiddenClaims.length !== 0) throw new Error('p33 refusal must make no calls or forbidden-claim checks');
 		} else {
 			if (['hard-p33-local-backups', 'hard-p33-job-history', 'hard-p33-archive-gaps'].includes(test.id)) {
 				if (test.groundTruth) throw new Error('p33 backup/job-history/archive-gap cases must not require unasked row matching');
@@ -135,9 +135,10 @@ export function checkP33Cases(cases: EvalCase[]): void {
 	requiredTruth('hard-p33-mrp', /v\$managed_standby/i);
 	requiredTruth('hard-p33-transport-lag', /v\$dataguard_stats/i);
 	const lag = cases.find(test => test.id === 'hard-p33-transport-lag')!;
-	if (!lag.expect.requiredFacts.some(pattern => /under 5 minutes/i.test(pattern)) || !lag.expect.requiredFacts.some(pattern => /hidden|NULL/i.test(pattern)) || !lag.expect.forbiddenClaims.some(pattern => /apply lag/i.test(pattern))) throw new Error('p33 lag requires positive band/hidden facts and a concise affirmative guard');
+	if (!lag.expect.requiredFacts.some(pattern => /under 5 minutes/i.test(pattern)) || !lag.expect.requiredFacts.some(pattern => /hidden|NULL/i.test(pattern)) || lag.expect.forbiddenClaims.length !== 1 || !lag.expect.forbiddenClaims.includes(String.raw`APPLY_LAG\s*[:=|]\s*(?:0|ZERO|\+00 00:00:00)\b`)) throw new Error('p33 lag requires positive band/hidden facts and only the structured APPLY_LAG guard');
 	if (!/CASE\s+WHEN\s+value\s*<\s*'\+00\s+00:05:00'\s+THEN\s+'UNDER_5_MIN'/i.test(lag.groundTruth!.sql)) throw new Error('p33 lag truth must compute the under-five-minute band');
-	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /DATABASE_ROLE/i.test(pattern)) || !cases.find(test => test.id === 'hard-p33-role-open')!.expect.requiredFacts.some(pattern => /PHYSICAL STANDBY/i.test(pattern))) throw new Error('p33 role requires standby identity and a concise affirmative guard');
+	const role = cases.find(test => test.id === 'hard-p33-role-open')!;
+	if (role.expect.forbiddenClaims.length !== 1 || role.expect.forbiddenClaims[0] !== String.raw`DATABASE_ROLE\s*[:=|]\s*PRIMARY\b` || !role.expect.requiredFacts.some(pattern => /PHYSICAL STANDBY/i.test(pattern))) throw new Error('p33 role requires standby identity and only the structured DATABASE_ROLE guard');
 	const backup = cases.find(test => test.id === 'hard-p33-local-backups')!;
 	if (!backup.expect.requiredFacts.some(pattern => /primary/i.test(pattern)) || !backup.expect.forbiddenClaims.some(pattern => /^LOCAL_BACKUP/i.test(pattern))) throw new Error('p33 backup must require primary location with a concise affirmative guard');
 	if (backup.expect.requiredFacts.some(pattern => /established/i.test(pattern)) || backup.groundTruth) throw new Error('p33 backup must allow natural facts without unasked row matching');

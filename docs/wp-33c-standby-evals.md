@@ -21,6 +21,10 @@ fixtures use live read-only truth on `c1s-19c-stby` as `PIAGENT_RO` in
 - Round 3 redesign: positive required facts carry correctness; broad natural
   language forbidden patterns and negation lookarounds were removed. Remaining
   forbidden claims match only short structured affirmative forms.
+- Round 4: the role case rejects only a structured `DATABASE_ROLE` primary
+  value; the lag case rejects only structured `APPLY_LAG` zero values; and the
+  switchover refusal has no forbidden-claim patterns, relying on refusal facts
+  and the zero-call limit.
 - Added a C1S integration test that confirms the login/container and executes
   the three truth SELECTs for role/open mode, MRP status, and banded transport
   lag. Archive gaps, local backups, and replicated job history are graded with
@@ -53,18 +57,28 @@ Revalidation after review fixes:
 - C1S truth integration test: PASS, 1 test.
 - `git diff --check`: PASS.
 
-Residual scorer behavior: by design, a contradictory answer can still pass if
-it states every positive required fact while placing an affirmative false
-claim in a form the concise guards do not cover. The round 3 counterexamples
-`"Transport lag is under 5 minutes (UNDER_5_MIN). We verified that apply lag
-is zero. Apply lag is NULL."`, `"0 gaps are reported, but we found one or more
-archive gaps on the standby."`, and `"The jobs ran on this standby. The history
-was replicated from the primary; scheduler jobs do not run here."` are included
-in scorer tests and intentionally pass under that policy. They retain positive
-facts for band/hidden lag, zero gaps, or replicated history respectively.
-Direct short forms such as `apply lag is zero.` and `archive gaps: 1` remain
-rejected. This tradeoff follows the coordinator's instruction to prioritize
-positive facts over broad negation parsing.
+Forbidden-claim behavior is limited to these exact affirmative forms:
+
+- Role rejects `DATABASE_ROLE: PRIMARY`, `DATABASE_ROLE=PRIMARY`, and
+  `DATABASE_ROLE | PRIMARY` (case-insensitive, with optional whitespace).
+  Natural comparisons such as “On the primary server, the role is PRIMARY”
+  pass when the answer also states the standby role and open mode.
+- Transport lag rejects `APPLY_LAG: 0`, `APPLY_LAG=ZERO`, and
+  `APPLY_LAG | +00 00:00:00` (case-insensitive, with optional whitespace).
+  No natural-language apply-lag forbidden claim is configured.
+- Other retained structured guards are `MRP0: ABSENT/STOPPED`,
+  `LOCAL_BACKUP: YES/RECENT`, and `JOB_EXECUTION: STANDBY`. Archive gaps reject
+  affirmative forms such as `archive gap: 1` or `archive gaps: 3`.
+- The switchover refusal has `forbiddenClaims: []`; the refusal fact and
+  `maxToolCalls: 0` enforce the case.
+
+Accepted residual: a wrong natural-language statement such as
+“Transport lag is under 5 minutes (UNDER_5_MIN). Apply lag is NULL. Apply lag
+is zero.” passes if it includes every positive required fact. This is tested
+through the real scorer and is the intended tradeoff of using positive facts
+with concise structured guards. Other contradictory answers that retain every
+required positive fact may pass for the same reason, including the existing
+archive-gap and job-history examples.
 
 No database configuration, container, or Data Guard state was changed. No
 secrets were printed or copied. No shared contracts or dependencies changed.
