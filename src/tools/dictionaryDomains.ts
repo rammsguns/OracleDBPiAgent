@@ -21,11 +21,14 @@ export const dictionaryDomains: Record<string, Record<string, readonly string[]>
 
 export function dictionaryDomainHint(sql: string, rowCount: number): string | undefined {
 	if (rowCount) return;
-	const tokens = sql.match(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|[a-zA-Z_][a-zA-Z0-9_$#]*|\S/g)?.filter(t => !t.startsWith('--') && !t.startsWith('/*')) ?? [];
+	const rawTokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|[a-zA-Z_][a-zA-Z0-9_$#]*|\S/g)];
+	// Prefixes are quoting syntax only when directly adjacent to an opening quote.
+	if (rawTokens.some((t, i) => /^(N|Q|NQ)$/i.test(t[0]) && rawTokens[i + 1]?.[0].startsWith("'") && t.index + t[0].length === rawTokens[i + 1]!.index)) return;
+	const tokens = rawTokens.map(t => t[0]).filter(t => !t.startsWith('--') && !t.startsWith('/*'));
 	const upper = tokens.map(t => t.startsWith("'") ? t : t.toUpperCase());
 	// Deliberately decline scopes, quoted identifiers, alternate/national strings,
 	// joins and expressions rather than guessing column provenance or semantics.
-	if (upper[0] !== 'SELECT' || upper.filter(t => t === 'SELECT').length !== 1 || upper.some(t => ['WITH', '"', 'Q', 'NQ', 'N', 'UNION', 'MINUS', 'INTERSECT', 'NOT', 'CASE', 'COLLATE'].includes(t))) return;
+	if (upper[0] !== 'SELECT' || upper.filter(t => t === 'SELECT').length !== 1 || upper.some(t => ['WITH', '"', 'UNION', 'MINUS', 'INTERSECT', 'NOT', 'CASE', 'COLLATE'].includes(t))) return;
 	const from = upper.indexOf('FROM'), where = upper.indexOf('WHERE');
 	if (from < 0 || where < from) return;
 	const source = upper.slice(from + 1, where);
@@ -39,6 +42,12 @@ export function dictionaryDomainHint(sql: string, rowCount: number): string | un
 	for (let i = 0; i < predicates.length; i++) {
 		if (i && !['AND', 'OR', '('].includes(predicates[i - 1]!)) continue;
 		let cursor = i;
+		const literals: string[] = [];
+		const reversed = /^'(?:''|[^'])*'$/.test(predicates[cursor]!);
+		if (reversed) {
+			literals.push(predicates[cursor++]!);
+			if (predicates[cursor++] !== '=') continue;
+		}
 		let column = predicates[cursor++]!;
 		if (predicates[cursor] === '.') {
 			if (column !== alias) continue;
@@ -47,13 +56,14 @@ export function dictionaryDomainHint(sql: string, rowCount: number): string | un
 		}
 		const values = domains[column];
 		if (!values) continue;
-		const op = predicates[cursor++];
-		const literals: string[] = [];
-		if (op === '=') literals.push(predicates[cursor++] ?? '');
-		else if (op === 'IN' && predicates[cursor++] === '(') {
-			do { literals.push(predicates[cursor++] ?? ''); } while (predicates[cursor++] === ',');
-			if (predicates[cursor - 1] !== ')') continue;
-		} else continue;
+		if (!reversed) {
+			const op = predicates[cursor++];
+			if (op === '=') literals.push(predicates[cursor++] ?? '');
+			else if (op === 'IN' && predicates[cursor++] === '(') {
+				do { literals.push(predicates[cursor++] ?? ''); } while (predicates[cursor++] === ',');
+				if (predicates[cursor - 1] !== ')') continue;
+			} else continue;
+		}
 		if (cursor < predicates.length && !['AND', 'OR', ')', ';'].includes(predicates[cursor]!)) continue;
 		if (!literals.length || literals.some(t => !/^'(?:''|[^'])*'$/.test(t) || values.includes(t.slice(1, -1).replace(/''/g, "'")))) continue;
 		return `Hint: ${table}.${column} values are ${values.map(v => `'${v}'`).join(' or ')}; the filter ${literals.join(', ')} matches nothing.`;

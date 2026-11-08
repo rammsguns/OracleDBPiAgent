@@ -179,3 +179,42 @@ The temporary dependency symlink was removed after validation. Remaining work:
 coordinator review of C1 backup metadata and the authorized model A/B gate.
 No contract changes are needed; no model-quality improvement is claimed without
 that gate.
+
+## Antigravity review follow-up
+
+Addressed both minor findings from the approved review:
+
+- National/alternative quoting is detected using the original token positions:
+  N, Q and NQ decline the hint only when immediately followed by an opening
+  quote. Ordinary table/select-list aliases named n, q or nq now work, including
+  uppercase spellings. Actual national and alternative quoted strings still
+  fail closed, including strings with embedded apostrophes and fake predicates.
+- Simple reversed equality (`'NO' = oracle_maintained` or
+  `'NO' = alias.oracle_maintained`) now shares the forward form's column
+  resolution, exact-literal domain validation and predicate-boundary checks.
+  Expressions, wrong aliases, binds, negation and other operators still decline.
+
+Changed files for this follow-up: `src/tools/dictionaryDomains.ts`,
+`tests/unit/dictionary-domains.test.ts`, and this report. Every reviewed domain
+value is tested in both equality directions. Added alias, nonempty-result,
+reversed-expression and quoting regression coverage. No domain, prompt, tool
+contract, database/LLM I/O, or dependency changes. No LLM calls. The prior live
+verification and integration outcomes above remain historical evidence; this
+pure parser follow-up requires no new database fixtures or model gate calls.
+
+Follow-up validation:
+
+```text
+npm run typecheck
+PASS (exit 0)
+
+npm test -- --maxWorkers=2
+Test Files 144 passed (144)
+Tests 2899 passed (2899)
+Duration 103.25s
+PASS (exit 0)
+```
+
+No new integration run was made for these pure SQL-token matching changes;
+no query execution, session handling or LLM code changed. Model A/B verification
+remains with the coordinator. No contract changes are needed.

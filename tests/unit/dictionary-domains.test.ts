@@ -6,7 +6,11 @@ import type { ToolContext } from '../../src/contracts.js';
 for (const [table, columns] of Object.entries(dictionaryDomains)) for (const [column, values] of Object.entries(columns)) {
 	it(`${table}.${column} rejects an invalid literal and accepts every reviewed value`, () => {
 		expect(dictionaryDomainHint(`SELECT * FROM ${table} WHERE ${column}='wrong'`, 0)).toContain(`${table}.${column}`);
-		for (const value of values) expect(dictionaryDomainHint(`SELECT * FROM ${table} WHERE ${column}='${value}'`, 0)).toBeUndefined();
+		expect(dictionaryDomainHint(`SELECT * FROM ${table} WHERE 'wrong'=${column}`, 0)).toContain(`${table}.${column}`);
+		for (const value of values) {
+			expect(dictionaryDomainHint(`SELECT * FROM ${table} WHERE ${column}='${value}'`, 0)).toBeUndefined();
+			expect(dictionaryDomainHint(`SELECT * FROM ${table} WHERE '${value}'=${column}`, 0)).toBeUndefined();
+		}
 	});
 }
 for (const sql of [
@@ -53,3 +57,35 @@ it('appends the hint only to empty run_query results without another database ca
 		expect(close).toHaveBeenCalledOnce();
 	}
 });
+
+for (const alias of ['n', 'q', 'nq', 'N', 'Q', 'NQ']) {
+	for (const predicate of [`${alias}.oracle_maintained='NO'`, `'NO'=${alias}.oracle_maintained`]) {
+		it(`accepts ordinary alias ${alias}: ${predicate}`, () => {
+			const sql = `SELECT ${alias}.username FROM sys.dba_users ${alias} WHERE (${predicate})`;
+			expect(dictionaryDomainHint(sql, 0)).toContain("the filter 'NO' matches nothing");
+			expect(dictionaryDomainHint(sql, 1)).toBeUndefined();
+		});
+	}
+	it(`accepts a select-list alias ${alias}`, () => {
+		expect(dictionaryDomainHint(`SELECT username ${alias} FROM dba_users WHERE 'NO'=oracle_maintained`, 0)).toContain('DBA_USERS.ORACLE_MAINTAINED');
+	});
+}
+for (const sql of [
+	"SELECT * FROM dba_users WHERE 'NO'=oracle_maintained||'x'",
+	"SELECT * FROM dba_users WHERE 'NO'||'x'=oracle_maintained",
+	"SELECT * FROM dba_users u WHERE 'NO'=other.oracle_maintained",
+	"SELECT * FROM app_users WHERE 'NO'=oracle_maintained",
+	"SELECT * FROM dba_users WHERE :flag=oracle_maintained",
+	"SELECT * FROM dba_users WHERE 'NO' LIKE oracle_maintained",
+	"SELECT * FROM dba_users WHERE 'NO'!=oracle_maintained",
+	"SELECT * FROM dba_users WHERE 'NO'=UPPER(oracle_maintained)",
+	"SELECT * FROM dba_users WHERE NOT ('NO'=oracle_maintained)",
+	"SELECT * FROM dba_users WHERE N'NO'=oracle_maintained",
+	"SELECT * FROM dba_users WHERE q'[NO]'=oracle_maintained",
+	"SELECT * FROM dba_users WHERE nq'[NO]'=oracle_maintained",
+	// Apostrophes within real alternative quoting must never expose fake predicates.
+	"SELECT q'[x' FROM dba_users WHERE oracle_maintained='NO']' FROM dual",
+	"SELECT nq'{x' FROM dba_users WHERE oracle_maintained='NO'}' FROM dual",
+	"SELECT q'!x' FROM dba_users WHERE oracle_maintained='NO'!' FROM dual",
+	"SELECT n'example' FROM dba_users WHERE 'NO'=oracle_maintained",
+]) it(`declines complex reversed equality or actual quoting: ${sql}`, () => expect(dictionaryDomainHint(sql, 0)).toBeUndefined());
