@@ -27,4 +27,5 @@ it('duplicate and deleted received redo do not create false gaps; missing receiv
 	expect(analyzeBackup('lab',true,evidence,new Date(),true).gaps).toEqual([]);
 	evidence.archives.rows.push(log(37));expect(analyzeBackup('lab',true,evidence,new Date(),true).gaps).toMatchObject([{fromSequence:36,toSequence:36}]);
 	evidence.archiveGap.rows=[{'THREAD#':2,'LOW_SEQUENCE#':8,'HIGH_SEQUENCE#':9}];expect(analyzeBackup('lab',true,evidence,new Date(),true).gaps).toHaveLength(2);
+	evidence.archives.status='unavailable';expect(analyzeBackup('lab',true,evidence,new Date(),true).gaps).toMatchObject([{thread:2,fromSequence:8,toSequence:9}]);
 });

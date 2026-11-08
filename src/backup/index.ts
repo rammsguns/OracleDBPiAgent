@@ -90,8 +90,10 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 			if(cursor<=seq.at(-1)!) gaps.push({thread,resetlogsScn:reset,fromSequence:cursor,toSequence:seq.at(-1)!});
 		}
 	}
-	if (standby && good('archives','database','archiveGap')) {
+	if (standby && good('database','archiveGap')) {
 		for (const row of rows('archiveGap')) gaps.push({thread:n(row['THREAD#']),resetlogsScn:reset,fromSequence:n(row['LOW_SEQUENCE#']),toSequence:n(row['HIGH_SEQUENCE#'])});
+	}
+	if (standby && good('archives','database')) {
 		// RMAN duplicate copies pre-creation history (SRMN). Only RFS received redo
 		// establishes a standby sequence baseline, regardless of later file deletion.
 		const threads = new Map<number, Set<number>>();
