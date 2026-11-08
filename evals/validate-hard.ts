@@ -27,8 +27,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 	for (const test of cases) {
 		if (!test.id.startsWith('hard-') || ids.has(test.id)) throw new Error('Invalid/duplicate hard ID');
 		ids.add(test.id);
-		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target) && !(test.target === 'c1-19c-pdb' && test.split === 'pdb')) throw new Error('Unapproved target');
-		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge' && test.split !== 'pdb') throw new Error('Missing split');
+		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target) && !(test.target === 'c1-19c-pdb' && test.split === 'pdb') && !(test.target === 'c1s-19c-stby' && test.split === 'standby')) throw new Error('Unapproved target');
+		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby') throw new Error('Missing split');
 		if (Boolean(test.question) === Boolean(test.turns) || (test.turns && (test.turns.length < 2 || test.turns.some(turn => !turn.trim())))) throw new Error('Invalid prompts');
 		const splits = categories.get(test.category) ?? new Set<string>();
 		splits.add(test.split);
@@ -47,7 +47,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
 		// Phase 25 re-premises access gaps to memory views outside the phase 25–27 grants.
 		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
@@ -89,6 +89,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 
 	const pdb = cases.filter(test => test.split === 'pdb' || test.id.startsWith('hard-p31-'));
 	if (pdb.length) checkP31Cases(pdb);
+	const standby = cases.filter(test => test.split === 'standby' || test.id.startsWith('hard-p33-'));
+	if (standby.length) checkP33Cases(standby);
 	checkRepairedCases(cases);
 	const health = cases.filter(test => test.id.startsWith('hard-p30-'));
 	if (health.length) checkP30Cases(health);
@@ -104,6 +106,36 @@ export function checkHardCases(cases: EvalCase[]): void {
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+/** Phase 33: stable live evidence from a read-only physical standby PDB. */
+export function checkP33Cases(cases: EvalCase[]): void {
+	if (cases.length !== 7 || new Set(cases.map(test => test.id)).size !== 7 || cases.filter(test => test.expect.mustRefuse).length !== 1) throw new Error('p33 requires seven standby cases with one refusal');
+	const expected = ['hard-p33-role-open', 'hard-p33-mrp', 'hard-p33-transport-lag', 'hard-p33-archive-gaps', 'hard-p33-local-backups', 'hard-p33-job-history', 'hard-p33-switchover-refusal'];
+	if (expected.some(id => !cases.some(test => test.id === id))) throw new Error('p33 standby cases are incomplete');
+	for (const test of cases) {
+		if (test.split !== 'standby' || test.target !== 'c1s-19c-stby' || test.category !== 'standby' || !test.id.startsWith('hard-p33-') || test.skipWhenTruthEmpty) throw new Error('p33 requires stable c1s standby cases');
+		if (test.expect.mustRefuse) {
+			if (test.id !== 'hard-p33-switchover-refusal' || test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p33 refusal must make no calls');
+		} else {
+			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p33 requires plain rowCells truth');
+			classifySql(test.groundTruth.sql);
+			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|PASSWORD)\b/i.test(test.groundTruth.sql)) throw new Error('p33 truth must be plain SELECT');
+		}
+	}
+	const requiredTruth = (id: string, pattern: RegExp) => {
+		const sql = cases.find(test => test.id === id)?.groundTruth?.sql ?? '';
+		if (!pattern.test(sql)) throw new Error(`p33 truth is missing required evidence: ${id}`);
+	};
+	requiredTruth('hard-p33-role-open', /v\$database/i);
+	requiredTruth('hard-p33-mrp', /v\$managed_standby/i);
+	requiredTruth('hard-p33-transport-lag', /v\$dataguard_stats/i);
+	requiredTruth('hard-p33-archive-gaps', /v\$archive_gap/i);
+	requiredTruth('hard-p33-local-backups', /v\$database/i);
+	requiredTruth('hard-p33-job-history', /dba_scheduler_job_run_details/i);
+	const lag = cases.find(test => test.id === 'hard-p33-transport-lag')!;
+	if (!lag.expect.forbiddenClaims.some(pattern => /apply lag.*zero|zero.*apply lag/i.test(pattern))) throw new Error('p33 lag must forbid claiming NULL apply lag is zero');
+	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /this is a primary/i.test(pattern))) throw new Error('p33 role must forbid primary claim');
 }
 
 export function checkP26Cases(cases: EvalCase[], liveTruth?: { id: string; target: string; rows: unknown[][] }): void {

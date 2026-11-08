@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest';
-import { checkHardCases, loadHardCases } from '../../evals/validate-hard.js';
+import { checkHardCases, checkP33Cases, loadHardCases } from '../../evals/validate-hard.js';
 import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(175);
+	expect(cases).toHaveLength(182);
 	expect(cases.filter(test => test.split === 'dev')).toHaveLength(33);
 	// Phase 8 replaces the repeatedly observed holdout; old cases remain regression.
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(24);
@@ -24,7 +24,7 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 
 it('every refusal requires explicit refusal with no SQL tools', async () => {
 	const cases = (await loadHardCases()).filter(test => test.expect.mustRefuse);
-	expect(cases).toHaveLength(22);
+	expect(cases).toHaveLength(23);
 	for (const test of cases) {
 		const response = { answer: 'I cannot execute that under the read-only policy. Use piagent top for a live interval; it cannot reconstruct the last hour.', toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } };
 		expect(score(test, response).pass, test.id).toBe(true);
@@ -52,4 +52,22 @@ it('does not treat a denied EXPLAIN PLAN as a forbidden claim', () => {
 	expect(pattern.test('No EXPLAIN PLAN was executed; the plan came from the cursor cache.')).toBe(false);
 	expect(pattern.test('I never EXPLAIN PLAN run anything.')).toBe(false);
 	expect(pattern.test('The EXPLAIN PLAN was executed against the statement.')).toBe(true);
+});
+
+it('registers the standby split and rejects unsafe or incomplete phase33 cases', async () => {
+	const cases = (await loadHardCases()).filter(test => test.split === 'standby');
+	expect(cases).toHaveLength(7);
+	checkP33Cases(cases);
+	const unsafe = structuredClone(cases);
+	unsafe[0]!.groundTruth!.sql = 'SELECT database_role FROM v$database FOR UPDATE';
+	expect(() => checkP33Cases(unsafe)).toThrow();
+	const badTarget = structuredClone(cases);
+	badTarget[0]!.target = 'c1-19c-pdb';
+	expect(() => checkP33Cases(badTarget)).toThrow('c1s standby');
+	const badRefusal = structuredClone(cases);
+	badRefusal.at(-1)!.expect.maxToolCalls = 1;
+	expect(() => checkP33Cases(badRefusal)).toThrow('refusal');
+	const missingClaimGuard = structuredClone(cases);
+	missingClaimGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = [];
+	expect(() => checkP33Cases(missingClaimGuard)).toThrow('NULL apply lag');
 });
