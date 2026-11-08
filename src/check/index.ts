@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { SafeConfigError } from '../config/safeErrors.js';
 import { createHash } from 'node:crypto';
 import type { ToolContext, OracleSession } from '../contracts.js';
@@ -58,7 +59,7 @@ export function redact<T>(value: T): T {
 	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [redact(k), redact(v)])) as T;
 	return value;
 }
-export async function runChecks(ctx: ToolContext, targets: readonly string[], settings: (target: string) => Thresholds = () => DEFAULTS, readers = collectors, now = new Date()): Promise<CheckRun> {
+async function runChecksImpl(ctx: ToolContext, targets: readonly string[], settings: (target: string) => Thresholds = () => DEFAULTS, readers = collectors, now = new Date()): Promise<CheckRun> {
 	if (!targets.length || targets.some(target => !ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target))) throw new CheckUsageError('Check requires configured targets within the pinned target scope');
 	const result: CheckRun = { version: 1, capturedAt: now.toISOString(), status: 'OK', targets: [] };
 	for (const target of targets) {
@@ -198,3 +199,5 @@ export function renderCheckMarkdown(run: CheckRun): string {
 	const counts = ['CRIT','WARN','UNKNOWN','OK'].map(status => `${checks.filter(c => c.status === status).length} ${status}`).join(', ');
 	return [`# Check: ${run.status} — ${counts} (${run.targets.map(t => esc(t.target)).join(', ')})`, `Captured ${run.capturedAt} (UTC). Sequential snapshots; windowed history is not a continuous monitor.`, '', '| Target | Check | Status | Value | Threshold WARN / CRIT | Scope | Drill down | Note |','| --- | --- | --- | --- | --- | --- | --- | --- |', ...run.targets.flatMap(t => t.checks.map(c => '| '+[t.target,c.id,c.status,c.display,c.threshold ? `${c.threshold.warn} / ${c.threshold.crit ?? 'incident only'}` : '> 0 = CRIT',c.scope,c.command,c.note].map(esc).join(' | ')+' |'))].join('\n')+'\n';
 }
+
+export const runChecks = (...args: Parameters<typeof runChecksImpl>) => withOracleAction('check', () => runChecksImpl(...args));

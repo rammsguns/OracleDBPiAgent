@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import type { OracleSession } from '../contracts.js';
 import type { Check } from '../triage/read.js';
 import { SQL } from './sql.js';
@@ -83,7 +84,7 @@ export function classifyWaits(rows: WaitRow[]): WaitClass[] {
 }
 function emptyCheck(label: string): Check { return { label, sql: '', binds: {}, view: '', status: 'ok', columns: [], rows: [], truncated: false, attempts: [] }; }
 function section<T>(label: string): SessionSection<T> { return { status: 'skipped', rows: [], evidence: emptyCheck(label), supportingEvidence: [] }; }
-export async function readSessionActivity(session: OracleSession, options: SessionsOptions = {}): Promise<SessionActivity> {
+async function readSessionActivityImpl(session: OracleSession, options: SessionsOptions = {}): Promise<SessionActivity> {
 	validateSessionsOptions(options);
 	const result: SessionActivity = { status: 'ok', target: session.target.name, capturedAt: new Date().toISOString(), self: { sid: 0 },
 		sections: { active: section('active'), blocking: section('blocking'), waits: section('waits'), timeModel: section('timeModel'), transactions: section('transactions') }, findings: [] };
@@ -206,3 +207,5 @@ export function renderSessionsMarkdown(a: SessionActivity): string {
 	}
 	return lines.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
 }
+
+export const readSessionActivity = (...args: Parameters<typeof readSessionActivityImpl>) => withOracleAction('sessions', () => readSessionActivityImpl(...args));

@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { createHash } from 'node:crypto';
 import type { ToolContext } from '../contracts.js';
 import { sinceHours } from '../triage/parse.js';
@@ -84,7 +85,7 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 		return { ...base, status: 'unavailable', grants: views.map(v => `GRANT SELECT ON SYS.${v.replace('V$', 'V_$')} TO ${configured.username};`), attempts: [{ view, code }] };
 	} finally { await session.close(); }
 }
-export async function readAlertLog(ctx: ToolContext, target: string, options: AlertLogOptions = {}): Promise<AlertResult<AlertRow>> {
+async function readAlertLogImpl(ctx: ToolContext, target: string, options: AlertLogOptions = {}): Promise<AlertResult<AlertRow>> {
 	const codes = [...new Set((options.codes ?? []).map(c => c.toUpperCase()))];
 	if (codes.length > 20 || codes.some(c => !/^(ORA|TNS)-\d{5}$/.test(c))) throw new AlertlogUsageError('codes must contain at most 20 ORA-/TNS- codes with five digits');
 	if (options.text !== undefined && (typeof options.text !== 'string' || options.text.length > 2048)) throw new AlertlogUsageError('text must be at most 2048 characters');
@@ -162,3 +163,5 @@ function adrScope(value: unknown): {containerId?: number; scope?: string} {
 	const containerId = Number(value);
 	return { containerId, scope: containerId <= 1 ? `CDB-wide/instance (CON_ID ${containerId})` : `PDB (CON_ID ${containerId})` };
 }
+
+export const readAlertLog = (...args: Parameters<typeof readAlertLogImpl>) => withOracleAction('alertlog', () => readAlertLogImpl(...args));

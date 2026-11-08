@@ -1,3 +1,4 @@
+import { oracleAction } from './observability.js';
 import { recordConnectionFailure, PasswordFileError } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
 import { checkAccount } from './account.js';
@@ -23,7 +24,7 @@ export async function previewValue(value: any): Promise<unknown> {
 }
 
 /** approvedEndpoints is overridable only so the gate integration test can reach a non-19c DB. */
-export function createSessionProvider(config: AppConfig, approvedEndpoints?: readonly ApprovedEndpoint[]): SessionProvider {
+export function createSessionProvider(config: AppConfig, approvedEndpoints?: readonly ApprovedEndpoint[], instrumentation?: { tag: string; statement: (sql: string, elapsedMs: number, error?: string) => void }): SessionProvider {
 	const sessions = new Set<OracleSession>();
 	return {
 		async get(targetName = config.defaultTarget) {
@@ -49,6 +50,19 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				} finally { await file.close(); }
 			} catch { throw recordConnectionFailure(new PasswordFileError(target.name, basename(target.passwordFile))); }
 			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` }).catch((error: unknown) => { throw recordConnectionFailure(error); });
+			connection.module = 'piagent';
+			const sessionAction = oracleAction();
+			connection.action = sessionAction;
+			if (instrumentation) {
+				if (!/^[a-zA-Z0-9_]+$/.test(instrumentation.tag)) { await connection.close(); throw new Error('Invalid measurement tag'); }
+				const execute = connection.execute.bind(connection);
+				connection.execute = async (sql: string, ...args: any[]) => {
+					const start = performance.now(); let error: string | undefined;
+					try { return await execute(`/* ${instrumentation.tag} */ ${sql}`, ...args); }
+					catch (e) { error = /ORA-\d+/.exec(String(e))?.[0] ?? 'execute failed'; throw e; }
+					finally { instrumentation.statement(sql, performance.now() - start, error); }
+				};
+			}
 			let closed = false; let busy = false;
 			try {
 				connection.callTimeout = config.limits.statementTimeoutSeconds * 1000;
@@ -81,6 +95,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 						if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > config.limits.maxRows || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new SafeConfigError("Invalid query limits");
 						busy = true; const start = performance.now(); let resultSet: any;
 						try {
+							connection.action = oracleAction() === 'query' ? sessionAction : oracleAction();
 							connection.callTimeout = timeout * 1000;
 							await connection.execute("SET TRANSACTION READ ONLY");
 							// Read execute metadata without fetching values: STRING alone still passes

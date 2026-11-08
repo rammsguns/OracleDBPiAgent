@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { formatBytes } from '../space/index.js';
 import { markdownTable, markdownNumber } from '../backup/markdown.js';
 import { setTimeout } from 'node:timers/promises';
@@ -26,7 +27,7 @@ export function deltas(before: unknown[][], after: unknown[][], column: number, 
 		return { name, delta, perSecond: delta === null ? null : delta / seconds, state };
 	});
 }
-export async function sampleTop(session: OracleSession, seconds = 15, runtime = { now: () => performance.now(), sleep: async (ms: number) => { await setTimeout(ms); } }) {
+async function sampleTopImpl(session: OracleSession, seconds = 15, runtime = { now: () => performance.now(), sleep: async (ms: number) => { await setTimeout(ms); } }) {
 	validateSeconds(seconds);
 	async function snapshot(key: keyof typeof SQL): Promise<Snapshot> {
 		try {
@@ -94,3 +95,5 @@ export function renderTop(result: Awaited<ReturnType<typeof sampleTop>>): string
 		'SQL drill-down: piagent sql --target ' + result.target + ' --sql-id <SQL_ID>');
 	return lines.join('\n\n') + '\n';
 }
+
+export const sampleTop = (...args: Parameters<typeof sampleTopImpl>) => withOracleAction('top', () => sampleTopImpl(...args));
