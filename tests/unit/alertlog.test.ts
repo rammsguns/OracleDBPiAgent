@@ -134,3 +134,13 @@ it.each(['alerts', 'incidents'] as const)('renders empty %s as a separated parag
 	const partial = renderAlertLogMarkdown({ ...result, truncated: true });
 	expect(partial).toContain('No rows returned.\n\nRow cap reached;');
 });
+
+it('filters PDB alerts by current CON_ID and bounds only the requested window',async()=>{
+	const f=fixture();
+	const r=await readAlertLog(f.ctx,'c1-19c-pdb',{level:'all',text:'ORA-',limit:100});
+	expect(r.sql).toContain("CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID'))");
+	expect(r.sql).toContain('ORIGINATING_TIMESTAMP >=');
+	expect(r.sql).toContain('ORIGINATING_TIMESTAMP <');
+	expect(r.sql).toContain('FETCH FIRST :fetchLimit ROWS ONLY');
+	expect(r.binds.text).toBe('ORA-');
+});

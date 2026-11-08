@@ -210,3 +210,16 @@ it('complete alert counts remain exact and unavailable alert evidence cannot ass
 it('truncated incident rows already prove the any-incident critical threshold',async()=>{
 	const {context,readers}=fake();readers.incidents=async()=>({status:'ok',view:'V$DIAG_INCIDENT',rows:[{}],truncated:true}) as never;const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now),c=r.targets[0]!.checks.find(c=>c.id==='incidents')!;expect(c.status).toBe('CRIT');expect(c.value).toBe(1);expect(c.display).toBe('>= 1 incidents');expect(c.lowerBound).toBe(true);expect(c.note).toContain('row cap reached');
 });
+
+it('uses labelled per-datafile fallback only in a PDB with empty RMAN jobs', async () => {
+	const {context,readers}=fake();
+	const get=context.sessions.get;
+	context.sessions.get=async (...args)=>({...await get(...args),identity:{isCdb:true,containerName:'PIPDB1'}} as never);
+	const original=readers.backup;
+	readers.backup=async()=>{const b=await original();b.evidence.jobs!.rows=[];return b;};
+	let run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+	expect(run.targets[0]!.checks.find(c=>c.id==='backupAge')).toMatchObject({status:'OK',value:1,note:expect.stringContaining('PDB fallback')});
+	readers.backup=async()=>{const b=await original();b.evidence.jobs!.rows=[];b.files=[];return b;};
+	run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+	expect(run.targets[0]!.checks.find(c=>c.id==='backupAge')!.status).toBe('UNKNOWN');
+});

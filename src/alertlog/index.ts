@@ -102,7 +102,7 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 		else if (level !== 'all') { clauses.push('MESSAGE_LEVEL <= :maxLevel'); binds.maxLevel = level; }
 		if (codes.length) clauses.push('(' + codes.map((code, i) => { const [prefix, digits] = code.split('-'); binds[`code${i}`] = `(^|[^A-Z0-9_])${prefix}-0*${Number(digits)}([^0-9]|$)`; return `REGEXP_LIKE(UPPER(MESSAGE_TEXT), :code${i})`; }).join(' OR ') + ')');
 		if (options.text) { clauses.push('INSTR(UPPER(MESSAGE_TEXT), UPPER(:text)) > 0'); binds.text = options.text; }
-		return { select: 'SELECT ORIGINATING_TIMESTAMP, MESSAGE_LEVEL, PROBLEM_KEY, MESSAGE_TEXT FROM V$DIAG_ALERT_EXT', where: clauses.join(' AND '), order: 'ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC', binds };
+		return { select: 'SELECT ORIGINATING_TIMESTAMP, MESSAGE_LEVEL, PROBLEM_KEY, MESSAGE_TEXT FROM V$DIAG_ALERT_EXT', where: [...clauses, "(SYS_CONTEXT('USERENV','CON_ID') IN ('0','1') OR CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID')))"].join(' AND '), order: 'ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC', binds };
 	}, row => {
 		const raw = str(row[3]), redacted = redactCredentials(raw).replace(/[\r\n]+$/, '');
 		let messageText = '', bytes = 0;

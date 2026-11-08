@@ -33,7 +33,8 @@ export async function readBackup(session: OracleSession, now = new Date()): Prom
 			e.rows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c.toUpperCase(), row[i]])));
 			if (e.truncated) e.note = 'Row cap reached; incomplete evidence.';
 			if (id === 'configuration' && !e.rows.some(r => String(r.NAME).toUpperCase() === 'CONTROLFILE AUTOBACKUP')) e.note = 'No explicit control-file autobackup setting visible; effective default not inferred (depends on database configuration).';
-			if (!e.rows.length && session.identity.isCdb) e.note = 'No rows visible in this PDB; absence cannot be inferred.';
+			if (id === 'jobs' && !e.rows.length && session.identity.isCdb) e.note = 'RMAN job details hidden/empty in PDB; use visible per-datafile full/level-0 completion metadata for backup age.';
+			if (!e.rows.length && session.identity.isCdb && id !== 'jobs') e.note = 'No rows visible in this PDB; absence cannot be inferred.';
 		} catch (error) {
 			const code = /ORA-\d{5}/.exec(String(error))?.[0];
 			if (!code || !['ORA-00942', 'ORA-01031', 'ORA-65040'].includes(code)) throw error;
