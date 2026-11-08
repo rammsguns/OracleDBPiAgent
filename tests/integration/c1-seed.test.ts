@@ -24,6 +24,8 @@ it('C1 seed has exact read-only grants, deliberate states and root refusal', asy
 		expect(await rows("select status from dba_ind_partitions where index_owner='SHOPAPP' and index_name='HISTORY_ORDER_IX' and partition_name='P_202601'")).toEqual([['UNUSABLE']]);
 		expect(await rows("select stale_stats from dba_tab_statistics where owner='SHOPAPP' and table_name='PRODUCTS'")).toEqual([['YES']]);
 		expect((await rows("select count(*) from dba_scheduler_job_run_details where owner='SHOPAPP' and job_name='REPORT_EXPORT_JOB' and status='FAILED' and error#=20001"))?.[0]?.[0] as number).toBeGreaterThan(0);
+		expect(await rows("select repeat_interval, enabled, logging_level from dba_scheduler_jobs where owner='SHOPAPP' and job_name='REPORT_EXPORT_JOB'")).toEqual([['FREQ=MINUTELY;INTERVAL=30', 'TRUE', 'FULL']]);
+		expect((await rows("select count(*) from dba_scheduler_job_run_details where owner='SHOPAPP' and job_name='REPORT_EXPORT_JOB' and status='FAILED' and error#=20001 and log_date>=SYSTIMESTAMP-INTERVAL '1' HOUR"))?.[0]?.[0] as number).toBeGreaterThan(0);
 		await expect(oracle.getConnection({ user: 'PIAGENT_RO', password, connectString: 'localhost:1524/CDB19' })).rejects.toMatchObject({ errorNum: 1017 });
 	} finally { await c.close(); }
 }, 30000);

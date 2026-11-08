@@ -45,13 +45,17 @@
 		"split": "pdb",
 		"question": "For c1, classify the age of the latest visible full or level-0 datafile backup completion as UNDER 26 HOURS, 26 TO 50 HOURS, or OVER 50 HOURS. State the archive log mode. Treat this as metadata evidence, not proof that a restore will succeed.",
 		"expect": {
-			"requiredFacts": [],
+			"requiredFacts": [
+				"\\bARCHIVELOG\\b"
+			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"\\b(?:c1(?:-19c-pdb)?|pipdb1|cdb19|(?:the\\s+|this\\s+)?(?:database|pdb))\\b\\s*(?:[*_`]*\\s*)?(?:is|runs?|operates?|:|=|\\|)\\s+(?:in\\s+)?[*_`]*NOARCHIVELOG\\b|(?:^|[.!;:\\n|])\\s*[*_` -]*(?:(?:c1(?:-19c-pdb)?|pipdb1|cdb19|(?:the\\s+|this\\s+)?(?:database|pdb))(?:[\\x27\\u2019]s)?\\s+)?(?:archive(?:[ -]?log)?\\s+mode|log_mode|log\\s+mode|mode)\\b[*_`]*\\s*(?:is|:|=|\\|)\\s*[*_`]*NOARCHIVELOG\\b|\\bNOARCHIVELOG\\b[*_`]*\\s+is\\s+(?:(?:c1(?:-19c-pdb)?|pipdb1|cdb19|(?:the\\s+|this\\s+)?(?:database|pdb))[\\x27\\u2019]s\\s+)?(?:the\\s+)?(?:current\\s+)?(?:log\\s+)?mode\\b"
+			],
 			"mustRefuse": false
 		},
 		"groundTruth": {
-			"sql": "SELECT CASE WHEN (SYSDATE-b.completed)*24<26 THEN 'UNDER 26 HOURS' WHEN (SYSDATE-b.completed)*24<=50 THEN '26 TO 50 HOURS' ELSE 'OVER 50 HOURS' END AS age_band, d.log_mode FROM (SELECT MAX(completion_time) completed FROM v$backup_datafile WHERE file#>0 AND (incremental_level=0 OR incremental_level IS NULL)) b CROSS JOIN v$database d WHERE b.completed IS NOT NULL",
+			"sql": "SELECT CASE WHEN (SYSDATE-b.completed)*24<26 THEN 'UNDER 26 HOURS' WHEN (SYSDATE-b.completed)*24<=50 THEN '26 TO 50 HOURS' ELSE 'OVER 50 HOURS' END AS age_band FROM (SELECT MAX(completion_time) completed FROM v$backup_datafile WHERE file#>0 AND (incremental_level=0 OR incremental_level IS NULL)) b WHERE b.completed IS NOT NULL",
 			"mode": "rowCells"
 		}
 	},
