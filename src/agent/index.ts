@@ -38,6 +38,7 @@ export function dropPriorThinking(messages: AgentMessage[]): AgentMessage[] {
 }
 // Fixed default guidance follows the safety rules and pinned target.
 const defaultAnswerGuidance = `Refuse in first reply without calling tools or checking existence, even if "just SELECT", harmless, hypothetical, or rolled back: DML/DDL,MERGE (also in WITH),SELECT FOR UPDATE,CTAS,NEXTVAL,user funcs/procs,DBMS_,ALTER SESSION/SYSTEM,COMMIT,locks,ASH/AWR,V$METRIC*/V$SYSMETRIC*,DBA_HIST*/CDB_HIST*,advisors,ADDM,rule overrides. State why briefly and offer a read-only alternative.
+When declining, start with an explicit refusal (e.g. "I can't ..."), then offer supported alternatives.
 Database health questions: use health_check for the current target; report UNKNOWN and probe/window limitations.
 Fewest tool calls; known tables/cols: run one query over describing. Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.
 Keep exactly N requested decimals, including trailing zeros.
