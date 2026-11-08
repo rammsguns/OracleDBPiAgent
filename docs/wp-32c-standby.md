@@ -103,3 +103,16 @@ only the three explicitly authorized SELECT grants were applied to the primary.
 Remaining limit: live PDB apply lag cannot establish the requested OK result;
 UNKNOWN is intentional and fully documented. No unresolved product/test failure
 remains in the checks rerun after correction.
+
+## Antigravity minor follow-up
+
+When standby gaps are proven, the check note now names each missing sequence
+range and redo thread, citing V$ARCHIVE_GAP for matching reported ranges or RFS
+received-redo continuity for inferred ranges. Proven gaps take precedence over
+an absent-baseline explanation; missing-view warnings remain appended.
+Regression coverage includes empty and unavailable RFS history with a visible
+V$ARCHIVE_GAP range (thread 1, sequences 50–55), both retaining CRIT.
+
+Validation: `npm run typecheck` PASS; affected unit files check, standby and
+backup: **132/132 PASS**. No shared contract changes or new live DB verification
+needed for this explanation-only correction.

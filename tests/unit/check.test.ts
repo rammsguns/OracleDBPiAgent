@@ -243,3 +243,20 @@ it('standby copied backups stay UNKNOWN and replicated jobs/maintenance retain l
 	for(const id of ['failedJobs','maintenance'])expect(checks.find(c=>c.id===id)!.note).toContain('replicated from the primary');
 	expect(checks.find(c=>c.id==='dgLag')!.status).toBe('UNKNOWN');
 });
+
+it('names V$ARCHIVE_GAP sequences when RFS history is empty or unavailable',async()=>{
+	for(const status of ['ok','unavailable']) {
+		const {context,readers}=fake(),get=context.sessions.get;
+		context.sessions.get=async target=>{const s=await get(target);s.query=async()=>({columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY WITH APPLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:0});return s;};
+		const original=readers.backup;
+		readers.backup=async()=>{const r=await original();Object.assign(r.evidence,{
+			archiveGap:{status:'ok',truncated:false,rows:[{'THREAD#':1,'LOW_SEQUENCE#':50,'HIGH_SEQUENCE#':55}]},
+			archives:{status,truncated:false,rows:[],view:'V$ARCHIVED_LOG',note:status==='unavailable'?'ORA-00942':undefined},
+		});r.gaps=[{thread:1,resetlogsScn:1,fromSequence:50,toSequence:55}] as never;return r;};
+		const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+		const gap=run.targets[0]!.checks.find(c=>c.id==='archiveGaps')!;
+		expect(gap).toMatchObject({status:'CRIT',value:1,note:expect.stringContaining('V$ARCHIVE_GAP: missing sequences 50–55 on thread 1.')});
+		expect(gap.note).not.toContain('baseline cannot be established');
+		if(status==='unavailable')expect(gap.note).toContain('ORA-00942');
+	}
+});
