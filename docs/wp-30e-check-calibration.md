@@ -1,8 +1,10 @@
 # WP-30E check calibration
 
-Eval-only correction on branch `wp-30e-check-calibration`. No product/scorer/SQL/contract changes; no DB connections, LLM calls or secret reads. Only the two requiredFacts and narrow positive-claim guards changed. Archive wording now includes vacuity, unmet preconditions, absent streams, empty sets and inapplicability; FRA wording includes undefined/N/A, missing measurements, false passes and an explicit No following the question. The independent archive limitation fact remains required.
+Eval-only correction on branch `wp-30e-check-calibration`. No product/scorer/SQL/contract changes; no DB connections, LLM calls or secret reads. Only the two cases’ required facts and positive-claim guards changed. Archive wording now includes vacuity, unmet preconditions, absent streams, empty sets and inapplicability; FRA wording includes undefined/N/A, missing measurements, false passes and an explicit No following the question. Archive applicability must now be established by the applicability fact itself.
 
-The forbidden patterns intentionally target explicit declarative positive claims at sentence starts. They reject “There are no gaps, healthy”, “We can establish a healthy no-gap”, and “Absent FRA is a healthy 0%”, including contradictory answers that also contain accepted applicability wording. They avoid matching the recorded question headings, conditional configured-FRA examples and negated healthy claims. Regex expectations are bounded lexical checks, not a general semantic contradiction detector.
+Following Antigravity's review, applicability facts now require phrases about the measurement or monitoring claim. Removed bare `no sequence`, `not configured`, `misleading`, `cannot`, and `not healthy`; the archive case no longer accepts an unrelated restore disclaimer as an independent required fact. Missing archived logs must be tied to existence or inspection, and archive streams must be named explicitly. The FRA question/No alternative requires the absent/unconfigured healthy-zero reporting question and a complete No answer, excluding “No doubt” and unrelated configuration questions.
+
+The forbidden patterns are bounded lexical checks, not semantic contradiction detection. They cover the review's positive no-sequence-gap/healthy and healthy-zero reporting templates, using clause boundaries and negation/disqualification exclusions to preserve recorded negated, vacuous and conditional examples. They can miss paraphrases or contradictions whose relevant words fall outside these bounds; they do not establish universal coverage.
 
 ## Offline replay
 
@@ -91,7 +93,7 @@ Each flip is justified by the following wording (the table below includes every 
 
 64 records: 54 → 61 passes; 7 flips; no regressions.
 
-## Validation and handoff
+## Initial validation and handoff
 
 - `npm run typecheck`: PASS (exit 0).
 - `npm test -- --maxWorkers=2`: PASS, 140 files / 2,633 tests, 110.81 seconds.
@@ -102,3 +104,22 @@ Each flip is justified by the following wording (the table below includes every 
 Initial focused validation exposed two missing phrase variants and an absent local `oracledb` installation. Added the phrase variants and restored existing locked dependencies with `npm ci --ignore-scripts`; no manifest or lockfile changes. All final checks above pass.
 
 Changed files: `evals/cases-hard/phase30-check.json`, `tests/unit/wp30e-check-calibration.test.ts`, `docs/wp-30e-replay.ts`, and this report. No contract changes requested. No change to `evals/scoring.ts`. Integration tests were not run: no DB/LLM code changed, and this task forbids live calls. New live model behavior was deliberately not verified. The three retained expiry errors prevent these archived p30 runs from becoming universally green.
+
+
+## Antigravity review revisions
+
+Addressed Major findings 1–4 and Minor finding 5 from the read-only review in `review-wp-30e-check-calibration/docs/review-wp-30e-check-calibration.md`. Also revised the overstated guard description (Info finding 6). No scorer, product, truth SQL, contract or replay-script change was needed.
+
+Added all review failure scenarios as negative tests, isolated tests ensuring unrelated tokens do not satisfy FRA applicability, contradictory-answer tests supplying valid applicability before positive healthy claims, and adversarial positives quoting recorded vacuity, conditional configured-FRA and explicit No explanations. Correct “cannot be reported”, “is not a healthy 0%”, and “would be a false pass” forms remain accepted.
+
+Offline replay after revision: **64 records, 54 → 61 passes, seven FAIL → PASS flips, zero regressions**. The per-record table and seven justifications above remain unchanged. All three NONE expiry errors still fail against archived OVER 14 DAYS. A first replay exposed one recorded em-dash/standalone-No heading missed by the tighter question pattern; fixing its line-ending boundary restored the expected result without accepting No doubt.
+
+Final revision checks:
+
+- `npm run typecheck`: PASS, exit 0.
+- `npm test -- --maxWorkers=2`: PASS, 140 files / 2,661 tests, 101.91 seconds, exit 0.
+- `npx vitest run tests/unit/wp30c-check-evals.test.ts tests/unit/wp30e-check-calibration.test.ts --maxWorkers=2`: PASS, 2 files / 67 tests, exit 0.
+- `npx tsx docs/wp-30e-replay.ts`: PASS, 54 → 61 / 64, seven flips, zero regressions; three expiry failures retained.
+- `git diff --check`: PASS.
+
+Revision files: the case JSON, calibration unit tests and this report. No contract changes requested. No LLM calls, DB connections, secret reads, push or merge. Integration/live behavior remains deliberately unverified under the offline-only task constraint.
