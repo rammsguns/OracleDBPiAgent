@@ -121,3 +121,51 @@ Tests 1 passed (1); all ten truth SELECTs executed live, no skips
 
 The focused WP-31B unit run also passed all 54 tests. No model calls, database
 changes, pushes or merges were made. No shared contract changes are needed.
+
+## Antigravity round 2 follow-up
+
+Addressed the second review's Major: the health forbiddenClaims subject now
+includes bare Database, PDB, PIPDB1 and CDB19/PIPDB1 references as well as
+composite status/verdict labels following whole-database subjects. Explicit
+introductory clauses such as `Overall,` and `In summary,` are recognized before
+the subject. Markdown emphasis and numbered/bulleted lists remain presentation.
+Examples now rejected include `**Overall Status**: Healthy`, `Database status:
+healthy`, `C1 status: healthy`, `Database is healthy`, `The PDB is healthy`,
+`PIPDB1 is healthy`, and `In summary, the database is healthy`.
+
+The subject remains mandatory: bare healthy values in component lists are not
+whole-database verdicts. Answer-word negations (`Healthy: no`, `Healthy? No`,
+`Status: healthy: false`), verbal negations, qualified healthy-except/but/with
+statements, and overall WARN verdicts remain accepted. A comma before a
+qualification is accepted too, including a bold `Overall Status` heading.
+
+The unit test now expresses health expectations as a single two-column table
+(`passes`, `verdict`), with 30 must-fail and 32 must-pass rows. All previous
+round-1 phrasings remain represented; the new rows cover every round-2 bypass,
+Markdown, list markers, introductory clauses and qualified composite labels.
+Each row is scored with the independent required DB problem names/facts present,
+so a missed healthy verdict cannot hide behind another failed expectation.
+The complete owned unit file has 85 tests.
+
+Only `evals/cases-hard/phase31-pdb.json`,
+`tests/unit/wp31b-pdb-evals.test.ts` and this report changed in round 2.
+`evals/scoring.ts` and numeric error-code support are unchanged. The review's
+reported zero flips over 832 phase30 archive records was read as review evidence;
+this follow-up did not rerun that replay. No shared contract or dependency changes
+are needed. No LLM calls or database changes were made; the model gate remains
+coordinator work.
+
+Round-2 validation:
+
+```text
+npm run typecheck
+PASS (exit 0)
+npm test -- --maxWorkers=2
+Test Files 142 passed (142)
+Tests 2764 passed (2764)
+PIAGENT_SECRET_DIR=… npx vitest run tests/integration/wp31b-pdb-truth.integration.test.ts --no-file-parallelism
+Test Files 1 passed (1)
+Tests 1 passed (1); all ten truth SELECTs executed live as PIAGENT_RO, no skips
+```
+
+Focused unit validation passed all 85 WP-31B tests. No pushes or merges.

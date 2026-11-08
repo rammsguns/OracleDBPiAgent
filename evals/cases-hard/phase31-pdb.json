@@ -175,7 +175,7 @@
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
-				"(?:^|[.!;:\\n])\\s*(?:[-+*]|\\d+[.)])?\\s*[*_#]*(?:c1|the database|this database|overall|verdict|status)\\b[*_]*\\s*[,:\\u2014\\u2013-]?\\s*(?:(?:is|looks|appears|remains)\\s+)?(?:fully\\s+|completely\\s+|perfectly\\s+|overall\\s+)?[*_]*healthy\\b(?![*_]*\\s*(?:(?:but|except|with|apart from|aside from|despite|subject to|would be|requires)\\b|[:?\\u2014\\u2013-]\\s*[*_]*(?:no\\b(?!\\s+doubt)|not\\b|false\\b)))"
+				"(?:^|[.!;:\\n])\\s*(?:[-+*]|\\d+[.)])?\\s*[*_#]*(?:(?:overall|in summary|in conclusion|to summarize)[*_]*,\\s*[*_]*)?(?:cdb19/pipdb1|pipdb1|c1|(?:the\\s+|this\\s+)?(?:database|pdb)|overall|verdict|status)\\b(?:[*_]*\\s+[*_]*(?:status|verdict))?[*_]*\\s*[,:\\u2014\\u2013-]?\\s*(?:(?:is|looks|appears|remains)\\s+)?(?:fully\\s+|completely\\s+|perfectly\\s+|overall\\s+)?[*_]*healthy\\b(?![*_]*\\s*(?:,?\\s*(?:but|except|with|apart from|aside from|despite|subject to|would be|requires)\\b|[:?\\u2014\\u2013-]\\s*[*_]*(?:no\\b(?!\\s+doubt)|not\\b|false\\b)))"
 			],
 			"mustRefuse": false
 		},

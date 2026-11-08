@@ -27,18 +27,6 @@ const grade = (verdict: string) => score(health, {
 	answer: `Failed job: REPORT_EXPORT_JOB. Invalid object: INVALID_CUSTOMER_VIEW. ${verdict}`,
 	toolCalls: ['health_check'], usage: { input: 0, output: 0 },
 }, [['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]).pass;
-it.each([
-	'The database is healthy.', 'Overall: healthy.', 'Status: healthy.',
-	'The backup is not verified. The database is fully healthy.',
-	'No restore was tested; c1 is healthy.', 'Verdict: completely healthy.',
-	'The database is not unhealthy; the database is healthy.',
-])('rejects unqualified health verdict: %s', verdict => expect(grade(verdict)).toBe(false));
-it.each([
-	'The database is not healthy.', 'Not fully healthy.', 'Overall: WARN.',
-	'It cannot be called healthy.', 'The database is healthy except for these maintenance problems.',
-	'The backup is healthy. The database requires attention.',
-	'Is the database healthy? No.', 'Healthy would be an incorrect verdict.',
-])('accepts negation and qualified/component verdicts: %s', verdict => expect(grade(verdict)).toBe(true));
 it('requires both DB problem names and their problem descriptions', () => {
 	for (const answer of ['WARN. Failed job: REPORT_EXPORT_JOB.', 'WARN. Invalid object: INVALID_CUSTOMER_VIEW.', 'REPORT_EXPORT_JOB. INVALID_CUSTOMER_VIEW.']) {
 		expect(score(health, { answer, toolCalls: [], usage: { input: 0, output: 0 } }, [['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]).pass).toBe(false);
@@ -63,23 +51,6 @@ it.each(['Autoextend is enabled', 'Autoextend is not disabled', 'Autoextend is n
 	expect(score(test, { answer: `OVER 128 MIB. ${fact}.`, toolCalls: [], usage: { input: 0, output: 0 } }, [['OVER 128 MIB']]).pass).toBe(false);
 });
 
-it.each([
-	'- Backup: healthy (recent level-0 backup present)\n- Space: healthy (headroom > 128 MiB)\nOverall: WARN.',
-	'1. Healthy: no, the database has scheduled job failures and invalid views.',
-	'Backup: healthy; Space: healthy; Overall: WARN.',
-	'Components: Backup: healthy: Space: healthy: Overall: WARN.',
-	'1. Backup: healthy\n2. Space: healthy\n3. Overall: WARN.',
-	'- Backup status: healthy\n- Space status: healthy\n- Overall: WARN.',
-	'Overall: Healthy: no, the database has failures.',
-	'Verdict: healthy? No, it has failures.',
-	'1. Status: healthy: false.',
-	'**Healthy**.',
-])('accepts review component lists and answer-word negations: %s', verdict => expect(grade(verdict)).toBe(true));
-it.each([
-	'- Overall: healthy.', '1. Verdict: healthy.', 'Summary: Overall: healthy.',
-	'Backup: healthy: The database is healthy.', 'This database is healthy.',
-	'Overall: healthy: no doubt.',
-])('still rejects explicit whole-database verdicts in colon/list layouts: %s', verdict => expect(grade(verdict)).toBe(false));
 const failedJob = cases.find(c => c.id === 'hard-p31-failed-job')!;
 const jobGrade = (answer: string, test = failedJob) => score(test, {
 	answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 },
@@ -96,4 +67,73 @@ it.each([
 ])('keeps wrong or misassociated error evidence failing: %s', answer => expect(jobGrade(answer)).toBe(false));
 it('keeps the numeric error-code exception local to the failed-job case', () => {
 	expect(jobGrade('| REPORT_EXPORT_JOB | 20001 |', { ...failedJob, id: 'unrelated-case' })).toBe(false);
+});
+
+// Full-score table: every row includes the independent DB problem facts and names.
+it.each`
+	passes   | verdict
+	${false} | ${"The database is healthy."}
+	${false} | ${"Overall: healthy."}
+	${false} | ${"Status: healthy."}
+	${false} | ${"The backup is not verified. The database is fully healthy."}
+	${false} | ${"No restore was tested; c1 is healthy."}
+	${false} | ${"Verdict: completely healthy."}
+	${false} | ${"The database is not unhealthy; the database is healthy."}
+	${false} | ${"- Overall: healthy."}
+	${false} | ${"1. Verdict: healthy."}
+	${false} | ${"Summary: Overall: healthy."}
+	${false} | ${"Backup: healthy: The database is healthy."}
+	${false} | ${"This database is healthy."}
+	${false} | ${"Overall: healthy: no doubt."}
+	${false} | ${"Overall status: healthy."}
+	${false} | ${"**Overall Status**: Healthy."}
+	${false} | ${"Database status: healthy."}
+	${false} | ${"Overall verdict: healthy."}
+	${false} | ${"C1 status: healthy."}
+	${false} | ${"Database: healthy."}
+	${false} | ${"Database is healthy."}
+	${false} | ${"The PDB is healthy."}
+	${false} | ${"PIPDB1 is healthy."}
+	${false} | ${"CDB19/PIPDB1 is healthy."}
+	${false} | ${"Overall, the database is healthy."}
+	${false} | ${"In summary, the database is healthy."}
+	${false} | ${"- **Overall status**: **healthy**."}
+	${false} | ${"1. **Database status**: healthy."}
+	${false} | ${"**CDB19/PIPDB1** is **healthy**."}
+	${false} | ${"In summary, **the database** is **healthy**."}
+	${false} | ${"Overall status: WARN. The PDB is healthy."}
+	${true} | ${"The database is not healthy."}
+	${true} | ${"Not fully healthy."}
+	${true} | ${"Overall: WARN."}
+	${true} | ${"It cannot be called healthy."}
+	${true} | ${"The database is healthy except for these maintenance problems."}
+	${true} | ${"The backup is healthy. The database requires attention."}
+	${true} | ${"Is the database healthy? No."}
+	${true} | ${"Healthy would be an incorrect verdict."}
+	${true} | ${"- Backup: healthy (recent level-0 backup present)\n- Space: healthy (headroom > 128 MiB)\nOverall: WARN."}
+	${true} | ${"1. Healthy: no, the database has scheduled job failures and invalid views."}
+	${true} | ${"Backup: healthy; Space: healthy; Overall: WARN."}
+	${true} | ${"Components: Backup: healthy: Space: healthy: Overall: WARN."}
+	${true} | ${"1. Backup: healthy\n2. Space: healthy\n3. Overall: WARN."}
+	${true} | ${"- Backup status: healthy\n- Space status: healthy\n- Overall: WARN."}
+	${true} | ${"Overall: Healthy: no, the database has failures."}
+	${true} | ${"Verdict: healthy? No, it has failures."}
+	${true} | ${"1. Status: healthy: false."}
+	${true} | ${"**Healthy**."}
+	${true} | ${"Overall status: WARN."}
+	${true} | ${"**Overall Status**: **WARN**."}
+	${true} | ${"- **Backup**: **healthy**\n- **Space**: healthy\n- **Overall status**: WARN."}
+	${true} | ${"1. **Overall Status**: **Healthy**: **No**, the database has failures."}
+	${true} | ${"Database status: not healthy."}
+	${true} | ${"The PDB cannot be called healthy."}
+	${true} | ${"PIPDB1 is not healthy."}
+	${true} | ${"CDB19/PIPDB1 is healthy except for maintenance problems."}
+	${true} | ${"Overall, the database is not healthy."}
+	${true} | ${"In summary, the database cannot be called healthy."}
+	${true} | ${"The database is healthy but requires maintenance."}
+	${true} | ${"The database is healthy with the exceptions listed above."}
+	${true} | ${"**Overall Status**: Healthy, but maintenance requires attention."}
+	${true} | ${"Overall verdict: healthy except for the failed job and invalid view."}
+`('health verdict passes=$passes: $verdict', ({ passes, verdict }) => {
+	expect(grade(verdict)).toBe(passes);
 });
