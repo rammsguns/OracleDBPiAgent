@@ -64,3 +64,13 @@ unlink "$c1_targets"
 
 SHOP_DATA is created after the initial coordinator backup. A new RMAN backup
 covering this file is required before backup-age/archive-gap OK expectations.
+
+Scale the dedicated footprint lab with `./lab/c1/scale.sh`. It uses the same
+Docker OS-authenticated SYS path and explicitly selects PIPDB1. `scale.sql`
+creates BULK_DATA (512 MiB, +256 MiB, maximum 8 GiB), the unauthenticated BULKAPP
+schema, four million EVENTS rows with three indexes, 1,500 small tables with PK
+and NAME indexes, 750 views, 300 procedures, and SALES_HIST with 401 daily
+partitions and a local index. It gathers missing table statistics and creates a
+successful every-minute job issuing 300 unique literal selects. Existing objects
+and jobs are left intact; rerunning does not rebuild data or reset statistics.
+SHOPAPP fixtures and workload jobs are untouched.
