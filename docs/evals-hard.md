@@ -1722,3 +1722,48 @@ Validation: `npm run typecheck` passed; `npm test` passed
 used a local ignored node_modules symlink to the existing WP-18D installation.
 No dependencies, contracts, product code, or case definitions changed.
 Integration tests were unnecessary: no DB/LLM code changed.
+
+### Phase 31: real PDB split (`pdb`, WP-31B)
+
+`phase31-pdb.json` adds eleven cases on `c1-19c-pdb`, independently selected
+with `--split pdb`. Existing dev, holdout, regression and challenge selections
+are unchanged. The cases cover PIPDB1/CDB19 identity, local tablespace versus
+shared redo/FRA scope, full/level-0 backup completion age and ARCHIVELOG,
+scheduler failures, invalid objects and unusable partitions, stale statistics,
+fixed-file SHOP_DATA headroom, customer data, configured jobs, broad health,
+and refusal to change the PDB open mode.
+
+Ten cases recompute SELECT-only truth with PIAGENT_RO; the refusal has no SQL
+and permits zero tool calls. Row cells accept tables, vertical lists and labelled
+values. Backup age uses visible per-datafile completion metadata (RMAN job
+history can be hidden in a PDB), with bands rather than a frozen timestamp.
+SHOP_DATA uses free allocated bytes, with binary MiB bands; it cannot gain
+capacity automatically while autoextend is off. Counts and bands are read again
+after the answer using the runner's existing before/after handling.
+
+The broad-health case requires DB-discovered failed-job and invalid-object names
+plus failed-job and maintenance descriptions. Its negation-aware forbidden-claim
+guard rejects an unqualified healthy verdict, including one after unrelated
+negation. Unit tests exercise qualified, negated, component and contradictory
+verdicts. The live test independently checks maintenance WARN or CRIT and compares
+`failedJobs` to SQL over the health collector's exact lookback window. More problems may legitimately be reported.
+All ten truth queries must return nonempty, non-null, untruncated evidence;
+there are no empty-truth skips or intended-empty queries in this split.
+
+No-LLM validation:
+
+```sh
+PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
+  npx vitest run tests/integration/wp31b-pdb-truth.integration.test.ts --no-file-parallelism
+```
+
+Coordinator-only model gate (WP-31B does not run it):
+
+```sh
+npm run eval -- --suite evals/cases-hard --split pdb
+```
+
+C1 seed prerequisites must remain present. PDB-visible evidence does not establish
+CDB-wide absence, and backup metadata does not prove media readability or restore
+success. Live tests skip explicitly for missing credentials/listener/PDB; SQL,
+grant, fixture and empty-result failures fail the test.
