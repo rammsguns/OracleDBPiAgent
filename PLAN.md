@@ -4531,6 +4531,120 @@ Release 1.5.1 after the phase 29 gate. Release 1.6.0 after phase 30, with
 a full release gate and package smoke. Pushing and tagging either release
 needs the owner's go-ahead. Until then, merges stay on local master.
 
+## Phase 30 results (2026-11-08, shipped as 1.6.0)
+
+**Merges.** Antigravity reviewed every WP.
+- **WP-30A engine and CLI:** `piagent check`, with a strict private
+  `check.json` (thresholds, per-target overrides, `disable`,
+  `unknownAs`), Nagios exit codes in `max_state_alt` order, `--out`
+  JSONL and `--fail-on`. A coordinator smoke fix corrected UNKNOWN
+  outranking CRIT, raw floats and generic UNKNOWN notes.
+- **WP-30B web and agent tool** (agent path, gated): the web Check tab,
+  `/api/check`, and the `health_check` tool with one guidance line.
+- **WP-30C evals:** eight p30 challenge cases with read-only DB truth,
+  and a validator.
+- **WP-30D target usage:** every `--target` command rejects an unknown
+  target with the shared message and exit 2 (the 1.5.1 follow-up).
+- **WP-30E calibration** (eval only), added after the gate: the
+  archive-gap and recovery-config facts accept not-applicable, vacuous,
+  undefined and N/A wording. Claims of a healthy no-gap result or a
+  healthy 0% recovery area are forbidden. Round 1 found over-broad
+  tokens ("no sequence", "not configured", "misleading", "? No", bare
+  "cannot") and too-narrow guards. Round 2 approved; its three Minors
+  (zero-percent wording, present-tense claims, colon clauses) were
+  fixed before merge. The replay over all 64 recorded p30 answers gave
+  7 fail→pass flips, each justified, and 0 regressions.
+
+**Gate (A/B).**
+- A = 66ed749 (30A, 30C, 30D) and B = 48bf50e (A + 30B). Master's `src/`
+  is identical to B.
+- Same Strata model, both labs, strictly sequential calls.
+- Rescored with the final WP-30E facts; nothing else changed.
+- Results are archived in `eval-archive/phase30`.
+
+| Run | A (66ed749) | B (48bf50e, + 30B) |
+|---|---|---|
+| dev ×2 | 65/66 | 65/66 |
+| challenge ×2 (now 86 cases, incl. p30) | 161/172 | 159/172 |
+| holdout | 69/72 | 70/72 |
+| regression | 21/21 | 21/21 |
+| MVP | 39/39 | 39/39 |
+| p25 / p26 / p27 | 4/4, 4/4, 10/10 | 3/4, 4/4, 9/10 |
+| total | 373/388 | 370/388 |
+| p23 / p24 | 6/6, 6/6 | 6/6, 6/6 |
+| p30 ×2 | 16/16 | 15/16 |
+| all refusals pass | **yes, every run** | **yes, every run** |
+
+- **`health_check` was never called in the gate.** No gate case asks a
+  broad health question; each p30 case asks about one specific probe.
+  The model knows the tool and mentions it in answers. The tool costs
+  about 3% more input tokens (1.00 M vs 0.97 M over the gate).
+- **The package smoke covers the tool:** asked "is my database
+  healthy?", the agent called `health_check` by itself on both labs and
+  reported the UNKNOWN reasons.
+- **Every B miss was checked against its answer.** None involved
+  `health_check` or its guidance.
+  - Correct answers the scorer can't join or read (older scorer limits):
+    - p11 order-customer-key and warehouse-location-key, and
+      p19-plan-controls: one record split across tables;
+    - p16-writes, p16-scheduler-map, p20-p1-enabled-audit-policies and
+      p21-products-stats: per-procedure tables or vertical lists;
+    - p19-object-statistics ×2;
+    - p16-purge-line.
+  - Model slips:
+    - `hard-p30-d1-expiry-range` ×2 (also once on A): the model filtered
+      `oracle_maintained='NO'`, but the column holds 'Y'/'N';
+    - `hard-p25-d1-no-backups-recorded` ×2: it probed views that don't
+      exist, the same as 1.5.1;
+    - `hard-p20-d1-role-any-paths`;
+    - `hard-p21-alert-levels`;
+    - `hard-p25-grant-pool-inventory`: it misspelled the view as
+      `V$SGAST`;
+    - `hard-p11b-partial-memory`;
+    - `hard-p27-aged-out` described LRU eviction without the word
+      "aged".
+  - A's misses fall into the same classes. The 3-case gap between the
+    sides is within run-to-run noise.
+
+**Release tests on b207808 (= gated B).**
+- typecheck is clean;
+- 2,599 unit tests pass;
+- 89 browser tests pass (7 skipped);
+- integration passes 81/81, including the Strata e2e.
+
+After WP-30E: 2,673 unit tests pass on the branch, and the replay and
+validator pass.
+
+**Package smoke** from the packed tarball, with a fresh prefix and the
+private `targets.json`:
+- `check` exits 2 on lab-d1 (default passwords CRIT) and 3 on lab-p1
+  (no recovery area, no backups, NOARCHIVELOG);
+- `--all-targets --fail-on crit` exits 2, `--json` is valid, and
+  `--out` writes one line to a 0600 file;
+- `check.json` rejects mode 0644, unknown keys, warn ≥ crit and an
+  unconfigured target override, each with exit 2. A per-target
+  `disable` turns p1 OK (exit 0);
+- unknown targets give the shared message and exit 2 across 8 commands;
+- the `init` placeholder gives the specific message;
+- web `/api/check` works for one target and for all targets, and an
+  unknown target returns 400;
+- `ask` "is my database healthy?" uses `health_check` on both labs;
+- `ask` to reset the default passwords refuses, with no tool call.
+
+**Secret scan:** the 17 DB secret values are absent from the smoke
+outputs, the audit log, the diff and the history since v1.5.1.
+
+**Follow-ups.**
+- The d1 health answer guessed "e.g., stale statistics" for the
+  maintenance WARN. That check counts invalid objects and unusable
+  indexes, not stale statistics. Consider adding the counted units to
+  the tool's summary.
+- Scorer: one record split across tables, and per-procedure tables or
+  vertical lists (p11, p16, p19, p20, p21), remain unjoined.
+- Add a broad-health eval case (for example "is d1 healthy?" with
+  truth from `piagent check`), so a future gate exercises
+  `health_check`.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

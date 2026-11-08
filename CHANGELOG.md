@@ -4,6 +4,55 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-08
+
+### Added
+
+- **`piagent check --target T | --all-targets [--json] [--out DIR]
+  [--fail-on warn|crit]`: a fast, read-only health verdict for cron and
+  Nagios, Icinga or Zabbix.** It never calls the LLM, and it reuses the
+  existing collectors, so it needs no new views or grants. It checks:
+  - tablespace, temp and undo use (autoextend-aware), and recovery area
+    use (reclaimable-aware);
+  - the longest blocking wait;
+  - the age of the last full or level-0 backup, and archived-log
+    sequence gaps;
+  - failed scheduler jobs, and alert-log ORA- errors and incidents in
+    the window;
+  - invalid objects and unusable indexes;
+  - expiring accounts and default passwords.
+
+  Each check reports OK, WARN, CRIT or UNKNOWN, with its value,
+  threshold, CDB/PDB scope and the `piagent` command to drill in. A
+  missing grant or an inapplicable check (for example NOARCHIVELOG) is
+  UNKNOWN, never OK. The exit code is the worst status, Nagios style:
+  0 OK, 1 WARN, 2 CRIT, 3 UNKNOWN. Thresholds, per-target overrides,
+  disabled checks and UNKNOWN mappings live in a private
+  `~/.piagent/check.json` (mode 0600, strictly validated). `--out`
+  appends one credential-redacted JSON line per run. See
+  [check](docs/check.md).
+- **Web Check tab.** It runs the check on demand for one target or all
+  targets, with the same cancellation and size limits as Top.
+- **`health_check` agent tool.** `ask` and chat can answer "is my
+  database healthy?" from the same check, and report UNKNOWN results and
+  probe or window limits.
+
+### Changed
+
+- **Every `--target` command rejects an unknown target the same way.**
+  It names the target, lists the configured targets, points to
+  `piagent targets`, and exits 2 before connecting. `jobs` still gives
+  its own message for a configured target outside its pinned scope.
+
+### Changed (evaluation only)
+
+- Eight phase 30 health cases with read-only truth from the database,
+  and a validator for them (WP-30C).
+- Calibrated the phase 30 not-applicable and unconfigured-area facts
+  (WP-30E). Correct wording such as "vacuous" or "undefined" now
+  passes, and claims of a healthy no-gap result or a healthy 0% recovery
+  area are rejected.
+
 ## [1.5.1] - 2026-11-07
 
 ### Fixed
