@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -6,7 +7,7 @@ import { readBackup, renderBackupMarkdown, BackupUsageError } from './index.js';
 import type { OracleSession } from '../contracts.js';
 export async function runBackup(options: { target: string; json?: boolean }): Promise<void> {
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new BackupUsageError('Unknown backup target');
+	requireConfiguredTarget(options.target, config.targets, BackupUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

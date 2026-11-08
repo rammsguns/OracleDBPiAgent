@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -9,7 +10,7 @@ export async function runSecurity(options: { target: string; check?: string; who
 	const filters = { checks: options.check?.split(',').map(id => id.trim()), whoCan: options.whoCan };
 	validateSecurityOptions(filters);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new SecurityUsageError('Unknown security target');
+	requireConfiguredTarget(options.target, config.targets, SecurityUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

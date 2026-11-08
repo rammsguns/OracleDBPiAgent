@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -8,7 +9,7 @@ export async function runTop(options: { target: string; seconds?: string; json?:
 	const seconds = options.seconds === undefined ? 15 : /^\d+$/.test(options.seconds) ? Number(options.seconds) : NaN;
 	validateSeconds(seconds);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new TopUsageError('Unknown top target');
+	requireConfiguredTarget(options.target, config.targets, TopUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

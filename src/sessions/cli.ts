@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -9,7 +10,7 @@ export async function runSessions(options: { target: string; section?: string; a
 	const filters = { sections: options.section?.split(',').map(id => id.trim()), includeBackground: options.all, minTxSeconds: options.minTxSeconds === undefined ? undefined : /^\d+$/.test(options.minTxSeconds) ? Number(options.minTxSeconds) : NaN, topWaits: options.top === undefined ? undefined : /^\d+$/.test(options.top) ? Number(options.top) : NaN };
 	validateSessionsOptions(filters);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new SessionsUsageError('Unknown sessions target');
+	requireConfiguredTarget(options.target, config.targets, SessionsUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

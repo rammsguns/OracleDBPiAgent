@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, open } from 'node:fs/promises';
 import { constants } from 'node:fs';
@@ -21,7 +22,7 @@ export async function runCheck(options: { target?: string; allTargets?: boolean;
 	if (options.failOn !== undefined && !['warn','crit'].includes(options.failOn)) throw new CheckUsageError('Usage: --fail-on must be warn or crit');
 	const config = loadConfig();
 	const names = config.targets.map(t => t.name);
-	if (options.target && !names.includes(options.target)) throw new CheckUsageError(`Usage: unknown check target; configured targets: ${names.join(', ')}`);
+	if (options.target) requireConfiguredTarget(options.target, config.targets, CheckUsageError);
 	const settings = loadCheckConfig(names), sessions = createSessionProvider(config);
 	try {
 		const result = await withoutConnectionFailures(() => runChecks({config,sessions,audit:new JsonlAuditSink(config.auditFile),runId:randomUUID()},options.allTargets ? names : [options.target!],target => thresholdsFor(settings,target)));

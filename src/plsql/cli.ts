@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -10,7 +11,7 @@ export async function runPlsql(kind: 'list' | 'doc', options: { target: string; 
 	if (kind === 'doc') objectName(options.object ?? '');
 	if (options.owner) identifier(options.owner);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new Error('Unknown PL/SQL target');
+	requireConfiguredTarget(options.target, config.targets);
 	const sessions = createSessionProvider(config);
 	try {
 		const ctx = { config, sessions, audit: new JsonlAuditSink(config.auditFile), runId: randomUUID() };
