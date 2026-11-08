@@ -1,3 +1,4 @@
+import { dictionaryDomainHint } from "./dictionaryDomains.js";
 import { createHealthCheckTool } from './healthCheck.js';
 import { Type } from "typebox";
 import { createHash } from "node:crypto";
@@ -141,7 +142,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							} else throw error;
 							result = await session.query(sql, binds, { maxRows });
 						}
-						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
+						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = dictionaryDomainHint(sql, 0) ?? await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
 							sql = "SELECT child_number, id, parent_id, operation, options, object_owner, object_name, cardinality, bytes, cost, access_predicates, filter_predicates FROM v$sql_plan WHERE sql_id=:sql_id ORDER BY child_number,id";
