@@ -107,7 +107,7 @@ export function renderCheck(content, r) {
 }
 export function initOperations(api, targets) {
 	for (const [id, render] of [['check', renderCheck], ['backup', renderBackup], ['jobs', renderJobs], ['top', renderTop]]) {
-		const view = setupPanel(id, id === 'top' ? 'Sample' : 'Refresh ' + id, targets, id === 'check'); view.form.className = 'operations-toolbar';
+		const view = setupPanel(id, id === 'top' ? 'Sample' : 'Refresh ' + id, targets); view.form.className = 'operations-toolbar';
 		if (id === 'check') { const all = el('option', 'All targets'); all.value = '__all_targets__'; view.target.append(all); }
 		let seconds;
 		if (id === 'top') { seconds = view.field('input', 'seconds', 'Sample seconds (5–120)'); seconds.type = 'number'; seconds.min = '5'; seconds.max = '120'; seconds.step = '1'; seconds.value = '15'; seconds.required = true; view.form.append(view.run); }

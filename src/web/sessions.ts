@@ -63,7 +63,7 @@ export class SessionManager {
 	async create(target?: string): Promise<Conversation> {
 		if (this.stopped) throw new WebError(503, "Server is closing");
 		if (target !== undefined && !this.config.targets.some(t => t.name === target)) {
-			throw new WebError(400, "Unknown target");
+			throw new WebError(400, "Invalid target");
 		}
 		// Reserve a slot before any asynchronous initialization.
 		if (this.entries.size + this.pending.size >= 4) throw new WebError(409, "Session limit reached");

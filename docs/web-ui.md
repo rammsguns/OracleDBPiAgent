@@ -12,6 +12,23 @@ SHA-256 digests with `crypto.timingSafeEqual`. All requests require a Host of
 `Content-Security-Policy: default-src 'self'`, `X-Content-Type-Options: nosniff`
 and `Referrer-Policy: no-referrer`; API responses also use `Cache-Control: no-store`.
 
+## Configured targets
+
+Every target selector and diagnostic API uses the loaded configuration, including
+owner-approved private targets. Start web with the same `PIAGENT_HOME`,
+`PIAGENT_TARGETS_FILE` (if used) and `PIAGENT_SECRET_DIR` as the CLI.
+A private targets file replaces the packaged list; packaged names absent from
+that file are rejected too. Unknown target names return HTTP 400 with
+`{"message":"Invalid target"}` before opening a database session.
+
+This applies to Check, Backup, Jobs, Top, PL/SQL, Triage, Alert Log, SQL, Security,
+Sessions, Space, Drift, Report/save/history and chat target selection. Check's
+**All targets** runs over the loaded list. Report and history use the main chat
+target selector. Configuration validation, account deny lists, Oracle 19c and
+read-only connection gates are shared with the CLI. Restart web after changing
+configuration; the running server retains its loaded list.
+See [private target setup](real-targets.md).
+
 ## HTTP API
 
 - `GET /api/targets`: array of `{ name, environment, description }`. No connection
@@ -228,7 +245,7 @@ WP-4B validation (2026-10-29):
 
 ### Cross-target drift
 
-The Drift tab compares two selected approved targets without an agent or LLM call.
+The Drift tab compares two selected configured targets without an agent or LLM call.
 Choose left/right targets, then Parameters, Schema or Objects. Schema and Objects
 also require an owner (for example HR). Self-comparisons are allowed. Results
 show source views, unavailable-section notes, and collapsible Only left, Only
@@ -238,7 +255,7 @@ for unavailable sections. Object and column names render as literal text.
 The authenticated `POST /api/drift` accepts JSON
 `{"left":"d1-19c-lab","right":"p1-19c-prod","scope":"schema:HR"}`.
 It uses the existing bearer-token, loopback Host and same-origin Origin checks;
-other methods are rejected. Targets must be both approved and configured, and
+other methods are rejected. Targets must be in the loaded configuration, and
 scope validation reuses the drift engine. Queries use its read-only policy,
 audit and row limits unchanged. One comparison per server is allowed through
 provider cleanup; concurrent requests return 429. JSON responses over 1 MiB
@@ -275,7 +292,7 @@ observations. No dependencies or shared contracts were added.
 
 ### PL/SQL and triage
 
-The **PL/SQL** tab lists objects for its selected approved target, optionally
+The **PL/SQL** tab lists objects for its selected configured target, optionally
 filtered by owner. Choose an object and **Document object** to see signatures,
 comments, status, errors, heuristic table operations, callers, jobs and redacted
 source. Expand the evidence sections to inspect dictionary availability and caps.
@@ -302,8 +319,7 @@ Authenticated endpoints:
 | GET | `/api/plsql/doc` | `target`, `object=OWNER.NAME` |
 | POST | `/api/triage` | JSON `target`, nonempty `issue`, optional `since` |
 
-Targets default to the configured default and must be one of the three approved
-configured targets. Names must be unquoted Oracle identifiers (letters followed
+Targets default to the configured default and must be in the loaded configuration. Names must be unquoted Oracle identifiers (letters followed
 by letters, digits, `_`, `$`, `#`, at most 128 characters per component).
 The existing bearer token, Host and Origin checks apply. These three routes share
 a single-flight lock through session cleanup (`429` when busy). Issue text is
@@ -332,7 +348,7 @@ tables and Oracle-supplied nodes. The legend sits immediately above the diagram.
 ### Alert Log (WP-18C)
 
 The **Alert Log** tab reads `V$DIAG_ALERT_EXT` and the joined ADR incident/problem
-list through `src/alertlog`. Choose either approved target, a relative window
+list through `src/alertlog`. Choose a configured target, a relative window
 (default `24h`, maximum `30d`), optional comma-separated five-digit ORA-/TNS-
 codes, and a case-insensitive message substring. The default reader severity
 filter includes diagnostic text markers even when Oracle labels them Normal.
@@ -348,7 +364,7 @@ grant request as text, without executing it. Markdown exports both tables.
 `GET /api/alertlog?target=d1-19c-lab&since=7d&codes=ORA-00600&text=incident`
 returns `{ entries, incidents, markdown }`, where the first two are the reader's
 `AlertResult<AlertRow>` and `AlertResult<IncidentRow>`. It shares the insight
-routes' bearer token, loopback Host/Origin checks, approved target validation,
+routes' bearer token, loopback Host/Origin checks, configured target validation,
 1 MiB response cap and single-flight lock through session cleanup. The readers
 run sequentially, with the configured row and statement-timeout limits.
 

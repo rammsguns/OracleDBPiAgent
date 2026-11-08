@@ -4,7 +4,7 @@ function el(tag, text) {
 	return node;
 }
 
-export function setupPanel(id, title, targets, includeConfiguredTargets = false) {
+export function setupPanel(id, title, targets) {
 	const panel = document.getElementById(id + "-panel");
 	const form = el("form");
 	function field(tag, name, label) {
@@ -16,8 +16,7 @@ export function setupPanel(id, title, targets, includeConfiguredTargets = false)
 		return input;
 	}
 	const target = field("select", "target", "Target");
-	const approved = includeConfiguredTargets ? targets : targets.filter(item => ["d1-19c-lab", "p1-19c-prod", "c1-19c-pdb", "c1s-19c-stby"].includes(item.name));
-	for (const item of approved) {
+	for (const item of targets) {
 		const option = el("option", item.name);
 		option.value = item.name;
 		target.append(option);

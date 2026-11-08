@@ -73,6 +73,11 @@ function json(res: ServerResponse, status: number, data: unknown) {
 	res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
 	res.end(JSON.stringify(data));
 }
+function redactUsername(description: string, username: string): string {
+	const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	// Oracle identifiers can contain $ and # as well as regex word characters.
+	return description.replace(new RegExp(`(?<![\\w$#])${escaped}(?![\\w$#])`, 'gi'), 'read-only account');
+}
 export function createWebServer(options: WebServerOptions = {}) {
 	const manager = options.manager ?? new SessionManager({ ...options, triageRunner: options.triage ?? options.triageRunner });
 	const token = options.token ?? randomBytes(32).toString("hex");
@@ -101,7 +106,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (!hosts.includes(req.headers.host ?? "") || (req.headers.origin !== undefined && req.headers.origin !== `http://${req.headers.host}`)) throw new WebError(403, "Forbidden");
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
-			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: redactUsername(description, username) })));
 			if (['/api/check', '/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';
@@ -109,7 +114,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 				const data: Record<string, unknown> = isTriage ? await body(req, 400 * 1024) : Object.fromEntries(new URL(req.url!, 'http://localhost').searchParams);
 				const target = data.target ?? manager.config.defaultTarget;
 				const allChecks = raw === '/api/check' && target === '__all_targets__';
-				if (typeof target !== 'string' || (!allChecks && ((raw !== '/api/check' && !['d1-19c-lab', 'p1-19c-prod', 'c1-19c-pdb', 'c1s-19c-stby'].includes(target)) || !manager.config.targets.some(t => t.name === target)))) throw new WebError(400, 'Invalid target');
+				if (typeof target !== 'string' || (!allChecks && !manager.config.targets.some(t => t.name === target))) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
 					if (['/api/check', '/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
@@ -182,9 +187,8 @@ export function createWebServer(options: WebServerOptions = {}) {
 			if (raw === "/api/drift") {
 				if (req.method !== "POST") throw new WebError(405, "Method not allowed");
 				const data = await body(req);
-				const approved = new Set(["d1-19c-lab", "p1-19c-prod", "c1-19c-pdb", "c1s-19c-stby"]);
 				for (const target of [data.left, data.right]) {
-					if (typeof target !== "string" || !approved.has(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
+					if (typeof target !== "string" || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
 				}
 				if (typeof data.scope !== "string" || data.scope.length > 136) throw new WebError(400, "Invalid scope");
 				try { parseScope(data.scope); } catch { throw new WebError(400, "Invalid scope"); }

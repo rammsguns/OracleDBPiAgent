@@ -1,4 +1,3 @@
-const approved = new Set(['d1-19c-lab', 'p1-19c-prod', 'c1-19c-pdb', 'c1s-19c-stby']);
 function node(tag, text) {
 	const element = document.createElement(tag);
 	if (text !== undefined) element.textContent = text;
@@ -15,7 +14,7 @@ export function initDrift(api, targets) {
 		const caption = node('label', label); caption.htmlFor = id; form.append(caption, select);
 		return select;
 	};
-	const choices = targets.filter(t => approved.has(t.name)).map(t => [t.name, t.name]);
+	const choices = targets.map(t => [t.name, t.name]);
 	const left = picker('drift-left', 'Left target', choices);
 	const right = picker('drift-right', 'Right target', choices);
 	if (choices.length > 1) right.selectedIndex = 1;

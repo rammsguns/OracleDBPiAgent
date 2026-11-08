@@ -74,6 +74,18 @@ async function fixture(options: { fail?: boolean; hold?: boolean; failFactory?: 
 }
 
 describe("loopback web API", () => {
+	it.each([
+		['RO', 'PRODUCTION DATABASE: RO, ro and Ro.', 'PRODUCTION DATABASE: read-only account, read-only account and read-only account.'],
+		['APP', 'APPLICATION SERVICE: APP and app.', 'APPLICATION SERVICE: read-only account and read-only account.'],
+		['APP$RO', 'APPXRO APP$ROLE APP$RO app$ro.', 'APPXRO APP$ROLE read-only account read-only account.'],
+		['APP#', 'APP#MORE APP# app#.', 'APP#MORE read-only account read-only account.'],
+	])('redacts whole username %s case-insensitively without changing other words', async (username, description, expected) => {
+		const f = await fixture();
+		f.manager.config.targets = [{ ...f.manager.config.targets[0]!, username, description }];
+		const result = await f.call('/api/targets');
+		expect(result.status).toBe(200);
+		expect(JSON.parse(result.text)[0].description).toBe(expected);
+	});
 	it("binds only 127.0.0.1 and generates a random fragment token", async () => {
 		const f = await fixture();
 		expect(f.web.server.address()).toMatchObject({ address: "127.0.0.1", family: "IPv4" });
