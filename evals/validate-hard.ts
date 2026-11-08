@@ -58,7 +58,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		const harder = challenge.filter(test => test.id.startsWith('hard-p11b-'));
 		if (harder.length && (harder.length !== 10 || ['sql-semantics', 'long-diagnosis', 'conflicting-evidence', 'partial-grants'].some(category => !harder.some(test => test.category === category)))) throw new Error('Harder challenge needs ten cases covering four categories');
 		for (const test of challenge) {
-			if (test.id.startsWith('hard-p27-') && !test.groundTruth) continue;
+			if ((test.id.startsWith('hard-p27-') || test.id.startsWith('hard-p30-')) && !test.groundTruth) continue;
 			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells') throw new Error('Challenge needs rowCells truth');
 			if (test.category === 'multi-turn-dependency' && !test.turns) throw new Error('Challenge dependency needs turns');
 		}
@@ -88,6 +88,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 	}
 
 	checkRepairedCases(cases);
+	const health = cases.filter(test => test.id.startsWith('hard-p30-'));
+	if (health.length) checkP30Cases(health);
 
 	const jobs = cases.filter(test => test.id.startsWith('hard-p26-'));
 	if (jobs.length) checkP26Cases(jobs);
@@ -177,6 +179,7 @@ export async function validateHardCases(input?: EvalCase[]) {
 					continue;
 				}
 				if (!rows.length || rows.length >= 100 || result.truncated || rows.some(row => row.some(cell => cell == null))) throw new Error(`Empty, null or possibly truncated truth: ${test.id}`);
+				if (test.id.startsWith('hard-p30-')) checkP30Cases(cases.filter(candidate => candidate.id.startsWith('hard-p30-')), { id: test.id, rows });
 				checkPinnedFacts(test, rows);
 				checkChallengeRows(test, rows);
 				if (test.id.startsWith('hard-p26-')) checkP26Cases(cases.filter(candidate => candidate.id.startsWith('hard-p26-')), { id: test.id, target: test.target, rows });
@@ -235,4 +238,24 @@ export function checkRepairedCases(cases: EvalCase[]): void {
 			if (!exposed && /\b(?:run_query|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question ?? '')) throw new Error('Blind replacement questions must not name tools or views');
 		}
 	}
+}
+
+/** Health questions choose their own tools; live prerequisites fail closed. */
+export function checkP30Cases(cases: EvalCase[], liveTruth?: { id: string; rows: unknown[][] }): void {
+	if (cases.length !== 8 || new Set(cases.map(test => test.id)).size !== 8 || cases.filter(test => test.expect.mustRefuse).length !== 1) throw new Error('p30 requires eight distinct cases and one refusal');
+	if (['d1-19c-lab', 'p1-19c-prod'].some(target => cases.filter(test => test.target === target).length !== 4)) throw new Error('p30 needs four cases per lab');
+	for (const test of cases) {
+		if (test.category !== 'check' || test.split !== 'challenge' || !test.question || test.skipWhenTruthEmpty) throw new Error('p30 requires stable challenge health questions');
+		if (/\b(?:health_check|run_query|piagent\s+check|V\$\w+|DBA_\w+|ALL_\w+)\b/i.test(test.question) || test.expect.requiredTools.length) throw new Error('p30 must leave tool choice open');
+		if (test.expect.mustRefuse) {
+			if (test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p30 refusal must make no calls');
+		} else {
+			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p30 requires read-only rowCells truth without setup');
+			classifySql(test.groundTruth.sql);
+			if (/\b(?:DBA_HIST_\w*|V\$ACTIVE_SESSION_HISTORY|PASSWORD|SPARE4|ADDITIONAL_INFO|JOB_ACTION)\b/i.test(test.groundTruth.sql)) throw new Error('p30 truth must exclude secrets, free text and pack views');
+		}
+	}
+	if (liveTruth?.id === 'hard-p30-p1-archive-gap' && (liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[0] !== 'NOARCHIVELOG')) throw new Error('p30 archive premise changed; review applicability facts');
+	if (liveTruth?.id === 'hard-p30-p1-recovery-config' && (liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[0] !== 'UNCONFIGURED')) throw new Error('p30 recovery premise changed; review limitation facts');
+	if (liveTruth?.id === 'hard-p30-d1-default-password-drivers' && !liveTruth.rows.length) throw new Error('p30 default-password driver premise disappeared');
 }
