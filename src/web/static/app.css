@@ -257,3 +257,18 @@ td:nth-child(2) { max-width: 24rem; }
 #backup-panel, #jobs-panel, #top-panel { min-width: 0; overflow-wrap: anywhere; }
 .operations-card .table-scroll { width: 100%; min-width: 0; }
 .operations-card table { min-width: 30rem; }
+
+.check-status { font-weight: 700; }
+.check-ok { color: #166534; }
+.check-warn { color: #854d0e; }
+.check-crit { color: #991b1b; }
+.check-unknown, .check-skipped { color: #475569; }
+@media (prefers-color-scheme: dark) {
+	.check-ok { color: #86efac; }
+	.check-warn { color: #fde047; }
+	.check-crit { color: #fca5a5; }
+	.check-unknown, .check-skipped { color: #cbd5e1; }
+}
+#check-panel, #check-content { min-width: 0; overflow-wrap: anywhere; }
+#check-content .table-scroll { width: 100%; min-width: 0; max-width: 100%; }
+#check-content table { min-width: 60rem; }

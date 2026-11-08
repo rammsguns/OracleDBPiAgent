@@ -230,7 +230,7 @@ $('target').addEventListener('change', async () => {
 });
 $('refresh').addEventListener('click', health);
 $('audit-refresh').addEventListener('click', audit);
-const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'sql', 'dbsessions', 'space', 'backup', 'jobs', 'top', 'security', 'alertlog', 'triage'];
+const tabs = ['trace', 'audit', 'report', 'drift', 'plsql', 'sql', 'dbsessions', 'space', 'backup', 'jobs', 'check', 'top', 'security', 'alertlog', 'triage'];
 for (const [index, id] of tabs.entries()) {
 	$(`${id}-tab`).addEventListener('click', () => tab(id));
 	$(`${id}-tab`).addEventListener('keydown', event => {
