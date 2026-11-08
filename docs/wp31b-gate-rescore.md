@@ -1,6 +1,6 @@
 # Phase 31 PDB offline replay
 
-Stored answers and truth from each archive; same scorer before/after. Only backup age truth is projected to its first column. No fresh truth or model calls.
+Stored answers and truth from archived gate results; same scorer before/after. Only backup age truth is projected to its first column. No fresh truth or model calls.
 
 ## gate31a/pdb-1
 
