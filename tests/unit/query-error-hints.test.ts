@@ -2,12 +2,12 @@ import { it, expect, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { createDbTools } from '../../src/tools/index.js';
 import type { ToolContext } from '../../src/contracts.js';
-function setup(message: string, rows: unknown[][] = [['SQL_ID', 3], ['SQL_FULLTEXT', 3], ['PARSE_CALLS', 3]]) {
+function setup(message: string, rows: unknown[][] = [['SQL_ID', 3], ['SQL_FULLTEXT', 3], ['PARSE_CALLS', 3]], identity?: object) {
 	const error = new Error(message);
 	const query = vi.fn().mockRejectedValueOnce(error).mockResolvedValue({ columns: ['COLUMN_NAME','TOTAL_COLUMNS'], rows, truncated: false, elapsedMs: 1 });
 	const close = vi.fn();
 	const record = vi.fn();
-	const ctx = { config: { defaultTarget: 'lab', targets: [{name:'lab',defaultSchema:'SH'}], limits: {maxRows:100,statementTimeoutSeconds:15,maxToolResultBytes:16000} }, sessions: {get:vi.fn().mockResolvedValue({target:{name:'lab'},query,close})}, audit:{record},runId:'test' } as unknown as ToolContext;
+	const ctx = { config: { defaultTarget: 'lab', targets: [{name:'lab',defaultSchema:'SH'}], limits: {maxRows:100,statementTimeoutSeconds:15,maxToolResultBytes:16000} }, sessions: {get:vi.fn().mockResolvedValue({target:{name:'lab'},identity,query,close})}, audit:{record},runId:'test' } as unknown as ToolContext;
 	const tool = createDbTools(ctx).find(t => t.name === 'run_query')!;
 	return { query, close, record, error, run: (sql: string) => tool.execute('1', {sql}).catch(e => e as Error) };
 }
@@ -65,6 +65,33 @@ it('does not let comment-like literal text expose fake FROM names',async()=>{
 it('returns successful run_query results without metadata lookups',async()=>{
 	const s=setup('unused'); s.query.mockReset().mockResolvedValue({columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const result=await s.run('SELECT 1 n FROM dual'); expect(result.details.rows).toEqual([[1]]); expect(s.query).toHaveBeenCalledTimes(1);
+});
+it('attributes multi-object ORA-00942 with bounded audited probes', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error)
+		.mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1})
+		.mockRejectedValueOnce(new Error('ORA-01031: insufficient privileges'));
+	const e=await s.run('SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#');
+	expect(e.message).toContain('Readable: V$LOG. Not visible to this account: V$LOGMEMBER.');
+	expect(s.query.mock.calls.map(call=>call[0])).toEqual(['SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#','SELECT * FROM V$LOG WHERE 1=0','SELECT * FROM V$LOGMEMBER WHERE 1=0']);
+	expect(s.query.mock.calls[1]![2]).toEqual({maxRows:100,timeoutSeconds:15});
+	expect(s.record).toHaveBeenCalledTimes(3);
+	expect(s.record.mock.calls[0]![0]).toMatchObject({sqlText:'SELECT * FROM V$LOG WHERE 1=0',sqlSha256:createHash('sha256').update('SELECT * FROM V$LOG WHERE 1=0').digest('hex')});
+});
+it('parses nested subqueries and comma joins, caps ORA-00942 probes at six', async () => {
+	const s=setup('ORA-00942: table or view does not exist');
+	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValue({columns:[],rows:[],truncated:false,elapsedMs:1});
+	await s.run('SELECT * FROM (SELECT * FROM a.x JOIN b.y ON 1=1) q, c.z, d.w, e.v, f.u, g.t, h.s');
+	expect(s.query).toHaveBeenCalledTimes(7);
+});
+it('skips single-object ORA-00942 and injection-shaped identifiers', async () => {
+	const one=setup('ORA-00942: table or view does not exist'); await one.run('SELECT * FROM v$log'); expect(one.query).toHaveBeenCalledTimes(1);
+	const bad=setup('ORA-00942: table or view does not exist'); await bad.run('SELECT * FROM v$log JOIN "bad.name" x ON 1=1'); expect(bad.query).toHaveBeenCalledTimes(1);
+});
+it.each([['PDB1',true],['CDB$ROOT',false],['ORCL',false]])('notes NULL apply lag only in PDB container %s', async (containerName, expectNote) => {
+	const s=setup('unused', [['apply lag',null]], {isCdb:containerName !== 'ORCL',containerName}); s.query.mockReset().mockResolvedValue({columns:['NAME','VALUE'],rows:[['apply lag',null]],truncated:false,elapsedMs:1});
+	const result=await s.run("SELECT NAME, VALUE FROM V$DATAGUARD_STATS WHERE NAME='apply lag'");
+	if (expectNote) expect(result.details.sourceNote).toContain('This does not mean zero lag'); else expect(result.details.sourceNote).toBeUndefined();
 });
 it('matches PARSES to PARSE_CALLS using their common stem', async () => {
 	const s = setup('ORA-00904: "PARSES": invalid identifier');

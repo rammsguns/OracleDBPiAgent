@@ -144,6 +144,9 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 							result = await session.query(sql, binds, { maxRows });
 						}
 						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = dictionaryDomainHint(sql, 0) ?? await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
+						if (name === "run_query" && isNullApplyLag(sql, result as QueryResult) && session.identity?.isCdb && session.identity.containerName && !['CDB$ROOT', 'PDB$SEED'].includes(session.identity.containerName.toUpperCase())) {
+							sourceNote = "Inside a PDB, Oracle hides apply lag (NULL). This does not mean zero lag. Use health_check/piagent check dgLag; its bounded apply value is based on the V$MANAGED_STANDBY view.";
+						}
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
 							sql = "SELECT child_number, id, parent_id, operation, options, object_owner, object_name, cardinality, bytes, cost, access_predicates, filter_predicates FROM v$sql_plan WHERE sql_id=:sql_id ORDER BY child_number,id";
@@ -388,17 +391,50 @@ function closeColumns(columns: string[], candidates: string[]): string[] {
 	}).filter(match => Number.isFinite(match.rank)).sort((a, b) => a.rank - b.rank || a.index - b.index).slice(0, 3).map(match => match.column);
 }
 
+const strictObjectPart = /^(?:[A-Za-z_][A-Za-z0-9_$#]*|"[A-Za-z_][A-Za-z0-9_$#]*")$/;
+function referencedObjects(sql: string): string[] {
+	const tokens = [...sql.matchAll(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[\p{L}_][\p{L}\p{N}_$#]*|[^\s]/gu)].map(m => m[0]);
+	const code = tokens.filter(t => !t.startsWith('--') && !t.startsWith('/*') && !t.startsWith("'"));
+	const found: string[] = [];
+	const boundaries = new Set(['WHERE','GROUP','ORDER','CONNECT','START','HAVING','UNION','MINUS','INTERSECT','FETCH','MODEL','PIVOT','SET','ON']);
+	let fromDepths = new Set<number>(), depth = 0, expectTable = false;
+	for (let i=0;i<code.length;i++) {
+		const token=code[i]!; const upper=token.toUpperCase();
+		if (token === '(') { if (expectTable) expectTable=false; depth++; continue; }
+		if (token === ')') { fromDepths.delete(depth); depth=Math.max(0,depth-1); expectTable=false; continue; }
+		if (upper === 'FROM') { fromDepths.add(depth); expectTable=true; continue; }
+		if (upper === 'JOIN' && fromDepths.has(depth)) { expectTable=true; continue; }
+		if (boundaries.has(upper)) { fromDepths.delete(depth); expectTable=false; continue; }
+		if (token === ',' && fromDepths.has(depth)) { expectTable=true; continue; }
+		if (!expectTable) continue;
+		expectTable=false;
+		if (!strictObjectPart.test(token)) continue;
+		let parts=[token];
+		while (code[i+1] === '.' && strictObjectPart.test(code[i+2] ?? '')) { parts.push(code[i+2]!); i+=2; }
+		const object=parts.map(part=>part.startsWith('"')?part:part.toUpperCase()).join('.');
+		if (parts.length <= 2 && /^[A-Za-z_$#"]/.test(object)) found.push(object);
+	}
+	return [...new Set(found)];
+}
+
+function isNullApplyLag(sql: string, result: QueryResult): boolean {
+	if (!/\bV\$DATAGUARD_STATS\b/i.test(sql)) return false;
+	const name=result.columns.findIndex(c=>c.toUpperCase()==='NAME'), value=result.columns.findIndex(c=>c.toUpperCase()==='VALUE');
+	return name>=0 && value>=0 && result.rows.some(row=>['apply lag','apply finish time'].includes(String(row[name]).toLowerCase()) && row[value] == null);
+}
+
 async function queryErrorHint(error: unknown, sql: string, session: OracleSession, ctx: ToolContext): Promise<unknown> {
 	if (!(error instanceof Error) || !/^ORA-(00904|01747|00942|00935):/.test(error.message)) return error;
 	let hint = "";
 	try {
-		const lookup = async (statement: string, binds: Record<string, unknown>) => {
+		const lookup = async (statement: string, binds: Record<string, unknown>, timeoutSeconds = Math.min(2, ctx.config.limits.statementTimeoutSeconds)) => {
 			const base = { at: new Date().toISOString(), runId: ctx.runId, target: session.target.name, tool: "run_query",
-				sqlSha256: createHash("sha256").update(statement).digest("hex") };
+				sqlSha256: createHash("sha256").update(statement).digest("hex"),
+				...(statement.startsWith("SELECT * FROM ") ? { sqlText: statement } : {}) };
 			try {
 				const result = await session.query(classifySql(statement), binds, {
 					maxRows: Math.min(1000, ctx.config.limits.maxRows),
-					timeoutSeconds: Math.min(2, ctx.config.limits.statementTimeoutSeconds),
+					timeoutSeconds,
 				});
 				await ctx.audit.record({ ...base, kind: "tool_call", rows: result.rows.length, truncated: result.truncated, elapsedMs: result.elapsedMs });
 				return result;
@@ -408,6 +444,19 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 			}
 		};
 		if (error.message.startsWith("ORA-00935:")) hint = "Hint: aggregates cannot nest in one SELECT level; aggregate in a subquery, then aggregate its result.";
+		else if (error.message.startsWith("ORA-00942:") && referencedObjects(sql).length > 1) {
+			const objects = referencedObjects(sql);
+			const readable: string[] = [], hidden: string[] = [];
+			for (const object of objects.slice(0, 6)) {
+				try { await lookup(`SELECT * FROM ${object} WHERE 1=0`, {}, ctx.config.limits.statementTimeoutSeconds); readable.push(object); }
+				catch (failure) { if (/ORA-(00942|01031)/.test(String(failure))) hidden.push(object); }
+			}
+			const sections = [];
+			if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
+			if (hidden.length) sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+			if (objects.length > 6) sections.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);
+			if (sections.length) hint = `Source: ${sections.join(" ")}`;
+		}
 		else {
 			const views = dictionaryViews(sql);
 			const parts: string[] = [];
