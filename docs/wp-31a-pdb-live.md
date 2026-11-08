@@ -5,14 +5,14 @@ Verified 2026-11-08 on branch wp-31a-pdb-live. C1: oracle19c-cdb, localhost:1524
 ## Changes and findings
 
 - Packaged identities now pin all three approved labs. The exact endpoint/username/password-file/schema/environment checks and private owner-approved target path are unchanged. Expectations that encoded two packaged targets were updated.
-- The session provider obtains the server offset from SYSTIMESTAMP for each new session. Its driver fetch converter recovers DATE/plain TIMESTAMP wall-clock fields and interprets them with that offset before any collector sees a Date. TIMESTAMP WITH TIME ZONE/LOCAL TIME ZONE retain driver instant semantics. Tool text uses ISO UTC too. This covers backup/check, jobs, sessions, alerts, space/undo, source metadata, report/history and drift centrally; existing SQL that already uses SYS_EXTRACT_UTC remains unchanged.
+- The session provider obtains the server offset from SYSTIMESTAMP for each new session. Following review, the provider fetches DATE/plain TIMESTAMP wall clocks as explicit server-side TO_CHAR text and interprets that text with the offset before constructing a Date. No host-local Date is used to decode those fields. TIMESTAMP WITH TIME ZONE/LOCAL TIME ZONE retain driver instant semantics. Tool text uses ISO UTC too. This covers backup/check, jobs, sessions, alerts, space/undo, source metadata, report/history and drift centrally; existing SQL that already uses SYS_EXTRACT_UTC remains unchanged.
 - **1.6.0 backup age was wrong when host and database timezones differed.** UTC database DATE fetched on this CST host became six hours too late. Other DATE-based ages/rendering had the same problem. **Scheduler failed-job windows were not host-timezone shifted:** jobs/check already bind explicit UTC TIMESTAMP WITH TIME ZONE windows; report history filters run in the database. Scheduler zone-aware timestamps were already instants. Session TIME_ZONE=UTC alone did not fix DATE decoding.
 - The normalization uses the database server offset at session creation. It does not reconstruct historical server daylight-saving rules from zone-less DATE values; DATE itself carries no timezone. No shared contract or dependency change is needed.
 - Empty PDB RMAN job details now permit a labelled full/level-0 per-datafile fallback, only with complete visible file/set/piece/incarnation evidence. Missing coverage remains UNKNOWN. Backup output explains the fallback and does not claim restore/media verification.
 - Despite the setup handoff, the 06:15 level-1 included SHOP_DATA but no full/level-0 row existed for file 13. A fresh C1-only RMAN level-0 database plus archivelog backup completed during this verification. No earlier backups/data were deleted. All five PDB datafiles now have level-0 coverage.
 - archiveGaps is measured OK: ARCHIVELOG, visible archived logs/history and full-file checkpoints, zero measured sequence gaps. This remains metadata evidence, not media validation.
 - Blocking failure was **NJS-123 (30-second call timeout), not an ORA privilege error**. The same V$LOCK query stalled as SYS in PIPDB1 and spilled to TEMP. A query-local RULE hint returned the same columns in ~0.18 seconds; no grants/session optimizer settings changed. The schema-drift constraints join had a similar slow dictionary plan and now uses a query-local RULE hint too.
-- Alert collection restricts time and CON_ID; health additionally filters ORA text before bounding the result. Lower-bound verdict behavior is retained. C1 has real ORAs from the intentional scheduler failures and initial seed tablespace recreation, so alertErrors is measured WARN, not clean/UNKNOWN.
+- Alert collection restricts time and includes the current CON_ID plus CDB-wide/instance CON_ID 0/1; health additionally filters ORA text before bounding the result. Lower-bound verdict behavior is retained. C1 has real ORAs from the intentional scheduler failures and initial seed tablespace recreation, so alertErrors is measured WARN, not clean/UNKNOWN.
 - General TEMP usage measures used sort blocks; UNDO measures ACTIVE + UNEXPIRED extents, excluding reusable EXPIRED bytes. Check does not warn merely because extents are allocated.
 - Web diagnostic and drift API/selector pins also encoded two labs; all three packaged labs are now available.
 - C1 hides LONG text for inherited SYS.ALL_CUBE_DEPENDENCIES even though its DBA_VIEWS length is visible. The source tool correctly refuses an incomplete fetch; integration now asserts this PDB visibility restriction. C1 WORKLOAD has a shorter body than p1, so its source fixture checks lines 1–6 rather than absent lines 24–29.
@@ -41,7 +41,7 @@ Captured 2026-11-08T06:24:35.852Z.
 | expiry | OK | 180.0 days | This PDB (PIPDB1) |
 | defaultPasswords | OK | 0 accounts | This PDB (PIPDB1) |
 
-The deliberate REPORT_EXPORT_JOB failures, one invalid VIEW, one unusable index partition, and stale PRODUCTS statistics remain visible in Jobs/Report. CDB/PDB labels distinguish local objects/sessions from shared redo/FRA/backup metadata; PDB-hidden evidence never establishes CDB-wide absence. ADR health uses This PDB after the container filter.
+The deliberate REPORT_EXPORT_JOB failures, one invalid VIEW, one unusable index partition, and stale PRODUCTS statistics remain visible in Jobs/Report. CDB/PDB labels distinguish local objects/sessions from shared redo/FRA/backup metadata; PDB-hidden evidence never establishes CDB-wide absence. The initial ADR health snapshot below predates review; current ADR scope includes the PDB plus visible CDB-wide/instance rows, with an explicit Oracle visibility caveat.
 
 ## Live commands
 
@@ -1158,3 +1158,45 @@ No contract changes requested. No LLM/eval gate performed (Strata reserved for c
 - `tests/unit/top-cli.test.ts`
 - `tests/unit/web-check.test.ts`
 - `docs/wp-31a-pdb-live.md`
+
+
+## Antigravity review follow-up (2026-11-08)
+
+Read the approved review in the separate review-wp-31a-pdb-live worktree without modifying it.
+
+- Minor 1 fixed: DATE/plain TIMESTAMP never pass through a host-local Date while decoding. Sessions set fixed NLS_DATE_FORMAT/NLS_TIMESTAMP_FORMAT, and the fetchTypeHandler requests STRING. Live testing demonstrated that installed thin driver 26 still decodes a Date before locally stringifying it, so STRING alone is insufficient. The provider describes SELECT metadata and explicitly projects date columns through Oracle TO_CHAR before fetching. Existing WITH clauses are hoisted to avoid Oracle 19c's nested-WITH restriction; generated aliases avoid name collisions and preserve column order, duplicate-name behavior and original database type metadata. Nulls and other column types remain intact. This adds a metadata-describe round trip per query; the complete integration run below covers the existing bounded collectors.
+- Consumers still receive normalized Date instants, retaining their existing API. Reviewed Date consumers in backup/check, jobs, space/undo, sessions, source/tool rendering, report/history and drift. Their date arithmetic, instanceof Date checks and ISO rendering continue to work; no shared contract changes are needed.
+- Added fake and live America/New_York tests for the missing local hour 2026-03-08 02:30, including DATE, TIMESTAMP fractional milliseconds, CTEs, duplicate names, nulls and numeric columns. Mexico City tests remain.
+- Info 4 fixed: alerts and incidents include CON_ID 0/1 plus the current container, with CDB-wide/instance row labels and explicit scope notes in check. Folding includes container identity. UI/Markdown/JSON retain scope labels; lower-bound cap rules are unchanged.
+- C1 visibility verification: SYS in root sees alert counts for CON_ID 1/2/3; SYS in PIPDB1 and PIAGENT_RO in PIPDB1 expose only CON_ID 3. The product cannot recover hidden root rows through a local login; notes explicitly state this limitation. The live test compares the complete visible ORA window with a direct grouped count, verifies the inclusive predicate and labels, and checks incident scope. Unit fakes prove 0/1 evidence is retained and never folded into a PDB row.
+- RULE retained. docs/sessions.md explains the Oracle 19c-specific CBO stall, deprecated query-local workaround and need to revalidate on another 19c release update.
+- Historical server DST reconstruction remains out of scope: normalization still uses the server offset sampled at session creation. Previously persisted 1.6.0 instants are not rewritten.
+
+Final follow-up validation:
+
+- `npm run typecheck`: PASS.
+- `npm test -- --maxWorkers=2`: PASS, 141 files, 2,683 tests (97.27 s).
+- `npx playwright test`: PASS, 89 passed, 7 optional live-capture tests skipped (1.1 min); regenerated docs/img screenshots restored.
+- Focused new C1 review tests: PASS, 2/2, covering the New York gap and inclusive ADR predicates/visible counts.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`: PASS, 39 files, 93 passed, 1 skipped (excluded Strata e2e), 770.77 s. Existing d1/p1 and C1 collectors, Date arithmetic/rendering, report/history, scope labels and web tabs pass.
+- `git diff --check`: PASS.
+- No LLM calls, push or merge. No dependencies or shared contracts changed.
+
+Follow-up changed files:
+
+
+- `docs/alertlog.md`
+- `docs/check.md`
+- `docs/sessions.md`
+- `docs/wp-31a-pdb-live.md`
+- `src/alertlog/index.ts`
+- `src/check/index.ts`
+- `src/oracle/index.ts`
+- `src/web/static/alertlog.js`
+- `tests/integration/c1-review.test.ts`
+- `tests/unit/alertlog.test.ts`
+- `tests/unit/check.test.ts`
+- `tests/unit/fixtures/triage-before-sessions.json`
+- `tests/unit/pdb-audit.test.ts`
+- `tests/unit/preflight-catalog.test.ts`
+- `tests/unit/session.test.ts`
