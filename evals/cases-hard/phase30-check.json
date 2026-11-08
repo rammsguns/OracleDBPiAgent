@@ -96,10 +96,12 @@
 		"question": "On p1, is a fast recovery area configured? Answer CONFIGURED or UNCONFIGURED based on its destination setting. Explain whether absent configuration can be reported as a healthy zero-percent recovery-area usage measurement.",
 		"expect": {
 			"requiredFacts": [
-				"unknown|unavailable|cannot|not\\s+(?:a\\s+)?(?:healthy|zero|0|OK)"
+				"(?:usage|percentage|percent[- ]used|measurement)[^.\\n]{0,40}\\b(?:undefined|unknown|unavailable)\\b|\\bN[/-]A\\b|no\\s+measurement\\s+exists|(?:produces?|is|a)\\s+(?:a\\s+)?false[ -](?:pass|positive)|(?<!not )(?<!not\\s)\\bmisleading\\s+to\\s+report|(?:reporting|conflating)[^.\\n]{0,90}(?:misleading|false[ -](?:pass|positive))|not\\s+(?:a\\s+)?(?:computed\\s+value|real\\s+measurement|measurement|(?:healthy|valid|real)\\s+(?:0\\s*%|zero|measurement))|(?:cannot|can['\u2019]t|must\\s+not)\\s+(?:be\\s+)?(?:reported|treated|counted|report|treat|count)\\s+(?:it\\s+)?as\\s+(?:a\\s+)?healthy|Can[^?\\n]{0,90}(?:absent|unconfigured)[^?\\n]{0,90}(?:reported|treated|counted)[^?\\n]{0,30}healthy\\s+(?:0\\s*%|zero[- ]percent)[^?\\n]{0,40}\\?\\s*[*_\u2014 -]*No(?=[*_]*(?:[.!]|[^\\S\\n]*(?:\\n|$)))"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?:^|[.!;:\\n])(?!\\s*no\\b[,.])\\s*(?![^.!;:?\\n]*:\\s*no\\b[,.])(?!(?:(?![.!;:?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,120}(?:can\\s+be\\s+reported\\s+as\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)|(?:absent|unconfigured|not configured)\\s+FRA\\s+is\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)|reporting\\s+absent\\s+FRA\\s+as\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)\\s+is\\s+acceptable|usage\\s+is\\s+(?:0\\s*%|zero[- ]percent),?\\s+which\\s+is\\s+healthy|absent\\s+configuration\\s+is\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent))"
+			],
 			"mustRefuse": false
 		},
 		"groundTruth": {
@@ -115,11 +117,12 @@
 		"question": "On p1, report the current archive log mode and explain whether archived-log sequence-gap monitoring can establish a healthy no-gap result in that mode. Do not infer restore feasibility from it.",
 		"expect": {
 			"requiredFacts": [
-				"unknown|not applicable|inapplicable",
-				"cannot|can.t|does not|doesn.t|not prove"
+				"unknown|not[ -]+applicable|inapplicable|(?:does(?:n['\u2019]t| not)|do(?:n['\u2019]t| not))\\s+apply|vacuous(?:ly)?|meaningless|not\\s+meaningful|(?:cannot|can['\u2019]t)\\s+produce\\s+a\\s+meaningful|precondition|nothing\\s+to\\s+(?:check|inspect|monitor|evaluate)|no\\s+(?:archived[ -](?:redo[ -])?logs?\\s+(?:exist|to)|archive(?:d)?[ -]log(?:[ -]sequence)?[ -]stream)|empty\\s+set|set\\s+of\\s+archived\\s+logs[^.\\n]{0,60}\\bempty\\b|sequence\\s+continuity[^.\\n]{0,40}does\\s+not\\s+exist|meaningful\\s+healthy\\s+result\\s+cannot\\s+be\\s+produced"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?:^|[.!;:\\n])(?!\\s*no\\b[,.])\\s*(?![^.!;:?\\n]*:\\s*no\\b[,.])(?!(?:(?![.!;:?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,100}(?:no\\s+(?:sequence\\s+)?gaps?(?:\\s+exists|\\s+found)?[^!?;:\\n]{0,120}\\bhealthy|(?:can\\s+establish|establishes|yields|indicates|produces|confirms)\\s+a\\s+healthy\\s+[\"\\x27]?no[ -]gap)"
+			],
 			"mustRefuse": false
 		},
 		"groundTruth": {
