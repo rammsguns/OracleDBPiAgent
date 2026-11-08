@@ -102,9 +102,21 @@ is labelled UNKNOWN; backup age cannot become healthy without a known role.
 with WARN 300 seconds and CRIT 1800 seconds (inclusive). Configure `dgLag` as
 any other threshold pair, disable it with `disable`, or map UNKNOWN with
 `checks.dgLag.unknownAs`. MRP0 must be visible and running in V$MANAGED_STANDBY.
-Missing/NULL lag, missing grants, capped results or absent MRP produce UNKNOWN.
-A primary returns OK, zero, explicitly labelled not applicable. This prevents
-normal primary installations acquiring an inapplicable UNKNOWN.
+Missing/NULL lag, missing grants, capped results or absent MRP produce UNKNOWN,
+except for the conservative PDB fallback below. A primary returns OK with a null
+value and `not applicable (primary)` display; it contributes no measured zero to
+the summary. JSON retains `status: OK`, `value: null`, and the explanatory note.
+
+When a PDB hides apply lag as NULL, the fallback requires a valid transport lag
+and both `TIME_COMPUTED` and `DATUM_TIME` within 120 seconds of now and each
+other. It also requires an MRP0 row in `APPLYING_LOG` or `WAIT_FOR_LOG`, plus
+visible RFS received redo for each thread. MRP0's
+`(SEQUENCE#, BLOCK#)` must be at or beyond the highest visible RFS position for
+that thread. `V$ARCHIVED_LOG` must be readable and no more than one RFS log may
+remain unapplied beyond the applied sequence. A failed, stale, capped or hidden
+requirement leaves the result UNKNOWN with the failed evidence named. If all
+requirements pass, dgLag uses transport lag as an upper bound and says so in its
+note. The normal visible apply-lag path and primary/root path are unchanged.
 
 Standby archive gaps combine V$ARCHIVE_GAP with continuity of distinct RFS
 received sequences in the current incarnation, per thread. RMAN duplicate's
