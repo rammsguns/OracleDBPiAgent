@@ -6,7 +6,7 @@ import { createWebServer } from '../../src/web/server.js';
 // must never acquire a connection, regardless of the diagnostic implementation.
 for (const privateNames of [false, true]) it('validates every route against loaded targets (private=' + privateNames + ')', async () => {
 	const config = loadConfig({});
-	if (privateNames) config.targets = config.targets.map((t, i) => ({ ...t, name: ['lab-d1', 'lab-p1', 'lab-c1'][i]! }));
+	if (privateNames) config.targets = config.targets.map((t, i) => ({ ...t, name: ['lab-d1', 'lab-p1', 'lab-c1', 'lab-c1s'][i]! }));
 	config.defaultTarget = config.targets[0]!.name;
 	const factory = vi.fn(async () => { throw new Error('session boundary'); });
 	const web = createWebServer({ config, port: 0, sessionFactory: factory, checkHealth: async () => {} });
