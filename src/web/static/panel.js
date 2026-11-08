@@ -16,7 +16,7 @@ export function setupPanel(id, title, targets, includeConfiguredTargets = false)
 		return input;
 	}
 	const target = field("select", "target", "Target");
-	const approved = includeConfiguredTargets ? targets : targets.filter(item => ["d1-19c-lab", "p1-19c-prod"].includes(item.name));
+	const approved = includeConfiguredTargets ? targets : targets.filter(item => ["d1-19c-lab", "p1-19c-prod", "c1-19c-pdb"].includes(item.name));
 	for (const item of approved) {
 		const option = el("option", item.name);
 		option.value = item.name;
