@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { budgets, commands, config, measure } from '../helpers/footprint.js';
 import { createSessionProvider } from '../../src/oracle/index.js';
-import { TOP_SQL } from '../../src/oracle/topSnapshot.js';
+import { TOP_SQL } from '../../src/top/snapshot.js';
 import { SQL } from '../../src/security/sql.js';
 
 for(const name of commands) it(`C1 footprint budget: ${name}`,async test=>{
@@ -9,6 +9,7 @@ for(const name of commands) it(`C1 footprint budget: ${name}`,async test=>{
 	const provider=createSessionProvider(config());
 	try{await provider.get('c1-19c-pdb');}catch(e){if(/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|ORA-01034|ORA-27101/.test(String(e))){test.skip('C1 listener/PDB unavailable');return;}throw e;}finally{await provider.closeAll();}
 	const result=await measure('c1-19c-pdb',name);
+	expect(result.error).toBeUndefined();
 	expect(result.stats.length,'measurement must capture SQL, not silently report zero').toBeGreaterThan(4);
 	expect(result.elapsedMs).toBeLessThan(budgets[name]!.elapsedMs);
 	expect(result.bufferGets).toBeLessThan(budgets[name]!.bufferGets);

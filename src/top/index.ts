@@ -1,4 +1,4 @@
-import { TOP_SQL, readTopSnapshot } from '../oracle/topSnapshot.js';
+import { TOP_SQL, readTopSnapshot } from './snapshot.js';
 import { withOracleAction } from '../oracle/observability.js';
 import { formatBytes } from '../space/index.js';
 import { markdownTable, markdownNumber } from '../backup/markdown.js';

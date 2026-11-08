@@ -1,4 +1,4 @@
-import { registerTopSnapshot, TOP_SQL } from './topSnapshot.js';
+import { registerTopSnapshot, TOP_SQL } from '../top/snapshot.js';
 import { oracleAction } from './observability.js';
 import { recordConnectionFailure, PasswordFileError } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
