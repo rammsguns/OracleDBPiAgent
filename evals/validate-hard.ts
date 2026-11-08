@@ -34,13 +34,21 @@ export function checkHardCases(cases: EvalCase[]): void {
 		splits.add(test.split);
 		categories.set(test.category, splits);
 		for (const pattern of [...test.expect.requiredFacts, ...test.expect.forbiddenClaims]) new RegExp(pattern, 'i');
-		if (test.expect.mustRefuse && (test.groundTruth || test.expect.requiredTools.some(tool => ['run_query', 'explain_plan'].includes(tool)))) throw new Error('Refusal must not execute SQL');
+		if (test.expect.mustRefuse && (test.groundTruth || test.setup || test.expect.requiredTools.some(tool => ['run_query', 'explain_plan'].includes(tool)))) throw new Error('Refusal must not execute SQL');
+		if (test.setup !== undefined) {
+			if (!Array.isArray(test.setup) || !test.setup.length) throw new Error('Case setup must be a nonempty list');
+			for (const statement of test.setup) {
+				if (typeof statement !== 'string') throw new Error('Case setup statements must be strings');
+				classifySql(statement);
+				if (!/^SELECT\s/i.test(statement) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)\b/i.test(statement)) throw new Error('Setup must be plain SELECT');
+			}
+		}
 		if (test.groundTruth) {
 			if (!['scalar', 'allCells', 'rowCells'].includes(test.groundTruth.mode)) throw new Error('Unknown truth mode');
 			classifySql(test.groundTruth.sql);
 			if (test.groundTruth.setupSql) {
 				classifySql(test.groundTruth.setupSql);
-				if (!/^SELECT\s/i.test(test.groundTruth.setupSql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.setupSql)) throw new Error('Setup must be plain SELECT');
+				if (!/^SELECT\s/i.test(test.groundTruth.setupSql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)\b/i.test(test.groundTruth.setupSql)) throw new Error('Setup must be plain SELECT');
 			}
 			// Match the independent ground-truth reader's deliberately narrower SELECT policy.
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.sql)) throw new Error('Truth must be plain SELECT');
@@ -229,8 +237,8 @@ export function checkRepairedCases(cases: EvalCase[]): void {
 			if (['hard-orders-plan', 'hard-lines-plan'].includes(test.id)) {
 				const table = test.id === 'hard-orders-plan' ? 'ORDERS' : 'ORDER_LINES';
 				const seed = `SELECT /* piagent_eval_plan_${table.toLowerCase()} */ COUNT(*) FROM SHOPAPP.${table}`;
-				if (test.groundTruth?.setupSql !== seed || !sql.includes(`s.sql_text='${seed}'`) || !sql.includes(`WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND command_type=3 AND sql_text='${seed}'`)) throw new Error('Plan truth requires exact isolated evaluator seed');
-			} else if (!sql.includes("parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP')") || test.groundTruth?.setupSql) throw new Error('Workload truth must filter parsing login without seeding diagnostic cursors');
+				if (test.setup?.length !== 1 || test.setup[0] !== seed || test.groundTruth?.setupSql || !sql.includes(`s.sql_text='${seed}'`) || !sql.includes(`WHERE parsing_schema_name='SHOPAPP' AND parsing_user_id=(SELECT user_id FROM all_users WHERE username='HARNESS_RO') AND command_type=3 AND sql_text='${seed}'`)) throw new Error('Plan truth requires exact isolated evaluator seed');
+			} else if (!sql.includes("parsing_user_id=(SELECT user_id FROM all_users WHERE username='SHOPAPP')") || test.setup || test.groundTruth?.setupSql) throw new Error('Workload truth must filter parsing login without seeding diagnostic cursors');
 			if (test.id === 'hard-p19-object-statistics' && (/TO_CHAR|last_analyzed_utc/i.test(sql) || !sql.includes("'MISSING' ELSE 'PRESENT'"))) throw new Error('Statistics truth must tolerate nightly collection timestamps');
 		}
 		if (['hard-p21-public-directory', 'hard-p21-schema-directory-grants', 'hard-p25-grant-component-inventory', 'hard-p25-grant-pool-inventory'].includes(test.id)) {
@@ -252,7 +260,7 @@ export function checkP30Cases(cases: EvalCase[], liveTruth?: { id: string; rows:
 		if (test.expect.mustRefuse) {
 			if (test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p30 refusal must make no calls');
 		} else {
-			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p30 requires read-only rowCells truth without setup');
+			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.setup || test.groundTruth.setupSql) throw new Error('p30 requires read-only rowCells truth without setup');
 			classifySql(test.groundTruth.sql);
 			if (/\b(?:DBA_HIST_\w*|V\$ACTIVE_SESSION_HISTORY|PASSWORD|SPARE4|ADDITIONAL_INFO|JOB_ACTION)\b/i.test(test.groundTruth.sql)) throw new Error('p30 truth must exclude secrets, free text and pack views');
 		}
@@ -274,7 +282,7 @@ export function checkP31Cases(cases: EvalCase[]): void {
 			if (test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p31 refusal must execute nothing');
 		} else {
 			const mode = test.id === 'hard-p31-health' ? 'allCells' : 'rowCells';
-			if (!test.groundTruth || test.groundTruth.mode !== mode || test.groundTruth.setupSql) throw new Error('p31 requires allCells only for health, rowCells otherwise');
+			if (!test.groundTruth || test.groundTruth.mode !== mode || test.setup || test.groundTruth.setupSql) throw new Error('p31 requires allCells only for health, rowCells otherwise');
 			classifySql(test.groundTruth.sql);
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|password)\b/i.test(test.groundTruth.sql)) throw new Error('p31 truth must be plain SELECT');
 		}

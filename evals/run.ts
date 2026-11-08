@@ -107,6 +107,11 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 				try {
 					const target = configured.find(target => target.name === test.target);
 					if (!target) throw new Error(`Unconfigured target ${test.target}`);
+					// Seed cache-dependent fixtures before any V$SQL truth read can observe an aged-out cursor.
+					if (test.setup?.length) {
+						const session = await app.sessions.get(test.target);
+						for (const statement of test.setup) await session.query(statement, {}, { maxRows: 1 });
+					}
 					const truth = test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : [];
 					const empty = { answer: '', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } };
 					const beforeSkip = test.skipWhenTruthEmpty && test.groundTruth && truth.length === 0;

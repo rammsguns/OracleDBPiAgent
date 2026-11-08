@@ -40,8 +40,8 @@ it('requires real grant denial rather than treating other failures as absence', 
 
 it('rejects a broad ORDERS match that could select CHILD_ROWS triage SQL', async () => {
 	const test = structuredClone((await loadHardCases()).find(test => test.id === 'hard-orders-plan')!);
-	const seed = test.groundTruth!.setupSql!;
-	test.groundTruth!.sql = test.groundTruth!.sql.replace(`sql_text='${seed}'`, "UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%'");
+	const seed = test.setup![0]!;
+	test.groundTruth!.sql = test.groundTruth!.sql.replaceAll(`sql_text='${seed}'`, "UPPER(sql_text) LIKE 'SELECT COUNT(%FROM SHOPAPP.ORDERS%'");
 	expect(() => checkRepairedCases([test])).toThrow(/exact isolated/);
 });
 

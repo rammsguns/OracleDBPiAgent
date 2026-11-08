@@ -766,12 +766,18 @@ SUBCATEGORY=Y Box Accessories / PRODUCTS=2
 SUBCATEGORY=Y Box Games / PRODUCTS=8
 ```
 
-The plan case's validator setup populates only its own tagged SELECT cursor,
-using a negative order ID and no application write. The question supplies the
-search marker, not an answer or SQL_ID, and prohibits executing the selected
-text. Truth picks the lowest SQL_ID and child, joins the exact pair and reads
-all plan lines. Revalidate immediately before baseline because cursor aging and
-plan differences can change this prerequisite. Estimates are not measurements.
+Cached-plan cases may define a per-case `setup` list of exact SELECT statements.
+The runner executes these as the case target account immediately before the
+agent run; they are excluded from the agent tool-call budget and are never shown
+to the model. Validation accepts only plain SELECT statements and rejects
+semicolons, database links, DBMS_/UTL_ calls, and `FOR UPDATE`. The dedicated
+HARNESS_RO seeds for ORDERS and ORDER_LINES keep their tagged cursors in `V$SQL`
+through the ask. PRICE has no seed: its truth is tied to a SHOPAPP-parsed
+workload cursor, which HARNESS_RO cannot create by running setup SQL. The
+ORDERS cursor aged out of the shared pool during the Phase 32 gate, so its
+setup is now performed directly before each ask. Truth still selects the lowest
+SQL_ID and child for the exact statement and reads all plan lines. Estimates are
+not measurements.
 
 Verification after the coordinator restored the approved listeners:
 
