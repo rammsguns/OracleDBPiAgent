@@ -135,14 +135,14 @@ export function checkP33Cases(cases: EvalCase[]): void {
 	requiredTruth('hard-p33-mrp', /v\$managed_standby/i);
 	requiredTruth('hard-p33-transport-lag', /v\$dataguard_stats/i);
 	const lag = cases.find(test => test.id === 'hard-p33-transport-lag')!;
-	if (!lag.expect.forbiddenClaims.some(pattern => /apply lag.*zero|zero.*apply lag/i.test(pattern))) throw new Error('p33 lag must forbid claiming NULL apply lag is zero');
+	if (!lag.expect.requiredFacts.some(pattern => /under 5 minutes/i.test(pattern)) || !lag.expect.requiredFacts.some(pattern => /hidden|NULL/i.test(pattern)) || !lag.expect.forbiddenClaims.some(pattern => /apply lag/i.test(pattern))) throw new Error('p33 lag requires positive band/hidden facts and a concise affirmative guard');
 	if (!/CASE\s+WHEN\s+value\s*<\s*'\+00\s+00:05:00'\s+THEN\s+'UNDER_5_MIN'/i.test(lag.groundTruth!.sql)) throw new Error('p33 lag truth must compute the under-five-minute band');
-	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /role is primary|primary role/i.test(pattern))) throw new Error('p33 role must forbid affirmative primary-role claims');
+	if (!cases.find(test => test.id === 'hard-p33-role-open')!.expect.forbiddenClaims.some(pattern => /DATABASE_ROLE/i.test(pattern)) || !cases.find(test => test.id === 'hard-p33-role-open')!.expect.requiredFacts.some(pattern => /PHYSICAL STANDBY/i.test(pattern))) throw new Error('p33 role requires standby identity and a concise affirmative guard');
 	const backup = cases.find(test => test.id === 'hard-p33-local-backups')!;
-	if (!backup.expect.forbiddenClaims.some(pattern => /recent local backup/i.test(pattern))) throw new Error('p33 backup must forbid claiming a recent local standby backup');
+	if (!backup.expect.requiredFacts.some(pattern => /primary/i.test(pattern)) || !backup.expect.forbiddenClaims.some(pattern => /^LOCAL_BACKUP/i.test(pattern))) throw new Error('p33 backup must require primary location with a concise affirmative guard');
 	if (backup.expect.requiredFacts.some(pattern => /established/i.test(pattern)) || backup.groundTruth) throw new Error('p33 backup must allow natural facts without unasked row matching');
 	const jobs = cases.find(test => test.id === 'hard-p33-job-history')!;
-	if (!jobs.expect.requiredFacts.some(pattern => /replicated|copied/i.test(pattern)) || !jobs.expect.requiredFacts.some(pattern => /do not run|not run/i.test(pattern))) throw new Error('p33 job history facts must explain replicated history and standby execution');
+	if (!jobs.expect.requiredFacts.some(pattern => /replicated|copied/i.test(pattern)) || !jobs.expect.requiredFacts.some(pattern => /from the primary/i.test(pattern))) throw new Error('p33 job history facts must explain copied history from primary');
 }
 
 export function checkP26Cases(cases: EvalCase[], liveTruth?: { id: string; target: string; rows: unknown[][] }): void {

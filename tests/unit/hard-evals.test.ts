@@ -69,10 +69,10 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	expect(() => checkP33Cases(badRefusal)).toThrow('refusal');
 	const missingClaimGuard = structuredClone(cases);
 	missingClaimGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = [];
-	expect(() => checkP33Cases(missingClaimGuard)).toThrow('NULL apply lag');
+	expect(() => checkP33Cases(missingClaimGuard)).toThrow('positive band/hidden facts');
 	const missingBackupGuard = structuredClone(cases);
 	missingBackupGuard.find(test => test.id === 'hard-p33-local-backups')!.expect.forbiddenClaims = [];
-	expect(() => checkP33Cases(missingBackupGuard)).toThrow('recent local standby backup');
+	expect(() => checkP33Cases(missingBackupGuard)).toThrow('primary location with a concise affirmative guard');
 	const archiveTruth = structuredClone(cases);
 	archiveTruth.find(test => test.id === 'hard-p33-archive-gaps')!.groundTruth = { sql: 'SELECT COUNT(*) FROM v$archive_gap', mode: 'rowCells' };
 	expect(() => checkP33Cases(archiveTruth)).toThrow('archive-gap cases must not require unasked row matching');
@@ -82,14 +82,16 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 	const cases = (await loadHardCases()).filter(test => test.split === 'standby');
 	const answers: Record<string, { correct: string[]; wrong: string[] }> = {
 		'hard-p33-role-open': {
-		correct: [
+			correct: [
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY',
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThis is not a primary; redo comes from the primary database.',
+				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThe database is not in the primary role.',
+				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nIt is not true that this is a primary database.',
 			],
 			wrong: ['This database is PRIMARY and open READ WRITE.', 'It is a PHYSICAL STANDBY, but it is open READ WRITE.'],
 		},
 		'hard-p33-mrp': {
-			correct: ['MRP0 is present and APPLYING_LOG, so managed recovery is applying redo.', 'MRP0 is applying redo; its status is APPLYING_LOG.'],
+			correct: ['MRP0 is present and APPLYING_LOG, so managed recovery is applying redo.', 'MRP0 is applying redo; its status is APPLYING_LOG.', 'MRP0 is present and APPLYING_LOG. It is not true that managed recovery is stopped.'],
 			wrong: ['MRP0 is absent; managed recovery is stopped.', 'MRP0 is present but waiting for an archive, not applying redo.'],
 		},
 		'hard-p33-transport-lag': {
@@ -97,6 +99,9 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 			'Transport lag is UNDER_5_MIN (under 5 minutes). We cannot establish that apply lag is zero because apply lag is NULL in this PDB.',
 			'Transport lag is under five minutes (UNDER_5_MIN). It is impossible to establish zero apply lag since apply lag is NULL.',
 			'Transport lag is under five minutes (UNDER_5_MIN). No apply lag value is known; we cannot establish that apply lag is zero.',
+				'Transport lag is under 5 minutes (UNDER_5_MIN). We verified that apply lag is zero. Apply lag is NULL.',
+				'Transport lag is under 5 minutes (UNDER_5_MIN). We observe zero apply lag. Apply lag is NULL.',
+				'Transport lag is under 5 minutes (UNDER_5_MIN). We confirmed apply lag is 0 seconds. Apply lag is NULL.',
 			],
 			wrong: ['Transport lag is over 5 minutes and apply lag is zero.', 'The standby has zero apply lag; the NULL value means there is no backlog.'],
 		},
@@ -107,6 +112,7 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 				'No archive gaps are reported for the standby.',
 				'No gaps were found in the archive report.',
 				'It is not true that archive gaps were found; 0 gaps are reported.',
+				'0 gaps are reported, but we found one or more archive gaps on the standby.',
 			],
 			wrong: ['One or more archive gaps are present.', 'The archive gap view reports 3 missing ranges.'],
 		},
@@ -125,6 +131,7 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 				'No, that does not mean the jobs ran on this standby; the history was replicated from the primary and jobs do not run here.',
 				'The history is copied from the primary. It does not mean the jobs ran on this standby; jobs do not run there.',
 				'The failed-job history is replicated from the primary; scheduler jobs do not run here.',
+				'The jobs ran on this standby. The history was replicated from the primary; scheduler jobs do not run here.',
 			],
 			wrong: ['Yes, those failed jobs ran on this standby.', 'The scheduler jobs execute on the standby and failed there.'],
 		},
