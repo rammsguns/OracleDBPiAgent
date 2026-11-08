@@ -101,6 +101,8 @@ function references(source: string): string[] {
 // by the deliberately conservative source scan. Scope them to their source file.
 // V$DIAG is only the triage router's family prefix, not a queried relation.
 const NON_VIEWS: Record<string, readonly string[]> = {
+	// Generated date-formatting CTE, not a grantable database view.
+	'oracle/index.ts': ['PIAGENT_WALL_QUERY'],
 	'agent/grounding.ts': ['ON', 'WHERE'],
 	'agent/index.ts': ['EXISTING'],
 	'alertlog/index.ts': ['AND'],
