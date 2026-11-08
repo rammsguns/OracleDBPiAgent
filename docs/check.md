@@ -108,12 +108,14 @@ value and `not applicable (primary)` display; it contributes no measured zero to
 the summary. JSON retains `status: OK`, `value: null`, and the explanatory note.
 
 When a PDB hides apply lag as NULL, the fallback requires a valid transport lag
-and both `TIME_COMPUTED` and `DATUM_TIME` within 120 seconds of now and each
-other. It also requires an MRP0 row in `APPLYING_LOG` or `WAIT_FOR_LOG`, plus
-visible RFS received redo for each thread. MRP0's
-`(SEQUENCE#, BLOCK#)` must be at or beyond the highest visible RFS position for
-that thread. `V$ARCHIVED_LOG` must be readable and no more than one RFS log may
-remain unapplied beyond the applied sequence. A failed, stale, capped or hidden
+and both `TIME_COMPUTED` and `DATUM_TIME` within 120 seconds of the database
+clock and each other. It also requires an MRP0 row in `APPLYING_LOG` or
+`WAIT_FOR_LOG`, plus visible RFS received redo with positive sequence and block
+positions for each thread. MRP0's `(SEQUENCE#, BLOCK#)` must be at or beyond the
+highest visible RFS position on every such thread. `V$ARCHIVED_LOG` must be
+readable, and no received RFS log with `APPLIED='NO'` may be beyond MRP0's
+current sequence; a missing MRP row for an archived-log thread also fails
+closed. A failed, stale, capped or hidden
 requirement leaves the result UNKNOWN with the failed evidence named. If all
 requirements pass, dgLag uses transport lag as an upper bound and says so in its
 note. The normal visible apply-lag path and primary/root path are unchanged.
