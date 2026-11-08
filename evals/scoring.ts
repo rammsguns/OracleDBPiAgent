@@ -10,6 +10,14 @@ const decimal = (text: string) => {
 	return (text.startsWith('-') && magnitude !== '0' ? '-' : '') + magnitude;
 };
 const numberTokens = (text: string) => [...text.matchAll(/(?<![\w.+-])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)/g)];
+function labelledP26ErrorCode(answer: string, expected: unknown): boolean {
+	if (!/^ORA-\d{5}$/i.test(String(expected))) return false;
+	const match = /\bOracle error code:\*{0,2}\s*`?(ORA-\d{5})`?\s*\(ERROR#\s*=\s*(\d+)\)/i.exec(answer);
+	return Boolean(match && match[1]!.toUpperCase() === String(expected).toUpperCase() && Number(match[2]) === Number(String(expected).slice(4)));
+}
+function labelledP25NoBackup(answer: string, expected: unknown): boolean {
+	return String(expected).toUpperCase() === 'NONE RECORDED' && /^\s*\*\*NONE RECORDED\*\*\s*[—–-]\s*on\s+\*{0,2}d1(?:-19c-lab)?\*{0,2}(?:\W|$)/i.test(answer);
+}
 
 /** Normalize only explicitly UTC-labelled p19 timestamps; never infer a timezone. */
 function p19UtcTimestamps(answer: string): string {
@@ -34,6 +42,16 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
 	const p19 = test.id.startsWith('hard-p19-');
 	let answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
+	if (test.id === 'hard-p30-d1-fullest-permanent' && test.groundTruth?.mode === 'rowCells' && truth[0]?.length === 2) {
+		const fullest = /^\s*\*{0,2}Fullest permanent tablespace(?:\s+on\s+d1-19c-lab)?:\s*([A-Za-z][\w$#]*)\*{0,2}\s*$/im.exec(answer);
+		const classification = fullest && /^\s*\*{0,2}Classification:\s*(LOW|MID|HIGH|FULL)\b([^\n]*)\*{0,2}\s*$/im.exec(answer.slice(fullest.index + fullest[0].length));
+		const attachedTo = classification && /\b(?:for|of)\s+([A-Za-z][\w$#]*)\b|\(\s*([A-Za-z][\w$#]*)\s*\)/i.exec(classification[2] ?? '');
+		if (fullest && classification && (!attachedTo || attachedTo[1]?.toUpperCase() === fullest[1]!.toUpperCase() || attachedTo[2]?.toUpperCase() === fullest[1]!.toUpperCase())) answer += `\n| ${fullest[1]} | ${classification[1]} |`;
+	}
+	const p30FullestName = test.id === 'hard-p30-d1-fullest-permanent' ? /^\s*\*{0,2}Fullest permanent tablespace(?:\s+on\s+d1-19c-lab)?:\s*([A-Za-z][\w$#]*)/im.exec(answer)?.[1] : undefined;
+	const p30ClassLine = test.id === 'hard-p30-d1-fullest-permanent' ? /^\s*\*{0,2}Classification(?:\s+(?:for|of)\s+([A-Za-z][\w$#]*))?:\s*(?:LOW|MID|HIGH|FULL)\b([^\n]*)/im.exec(answer) : null;
+	const p30TrailingName = p30ClassLine && /\(\s*([A-Za-z][\w$#]*)\s*\)/.exec(p30ClassLine[2] ?? '')?.[1];
+	const p30Misattributed = Boolean(p30FullestName && p30ClassLine && ((p30ClassLine[1] && p30ClassLine[1].toUpperCase() !== p30FullestName.toUpperCase()) || (p30TrailingName && p30TrailingName.toUpperCase() !== p30FullestName.toUpperCase())));
 	// Scheduler history calls the error-code column ERROR#; accept that label here only.
 	if (test.id === 'hard-p31-failed-job') answer = answer.replace(/^(\s*(?:[-*]\s*)?)error#\s*:/gim, '$1Error code:');
 	// This single-table case needs the two flags, not a repeated table name.
@@ -79,7 +97,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
+			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: !p30Misattributed && (rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
 				preserveQualified: test.id.startsWith('hard-p18-'),
 				p31ErrorCode: test.id === 'hard-p31-failed-job',
 				p19,
@@ -87,7 +105,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 				p23: test.id.startsWith('hard-p23-'),
 				p27: test.id.startsWith('hard-p27-'),
 				backupCounts: test.id === 'hard-p25-d1-no-backups-recorded',
-			}) });
+			}) || test.id === 'hard-p26-p1-last-failed-job' && row.length === 1 && labelledP26ErrorCode(answer, row[0]) || test.id === 'hard-p25-d1-last-level0' && row.length === 1 && labelledP25NoBackup(answer, row[0])) });
 		} else {
 			const values = test.groundTruth.mode === 'scalar' ? [scalar] : truth.flat();
 			for (const value of values) {
