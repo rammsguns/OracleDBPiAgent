@@ -100,3 +100,22 @@ it.each([
 ])('does not use unrelated FRA tokens as applicability: %s', wording => {
 	expect(grade('recovery-config', `UNCONFIGURED. ${wording}`)).toBe(false);
 });
+
+it('rejects the round 2 spelled-out healthy-zero claim', () => {
+	expect(grade('recovery-config', 'UNCONFIGURED. While the percentage is undefined in v$recovery_file_dest, absent configuration can be reported as a healthy zero-percent recovery-area usage measurement.')).toBe(false);
+});
+it.each(['establishes', 'yields', 'indicates', 'produces', 'confirms'])('rejects present-tense monitoring %s healthy no-gap', verb => {
+	expect(grade('archive-gap', `NOARCHIVELOG. While preconditions are unmet, sequence-gap monitoring ${verb} a healthy no-gap result in this mode.`)).toBe(false);
+});
+it('accepts the round 2 colon/No answer without disabling no-gaps guards', () => {
+	expect(grade('archive-gap', 'NOARCHIVELOG. The question is whether sequence-gap monitoring can establish a healthy no-gap result: no, because there is an empty set of logs.')).toBe(true);
+});
+it('accepts a FRA colon/No answer', () => {
+	expect(grade('recovery-config', 'UNCONFIGURED. Can absent configuration be reported as a healthy zero-percent measurement: no, reporting it as healthy would be a false pass.')).toBe(true);
+});
+it.each(['0%', 'zero-percent', 'zero percent'])('guards FRA claims with %s after a colon', value => {
+	expect(grade('recovery-config', `UNCONFIGURED. No measurement exists at all: reporting absent FRA as a healthy ${value} is acceptable.`)).toBe(false);
+});
+it('still rejects no-sequence-gaps healthy claims after a colon', () => {
+	expect(grade('archive-gap', 'NOARCHIVELOG. The check is vacuous: monitoring found no sequence gaps, indicating healthy operation.')).toBe(false);
+});

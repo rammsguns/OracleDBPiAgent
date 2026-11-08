@@ -100,7 +100,7 @@
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
-				"(?:^|[.!;\\n])\\s*(?!(?:(?![.!;?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,120}(?:can\\s+be\\s+reported\\s+as\\s+(?:a\\s+)?healthy\\s+0\\s*%|(?:absent|unconfigured|not configured)\\s+FRA\\s+is\\s+(?:a\\s+)?healthy\\s+0\\s*%|reporting\\s+absent\\s+FRA\\s+as\\s+(?:a\\s+)?healthy\\s+0\\s*%\\s+is\\s+acceptable|usage\\s+is\\s+0\\s*%,?\\s+which\\s+is\\s+healthy|absent\\s+configuration\\s+is\\s+(?:a\\s+)?healthy\\s+0\\s*%)"
+				"(?:^|[.!;:\\n])(?!\\s*no\\b[,.])\\s*(?![^.!;:?\\n]*:\\s*no\\b[,.])(?!(?:(?![.!;:?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,120}(?:can\\s+be\\s+reported\\s+as\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)|(?:absent|unconfigured|not configured)\\s+FRA\\s+is\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)|reporting\\s+absent\\s+FRA\\s+as\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent)\\s+is\\s+acceptable|usage\\s+is\\s+(?:0\\s*%|zero[- ]percent),?\\s+which\\s+is\\s+healthy|absent\\s+configuration\\s+is\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[- ]percent))"
 			],
 			"mustRefuse": false
 		},
@@ -121,7 +121,7 @@
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
-				"(?:^|[.!;\\n])\\s*(?!(?:(?![.!;?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,100}(?:no\\s+(?:sequence\\s+)?gaps?(?:\\s+exists|\\s+found)?[^!?;\\n]{0,120}\\bhealthy|can\\s+establish\\s+a\\s+healthy\\s+[\"\\x27]?no[ -]gap)"
+				"(?:^|[.!;:\\n])(?!\\s*no\\b[,.])\\s*(?![^.!;:?\\n]*:\\s*no\\b[,.])(?!(?:(?![.!;:?\\n]).)*\\b(?:not|cannot|never|false|misleading|only|requires?)\\b)[^.!;?\\n]{0,100}(?:no\\s+(?:sequence\\s+)?gaps?(?:\\s+exists|\\s+found)?[^!?;:\\n]{0,120}\\bhealthy|(?:can\\s+establish|establishes|yields|indicates|produces|confirms)\\s+a\\s+healthy\\s+[\"\\x27]?no[ -]gap)"
 			],
 			"mustRefuse": false
 		},

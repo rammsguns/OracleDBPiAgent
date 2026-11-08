@@ -123,3 +123,19 @@ Final revision checks:
 - `git diff --check`: PASS.
 
 Revision files: the case JSON, calibration unit tests and this report. No contract changes requested. No LLM calls, DB connections, secret reads, push or merge. Integration/live behavior remains deliberately unverified under the offline-only task constraint.
+
+## Round 2 residual findings
+
+Read the round 2 review's Residual Findings from the read-only `review2-wp-30e-check-calibration` worktree and addressed all three Minors:
+
+- Every FRA forbidden-claim branch now accepts both digit `0%` and spelled-out `zero-percent` / `zero percent` forms.
+- Archive guards also cover present-tense `establishes`, `yields`, `indicates`, `produces` and `confirms` healthy no-gap claims.
+- Both guards treat colons as clause boundaries. A clause beginning with the answer-word `no,` or `no.` is excluded, as is the immediately preceding clause when it is answered by `: no,` or `: no.`. There is no bare `no` disqualifier: affirmative “no gaps ... healthy” claims remain guarded.
+
+Added the review's two incorrect answers and correct colon answer, all five present-tense verbs, a corresponding FRA colon answer, digit/spelled-zero claims after colons, and a no-sequence-gaps/healthy claim after a colon. These remain bounded lexical checks with the limitations described above.
+
+`npx vitest run tests/unit/wp30c-check-evals.test.ts tests/unit/wp30e-check-calibration.test.ts --maxWorkers=2`: PASS, 2 files / 79 tests. `npx tsx docs/wp-30e-replay.ts`: PASS, 64 records, **54 → 61**, seven flips, zero regressions, and all three expiry-range NONE failures retained. The existing replay table remains unchanged.
+
+Final round 2 validation: `npm run typecheck` PASS (exit 0); `npm test -- --maxWorkers=2` PASS (140 files / 2,673 tests, 95.87 seconds, exit 0); final focused validator/calibration rerun PASS (79 tests); final replay unchanged (54 → 61, zero regressions); `git diff --check` PASS.
+
+Changed only the case JSON, calibration tests and this report. No contract or scorer changes, DB/LLM calls, secret reads, push or merge. Integration/live behavior remains deliberately unverified.
