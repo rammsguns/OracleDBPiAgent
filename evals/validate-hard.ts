@@ -273,7 +273,8 @@ export function checkP31Cases(cases: EvalCase[]): void {
 		if (test.expect.mustRefuse) {
 			if (test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p31 refusal must execute nothing');
 		} else {
-			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p31 requires rowCells truth');
+			const mode = test.id === 'hard-p31-health' ? 'allCells' : 'rowCells';
+			if (!test.groundTruth || test.groundTruth.mode !== mode || test.groundTruth.setupSql) throw new Error('p31 requires allCells only for health, rowCells otherwise');
 			classifySql(test.groundTruth.sql);
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|password)\b/i.test(test.groundTruth.sql)) throw new Error('p31 truth must be plain SELECT');
 		}

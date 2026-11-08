@@ -290,3 +290,74 @@ read-only DB constraint; neither the seed nor any administrative SQL was run by
 this worker. Recent window evidence and passing live recency tests remain
 unverified until that run or the next scheduled run occurs. The assertions were
 kept strict rather than silently accepting the missing fixture.
+
+## Rerun health summary layout calibration
+
+Changed only hard-p31-health's groundTruth mode from rowCells to allCells.
+The live truth SQL, failure and maintenance facts, and forbiddenClaims guard
+are unchanged. Every truth name must still be present, but may be owner-qualified
+inside a descriptive table cell or bullet rather than occupy a whole cell.
+The validator requires allCells for this case alone and retains rowCells for
+every other factual p31 case. The scorer itself is unchanged.
+
+New unit coverage includes owner-qualified names in table details and free-form
+bullets, a missing invalid view, a missing failed job, and longer near-miss names.
+Mutating any other factual p31 case to allCells is rejected. All existing health
+verdict and missing-name tests continue to run. The focused unit file has 114 tests.
+`docs/evals-hard.md` now documents the single-case exception.
+
+### Replay of all four phase31 gate groups
+
+[Per-file, per-case replay results](wp31b-health-rescore.md) cover all 110 p31
+records in ten archived gate result files across gate31a, gate31b, gate31ra and
+gate31rb. Each file's SHA-256 and every before/after case result are recorded.
+Only the health mode differs between the two sides; definitions for all other
+cases, the required facts and forbidden claims are asserted identical. Stored
+truth is recovered from archived checks. The previously accepted backup-age
+projection is applied identically on both sides to the original gate31a/b files,
+so its earlier scoring correction is not counted again. No fresh DB or model
+calls are made.
+
+| Archived file label | Before | After |
+|---|---|---|
+| gate31a/pdb-1 | 9/11 | 9/11 |
+| gate31a/pdb-2 | 10/11 | 10/11 |
+| gate31b/pdb-1 | 9/11 | 9/11 |
+| gate31b/pdb-2 | 10/11 | 10/11 |
+| gate31ra/pdb-1 | 10/11 | 10/11 |
+| gate31ra/pdb-2 | 10/11 | 10/11 |
+| gate31ra/pdb-3 | 9/11 | 9/11 |
+| gate31rb/pdb-1 | 11/11 | 11/11 |
+| gate31rb/pdb-2 | 10/11 | 11/11 |
+| gate31rb/pdb-3 | 10/11 | 11/11 |
+| Total | 98/110 | 100/110 |
+
+Exactly two FAIL→PASS flips: hard-p31-health in gate31rb/pdb-2 and pdb-3.
+Their free-form table details include both qualified truth names, but the old
+whole-cell matcher missed the invalid-view name. Both satisfy the unchanged
+failure/maintenance facts and health-verdict guard. All other records are
+unchanged, including earlier answers that omitted problem names. Removing each
+truth name from every archived health answer produced 20 adversarial answers;
+all still failed. There are zero unrelated flips and zero PASS→FAIL flips.
+
+Replay used a temporary local script; only the Markdown report is retained in
+the repository, per housekeeping. No archive contents were changed. No LLM calls,
+database changes, dependencies or shared contract changes are involved. Changed
+files are the case JSON, hard validator, WP-31B unit tests, hard-eval docs, this
+report, and the Markdown replay report. Live integration was not rerun for this
+case-mode change; the DB truth SQL and its existing live assertions are unchanged.
+
+Health-layout validation:
+
+```text
+npm run typecheck
+PASS (exit 0)
+npm test -- --maxWorkers=2
+Test Files 142 passed (142)
+Tests 2793 passed (2793)
+Focused WP-31B unit tests: 114 passed
+Archived replay: 110 records, 2 health-only FAIL→PASS flips, 0 unrelated flips
+Missing-name replay: 20/20 omissions still fail
+```
+
+No pushes or merges. No shared contract changes are needed.

@@ -185,7 +185,7 @@
 		},
 		"groundTruth": {
 			"sql": "SELECT DISTINCT job_name AS problem_name FROM dba_scheduler_job_run_details WHERE owner='SHOPAPP' AND status='FAILED' UNION SELECT object_name FROM dba_objects WHERE owner='SHOPAPP' AND status='INVALID'",
-			"mode": "rowCells"
+			"mode": "allCells"
 		}
 	},
 	{
