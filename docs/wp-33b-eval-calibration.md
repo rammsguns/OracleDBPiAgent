@@ -34,7 +34,7 @@ The calibration checksum assertion in `tests/unit/wp2527j-calibration.test.ts` n
 - `npm run typecheck`: passed.
 - Focused unit tests: `hard-evals` and `wp2527j-calibration` passed (9 tests) after the review fixes; the full suite below includes `wp29b-eval-cases`.
 - Full unit suite with `--maxWorkers=2` and the local Strata end-to-end test excluded: passed after this review follow-up (147 files, 2,927 tests).
-- Integration suite with `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets` and the local Strata end-to-end test excluded: passed (44 files, 121 tests passed, 1 skipped).
+- Integration suite with `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets` and the local Strata end-to-end test excluded passed before this review follow-up (44 files, 121 tests passed, 1 skipped). It was not rerun after moving eval setup ahead of truth sampling.
 
 ## Contracts and unverified items
 
