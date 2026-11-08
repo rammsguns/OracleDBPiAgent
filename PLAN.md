@@ -4769,6 +4769,47 @@ merge.
     p21, p25 inventories).
 - **Verdict:** B passes and 31C is merged.
 
+## Phase 32: production gaps after the PDB pilot (approved 2026-11-08: "next phases approved and optional extras"; continued with "continue")
+
+### Goal
+Phase 31 proved the PDB path, but the gap list from the readiness review (2026-11-08)
+still has these open items:
+- private targets work only in the web Check tab;
+- the probes' footprint on a large, busy instance has never been measured;
+- Data Guard standby behaviour is untested;
+- the LLM still makes avoidable dictionary-value mistakes (for example
+  `ORACLE_MAINTAINED='NO'` instead of `'N'`).
+RAC and ASM stay out of scope, because a single-host Docker lab can't model them
+faithfully.
+
+### Lab (coordinator ops)
+- **C1 scale-up for footprint work:** more SHOPAPP rows and objects, and cursor
+  churn in the shared pool, so dictionary and V$ probes run against non-trivial
+  sizes. The existing seeded fixtures stay as they are.
+- **Standby C1S:** a physical standby of CDB19 in a second container
+  (`oracle19c-cdb-stby`, port 1525), built with RMAN active duplicate over a
+  Docker network. Redo transport from CDB19 and managed recovery, opened read-only
+  with apply where the image allows it. A read-only PDB account on the standby is
+  reached through the standby's PIPDB1 service. Passwords stay in
+  `PIAGENT_SECRET_DIR`.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-32A web private targets | `wp-32a-web-targets` | Codex | Every web tab (not only Check) accepts any configured target, whether owner-approved private or packaged, with the same validation and deny list as the CLI; selectors, drift and report history; tests, including a private-targets file in a temp home |
+| WP-32B probe footprint | `wp-32b-footprint` | Codex | Measure each deterministic command's probes on the scaled C1 under workload: elapsed time, buffer gets, CPU, parses and rows, read from V$SQL by module/action or tag. Publish `docs/footprint.md` with per-command budgets, fix any probe over budget, and add an integration test that asserts the budgets |
+| WP-32C standby awareness | `wp-32c-standby` | Codex | Detect `DATABASE_ROLE` and open mode, and label check, backup and space results on a standby. Archive gaps come from `V$ARCHIVE_GAP`, and transport and apply lag from `V$DATAGUARD_STATS`, with UNKNOWN when hidden. Integration tests on C1S, docs. Starts after the standby lab exists |
+| WP-32D answer accuracy | `wp-32d-accuracy` | Codex | Deterministic `run_query` hints when a query returns 0 rows because it filtered a known dictionary domain column (Y/N, YES/NO, status enums) with a value outside its domain. Explicit refusal wording in the agent guidance. Unit tests; agent path, gated |
+
+### Gate
+gate170 (gate160 plus pdb ×2), plus any new standby cases. A/B for WP-32D (A =
+master with 32A to 32C, B = A + 32D). All refusals pass, every miss is read, and B
+must be no worse beyond noise.
+
+### Release
+1.8.0 after the gate: release tests, plus a package smoke on all targets including
+the standby.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
