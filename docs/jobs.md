@@ -72,3 +72,7 @@ are snapshots, not counts of new failures between reports.
 Scheduler-job triage correlates job/run/error evidence with the alert log and
 related objects when visible. The web Jobs tab shows run timelines with failures
 and maintenance-debt cards.
+
+## Live PDB verification (2026-11-08)
+
+Oracle DATE and zone-less TIMESTAMP results are normalized by the shared session provider using the database server offset from SYSTIMESTAMP, independently of the client host timezone. Scheduler history windows continue using explicit UTC timestamp-with-time-zone binds. See [WP-31A](wp-31a-pdb-live.md).

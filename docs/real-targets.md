@@ -2,12 +2,12 @@
 
 This is the phase 28 setup path for a human DBA and database owner. The owner
 approves the endpoint and metadata exposure; the DBA provisions access; the CLI
-only reads. Agents and development workers still connect only to `d1-19c-lab`
-and `p1-19c-prod` (plus the dedicated non-19c refusal test).
+only reads. The packaged diagnostic targets are `d1-19c-lab`, `p1-19c-prod` and
+`c1-19c-pdb` (plus the dedicated non-19c refusal test).
 
 **Availability:** private targets and account/view preflight shipped in 1.4.0;
 backup, jobs and top are included in 1.5.0. Check `piagent --version` and
-`piagent targets check --help`. No live PDB has been tested here. The two labs
+`piagent targets check --help`. C1 (Oracle 19.9.1, PIPDB1) was verified live on 2026-11-08 with the PDB-local PIAGENT_RO account, root-service refusal, every diagnostic CLI and web API tab, and UTC date handling from a Mexico City host. See [WP-31A verification](wp-31a-pdb-live.md). The original two labs
 are Oracle 19.9.1 non-CDBs, including the service named PRODCDB.
 
 ## 1. Agree the PDB and provision its login (DBA)

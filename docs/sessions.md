@@ -172,3 +172,7 @@ all fields and the original sentinel. Ok section headers omit their status line;
 notes remain visible, as do unavailable/skipped statuses. Findings now have advice
 specific to their kind; dominant-wait advice is class-specific and explicitly
 cumulative since startup.
+
+## Live PDB verification (2026-11-08)
+
+C1/PIPDB1 was verified live. The V$LOCK collector uses a query-local RULE hint to avoid an Oracle 19.9 PDB plan that spills heavily to TEMP and times out (NJS-123); no grants or session optimizer settings are changed. See [WP-31A](wp-31a-pdb-live.md).

@@ -120,3 +120,7 @@ and clearly skip when approved databases or credential configuration are down.
 No grants, database changes, dependencies, shared contracts or model changes
 are required. The new CLI and core tests cover fallback and unavailable
 fixtures; the live smoke does not force cache eviction or revoke privileges.
+
+## Live PDB verification (2026-11-08)
+
+C1/PIPDB1 cache search was verified with `sql --target c1-19c-pdb --text SHOPAPP`. Tool DATE/plain TIMESTAMP cells now render normalized UTC ISO instants, consistently with JSON and reports. See [WP-31A](wp-31a-pdb-live.md).

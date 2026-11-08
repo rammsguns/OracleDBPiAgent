@@ -34,3 +34,7 @@ archive-gap count and oldest full-backup age when evidence is complete. Backup-r
 and the web Backup tab shows the restore estimate and backup/archive timeline.
 
 Oracle 19c references: [V$RMAN_CONFIGURATION](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-RMAN_CONFIGURATION.html), [RMAN configuration and defaults](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/configuring-rman-client-basic.html), [backup concepts](https://docs.oracle.com/en/database/oracle/oracle-database/19/bradv/rman-backup-concepts.html). Live PDB, RAC and media recovery behaviour remain unverified; the labs are non-CDBs.
+
+## Live PDB verification (2026-11-08)
+
+In a PDB with empty RMAN job details, backup age uses available full/level-0 completion metadata for every visible datafile, matched to its creation SCN, incarnation, backup set and available pieces. The fallback is labelled; missing coverage remains UNKNOWN. This is control-file metadata, not media verification. See [WP-31A](wp-31a-pdb-live.md).

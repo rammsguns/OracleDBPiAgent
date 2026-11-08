@@ -229,3 +229,7 @@ ok; V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM; 2026-10-06T04:22:09.161Z to 2026-11-05T
 | 2026-10-24T23:41:19.281Z | 81965 | ORA 800 | 2 |
 Row cap reached; partial result (folding covers only fetched rows).
 ```
+
+## Live PDB verification (2026-11-08)
+
+In a PDB, alert rows are restricted to the current CON_ID in addition to the explicit timestamp window. CDB-wide ADR rows from other containers are excluded. Health checks filter ORA text before bounding the fetch; a truncated below-threshold sample remains UNKNOWN. See [WP-31A](wp-31a-pdb-live.md).

@@ -228,7 +228,7 @@ WP-4B validation (2026-10-29):
 
 ### Cross-target drift
 
-The Drift tab compares the two approved targets without an agent or LLM call.
+The Drift tab compares two selected approved targets without an agent or LLM call.
 Choose left/right targets, then Parameters, Schema or Objects. Schema and Objects
 also require an owner (for example HR). Self-comparisons are allowed. Results
 show source views, unavailable-section notes, and collapsible Only left, Only
@@ -302,7 +302,7 @@ Authenticated endpoints:
 | GET | `/api/plsql/doc` | `target`, `object=OWNER.NAME` |
 | POST | `/api/triage` | JSON `target`, nonempty `issue`, optional `since` |
 
-Targets default to the configured default and must be one of the two approved
+Targets default to the configured default and must be one of the three approved
 configured targets. Names must be unquoted Oracle identifiers (letters followed
 by letters, digits, `_`, `$`, `#`, at most 128 characters per component).
 The existing bearer token, Host and Origin checks apply. These three routes share
@@ -497,3 +497,7 @@ See [security](security.md) for reachability limits and deliberately excluded da
 Both tabs use deterministic read-only database evidence without an LLM. They
 support light/dark themes and contain wide content inside scrolling regions.
 The Alert Log tab now shows decoded ADR status names alongside raw codes.
+
+## Live PDB verification (2026-11-08)
+
+The three packaged labs, including c1-19c-pdb, are available in diagnostic tab and drift selectors. C1 API verification covers Check, Backup, Jobs, Top, Space, Sessions, Security, Alert Log, SQL, PL/SQL, Report/history and Drift without an LLM call. See [WP-31A](wp-31a-pdb-live.md).

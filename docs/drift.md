@@ -1,6 +1,6 @@
 # Cross-target drift (WP-13A)
 
-`piagent drift` compares metadata on the two configured, approved Oracle 19c
+`piagent drift` compares metadata between two selected, configured Oracle 19c
 targets. It uses no agent or LLM. All database queries use the existing SQL
 policy, read-only session provider, statement timeout and row cap. Each query
 records a SQL hash, target, section, row count and truncation flag in the audit
@@ -111,3 +111,7 @@ Typecheck passed; unit tests finished with 672 passed and the two expected
 `wp-i-optimizer.test.ts` failures (`Eval endpoint primary is already locked`
 while the owner's eval was running). No LLM or integration tests were run for
 these filesystem-only changes.
+
+## Live PDB verification (2026-11-08)
+
+C1/PIPDB1 schema self-drift was verified live. The constraints catalog join uses a query-local RULE hint to avoid a slow Oracle 19.9 PDB dictionary plan; no optimizer/session settings change. See [WP-31A](wp-31a-pdb-live.md).
