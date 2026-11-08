@@ -4,6 +4,57 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-08
+
+Phase 31: production readiness on a real Oracle 19c CDB/PDB.
+
+### Added
+
+- **Packaged multitenant lab target `c1-19c-pdb`.** It is the PDB `PIPDB1`
+  in the container database `CDB19`, on `localhost:1524/PIPDB1`. It runs in
+  ARCHIVELOG mode with a fast recovery area and RMAN level 0 and level 1
+  backups. It connects as a dedicated read-only `PIAGENT_RO` account with the
+  PDB grants template. `lab/c1/` holds an idempotent seed. The seed sets up a
+  live order workload and deliberate problems for the checks to find: a job
+  that fails every 30 minutes, an invalid view, an unusable index partition,
+  stale statistics and a fixed-size tablespace. See [lab/c1](lab/c1/README.md).
+- **PDB eval split (`--split pdb`).** It has eleven hard cases on c1, with live
+  read-only ground truth. They cover container identity, PDB versus CDB-wide
+  scope, backup age, failed jobs, maintenance, stale statistics, headroom,
+  jobs, a broad "is the database healthy?" question, and a refusal.
+- **`health_check` explains each finding.** Each line now says what the check
+  measures and names up to five affected objects, with a `+N more` count. For
+  example, it lists failed jobs, unusable index partitions, invalid objects and
+  default-password accounts.
+
+### Fixed
+
+- **Oracle DATE and plain TIMESTAMP values were shifted by the host's time
+  zone.** The thin driver read wall-clock values in the host zone. On hosts not
+  running in the database's zone, 1.6.0 reported wrong backup ages and other
+  times. Values are now formatted on the server and converted using the
+  database's own offset. Results no longer depend on the host's time zone or its
+  DST gaps. Queries without date columns no longer pay for an extra describe
+  round trip.
+- **PDB backup age.** In a PDB, `V$RMAN_BACKUP_JOB_DETAILS` can be empty. Backup
+  age now falls back to the per-datafile full or level-0 completion records it
+  can verify. These are labelled CDB-wide and fall back to UNKNOWN when the
+  evidence is incomplete.
+- **Blocking-session probe stall in PDBs.** On a PDB, the optimizer plan for
+  `V$LOCK` could take about two minutes and hit the statement timeout. A
+  query-local hint now makes it return in under a second.
+- **Alert log scope in PDBs.** Alert rows are now limited to the current
+  container, plus instance-level rows that the PDB can see.
+- **TEMP and UNDO usage** now count active sort blocks and active or
+  unexpired undo extents, not allocated space. This removes false alarms near
+  100%.
+- **The packaged target list** now allows all three packaged labs, not two.
+
+### Changed
+
+- The README and [real targets](docs/real-targets.md) now describe verified
+  live PDB behaviour.
+
 ## [1.6.0] - 2026-11-08
 
 ### Added

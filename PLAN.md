@@ -4681,6 +4681,94 @@ miss is read, and B is not worse beyond noise.
 1.7.0 after the gate, with release tests (including c1 integration) and a package
 smoke on all three targets.
 
+## Phase 31 results (2026-11-08, shipped as 1.7.0)
+
+**Lab C1 (coordinator).**
+- Docker container `oracle19c-cdb` (port 1524), running CDB19 with the PDB
+  PIPDB1 (19.9).
+- ARCHIVELOG mode, a 20G fast recovery area and RMAN settings: control-file
+  autobackup, a 7-day recovery window and compressed backup sets. One level 0
+  and one level 1 backup were taken.
+- The PDB's open state is saved, and the container restarts unless stopped.
+- During the gate, the `REPORT_EXPORT_JOB` fixture was changed from daily to
+  every 30 minutes. The health check looks back only 1 hour, so a daily
+  failure had aged out before the gate ran.
+
+**Merges.** Antigravity reviewed every WP, and every finding was fixed before
+merge.
+- **WP-31 lab seed:** `lab/c1/` seed, packaged target `c1-19c-pdb`
+  (PIAGENT_RO), and seed integration tests.
+- **WP-31A live verification:** found and fixed real product bugs on the PDB:
+  - DATE/TIMESTAMP values were shifted by the host time zone, which made 1.6.0
+    backup ages wrong on non-UTC hosts;
+  - PDB backup age needed a per-datafile fallback;
+  - the `V$LOCK` optimizer plan stalled for about 127 s;
+  - alert-log container scope;
+  - TEMP/UNDO usage counted allocated space, not used space;
+  - the packaged target list allowed only two targets.
+  Round 2 fixed the DST-gap issue. Round 3 removed the per-query describe
+  round trip.
+- **WP-31B PDB evals:** 11 `pdb` split cases with live truth.
+  - Three review rounds hardened the health-verdict guard: composite subjects,
+    introductory clauses and spaced Markdown headings.
+  - The failed-job case accepts numeric error codes; replaying the scorer over
+    the phase 30 archive gave 0 flips.
+  - After the gate, three cases were calibrated:
+    - backup age is scored apart from ARCHIVELOG;
+    - the health case uses whole-identifier allCells truth;
+    - the seed creates the 30-minute job.
+  - The replay over all 110 archived p31 records changed only the targeted
+    cases: 0 unrelated flips, 0 pass→fail, and all 20 answers with a name
+    removed still fail.
+- **WP-31C health summary** (agent path, gated): `health_check` lines say
+  what each check measures and name up to 5 affected objects, with a
+  `+N more` count. After the gate, the maintenance names were fixed to include
+  invalid objects, not only index units.
+
+**Gate (A/B).**
+- A = master with lab seed, 31A and 31B; B = A + 31C.
+- Same Strata model (qwen3.8-flash-next-iq3_s), all three labs, strictly
+  sequential calls.
+- Results are archived in `eval-archive/phase31`.
+
+| Run | A | B (+ 31C) |
+|---|---|---|
+| dev ×2 | 64/66 | 64/66 |
+| challenge ×2 | 161/172 | 162/172 |
+| holdout | 67/72 | 67/72 |
+| regression | 21/21 | 21/21 |
+| MVP | 38/39 | 39/39 |
+| p25 / p26 / p27 | 4/4, 4/4, 10/10 | 4/4, 4/4, 9/10 |
+| p23 / p24 | 6/6, 5/6 | 6/6, 6/6 |
+| p30 ×2 | 15/16 | 14/16 |
+| pdb ×2 (first run, before fixes) | 17/22 | 17/22 |
+| **rerun after fixes: pdb ×3** (final scorer) | **29/33** | **33/33** |
+| **rerun after fixes: p30 ×2** | 12/16 | 15/16 |
+
+- **Why the first PDB run was low on both sides.**
+  - The health case could not pass: the failure fixture had aged out of the
+    health check's 1-hour window.
+  - Backup age needed two values in one record.
+  - B's maintenance names left out the invalid view.
+  All three were fixed, then the PDB split and p30 were rerun on both sides.
+- **On the rerun, `hard-p31-health` passed 3/3 on B and 0/3 on A.**
+  - On A, `health_check` gives no names, so the model can't name the invalid
+    view.
+  - On B, the model called `health_check` by itself and reported both
+    warnings, with the job, the index partition and the view.
+- **Token cost is flat:** 1.07 M input tokens on B against 1.08 M on A over
+  the full gate.
+- **Misses were read one by one; none come from Phase 31 code.**
+  - `hard-p27-refuse-ash` failed 2 times on each side. The answers refuse
+    correctly but use no refusal keyword the scorer knows. It failed 3 of 23
+    times in archived runs, with the same model.
+  - `hard-p30-p1-recovery-config` and `hard-p30-d1-expiry-range`: correct
+    answers worded outside the fact patterns, from `run_query`, without
+    `health_check`.
+  - The rest are older scorer limits that show up on both sides (p16, p19,
+    p21, p25 inventories).
+- **Verdict:** B passes and 31C is merged.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

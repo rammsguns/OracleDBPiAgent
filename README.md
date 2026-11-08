@@ -5,7 +5,7 @@ local Strata LLM at `http://127.0.0.1:8080/v1`.
 
 ## Rules
 
-- The product uses the owner's private target allowlist, or the packaged labs. Every session checks for Oracle 19c; CDB$ROOT is refused. Agents/workers use only the two labs (plus the dedicated version-refusal test).
+- The product uses the owner's private target allowlist, or the packaged labs. Every session checks for Oracle 19c; CDB$ROOT is refused. Agents/workers use only the three packaged labs (plus the dedicated version-refusal test).
 - No database writes, DDL or changing PL/SQL. No SYS, SYSTEM, HARNESS_APP or SHOPAPP credentials.
 - No cloud LLMs. Send Strata requests one at a time. Do not restart or reconfigure Strata; stop if it is unloaded.
 - Keep passwords and API keys outside the repo. Audit records omit bind values and credentials.
@@ -37,20 +37,22 @@ See [install details](docs/install.md) for permissions, defaults and overrides.
 For an owner-approved Oracle 19c PDB, follow the [real-target setup guide](docs/real-targets.md):
 DBA-local account and reviewed grants, private targets/password files, preflight,
 then deterministic commands and ask. Private targets are supported since 1.4.0;
-live PDB behaviour is unverified. The lab workflow below remains available.
+live PDB behaviour is verified on the c1 lab PDB since 1.7.0 (see
+[real targets](docs/real-targets.md)). The lab workflow below remains available.
 
-Use Node 24 and npm. Have the two approved Oracle 19c targets in
+Use Node 24 and npm. Have the approved Oracle 19c targets in
 [config/targets.json](config/targets.json) available: `d1-19c-lab` on
-`localhost:1522/ORCL` and `p1-19c-prod` on `localhost:1523/PRODCDB`, with their
-configured read-only accounts and grants. The local OpenAI-compatible LLM endpoint
+`localhost:1522/ORCL`, `p1-19c-prod` on `localhost:1523/PRODCDB` and the
+multitenant lab `c1-19c-pdb` on `localhost:1524/PIPDB1` (see
+[lab/c1](lab/c1/README.md)), with their configured read-only accounts and grants. The local OpenAI-compatible LLM endpoint
 must be loaded Strata at `http://127.0.0.1:8080/v1`, with the model named in
 [.env.example](.env.example). A generic cloud endpoint is not supported.
 
 After the clone/global install above, `piagent init` creates a private
 `~/.piagent/.env`. Edit its placeholder paths:
 
-- `PIAGENT_SECRET_DIR`: private directory containing `d1_lab.pw` for `HARNESS_LAB`
-  and `p1_harness_ro.pw` for `HARNESS_RO`.
+- `PIAGENT_SECRET_DIR`: private directory containing `d1_lab.pw` for `HARNESS_LAB`,
+  `p1_harness_ro.pw` for `HARNESS_RO` and `c1_piagent_ro.pw` for `PIAGENT_RO`.
 - `PIAGENT_LLM_API_KEY_FILE`: private file containing the existing Strata key.
 
 Credential files contain only their credential with an optional trailing newline;
