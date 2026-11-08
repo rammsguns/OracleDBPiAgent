@@ -1164,7 +1164,7 @@ No contract changes requested. No LLM/eval gate performed (Strata reserved for c
 
 Read the approved review in the separate review-wp-31a-pdb-live worktree without modifying it.
 
-- Minor 1 fixed: DATE/plain TIMESTAMP never pass through a host-local Date while decoding. Sessions set fixed NLS_DATE_FORMAT/NLS_TIMESTAMP_FORMAT, and the fetchTypeHandler requests STRING. Live testing demonstrated that installed thin driver 26 still decodes a Date before locally stringifying it, so STRING alone is insufficient. The provider describes SELECT metadata and explicitly projects date columns through Oracle TO_CHAR before fetching. Existing WITH clauses are hoisted to avoid Oracle 19c's nested-WITH restriction; generated aliases avoid name collisions and preserve column order, duplicate-name behavior and original database type metadata. Nulls and other column types remain intact. This adds a metadata-describe round trip per query; the complete integration run below covers the existing bounded collectors.
+- Minor 1 fixed: DATE/plain TIMESTAMP never pass through a host-local Date while decoding. Sessions set fixed NLS_DATE_FORMAT/NLS_TIMESTAMP_FORMAT, and the fetchTypeHandler requests STRING. Live testing demonstrated that installed thin driver 26 still decodes a Date before locally stringifying it, so STRING alone is insufficient. The provider describes SELECT metadata and explicitly projects date columns through Oracle TO_CHAR before fetching. Existing WITH clauses are hoisted to avoid Oracle 19c's nested-WITH restriction; generated aliases avoid name collisions and preserve column order, duplicate-name behavior and original database type metadata. Nulls and other column types remain intact. At that review stage this added a metadata-describe round trip per query; the round 2 follow-up below removes that unconditional call.
 - Consumers still receive normalized Date instants, retaining their existing API. Reviewed Date consumers in backup/check, jobs, space/undo, sessions, source/tool rendering, report/history and drift. Their date arithmetic, instanceof Date checks and ISO rendering continue to work; no shared contract changes are needed.
 - Added fake and live America/New_York tests for the missing local hour 2026-03-08 02:30, including DATE, TIMESTAMP fractional milliseconds, CTEs, duplicate names, nulls and numeric columns. Mexico City tests remain.
 - Info 4 fixed: alerts and incidents include CON_ID 0/1 plus the current container, with CDB-wide/instance row labels and explicit scope notes in check. Folding includes container identity. UI/Markdown/JSON retain scope labels; lower-bound cap rules are unchanged.
@@ -1200,3 +1200,55 @@ Follow-up changed files:
 - `tests/unit/pdb-audit.test.ts`
 - `tests/unit/preflight-catalog.test.ts`
 - `tests/unit/session.test.ts`
+
+
+## Round 2: remove unconditional metadata describe (2026-11-08)
+
+Read the approved round 2 review from review2-wp-31a-pdb-live without modifying that worktree.
+
+Commit 09a1d64 removes every connection.getStatementInfo call from product code. The initial execute supplies column metadata with prefetchRows=0, so no zone-less date values are decoded before their types are known. Non-date queries fetch directly from that result set: one SELECT execute, no separate describe. Date-bearing queries close the unfetched result set and use the existing server-side TO_CHAR projection; normal prefetch=2 is safe for this formatted result. Existing NLS formats and STRING handler remain. All consumers still receive Date instants, original type metadata, nulls and fractional milliseconds.
+
+A new unit test makes getStatementInfo throw if called and verifies two numeric queries use exactly two SELECT executes. The mixed date/numeric/duplicate-name/CTE test also asserts zero describe calls, no getRows on the unformatted result, and prefetch values [0,2]. New York DST-gap and Mexico City tests remain unchanged.
+
+### Why STRING-only cannot replace the remaining date-only metadata execute
+
+The installed node-oracledb thin driver is 26.0.0. In lib/impl/resultset.js it converts native date values to STRING using value.toString(); lib/thin/protocol/messages/withData.js still decodes the original DATE/TIMESTAMP wire type using a local Date. Fixed NLS formats do not change that client-side path.
+
+Reproduced live on C1 with TZ=America/New_York, fixed NLS_DATE_FORMAT/NLS_TIMESTAMP_FORMAT and a handler returning {type:oracledb.STRING}, querying both:
+
+- TO_DATE('2026-03-08 02:30:00','YYYY-MM-DD HH24:MI:SS')
+- TIMESTAMP '2026-03-08 02:30:00.123456789'
+
+Both returned this incorrect string (the timestamp's fractional milliseconds are also lost):
+
+```text
+Sun Mar 08 2026 03:30:00 GMT-0400 (Eastern Daylight Time)
+```
+
+Thus the suggested single-execute STRING-only implementation would regress the required gap and fractional-second cases. For arbitrary read-only SQL, the actual Oracle column types are only known after executing or describing the statement; inferring them from SQL text would not cover ad-hoc queries reliably. The date-only formatting execute therefore remains necessary for this safe text-conversion path with the installed driver. No driver/dependency patch, timezone mutation or host-local date reconstruction was introduced.
+
+### Measured overhead
+
+Compared the reviewed implementation at 7e4114c with 09a1d64 on c1-19c-pdb, PIAGENT_RO, thin driver 26.0.0, TZ=America/New_York. Each case used 30 queries after warming the statement cache, including the normal read-only transaction setup, bounded fetch, result-set close and rollback. Connection initialization, warmup and SID lookup were outside the measured interval. Round trips are actual differences in V$SESSTAT's 'SQL*Net roundtrips to/from client' counter; SYS read that counter via Docker OS authentication outside the timed client loop. No grants or data changed.
+
+| Case | Prior round trips/query | New round trips/query | Prior mean ms | New mean ms |
+| --- | --- | --- | --- | --- |
+| number-1 | 4 | 4 | 2.552 | 1.808 |
+| number-100 | 5 | 4 | 2.899 | 1.862 |
+| wall-1 | 4 | 4 | 1.994 | 1.462 |
+| wall-100 | 5 | 5 | 2.977 | 3.333 |
+
+Numeric cases select 42 from DUAL (one row) or LEVEL from DUAL CONNECT BY LEVEL<=100. Wall cases select the two gap literals above from DUAL, with CONNECT BY LEVEL<=100 for 100 rows.
+
+The unsafe STRING-only path measured 3 round trips for one date row and 4 for 100 date rows, versus the safe path's 4 and 5. Consequently date safety costs one round trip relative to that incorrect path, and the new implementation does not add round trips relative to the reviewed implementation. The 100-row numeric case saves one round trip; the one-row numeric case trades the old describe for a fetch and has unchanged total round trips. Local means are not a WAN benchmark and include cache/JIT/scheduling noise. Inference: one extra serial round trip contributes roughly one network RTT on a WAN (about 50 ms at 50 ms RTT); no actual WAN endpoint was tested.
+
+### Final validation
+
+- `npm run typecheck`: PASS.
+- `npm test -- --maxWorkers=2`: PASS, 141 files, 2,684 tests (98.68 s).
+- `npx playwright test`: PASS, 89 passed, 7 optional live-capture tests skipped (1.1 min). Regenerated docs/img screenshots restored with git checkout.
+- Focused C1 review tests: PASS, 2/2 (New York gap, original types/nulls/fractions/CTEs and ADR visibility).
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`: PASS, 39 files, 93 passed, 1 skipped (excluded Strata e2e), 515.43 s.
+- `git diff --check`: PASS.
+- No shared contract or dependency changes. No LLM calls, push or merge.
+- Changed files: src/oracle/index.ts, tests/unit/session.test.ts, docs/wp-31a-pdb-live.md.
