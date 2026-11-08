@@ -140,3 +140,44 @@ it.each`
 `('health verdict passes=$passes: $verdict', ({ passes, verdict }) => {
 	expect(grade(verdict)).toBe(passes);
 });
+
+const backupAge = cases.find(c => c.id === 'hard-p31-backup-age')!;
+const backupGrade = (answer: string) => score(backupAge, {
+	answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 },
+}, [['UNDER 26 HOURS']]).pass;
+it.each([
+	'Classification: UNDER 26 HOURS\n| Archive log mode | ARCHIVELOG |',
+	'### Classification: **UNDER 26 HOURS**\nLog mode: ARCHIVELOG.',
+	'Age band: UNDER 26 HOURS. C1 is in ARCHIVELOG mode, not NOARCHIVELOG.',
+	'Age band: UNDER 26 HOURS. ARCHIVELOG. Mode is not NOARCHIVELOG.',
+	'Age band: UNDER 26 HOURS. C1 is in ARCHIVELOG mode. D1 log mode: NOARCHIVELOG.',
+	'Age band: UNDER 26 HOURS. C1 is in ARCHIVELOG mode. D1 is in NOARCHIVELOG mode.',
+	"Age band: UNDER 26 HOURS. ARCHIVELOG. NOARCHIVELOG is not c1's mode.",
+])('accepts independent backup band and log-mode evidence: %s', answer => expect(backupGrade(answer)).toBe(true));
+it.each([
+	'Classification: OVER 50 HOURS. ARCHIVELOG.',
+	'Classification: UNDER 26 HOURS.',
+	'Classification: UNDER 26 HOURS. NOARCHIVELOG.',
+	'Classification: UNDER 26 HOURS. ARCHIVELOG. C1 is in NOARCHIVELOG mode.',
+	'Classification: UNDER 26 HOURS. ARCHIVELOG. Log mode: NOARCHIVELOG.',
+	"Classification: UNDER 26 HOURS. ARCHIVELOG. C1's mode: NOARCHIVELOG.",
+	"Classification: UNDER 26 HOURS. ARCHIVELOG. NOARCHIVELOG is c1's mode.",
+	'Classification: UNDER 26 HOURS. ARCHIVELOG. C1: NOARCHIVELOG.',
+	'Classification: UNDER 26 HOURS. ARCHIVELOG. | Archive log mode | NOARCHIVELOG |',
+])('rejects wrong/missing backup band or contradictory mode: %s', answer => expect(backupGrade(answer)).toBe(false));
+it('validates the independent backup log-mode checks', () => {
+	for (const mutate of [
+		(c: EvalCase) => { c.expect.requiredFacts = []; },
+		(c: EvalCase) => { c.expect.forbiddenClaims = []; },
+	]) {
+		const copy = structuredClone(cases); mutate(copy.find(c => c.id === backupAge.id)!);
+		expect(() => checkP31Cases(copy)).toThrow('independent');
+	}
+});
+it('keeps the seeded failure in the one-hour health window', () => {
+	const seed = readFileSync(new URL('../../lab/c1/seed.sql', import.meta.url), 'utf8');
+	expect(seed).toContain("start_date=>systimestamp,repeat_interval=>'FREQ=MINUTELY;INTERVAL=30'");
+	expect(seed).toContain("raise_application_error(-20001,''C1 intentional report export failure'')");
+	expect(seed).toContain("set_attribute('SHOPAPP.REPORT_EXPORT_JOB','logging_level',dbms_scheduler.logging_full)");
+	expect(seed).toContain("run_job('SHOPAPP.REPORT_EXPORT_JOB',use_current_session=>false)");
+});

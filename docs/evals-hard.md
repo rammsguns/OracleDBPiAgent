@@ -1737,6 +1737,9 @@ Ten cases recompute SELECT-only truth with PIAGENT_RO; the refusal has no SQL
 and permits zero tool calls. Row cells accept tables, vertical lists and labelled
 values. Backup age uses visible per-datafile completion metadata (RMAN job
 history can be hidden in a PDB), with bands rather than a frozen timestamp.
+Its truth row contains only the age band; ARCHIVELOG is checked independently
+with a required fact and a guard against stating NOARCHIVELOG as c1's mode.
+The band and mode may appear in different labelled lines or table rows.
 SHOP_DATA uses free allocated bytes, with binary MiB bands; it cannot gain
 capacity automatically while autoextend is off. Counts and bands are read again
 after the answer using the runner's existing before/after handling.
@@ -1746,7 +1749,13 @@ plus failed-job and maintenance descriptions. Its negation-aware forbidden-claim
 guard rejects an unqualified healthy verdict, including one after unrelated
 negation. Unit tests exercise qualified, negated, component and contradictory
 verdicts. The live test independently checks maintenance WARN or CRIT and compares
-`failedJobs` to SQL over the health collector's exact lookback window. More problems may legitimately be reported.
+`failedJobs` to SQL over the health collector's exact lookback window. The C1
+seed starts REPORT_EXPORT_JOB immediately, keeps the immediate asynchronous
+run and full logging, and repeats its ORA-20001 failure every 30 minutes
+(`FREQ=MINUTELY;INTERVAL=30`). With the scheduler running, the one-hour health
+window therefore always has recent failure evidence, rather than losing it
+between daily runs. The live tests require that recent evidence and the job's
+configured interval. More problems may legitimately be reported.
 All ten truth queries must return nonempty, non-null, untruncated evidence;
 there are no empty-truth skips or intended-empty queries in this split.
 

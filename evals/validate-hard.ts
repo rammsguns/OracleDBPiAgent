@@ -264,6 +264,8 @@ export function checkP30Cases(cases: EvalCase[], liveTruth?: { id: string; rows:
 
 export function checkP31Cases(cases: EvalCase[]): void {
 	if (cases.length !== 11 || cases.filter(test => test.expect.mustRefuse).length !== 1) throw new Error('p31 requires eleven PDB cases with one refusal');
+	const backup = cases.find(test => test.id === 'hard-p31-backup-age');
+	if (!backup?.groundTruth || backup.expect.requiredFacts.join('') !== '\\bARCHIVELOG\\b' || !backup.expect.forbiddenClaims.length || /d\.log_mode|CROSS JOIN v\$database/i.test(backup.groundTruth.sql)) throw new Error('p31 backup needs independent age-band and log-mode checks');
 	const health = cases.find(test => test.id === 'hard-p31-health');
 	if (!health?.groundTruth || health.expect.requiredFacts.length < 2 || !health.expect.forbiddenClaims.length) throw new Error('p31 requires guarded broad health truth');
 	for (const test of cases) {

@@ -82,7 +82,7 @@ begin
  dbms_scheduler.create_job('SHOPAPP.PLACE_ORDERS_JOB','PLSQL_BLOCK','begin SHOPAPP.workload.place_orders(20); end;',start_date=>systimestamp+interval '1' minute,repeat_interval=>'FREQ=MINUTELY;INTERVAL=1',enabled=>true,auto_drop=>false);
  dbms_scheduler.create_job('SHOPAPP.SHIP_ORDERS_JOB','PLSQL_BLOCK','begin SHOPAPP.workload.ship_orders; end;',start_date=>systimestamp+interval '5' minute,repeat_interval=>'FREQ=MINUTELY;INTERVAL=5',enabled=>true,auto_drop=>false);
  dbms_scheduler.create_job('SHOPAPP.NIGHTLY_PURGE_JOB','PLSQL_BLOCK','begin SHOPAPP.workload.nightly_purge; end;',start_date=>systimestamp+interval '1' day,repeat_interval=>'FREQ=DAILY;BYHOUR=2;BYMINUTE=0;BYSECOND=0',enabled=>true,auto_drop=>false);
- dbms_scheduler.create_job('SHOPAPP.REPORT_EXPORT_JOB','PLSQL_BLOCK','begin raise_application_error(-20001,''C1 intentional report export failure''); end;',start_date=>systimestamp+interval '1' day,repeat_interval=>'FREQ=DAILY',enabled=>true,auto_drop=>false);
+ dbms_scheduler.create_job('SHOPAPP.REPORT_EXPORT_JOB','PLSQL_BLOCK','begin raise_application_error(-20001,''C1 intentional report export failure''); end;',start_date=>systimestamp,repeat_interval=>'FREQ=MINUTELY;INTERVAL=30',enabled=>true,auto_drop=>false);
  dbms_scheduler.set_attribute('SHOPAPP.REPORT_EXPORT_JOB','logging_level',dbms_scheduler.logging_full);
  dbms_scheduler.run_job('SHOPAPP.REPORT_EXPORT_JOB',use_current_session=>false);
 end;

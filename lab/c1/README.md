@@ -28,7 +28,11 @@ captured and secrets redacted before display. Never run with shell tracing.
 Reruns preserve app data and the fixed initial seed (DBMS_RANDOM seed 31031),
 replace the package and four jobs, recreate the invalid-view source, reset stale
 PRODUCTS statistics, mark HISTORY_ORDER_IX/P_202601 unusable, and submit a fresh
-intentional REPORT_EXPORT_JOB failure asynchronously. Initial data: 3,000 customers,
+intentional REPORT_EXPORT_JOB failure asynchronously. REPORT_EXPORT_JOB starts
+immediately and fails with ORA-20001 every 30 minutes
+(`FREQ=MINUTELY;INTERVAL=30`), with full scheduler logging. While the scheduler
+is running, this keeps intentional failure evidence inside the health check's
+one-hour window instead of aging out between daily runs. Initial data: 3,000 customers,
 2,000 products, 30,000 orders and 90,000 lines; monthly history begins January 2026.
 The live scheduler changes counts after seeding. SHOP_DATA is 256 MiB with
 autoextend off. Statistics on PRODUCTS are locked to retain the stale fixture;

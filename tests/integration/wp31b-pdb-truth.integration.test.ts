@@ -24,6 +24,11 @@ it('C1: every phase31 truth SELECT parses and runs as PIAGENT_RO with nonempty t
 			expect(result.truncated, test.id).toBe(false);
 			expect(result.rows.length, test.id).toBeGreaterThan(0);
 			for (const row of result.rows) for (const cell of row) expect(cell, test.id).not.toBeNull();
+			if (test.id === 'hard-p31-backup-age') {
+				expect(result.rows).toHaveLength(1);
+				expect(result.rows[0]).toHaveLength(1);
+				expect((await session.query('SELECT log_mode FROM v$database')).rows).toEqual([['ARCHIVELOG']]);
+			}
 			if (test.id === 'hard-p31-health') {
 				expect(result.rows).toEqual(expect.arrayContaining([['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]));
 			}
@@ -39,7 +44,7 @@ it('C1: every phase31 truth SELECT parses and runs as PIAGENT_RO with nonempty t
 		});
 		expect(check.targets[0]!.checks.find(c => c.id === 'maintenance')?.status).toMatch(/WARN|CRIT/);
 		expect(failureWindow).toBeDefined();
-		// Seed failures remain in retained truth after they leave the health check's one-hour window.
+		// The half-hour failure fixture must remain visible in the one-hour health window.
 		// Compare the windowed health measurement to independent SQL over the exact collector window.
 		const failures = await session.query(`SELECT COUNT(*) FROM dba_scheduler_job_run_details
 			WHERE status='FAILED'
@@ -47,6 +52,7 @@ it('C1: every phase31 truth SELECT parses and runs as PIAGENT_RO with nonempty t
 			AND log_date<FROM_TZ(TO_TIMESTAMP(:to_time,'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'),'UTC')`,
 			{ from_time: failureWindow!.from, to_time: failureWindow!.to });
 		const failedCount = Number(failures.rows[0]![0]);
+		expect(failedCount).toBeGreaterThan(0);
 		expect(check.targets[0]!.checks.find(c => c.id === 'failedJobs')).toMatchObject({
 			value: failedCount, status: classify(failedCount, DEFAULTS.failedJobs),
 		});

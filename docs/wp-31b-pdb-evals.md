@@ -198,3 +198,95 @@ Tests 2767 passed (2767)
 All 32 must-pass phrasings still pass; all 33 must-fail phrasings fail scoring
 as intended, including the three Markdown headings and the existing bold label.
 No shared contract changes are needed. No push or merge.
+
+## Gate findings: recurring failure and backup answer layout
+
+Changed `lab/c1/seed.sql` so REPORT_EXPORT_JOB starts at SYSTIMESTAMP and
+repeats `FREQ=MINUTELY;INTERVAL=30`. The immediate asynchronous run, intentional
+ORA-20001, full logging and retained job remain unchanged. This keeps the
+one-hour health window supplied with failures while the scheduler runs.
+`lab/c1/README.md` and `docs/evals-hard.md` describe the fixture requirement.
+The seed integration additionally checks the interval, enabled state, logging
+and recent intentional failure; the truth integration requires a nonzero
+windowed failure count, still independently checked against the collector window.
+
+Changed only hard-p31-backup-age among the eval cases. Its truth is one cell:
+the DB-derived age band. ARCHIVELOG is an independent required fact, with a
+negation-aware guard against a positive claim that c1 runs NOARCHIVELOG.
+Mode labels, table cells and direct database claims are covered; negated claims
+and comparisons to another target's NOARCHIVELOG mode remain safe. The validator
+requires the separate mode checks; the live validator checks single-cell shape
+and confirms ARCHIVELOG separately as PIAGENT_RO. Tests cover split classification
+and mode layouts, wrong bands, absent modes, contradictions and negations.
+The scorer and every other eval case are unchanged.
+
+### Offline archived replay
+
+The supplied directories contain timestamp-named result JSON files; `files.tsv`
+maps them to pdb-1/pdb-2. [Per-case results](wp31b-gate-rescore.md) list every p31
+case's before/after pass state in each of the four files. The
+[machine-readable report](wp31b-gate-rescore.json) includes source SHA-256 hashes.
+The [replay script](wp31b-gate-rescore.mts) uses baseline case definitions from
+57d2540 and archived truth rows recovered from stored checks, never fresh DB
+truth. Before scores must reproduce each archived pass bit. Only the backup
+truth projects to its original age-band column; all other definitions and
+pass bits must stay identical. No model calls are made.
+
+| Archived file label | Before | After |
+|---|---|---|
+| gate31a/pdb-1 | 8/11 | 9/11 |
+| gate31a/pdb-2 | 9/11 | 10/11 |
+| gate31b/pdb-1 | 8/11 | 9/11 |
+| gate31b/pdb-2 | 9/11 | 10/11 |
+| Total | 34/44 | 38/44 |
+
+All four backup-age failures become passes. Every other score is unchanged:
+the four health failures stay failures (historical answers cannot gain evidence
+retroactively), gate31a/pdb-1 identity stays failed, and gate31b/pdb-1 headroom
+stays failed. There are zero unrelated flips and zero pass-to-fail flips.
+
+Reproduce without DB or LLM calls:
+
+```sh
+npx tsx docs/wp31b-gate-rescore.mts /tmp/claude-1000/-home-kiwi-orca-projects-OracleDBPiAgent/4094c500-1c7c-411a-a045-e1c394d3f98b/scratchpad
+```
+
+Changed files: the case JSON, validator, seed SQL and README, the two C1
+integration tests, WP-31B unit tests, hard-eval documentation, this report, and
+the three replay artifacts linked above. No shared contract or dependency
+changes are needed. No LLM calls, database changes, pushes or merges by this
+worker. The coordinator changed the live scheduler configuration.
+
+Gate-follow-up validation:
+
+```text
+npm run typecheck
+PASS (exit 0)
+npm test -- --maxWorkers=2
+Test Files 142 passed (142)
+Tests 2785 passed (2785)
+Focused WP-31B unit tests: 106 passed
+Offline gate replay: 44 records; 4 backup-age FAIL→PASS, 0 unrelated flips
+PIAGENT_SECRET_DIR=… npx vitest run tests/integration/c1-seed.test.ts tests/integration/wp31b-pdb-truth.integration.test.ts --no-file-parallelism
+Test Files 2 failed (2)
+Tests 2 failed (2), no skips: both failed only the new recent-failure assertion
+```
+
+The integration failure is a live fixture startup gap, not a SQL/grant/scoring
+failure. PIAGENT_RO observed, at 2026-11-08T12:01:50Z:
+
+- REPORT_EXPORT_JOB enabled TRUE, state SCHEDULED, interval
+  FREQ=MINUTELY;INTERVAL=30, logging FULL.
+- Latest retained failed run: 2026-11-08T06:09:29.116Z, error 20001.
+- Next scheduled run: 2026-11-08T12:27:47.896Z.
+- Zero failed runs in the one-hour health window; the health engine correctly
+  reported zero. All ten truth SELECTs, the single-cell backup shape and separate
+  ARCHIVELOG assertion passed before the recent-failure assertion.
+
+The seed's immediate run fixes this gap for future seeding. Merely changing an
+existing job's repeat schedule does not supply a new run-history row. The worker
+requested a coordinator-triggered immediate run and retained the original
+read-only DB constraint; neither the seed nor any administrative SQL was run by
+this worker. Recent window evidence and passing live recency tests remain
+unverified until that run or the next scheduled run occurs. The assertions were
+kept strict rather than silently accepting the missing fixture.
