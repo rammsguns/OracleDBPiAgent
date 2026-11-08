@@ -1,3 +1,4 @@
+import { readDatabaseRole } from './role.js';
 import { markdownTable } from './markdown.js';
 import type { OracleSession } from '../contracts.js';
 import { SQL } from './sql.js';
@@ -23,11 +24,13 @@ const date = (v: unknown): string | null => { if (v == null) return null; const 
 const time = (v: unknown) => { const d = date(v); return d ? Date.parse(d) : Number.MIN_SAFE_INTEGER; };
 const sameIdentifier = (a: unknown, b: unknown) => a != null && b != null && Number.isSafeInteger(n(a)) && Number.isSafeInteger(n(b)) && n(a) === n(b);
 export async function readBackup(session: OracleSession, now = new Date()): Promise<BackupReport> {
+	const role = await readDatabaseRole(session);
 	const evidence = {} as BackupReport['evidence'];
 	for (const id of Object.keys(SQL) as EvidenceId[]) {
 		const sql = SQL[id], view = /FROM\s+(\S+)/i.exec(sql)![1]!;
 		const e: Evidence = { view, sql, status: 'ok', columns: [], rows: [], truncated: false }; evidence[id] = e;
 		try {
+			if (id === 'archiveGap' && !role.standby) { e.note = 'Standby apply-gap view not applicable to primary backup-chain analysis.'; continue; }
 			const result = await session.query(sql);
 			e.columns = result.columns; e.truncated = result.truncated;
 			e.rows = result.rows.map(row => Object.fromEntries(result.columns.map((c, i) => [c.toUpperCase(), row[i]])));
@@ -41,10 +44,13 @@ export async function readBackup(session: OracleSession, now = new Date()): Prom
 			e.status = 'unavailable'; e.note = `Not available in a PDB / not granted (${code}).`;
 		}
 	}
-	return analyzeBackup(session.target.name, session.identity.isCdb, evidence, now);
+	const report = analyzeBackup(session.target.name, session.identity.isCdb, evidence, now, role.standby);
+	report.scope = role.label + '. ' + report.scope;
+	if (role.standby) report.scope += ' Backups are normally taken on the primary; visible control-file metadata may be copied by duplicate/redo and does not prove a standby backup.';
+	return report;
 }
-export function analyzeBackup(target: string, pdb: boolean, evidence: BackupReport['evidence'], now = new Date()): BackupReport {
-	const good = (...ids: EvidenceId[]) => ids.every(id => evidence[id].status === 'ok' && !evidence[id].truncated);
+export function analyzeBackup(target: string, pdb: boolean, evidence: BackupReport['evidence'], now = new Date(), standby = false): BackupReport {
+	const good = (...ids: EvidenceId[]) => ids.every(id => evidence[id]?.status === 'ok' && !evidence[id].truncated);
 	const rows = (id: EvidenceId) => evidence[id].rows;
 	const findings: Finding[] = [];
 	const add = (id: string, severity: Finding['severity'], detail: string, ids: EvidenceId[]) => findings.push({ id, severity, detail, evidence: ids, advice: 'For a human DBA: review the cited metadata and validate the restore plan and backup media using RMAN in an approved recovery environment.' });
@@ -69,7 +75,7 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 	}
 	const checkpoint = files.length && files.every(f => f.checkpointScn != null) ? Math.min(...files.map(f => f.checkpointScn!)) : null;
 	const gaps: ArchiveGap[] = [];
-	if (checkpoint !== null && good('archives','history','database')) {
+	if (!standby && checkpoint !== null && good('archives','history','database')) {
 		const groups = new Map<number, Set<number>>();
 		for (const r of [...rows('archives'), ...rows('history')]) if (n(r['RESETLOGS_CHANGE#']) === reset && n(r['NEXT_CHANGE#'])>checkpoint) {
 			const thread = n(r['THREAD#']); if (!groups.has(thread)) groups.set(thread,new Set()); groups.get(thread)!.add(n(r['SEQUENCE#']));
@@ -84,10 +90,25 @@ export function analyzeBackup(target: string, pdb: boolean, evidence: BackupRepo
 			if(cursor<=seq.at(-1)!) gaps.push({thread,resetlogsScn:reset,fromSequence:cursor,toSequence:seq.at(-1)!});
 		}
 	}
-	if(gaps.length) add('archive-gap','high', `${gaps.length} archived-log sequence gap(s) after the full backup checkpoint; availability is control-file metadata only.`, ['archives','history','backups']);
+	if (standby && good('archives','database','archiveGap')) {
+		for (const row of rows('archiveGap')) gaps.push({thread:n(row['THREAD#']),resetlogsScn:reset,fromSequence:n(row['LOW_SEQUENCE#']),toSequence:n(row['HIGH_SEQUENCE#'])});
+		// RMAN duplicate copies pre-creation history (SRMN). Only RFS received redo
+		// establishes a standby sequence baseline, regardless of later file deletion.
+		const threads = new Map<number, Set<number>>();
+		for (const row of rows('archives').filter(r => r.REGISTRAR === 'RFS' && n(r['RESETLOGS_CHANGE#']) === reset)) {
+			const thread = n(row['THREAD#']);
+			if (!threads.has(thread)) threads.set(thread, new Set());
+			threads.get(thread)!.add(n(row['SEQUENCE#']));
+		}
+		for (const [thread, sequences] of threads) {
+			const seq = [...sequences].sort((a,b) => a-b);
+			for (let i=1;i<seq.length;i++) if (seq[i]! > seq[i-1]!+1 && !gaps.some(g => g.thread === thread && g.fromSequence <= seq[i-1]!+1 && g.toSequence >= seq[i]!-1)) gaps.push({thread,resetlogsScn:reset,fromSequence:seq[i-1]!+1,toSequence:seq[i]!-1});
+		}
+	}
+	if(gaps.length) add('archive-gap','high', standby ? `${gaps.length} standby apply / received-log sequence gap(s); duplicate history excluded.` : `${gaps.length} archived-log sequence gap(s) after the full backup checkpoint; availability is control-file metadata only.`, standby ? ['archiveGap','archives'] : ['archives','history','backups']);
 	if(good('configuration') && rows('configuration').some(r=>String(r.NAME).toUpperCase()==='CONTROLFILE AUTOBACKUP' && /\bOFF\b/i.test(String(r.VALUE)))) add('autobackup-off','medium','Control-file autobackup is OFF.', ['configuration']);
 	for(const [id,label] of [['corruption','Corrupt block(s) listed'],['recoverFiles','Datafile(s) needing recovery']] as const) if(good(id)&&rows(id).length) add(id,'high',`${label}: ${rows(id).length} row(s).`,[id]);
-	const complete = !pdb && rows('database')[0]?.LOG_MODE === 'ARCHIVELOG' && good(...Object.keys(evidence) as EvidenceId[]) && files.length>0 && files.every(f=>f.level0) && !gaps.length && !rows('corruption').length && !rows('recoverFiles').length;
+	const complete = !standby && !pdb && rows('database')[0]?.LOG_MODE === 'ARCHIVELOG' && good(...Object.keys(evidence) as EvidenceId[]) && files.length>0 && files.every(f=>f.level0) && !gaps.length && !rows('corruption').length && !rows('recoverFiles').length;
 	const archives=rows('archives').filter(r=>n(r['RESETLOGS_CHANGE#'])===reset&&r.STATUS==='A'&&r.DELETED==='NO'&&r.NAME);
 	// Conservative candidate bound: each thread must cover the oldest full checkpoint continuously.
 	const threads=[...new Set(rows('history').filter(r=>n(r['RESETLOGS_CHANGE#'])===reset).map(r=>n(r['THREAD#'])))];

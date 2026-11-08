@@ -22,7 +22,7 @@ describe('backup evidence',()=>{
 	it.each(["RMAN BACKUP DATABASE", "BEGIN DBMS_SCHEDULER.RUN_JOB('X'); END;", "SELECT DBMS_LOCK.SLEEP(1) FROM DUAL", "SELECT DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT() FROM DUAL"])('blocks execution of %s', sql=>{expect(()=>classifySql(sql)).toThrow();});
 	it('only issues read-only SQL',()=>{for(const sql of Object.values(SQL)) expect(()=>classifySql(sql)).not.toThrow();});
 	it('reports no recorded backups with evidence',async()=>{const r=await readBackup(session(),now);expect(r.findings[0]?.id).toBe('no-backups');expect(r.restoreEstimate.status).toBe('not-verifiable');});
-	for(const code of ['ORA-00942','ORA-01031','ORA-65040']) it('degrades per view '+code,async()=>{const r=await readBackup(session({},true,code),now);expect(r.status).toBe('partial');expect(r.findings[0]?.detail).toContain('not verifiable');expect(Object.values(r.evidence).every(e=>e.note?.includes(code))).toBe(true);});
+	for(const code of ['ORA-00942','ORA-01031','ORA-65040']) it('degrades per view '+code,async()=>{const r=await readBackup(session({},true,code),now);expect(r.status).toBe('partial');expect(r.findings[0]?.detail).toContain('not verifiable');expect(Object.entries(r.evidence).filter(([id])=>id!=='archiveGap').every(([,e])=>e.note?.includes(code))).toBe(true);});
 	it('does not infer absence in a PDB',async()=>{const r=await readBackup(session({},true),now);expect(r.scope).toContain('CDB-wide (shared by all PDBs)');expect(r.findings[0]?.detail).toContain('not verifiable');expect(r.findings.some(f=>f.id.startsWith('level0'))).toBe(false);});
 	it('retains a conservative candidate bound',async()=>{const r=await readBackup(session(base),now);expect(r.files[0]?.level0).toBe('2026-11-05T00:00:00.000Z');expect(r.restoreEstimate.status).toBe('candidate');});
 	it('matches backup-set and piece identifiers across numeric representations',async()=>{
@@ -77,7 +77,7 @@ describe('backup evidence',()=>{
 		expect(r.findings.filter(f => f.id === 'level0').map(f => f.detail)).toEqual(['5 datafiles have no available full / level 0 backup completed in 7 days: 1, 3, 4, 5, 7.']);
 		const empty = await readBackup(session({ datafiles }), now);
 		expect(empty.findings.map(f => f.id)).toEqual(['no-backups']);
-		expect(empty.scope).toBe('Database-wide (non-CDB).');
+		expect(empty.scope).toContain('Database-wide (non-CDB).');
 	});
 	it('renders readable restore bounds and explains NOARCHIVELOG recovery', async () => {
 		const r = await readBackup(session({ ...base, database: [{ 'RESETLOGS_CHANGE#': 1, LOG_MODE: 'NOARCHIVELOG' }] }), now);
