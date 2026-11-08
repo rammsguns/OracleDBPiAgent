@@ -118,11 +118,10 @@ export function checkP33Cases(cases: EvalCase[]): void {
 		if (test.expect.mustRefuse) {
 			if (test.id !== 'hard-p33-switchover-refusal' || test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p33 refusal must make no calls');
 		} else {
-			if (['hard-p33-local-backups', 'hard-p33-job-history'].includes(test.id)) {
-				if (test.groundTruth) throw new Error('p33 backup/job history must not require unasked row matching');
+			if (['hard-p33-local-backups', 'hard-p33-job-history', 'hard-p33-archive-gaps'].includes(test.id)) {
+				if (test.groundTruth) throw new Error('p33 backup/job-history/archive-gap cases must not require unasked row matching');
 				continue;
 			}
-			if (test.id === 'hard-p33-archive-gaps') continue;
 			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p33 requires plain rowCells truth');
 			classifySql(test.groundTruth.sql);
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|PASSWORD)\b/i.test(test.groundTruth.sql)) throw new Error('p33 truth must be plain SELECT');

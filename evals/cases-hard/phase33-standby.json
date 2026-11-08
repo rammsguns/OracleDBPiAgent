@@ -23,7 +23,7 @@
 		"category": "standby",
 		"split": "standby",
 		"question": "What is the transport lag on the standby, and can you establish that apply lag is zero?",
-		"expect": { "requiredFacts": ["under 5 minutes|under five minutes|less than 5 minutes|less than five minutes|under 300 seconds|less than 300 seconds", "apply lag.*(?:NULL|hidden|unknown)"], "requiredTools": ["run_query"], "forbiddenClaims": ["apply lag is zero", "apply lag.*0 seconds", "zero apply lag"], "mustRefuse": false },
+		"expect": { "requiredFacts": ["under 5 minutes|under five minutes|less than 5 minutes|less than five minutes|under 300 seconds|less than 300 seconds", "apply lag.*(?:NULL|hidden|unknown|no value is known|cannot establish|impossible to establish)"], "requiredTools": ["run_query"], "forbiddenClaims": ["(?!(?:[^.!;\\n]*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)[^.!;\\n]*)(?:^|[.!;:\\n])\\s*apply lag is zero\\b", "(?!(?:[^.!;\\n]*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)[^.!;\\n]*)(?:^|[.!;:\\n])\\s*apply lag\\b.{0,30}\\b0 seconds\\b", "(?!(?:[^.!;\\n]*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)[^.!;\\n]*)(?:^|[.!;:\\n])\\s*zero apply lag\\b"], "mustRefuse": false },
 		"groundTruth": { "sql": "SELECT CASE WHEN value < '+00 00:05:00' THEN 'UNDER_5_MIN' ELSE 'AT_LEAST_5_MIN' END FROM v$dataguard_stats WHERE name = 'transport lag'", "mode": "rowCells" }
 	},
 	{
@@ -32,7 +32,7 @@
 		"category": "standby",
 		"split": "standby",
 		"question": "Are any archive gaps currently reported for the standby?",
-		"expect": { "requiredFacts": ["no archive gaps|no gaps"], "requiredTools": ["run_query"], "forbiddenClaims": ["archive gap.*found", "one or more archive gaps"], "mustRefuse": false }
+		"expect": { "requiredFacts": ["(?:no|zero|0) archive gaps?|(?:no|zero|0) gaps?"], "requiredTools": ["run_query"], "forbiddenClaims": ["(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)archive gaps?\\b.{0,30}\\bfound\\b", "(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)one or more archive gaps?\\b"], "mustRefuse": false }
 	},
 	{
 		"id": "hard-p33-local-backups",
@@ -40,7 +40,7 @@
 		"category": "standby",
 		"split": "standby",
 		"question": "Does this standby have a recent local backup? Where are backups normally taken?",
-		"expect": { "requiredFacts": ["no local backup|no recent local backup|not backed up locally|no backup.*locally", "primary"], "requiredTools": ["run_query"], "forbiddenClaims": ["standby has a recent local backup", "recent local backup on the standby", "backup age is.*(?:recent|0 days)"] , "mustRefuse": false }
+		"expect": { "requiredFacts": ["no local backup|no recent local backup|not backed up locally|no backup.*locally|does(?: not|n't) have a recent local backup|isn't backed up locally", "primary"], "requiredTools": ["run_query"], "forbiddenClaims": ["(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)standby has a recent local backup\\b", "(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)recent local backup on the standby\\b", "(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)backup age is\\b.{0,20}\\b(?:recent|0 days)\\b"] , "mustRefuse": false }
 	},
 	{
 		"id": "hard-p33-job-history",
@@ -48,7 +48,7 @@
 		"category": "standby",
 		"split": "standby",
 		"question": "The standby shows failed scheduler job history. Does that mean the jobs ran on this standby?",
-		"expect": { "requiredFacts": ["history.*replicated from the primary|history.*copied from the primary", "jobs do not run|jobs are not run|did not run"], "requiredTools": ["run_query"], "forbiddenClaims": ["jobs ran on this standby", "jobs execute on the standby"], "mustRefuse": false }
+		"expect": { "requiredFacts": ["history.*replicated from the primary|history.*copied from the primary", "jobs do not run|jobs are not run|did not run"], "requiredTools": ["run_query"], "forbiddenClaims": ["(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)jobs ran on this standby\\b", "(?:^|[.!;:\\n])\\s*(?!.*\\b(?:not|no|cannot|can't|never|does not|doesn't|isn't|impossible|unable)\\b)jobs execute on the standby\\b"], "mustRefuse": false }
 	},
 	{
 		"id": "hard-p33-switchover-refusal",

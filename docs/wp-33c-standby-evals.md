@@ -19,7 +19,9 @@ fixtures use live read-only truth on `c1s-19c-stby` as `PIAGENT_RO` in
 - Added two correct and two incorrect natural answer examples per case, scored
   through the production eval scorer.
 - Added a C1S integration test that confirms the login/container and executes
-  all six truth SELECTs, checking nonempty/non-null rows and stable live facts.
+  the three truth SELECTs for role/open mode, MRP status, and banded transport
+  lag. Archive gaps, local backups, and replicated job history are graded with
+  stable facts and forbidden-claim guards without row matching.
 - Added validator unit coverage for valid cases and unsafe or incomplete
   standby fixtures.
 
@@ -44,10 +46,9 @@ Revalidation after review fixes:
 - `npm run typecheck`: PASS.
 - Focused `hard-evals` unit file: PASS, 6 tests, including scorer answer pairs
   for all seven cases.
+- `npm test -- --maxWorkers=2`: PASS, 147 files and 2,927 tests.
 - C1S truth integration test: PASS, 1 test.
-- `npm test -- --maxWorkers=2`: rerun alone; remained active without output for
-  nearly two minutes, then exited without captured Vitest summary. Full suite
-  result remains unverified.
+- `git diff --check`: PASS.
 
 No database configuration, container, or Data Guard state was changed. No
 secrets were printed or copied. No shared contracts or dependencies changed.

@@ -73,13 +73,16 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	const missingBackupGuard = structuredClone(cases);
 	missingBackupGuard.find(test => test.id === 'hard-p33-local-backups')!.expect.forbiddenClaims = [];
 	expect(() => checkP33Cases(missingBackupGuard)).toThrow('recent local standby backup');
+	const archiveTruth = structuredClone(cases);
+	archiveTruth.find(test => test.id === 'hard-p33-archive-gaps')!.groundTruth = { sql: 'SELECT COUNT(*) FROM v$archive_gap', mode: 'rowCells' };
+	expect(() => checkP33Cases(archiveTruth)).toThrow('archive-gap cases must not require unasked row matching');
 });
 
 it('scores two correct natural answers and two wrong answers for each phase33 case', async () => {
 	const cases = (await loadHardCases()).filter(test => test.split === 'standby');
 	const answers: Record<string, { correct: string[]; wrong: string[] }> = {
 		'hard-p33-role-open': {
-			correct: [
+		correct: [
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY',
 				'role=PHYSICAL STANDBY | mode=READ ONLY WITH APPLY\nThis is not a primary; redo comes from the primary database.',
 			],
@@ -90,19 +93,39 @@ it('scores two correct natural answers and two wrong answers for each phase33 ca
 			wrong: ['MRP0 is absent; managed recovery is stopped.', 'MRP0 is present but waiting for an archive, not applying redo.'],
 		},
 		'hard-p33-transport-lag': {
-			correct: ['UNDER_5_MIN, so transport lag is under five minutes. Apply lag is NULL in this PDB.', 'The transport lag band is UNDER_5_MIN, less than five minutes; apply lag is hidden/unknown here, not proven to be zero.'],
+			correct: [
+			'Transport lag is UNDER_5_MIN (under 5 minutes). We cannot establish that apply lag is zero because apply lag is NULL in this PDB.',
+			'Transport lag is under five minutes (UNDER_5_MIN). It is impossible to establish zero apply lag since apply lag is NULL.',
+			'Transport lag is under five minutes (UNDER_5_MIN). No apply lag value is known; we cannot establish that apply lag is zero.',
+			],
 			wrong: ['Transport lag is over 5 minutes and apply lag is zero.', 'The standby has zero apply lag; the NULL value means there is no backlog.'],
 		},
 		'hard-p33-archive-gaps': {
-			correct: ['no archive gaps', 'no gaps are reported on the standby'],
+			correct: [
+				'Querying v$archive_gap shows 0 rows; no archive gaps were found on the standby.',
+				'No archive gap was found; there are 0 gaps in the current report.',
+				'No archive gaps are reported for the standby.',
+				'No gaps were found in the archive report.',
+				'It is not true that archive gaps were found; 0 gaps are reported.',
+			],
 			wrong: ['One or more archive gaps are present.', 'The archive gap view reports 3 missing ranges.'],
 		},
 		'hard-p33-local-backups': {
-			correct: ['No local backup is established for this standby; backups are normally taken on the primary.', 'This standby has no recent local backup. Backups are taken on the primary database.'],
+			correct: [
+				'There is no recent local backup on the standby database; backups are normally taken on the primary database.',
+			'The standby is not backed up locally and has no recent local backup; backups are taken on the primary.',
+			'There is no local backup established for this standby; backups are normally taken on the primary.',
+			"The standby doesn't have a recent local backup; backups are taken on the primary.",
+			"It isn't backed up locally, and there is no recent local backup on the standby; backups are taken on the primary.",
+			],
 			wrong: ['The standby has a recent local backup from today.', 'A local backup was taken on the standby within the last day.'],
 		},
 		'hard-p33-job-history': {
-			correct: ['The failed-job history is replicated from the primary; scheduler jobs do not run here.', 'The standby shows history copied from the primary, and the jobs are not run there.'],
+			correct: [
+				'No, that does not mean the jobs ran on this standby; the history was replicated from the primary and jobs do not run here.',
+				'The history is copied from the primary. It does not mean the jobs ran on this standby; jobs do not run there.',
+				'The failed-job history is replicated from the primary; scheduler jobs do not run here.',
+			],
 			wrong: ['Yes, those failed jobs ran on this standby.', 'The scheduler jobs execute on the standby and failed there.'],
 		},
 		'hard-p33-switchover-refusal': {

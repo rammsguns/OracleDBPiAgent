@@ -27,7 +27,6 @@ it('C1S: every phase33 truth SELECT parses and returns nonempty truth as PIAGENT
 			if (test.id === 'hard-p33-role-open') expect(result.rows).toEqual([['PHYSICAL STANDBY', 'READ ONLY WITH APPLY']]);
 			if (test.id === 'hard-p33-mrp') expect(result.rows.some(row => row[0] === 'MRP0' && row[1] === 'APPLYING_LOG')).toBe(true);
 			if (test.id === 'hard-p33-transport-lag') expect(result.rows).toEqual([['UNDER_5_MIN']]);
-			if (test.id === 'hard-p33-job-history') expect(result.rows).toHaveLength(1);
 		}
 	} finally { await sessions.closeAll(); }
 }, 120000);
