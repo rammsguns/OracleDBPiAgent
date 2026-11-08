@@ -4,6 +4,62 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-08
+
+Phase 32: production gaps found after the PDB pilot.
+
+### Added
+
+- **Physical standby support and the packaged target `c1s-19c-stby`.** It is
+  the Active Data Guard standby `CDB19S` of the c1 lab, on
+  `localhost:1525/PIPDB1`. It runs real-time apply with PIPDB1 open read-only.
+  Checks now detect the database role. On a standby, they qualify recovery,
+  backup and job evidence that is copied from the primary. They also report
+  proven archive gaps by sequence. See
+  [physical standby](docs/check.md#physical-standby-phase-32) and
+  [lab/c1](lab/c1/README.md).
+- **Data Guard lag (`dgLag`) on standbys, including from inside a PDB.** Oracle
+  hides apply lag in a PDB. In that case, the check reports transport lag as an
+  upper bound, but only when every redo thread passes these tests:
+  - the transport-lag timestamp is fresh against the database clock;
+  - MRP0 is applying at or past the last block RFS received;
+  - no received log is still unapplied.
+  If any test fails, the check reports UNKNOWN and names the test that failed.
+  On a primary, `dgLag` now reads "not applicable (primary)" instead of
+  "0 seconds".
+- **Diagnostic sessions are labelled.** Every Oracle session sets
+  `MODULE=piagent` and an `ACTION` naming the command or tool. A DBA can then
+  find and attribute the agent's work in `V$SESSION` and `V$SQL`.
+- **C1 scale lab (`lab/c1/scale.sh`).** It adds a BULKAPP schema with 4 million
+  rows, 1,500 tables, 750 views, 300 procedures, 401 partitions, and a job that
+  floods the cursor cache. Repeated runs leave the existing data unchanged.
+
+### Changed
+
+- **The web UI uses your configured targets everywhere.** Every web route and
+  selector now follows the loaded `targets.json`, including private lists in
+  `~/.piagent/targets.json`. Previously some used only the packaged names.
+  Unknown names get HTTP 400 before any connection is opened. Target
+  descriptions mask the account name only where it appears as a whole word.
+- **Smaller probe footprint.** `top` reads its bounded SQL snapshot once instead
+  of paging through it repeatedly, which cut `top` on d1 from 34.4 s to 7.7 s.
+  Security checks scan only the application owners they report on. Per-command
+  SQL budgets are measured on c1 and enforced by an integration test; see
+  [footprint](docs/footprint.md).
+
+### Fixed
+
+- **Empty results from an out-of-domain filter now say why.** Example: a query
+  filtering `DBA_USERS.ORACLE_MAINTAINED = 'NO'` returns no rows, because the
+  column only holds `Y` or `N`. `run_query` now adds a source note naming the
+  column's valid values. It covers 17 documented Oracle 19c dictionary columns,
+  each checked against live labs. The SQL is never rewritten or re-run. The note
+  appears only for simple single-view equality or `IN` filters whose values are
+  all invalid.
+- **Refusals open with the refusal.** The agent guidance now asks the agent to
+  state a refusal first and then offer supported alternatives (+104 bytes of
+  prompt).
+
 ## [1.7.0] - 2026-11-08
 
 Phase 31: production readiness on a real Oracle 19c CDB/PDB.

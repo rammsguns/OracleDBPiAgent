@@ -4810,6 +4810,72 @@ must be no worse beyond noise.
 1.8.0 after the gate: release tests, plus a package smoke on all targets including
 the standby.
 
+## Phase 32 results (2026-11-08, shipped as 1.8.0)
+
+Release approved with "continue and push v1.8.0 when the gate passes".
+
+**Lab (coordinator).**
+- C1S physical standby `oracle19c-cdb-stby` (port 1525, network `c1-dg`).
+  - Built by RMAN active duplicate without the SPFILE clause. With that clause,
+    the auxiliary restart hit ORA-00600 in SMCO, so the standby spfile was
+    built from the primary pfile instead.
+  - Real-time apply; PIPDB1 open READ ONLY; ASYNC transport; standby redo logs
+    11–14.
+  - A startup hook resumes apply after a container restart.
+- C1 scale-up: the BULK_DATA tablespace and BULKAPP schema (4M rows, 1,500
+  tables, 750 views, 300 procedures, 401 partitions) and a cursor-churn job.
+- A new level 0 backup covers BULK_DATA.
+
+**Merges.** Antigravity reviewed every WP, and every finding was fixed before
+merge.
+- **WP-32A web private targets:** every web route and selector uses the loaded
+  targets. The minor finding (account-name masking inside words) was fixed.
+- **WP-32B probe footprint:**
+  - `MODULE`/`ACTION` session labels.
+  - A single-read top-SQL snapshot: d1 `top` went from 34.4 s to 7.7 s.
+  - Bounded security scans.
+  - Per-command budgets enforced by an integration test.
+  - Reproducible `lab/c1/scale.sh`.
+  The review found nothing.
+- **WP-32C standby awareness:**
+  - Role detection.
+  - Qualified evidence copied from the primary on a standby.
+  - Proven archive gaps reported by sequence.
+  - Packaged target `c1s-19c-stby`.
+  - Three replicated diagnostic grants (`V$ARCHIVE_GAP`, `V$DATAGUARD_STATS`,
+    `V$MANAGED_STANDBY`).
+  The minor finding (the note for a proven gap) was fixed.
+- **WP-32E Data Guard lag** (added during the phase):
+  - On a primary, `dgLag` is "not applicable", not "0 seconds".
+  - In a standby PDB, where Oracle hides apply lag, the check reports transport
+    lag as an upper bound, only when every redo thread passes these tests:
+    - the transport-lag timestamp is fresh against the database clock;
+    - MRP0 is at or past the last block RFS received;
+    - no received log is still unapplied.
+  - Round 1 REQUEST CHANGES:
+    - critical: unapplied logs on a thread with no MRP0 row were ignored;
+    - major: one unapplied log was tolerated;
+    - three minors.
+    All were fixed. Round 2 APPROVE.
+- **WP-32D answer accuracy** (agent path, gated):
+  - Out-of-domain hints for 17 dictionary columns.
+  - Refusals open with the refusal (+104 bytes of prompt).
+  - Minor findings fixed: aliases `n`/`q`, and a literal on the left of `=`.
+
+**Gate (gate170, strictly sequential).**
+- A = master + 32A/B/C/E: 403/445.
+- B = A + 32D: 413/445.
+- Every refusal passes on both sides, and every suite is at or above 75%.
+- Every B miss was read, and 32D's hint fired in none of them. The misses were:
+  - scorer strictness (p26 ORA-02292 and p25 NONE RECORDED, each in a layout
+    the scorer doesn't accept);
+  - model over-generalization (d1 redo views, a nonexistent
+    `DBA_USERS_WITH_PWD`);
+  - an aged-out p1 cursor;
+  - the known variance set: p19, p25 grant pool, p30 recovery-config and
+    fullest-permanent.
+- Archive: `eval-archive/phase32`.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
