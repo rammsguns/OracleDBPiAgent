@@ -78,7 +78,7 @@ describe('jobs read-only evidence', () => {
 	});
 	it('propagates unexpected errors and closes', async () => { const f = fixture('ORA-00600'); await expect(readJobs(f.ctx, 'd1-19c-lab')).rejects.toThrow('ORA-00600'); expect(f.close).toHaveBeenCalledOnce(); });
 	for (const options of [{ since: '0h' }, { since: '31d' }, { owner: 'SH OR 1=1' }]) it('rejects bad options before acquiring a session', async () => { const f = fixture(); await expect(readJobs(f.ctx, 'd1-19c-lab', options)).rejects.toThrow(); expect(f.get).not.toHaveBeenCalled(); });
-	it('rejects unknown and unpinned targets', async () => { const f = fixture(); f.ctx.pinnedTarget = 'p1-19c-prod'; await expect(readJobs(f.ctx, 'd1-19c-lab')).rejects.toThrow(); await expect(readJobs(f.ctx, 'other')).rejects.toThrow(); });
+	it('rejects unknown and unpinned targets', async () => { const f = fixture(); f.ctx.pinnedTarget = 'p1-19c-prod'; await expect(readJobs(f.ctx, 'd1-19c-lab')).rejects.toThrow('is not the pinned target'); await expect(readJobs(f.ctx, 'other')).rejects.toThrow('Unknown target other; configured targets:'); expect(f.get).not.toHaveBeenCalled(); });
 	it('covers every view in preflight', () => { for (const def of Object.values(jobQueries)) expect(FEATURE_VIEWS.jobs).toContain(def.view); });
 	it('renders every section with contiguous tables, single spacing and UTC timestamp columns', async () => {
 		const f = fixture();

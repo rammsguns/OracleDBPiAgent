@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { markdownNumber } from '../backup/markdown.js';
 import { formatDuration } from './duration.js';
 import { createHash } from 'node:crypto';
@@ -39,7 +40,8 @@ export function safeJobText(value: string): { text: string; truncated: boolean }
 	return { text, truncated: text.length < redacted.length };
 }
 export async function readJobs(ctx: ToolContext, target: string, options: JobsOptions = {}): Promise<JobsResult> {
-	if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new JobsUsageError('Unknown or unpinned jobs target');
+	requireConfiguredTarget(target, ctx.config.targets, JobsUsageError);
+	if (ctx.pinnedTarget && ctx.pinnedTarget !== target) throw new JobsUsageError('Jobs target ' + target + ' is not the pinned target');
 	let hours: number;
 	try { hours = sinceHours(options.since); } catch (error) { throw new JobsUsageError((error as Error).message); }
 	const owner = options.owner?.toUpperCase();

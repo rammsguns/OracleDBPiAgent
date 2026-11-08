@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -9,7 +10,7 @@ export async function runSpace(options: { target: string; section?: string; all?
 	const filters = { sections: options.section?.split(',').map(id => id.trim()), includeOracleMaintained: options.all, owner: options.owner, top: options.top === undefined ? undefined : /^\d+$/.test(options.top) ? Number(options.top) : NaN };
 	validateSpaceOptions(filters);
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new SpaceUsageError('Unknown space target');
+	requireConfiguredTarget(options.target, config.targets, SpaceUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

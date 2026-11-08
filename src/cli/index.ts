@@ -117,6 +117,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		} finally { await sessions.closeAll(); }
 	});
 	program.commands.find(command => command.name() === "report")!.command("history").description("Trends from saved reports; no database connection").requiredOption("--target <target>").option("--last <N>", "Newest saved files, 1–30", "30").option("--json").action(async (options: { target: string; last: string; json?: boolean }) => {
+		requireConfiguredTarget(options.target, loadConfig().targets);
 		const { loadReportHistory } = await import("../report/history.js");
 		const { buildReportTrends, renderTrends } = await import("../report/trends.js");
 		const result = buildReportTrends(await loadReportHistory(reportDirectory(), options.target, loadConfig().targets, /^\d+$/.test(options.last) ? Number(options.last) : NaN));
@@ -217,11 +218,13 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	});
 	const schedule = program.commands.find(command => command.name() === "report")!.command("schedule").description("Schedule saved database reports").enablePositionalOptions().option("--target <target>").option("--every <interval>").option("--out <dir>").action(async (options: { target: string; every: string; out?: string }) => {
 		if (!options.target || !options.every) throw new SafeConfigError("Schedule requires --target and --every");
+		requireConfiguredTarget(options.target, loadConfig().targets);
 		const { generateSchedule, renderSchedule } = await import("../report/schedule.js");
 		const { agentHome } = await import("../config/paths.js");
 		console.log(renderSchedule(generateSchedule({ target: options.target, every: options.every, home: agentHome(), out: options.out ? (await import("node:path")).resolve(options.out) : reportDirectory(), node: process.execPath, cli: join(PACKAGE_ROOT, "dist/cli/index.js") }, loadConfig().targets)));
 	});
 	schedule.command("run").description("Run a scheduled database report").requiredOption("--target <target>").option("--home <dir>").option("--out <dir>").action(async (options: { target: string; home?: string; out?: string }) => {
+		requireConfiguredTarget(options.target, loadConfig(options.home ? { ...process.env, PIAGENT_HOME: options.home } : process.env).targets);
 		const { runSchedule } = await import("../report/schedule.js");
 		process.exitCode = runSchedule({ ...options, cli: join(PACKAGE_ROOT, "dist/cli/index.js") });
 	});
@@ -231,6 +234,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
 	});
 	targets.command("check").description("Check account safety and feature view access; no LLM").requiredOption("--target <target>").option("--json").option("--all", "List every feature view").option("--grants-sql").action(async options => {
+		requireConfiguredTarget(options.target, loadConfig().targets);
 		const sessions = await (dependencies.createSessions ?? createSessions)(loadConfig());
 		try {
 			const result = await checkTarget(sessions, options.target);

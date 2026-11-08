@@ -1,3 +1,4 @@
+import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { loadConfig } from '../config/index.js';
 import { createSessionProvider } from '../oracle/index.js';
@@ -14,7 +15,7 @@ export async function runSql(options: { target: string; sqlId?: string; text?: s
 		if (child !== undefined && (!Number.isInteger(child) || child < 0)) throw new SqlUsageError('child must be a nonnegative integer');
 	}
 	const config = loadConfig();
-	if (!config.targets.some(t => t.name === options.target)) throw new SqlUsageError('Unknown SQL insight target');
+	requireConfiguredTarget(options.target, config.targets, SqlUsageError);
 	const sessions = createSessionProvider(config), audit = new JsonlAuditSink(config.auditFile), runId = randomUUID();
 	try {
 		const raw = await sessions.get(options.target);

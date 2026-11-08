@@ -9,6 +9,8 @@ export class TargetUsageError extends Error {
 		this.name = 'TargetUsageError';
 	}
 }
-export function requireConfiguredTarget(requested: string, targets: readonly { name: string }[]): void {
-	if (!targets.some(t => t.name === requested)) throw new TargetUsageError(requested, targets);
+export function requireConfiguredTarget(requested: string, targets: readonly { name: string }[], usageError?: new (message: string) => Error): void {
+	if (targets.some(t => t.name === requested)) return;
+	const error = new TargetUsageError(requested, targets);
+	throw usageError ? new usageError(error.message) : error;
 }

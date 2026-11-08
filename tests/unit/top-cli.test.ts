@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 it.each([
 	[['--target','d1-19c-lab','--seconds','3'], 'seconds must be an integer from 5 to 120'],
 	[['--target','d1-19c-lab','--seconds','NaN'], 'seconds must be an integer from 5 to 120'],
-	[['--target','invalid-target'], 'Unknown top target'],
+	[['--target','invalid-target'], 'Unknown target invalid-target; configured targets: d1-19c-lab, p1-19c-prod (see piagent targets)'],
 	[[], "required option '--target <target>' not specified"],
 	[['--target','d1-19c-lab','--invalid'], "unknown option '--invalid'"],
 ] as const)('prints a specific usage error with exit 2: %j', (args, message) => {
