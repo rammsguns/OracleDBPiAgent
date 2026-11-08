@@ -45,12 +45,12 @@ describe("private CLI configuration", () => {
 	});
 	it("resolves package targets and user paths away from cwd, retaining explicit overrides", () => {
 		const home = temp(), cwd = process.cwd();
-		try { process.chdir(home); const config = loadConfig({ HOME: home }); expect(config.targets).toHaveLength(2); expect(config.auditFile).toBe(join(home, ".piagent/audit.jsonl")); } finally { process.chdir(cwd); }
+		try { process.chdir(home); const config = loadConfig({ HOME: home }); expect(config.targets).toHaveLength(3); expect(config.auditFile).toBe(join(home, ".piagent/audit.jsonl")); } finally { process.chdir(cwd); }
 		expect(agentHome({ HOME: home })).toBe(join(home, ".piagent"));
 		expect(reportDirectory({ PIAGENT_HOME: home })).toBe(join(home, "reports"));
 		expect(reportDirectory({ PIAGENT_REPORT_DIRECTORY: home })).toBe(home);
 		expect(loadConfig({ PIAGENT_AUDIT_FILE: join(home, "custom") }).auditFile).toBe(join(home, "custom"));
-		expect(loadConfig({ PIAGENT_TARGETS_FILE: join(PACKAGE_ROOT, "config/targets.json") }).targets).toHaveLength(2);
+		expect(loadConfig({ PIAGENT_TARGETS_FILE: join(PACKAGE_ROOT, "config/targets.json") }).targets).toHaveLength(3);
 	});
 	it("prints the package version without DB or LLM calls", async () => {
 		const home = join(temp(), "absent");
