@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { createHealthCheckTool } from './healthCheck.js';
 import { Type } from "typebox";
 import { createHash } from "node:crypto";
@@ -91,7 +92,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 					if (name === "wait_events") { binds.n = p.limit ?? 10; sql = `SELECT event, wait_class, total_waits, time_waited_micro FROM v$system_event WHERE wait_class<>'Idle' ORDER BY time_waited_micro DESC FETCH FIRST :n ROWS ONLY`; }
 					if (name === "tablespace_usage") sql = `SELECT d.tablespace_name, d.allocated_bytes, NVL(f.free_bytes,0) free_bytes, d.allocated_bytes-NVL(f.free_bytes,0) used_bytes, d.max_bytes, d.autoextend_files FROM (SELECT tablespace_name, SUM(bytes) allocated_bytes, SUM(CASE WHEN autoextensible='YES' THEN maxbytes ELSE bytes END) max_bytes, SUM(CASE WHEN autoextensible='YES' THEN 1 ELSE 0 END) autoextend_files FROM dba_data_files GROUP BY tablespace_name) d LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) f ON f.tablespace_name=d.tablespace_name ORDER BY d.tablespace_name`;
 					if (!sql) throw new Error("Unknown tool");
-					const session = await ctx.sessions.get(target);
+					const session = await withOracleAction(name, () => ctx.sessions.get(target));
 					try {
 
 						if (name === "explain_plan" && p.sql) {

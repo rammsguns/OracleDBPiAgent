@@ -1,6 +1,7 @@
+import { withOracleAction } from '../oracle/observability.js';
 import type { SessionProvider } from '../contracts.js';
 import { FEATURE_VIEWS, grantObject } from './views.js';
-export async function checkTarget(sessions: SessionProvider, target: string) {
+async function checkTargetImpl(sessions: SessionProvider, target: string) {
 	const session = await sessions.get(target);
 	try {
 		const views = [];
@@ -22,3 +23,5 @@ export async function checkTarget(sessions: SessionProvider, target: string) {
 		return { identity: session.identity, accountCheck: 'passed', views, grantsSql };
 	} finally { await session.close(); }
 }
+
+export const checkTarget = (...args: Parameters<typeof checkTargetImpl>) => withOracleAction('targets check', () => checkTargetImpl(...args));

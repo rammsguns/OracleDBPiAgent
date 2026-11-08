@@ -1,9 +1,11 @@
+import { TOP_SQL, readTopSnapshot } from './snapshot.js';
+import { withOracleAction } from '../oracle/observability.js';
 import { formatBytes } from '../space/index.js';
 import { markdownTable, markdownNumber } from '../backup/markdown.js';
 import { setTimeout } from 'node:timers/promises';
 import type { OracleSession } from '../contracts.js';
 export const SQL = {
-	sql: 'SELECT sql_id, elapsed_time, cpu_time, buffer_gets, disk_reads, executions FROM V$SQLSTATS ORDER BY sql_id',
+	sql: TOP_SQL,
 	load: "SELECT name, value FROM V$SYSSTAT WHERE name IN ('user calls', 'session logical reads', 'physical reads', 'redo size', 'parse count (hard)', 'parse count (total)', 'user commits') ORDER BY name",
 	host: 'SELECT stat_name, value, cumulative FROM V$OSSTAT ORDER BY stat_name',
 };
@@ -26,11 +28,11 @@ export function deltas(before: unknown[][], after: unknown[][], column: number, 
 		return { name, delta, perSecond: delta === null ? null : delta / seconds, state };
 	});
 }
-export async function sampleTop(session: OracleSession, seconds = 15, runtime = { now: () => performance.now(), sleep: async (ms: number) => { await setTimeout(ms); } }) {
+async function sampleTopImpl(session: OracleSession, seconds = 15, runtime = { now: () => performance.now(), sleep: async (ms: number) => { await setTimeout(ms); } }) {
 	validateSeconds(seconds);
 	async function snapshot(key: keyof typeof SQL): Promise<Snapshot> {
 		try {
-			const result = await session.query(SQL[key]);
+			const result = key === 'sql' ? await readTopSnapshot(session) : await session.query(SQL[key]);
 			// Page within a bounded snapshot so an alphabetical row cap cannot hide most SQL.
 			if (key === 'sql') while (result.truncated && result.rows.length > 0 && result.rows.length < 10000) {
 				const offset = result.rows.length;
@@ -94,3 +96,5 @@ export function renderTop(result: Awaited<ReturnType<typeof sampleTop>>): string
 		'SQL drill-down: piagent sql --target ' + result.target + ' --sql-id <SQL_ID>');
 	return lines.join('\n\n') + '\n';
 }
+
+export const sampleTop = (...args: Parameters<typeof sampleTopImpl>) => withOracleAction('top', () => sampleTopImpl(...args));

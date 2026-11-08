@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import type { OracleSession } from '../contracts.js';
 import type { Check } from '../triage/read.js';
 import { SQL } from './sql.js';
@@ -30,7 +31,7 @@ export function validateSpaceOptions(o:SpaceOptions) {
 const num=(v:unknown)=>Number(v??0), str=(v:unknown)=>String(v??'');
 function check(label:string):Check { return {label,sql:'',binds:{},view:'',status:'ok',columns:[],rows:[],truncated:false,attempts:[]}; }
 function section<T>(label:string):SpaceSection<T> { return {status:'skipped',rows:[],evidence:check(label),supportingEvidence:[]}; }
-export async function readSpaceUsage(session:OracleSession,options:SpaceOptions={}):Promise<SpaceReport> {
+async function readSpaceUsageImpl(session:OracleSession,options:SpaceOptions={}):Promise<SpaceReport> {
 	validateSpaceOptions(options);
 	const report:SpaceReport={status:'ok',target:session.target.name,capturedAt:new Date().toISOString(),sections:{tablespaces:section('tablespaces'),segments:section('segments'),temp:section('temp'),undo:section('undo'),redo:section('redo'),recovery:section('recovery')},findings:[]};
 	async function read(id:SectionId,key:keyof typeof SQL,binds:Record<string,unknown>={},optional=false) {
@@ -165,3 +166,5 @@ export function renderSpaceMarkdown(r:SpaceReport):string {
 	}
 	return lines.join('\n').replace(/\n{3,}/g, '\n\n')+'\n';
 }
+
+export const readSpaceUsage = (...args: Parameters<typeof readSpaceUsageImpl>) => withOracleAction('space', () => readSpaceUsageImpl(...args));

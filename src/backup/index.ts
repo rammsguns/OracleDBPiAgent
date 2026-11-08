@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { markdownTable } from './markdown.js';
 import type { OracleSession } from '../contracts.js';
 import { SQL } from './sql.js';
@@ -22,7 +23,7 @@ const date = (v: unknown): string | null => { if (v == null) return null; const 
 // Invalid completion times sort after every valid Oracle date, without NaN comparators.
 const time = (v: unknown) => { const d = date(v); return d ? Date.parse(d) : Number.MIN_SAFE_INTEGER; };
 const sameIdentifier = (a: unknown, b: unknown) => a != null && b != null && Number.isSafeInteger(n(a)) && Number.isSafeInteger(n(b)) && n(a) === n(b);
-export async function readBackup(session: OracleSession, now = new Date()): Promise<BackupReport> {
+async function readBackupImpl(session: OracleSession, now = new Date()): Promise<BackupReport> {
 	const evidence = {} as BackupReport['evidence'];
 	for (const id of Object.keys(SQL) as EvidenceId[]) {
 		const sql = SQL[id], view = /FROM\s+(\S+)/i.exec(sql)![1]!;
@@ -108,3 +109,5 @@ export function renderBackupMarkdown(r: BackupReport): string {
 		`## Per-datafile backups\n\n${markdownTable(r.files)}`,`## Archive gaps\n\n${markdownTable(r.gaps)}`,`## Recovery-area balance (bytes)\n\n${markdownTable(r.recoveryArea)}`,
 		...Object.entries(r.evidence).map(([id,e])=>`## Evidence ${id} (${e.view}): ${e.status}${e.note?' — '+e.note:''}\n\n${markdownTable(e.rows)}${e.truncated ? '\n\nRow cap reached; evidence incomplete; use --json.' : ''}`)].join('\n\n')+'\n';
 }
+
+export const readBackup = (...args: Parameters<typeof readBackupImpl>) => withOracleAction('backup', () => readBackupImpl(...args));

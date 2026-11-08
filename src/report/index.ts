@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { validateReportSections } from './arguments.js';
 export { sectionNames } from './arguments.js';
 import { readFeatureReport } from './features.js';
@@ -29,7 +30,7 @@ function safeReason(error: unknown, grant: string): string {
 	if (/NJS-040|NJS-560|DPI-1067|ORA-01013|call timeout|callTimeout/i.test(text)) return `query timed out (${grant})`;
 	return `query failed (${grant}); check local service availability`;
 }
-export async function generateReport(ctx: ToolContext, options: ReportOptions = {}): Promise<DatabaseReport> {
+async function generateReportImpl(ctx: ToolContext, options: ReportOptions = {}): Promise<DatabaseReport> {
 	const target = options.target ?? ctx.config.defaultTarget;
 	const cfg = ctx.config.targets.find(t => t.name === target);
 	if (!cfg || (ctx.pinnedTarget && target !== ctx.pinnedTarget)) throw new Error('Unknown or unpinned target');
@@ -131,3 +132,5 @@ export function renderMarkdown(report: DatabaseReport): string {
 	});
 	return [`# Oracle 19c report: ${cell(report.target)}`, `Generated: ${report.generatedAt}`, ...sections].join('\n\n') + '\n';
 }
+
+export const generateReport = (...args: Parameters<typeof generateReportImpl>) => withOracleAction('report', () => generateReportImpl(...args));

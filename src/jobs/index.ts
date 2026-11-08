@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { markdownNumber } from '../backup/markdown.js';
 import { formatDuration } from './duration.js';
@@ -39,7 +40,7 @@ export function safeJobText(value: string): { text: string; truncated: boolean }
 	for (const char of redacted) { if (Buffer.byteLength(text + char) > 2048) break; text += char; }
 	return { text, truncated: text.length < redacted.length };
 }
-export async function readJobs(ctx: ToolContext, target: string, options: JobsOptions = {}): Promise<JobsResult> {
+async function readJobsImpl(ctx: ToolContext, target: string, options: JobsOptions = {}): Promise<JobsResult> {
 	requireConfiguredTarget(target, ctx.config.targets, JobsUsageError);
 	if (ctx.pinnedTarget && ctx.pinnedTarget !== target) throw new JobsUsageError('Jobs target ' + target + ' is not the pinned target');
 	let hours: number;
@@ -109,3 +110,5 @@ export function renderJobs(result: JobsResult): string {
 	}
 	return lines.join('\n') + '\n';
 }
+
+export const readJobs = (...args: Parameters<typeof readJobsImpl>) => withOracleAction('jobs', () => readJobsImpl(...args));

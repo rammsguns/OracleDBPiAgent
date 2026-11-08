@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { createHash } from 'node:crypto';
 import type { ToolContext } from '../contracts.js';
 import { sinceHours } from '../triage/parse.js';
@@ -84,7 +85,7 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 		return { ...base, status: 'unavailable', grants: views.map(v => `GRANT SELECT ON SYS.${v.replace('V$', 'V_$')} TO ${configured.username};`), attempts: [{ view, code }] };
 	} finally { await session.close(); }
 }
-export async function readAlertLog(ctx: ToolContext, target: string, options: AlertLogOptions = {}): Promise<AlertResult<AlertRow>> {
+async function readAlertLogImpl(ctx: ToolContext, target: string, options: AlertLogOptions = {}): Promise<AlertResult<AlertRow>> {
 	const codes = [...new Set((options.codes ?? []).map(c => c.toUpperCase()))];
 	if (codes.length > 20 || codes.some(c => !/^(ORA|TNS)-\d{5}$/.test(c))) throw new AlertlogUsageError('codes must contain at most 20 ORA-/TNS- codes with five digits');
 	if (options.text !== undefined && (typeof options.text !== 'string' || options.text.length > 2048)) throw new AlertlogUsageError('text must be at most 2048 characters');
@@ -134,7 +135,7 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 	}
 	return { ...result, rows: folded };
 }
-export function readIncidents(ctx: ToolContext, target: string, options: WindowOptions = {}): Promise<AlertResult<IncidentRow>> {
+function readIncidentsImpl(ctx: ToolContext, target: string, options: WindowOptions = {}): Promise<AlertResult<IncidentRow>> {
 	return read(ctx, target, options, 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM', ['V$DIAG_INCIDENT', 'V$DIAG_PROBLEM'], time => ({
 		select: 'SELECT i.INCIDENT_ID, p.PROBLEM_KEY, i.CREATE_TIME, i.STATUS, i.CON_ID FROM V$DIAG_INCIDENT i LEFT JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID = i.PROBLEM_ID AND p.CON_ID = i.CON_ID',
 		where: `i.CREATE_TIME >= ${time} AND i.CREATE_TIME < ${time.replace(':fromTime', ':toTime')} AND (SYS_CONTEXT('USERENV','CON_ID') IN ('0','1') OR i.CON_ID IN (0,1) OR i.CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID')))`,
@@ -162,3 +163,7 @@ function adrScope(value: unknown): {containerId?: number; scope?: string} {
 	const containerId = Number(value);
 	return { containerId, scope: containerId <= 1 ? `CDB-wide/instance (CON_ID ${containerId})` : `PDB (CON_ID ${containerId})` };
 }
+
+export const readAlertLog = (...args: Parameters<typeof readAlertLogImpl>) => withOracleAction('alertlog', () => readAlertLogImpl(...args));
+
+export const readIncidents = (...args: Parameters<typeof readIncidentsImpl>) => withOracleAction('alertlog', () => readIncidentsImpl(...args));

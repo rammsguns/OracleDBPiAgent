@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { compareSpace } from './space.js';
 import { readReportSecurity } from '../report/security.js';
 import { createHash } from 'node:crypto';
@@ -48,7 +49,7 @@ export function compareEntries(left: DriftEntry[], right: DriftEntry[]): Pick<Dr
 	const l = new Map(left.map(e => [e.key, e])), r = new Map(right.map(e => [e.key, e]));
 	return { onlyLeft: left.filter(e => !r.has(e.key)), onlyRight: right.filter(e => !l.has(e.key)), different: left.filter(e => r.has(e.key) && JSON.stringify(e.values) !== JSON.stringify(r.get(e.key)!.values)).map(e => ({ key: e.key, left: e.values, right: r.get(e.key)!.values })) };
 }
-export async function compareTargets(ctx: ToolContext, options: DriftOptions): Promise<DriftResult> {
+async function compareTargetsImpl(ctx: ToolContext, options: DriftOptions): Promise<DriftResult> {
 	const scope = parseScope(options.scope);
 	for (const target of [options.left, options.right]) if (!ctx.config.targets.some(t => t.name === target) || (ctx.pinnedTarget && ctx.pinnedTarget !== target)) throw new Error('Unknown or unpinned drift target');
 	if (scope.kind === 'space') return compareSpace(ctx, options);
@@ -127,3 +128,5 @@ async function compareSecurity(ctx: ToolContext, options: DriftOptions): Promise
 	}
 	return result;
 }
+
+export const compareTargets = (...args: Parameters<typeof compareTargetsImpl>) => withOracleAction('drift', () => compareTargetsImpl(...args));

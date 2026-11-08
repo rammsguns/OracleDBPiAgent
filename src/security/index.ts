@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import type { OracleSession } from '../contracts.js';
 import type { Check } from '../triage/read.js';
 import { SQL } from './sql.js';
@@ -48,7 +49,7 @@ export function anyPrivileges(type: string): string[] {
 		INDEX: ['ALTER ANY INDEX', 'DROP ANY INDEX'], TRIGGER: ['ALTER ANY TRIGGER', 'DROP ANY TRIGGER'],
 	}; return map[type] ?? [];
 }
-export async function readSecurityPosture(session: OracleSession, options: SecurityOptions = {}): Promise<SecurityPosture> {
+async function readSecurityPostureImpl(session: OracleSession, options: SecurityOptions = {}): Promise<SecurityPosture> {
 	validateSecurityOptions(options);
 	const result: SecurityPosture = { status: 'ok', target: session.target.name, checks: [] };
 	const cache = new Map<string, Check>();
@@ -200,3 +201,5 @@ export function renderSecurityMarkdown(result: SecurityPosture): string {
 	}
 	return lines.join('\n') + '\n';
 }
+
+export const readSecurityPosture = (...args: Parameters<typeof readSecurityPostureImpl>) => withOracleAction('security', () => readSecurityPostureImpl(...args));

@@ -1,3 +1,4 @@
+import { withOracleAction } from '../oracle/observability.js';
 import { Type } from 'typebox';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ToolContext } from '../contracts.js';
@@ -120,7 +121,7 @@ export function createHealthCheckTool(ctx: ToolContext): AgentTool<any> {
 			const event = { at: new Date().toISOString(), runId: ctx.runId, target, tool: 'health_check' };
 			try {
 				if (ctx.pinnedTarget && target !== ctx.pinnedTarget) throw new Error('Health check target differs from pinned target');
-				const run = await checkedHealth(ctx, [target], signal);
+				const run = await withOracleAction('health_check', () => checkedHealth(ctx, [target], signal));
 				const output = boundedHealthResult(run, ctx.config.limits.maxToolResultBytes);
 				await ctx.audit.record({ ...event, kind: 'tool_call', truncated: output.details.truncated });
 				return output;
