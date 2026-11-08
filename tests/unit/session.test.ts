@@ -1,6 +1,6 @@
 import { it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({ connect: vi.fn(), read: vi.fn() }));
-vi.mock('oracledb',()=>({default:{thin:true,getConnection:mocks.connect,OUT_FORMAT_ARRAY:4001}}));
+vi.mock('oracledb',()=>({default:{thin:true,getConnection:mocks.connect,OUT_FORMAT_ARRAY:4001,DB_TYPE_DATE:"DATE",DB_TYPE_TIMESTAMP:"TIMESTAMP"}}));
 vi.mock('node:fs/promises',()=>({open:async()=>({stat:async()=>({isFile:()=>true,mode:0o600}),readFile:mocks.read,close:async()=>{}})}));
 import { createSessionProvider, previewValue } from '../../src/oracle/index.js';
 import type { AppConfig } from '../../src/contracts.js';
@@ -9,7 +9,7 @@ beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mo
 function connection(version='19.9.1.0.0') {
 	const rs = {getRows:vi.fn().mockResolvedValue([[1],[2],[3]]),close:vi.fn()};
 	const c = {callTimeout:0,execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
-	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({rows:[['HARNESS_LAB','FALSE',null,'0','ORCL']]}).mockResolvedValueOnce({rows:[['CREATE SESSION']]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR']]});
+	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({rows:[['HARNESS_LAB','FALSE',null,'0','ORCL']]}).mockResolvedValueOnce({rows:[['CREATE SESSION']]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR','ORCL','+00:00']]});
 	mocks.connect.mockResolvedValue(c); return {c,rs};
 }
 it('sets schema and timeout, fetches one extra row and rolls back',async()=>{
@@ -98,4 +98,20 @@ it('sanitizes connection rejection before exposing it to any feature',async()=>{
 	mocks.connect.mockRejectedValueOnce(new Error('ORA-01017: private-password private-host'));
 	await expect(createSessionProvider(config).get()).rejects.toThrow('ORA-01017: invalid username/password');
 	try{mocks.connect.mockRejectedValueOnce(new Error('private-password'));await createSessionProvider(config).get();}catch(error){expect(String(error)).not.toContain('private-password');expect(String(error)).toContain('Database connection failed');}
+});
+
+it('interprets UTC database DATE/TIMESTAMP wall fields with a Mexico City host', async () => {
+	const previous = process.env.TZ;
+	process.env.TZ = 'America/Mexico_City';
+	try {
+		const {c}=connection(), p=createSessionProvider(config), session=await p.get();
+		await session.query('SELECT SYSDATE FROM dual');
+		const options=c.execute.mock.calls.at(-1)![2] as any;
+		const converter=options.fetchTypeHandler({dbType:'DATE'}).converter;
+		expect(converter(new Date(2026,10,8,6,6,0)).toISOString()).toBe('2026-11-08T06:06:00.000Z');
+		expect(converter(null)).toBeNull();
+		expect(options.fetchTypeHandler({dbType:'TIMESTAMP'}).converter(new Date(2026,10,8,6,6,0,123)).toISOString()).toBe('2026-11-08T06:06:00.123Z');
+		expect(options.fetchTypeHandler({dbType:'TIMESTAMP WITH TIME ZONE'})).toBeUndefined();
+		await p.closeAll();
+	} finally { if(previous===undefined) delete process.env.TZ; else process.env.TZ=previous; }
 });

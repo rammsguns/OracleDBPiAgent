@@ -57,8 +57,19 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				await checkAccount(connection, target.username, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = "${target.defaultSchema}"`);
 				await connection.execute("ALTER SESSION SET TIME_ZONE = '+00:00'");
-				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
+				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME'), TO_CHAR(SYSTIMESTAMP, 'TZH:TZM') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const r = id.rows[0];
+				const databaseOffset = r[7];
+				// node-oracledb materializes zone-less fields in the host TZ.
+				// Recover those wall-clock fields before interpreting the database offset.
+				const fetchTypeHandler = (metadata: any) => {
+					if ([oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(metadata.dbType)) return {
+						converter: (value: Date | null) => value === null ? null : oracleWallTime(
+							[value.getFullYear(), String(value.getMonth()+1).padStart(2,'0'), String(value.getDate()).padStart(2,'0')].join('-') +
+							'T' + [value.getHours(),value.getMinutes(),value.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') +
+							'.' + String(value.getMilliseconds()).padStart(3,'0'), databaseOffset),
+					};
+				};
 				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
 				await connection.rollback();
 				const session: OracleSession = {
@@ -73,7 +84,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 						try {
 							connection.callTimeout = timeout * 1000;
 							await connection.execute("SET TRANSACTION READ ONLY");
-							const result = await connection.execute(statement, binds, { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, fetchArraySize: Math.min(maxRows + 1, 100) });
+							const result = await connection.execute(statement, binds, { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler });
 							resultSet = result.resultSet;
 							const fetched = await resultSet.getRows(maxRows + 1);
 							const rows: unknown[][] = [];
@@ -88,4 +99,13 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 		},
 		async closeAll() { await Promise.all([...sessions].map(s => s.close())); },
 	};
+}
+
+/** Convert database wall time without consulting the host TZ. */
+export function oracleWallTime(value: string | null, offset: string): Date | null {
+	if (value === null) return null;
+	if (!/^[+-]\d{2}:\d{2}$/.test(offset)) throw new Error("Database time-zone offset unavailable");
+	const date = new Date(value.replace(/(\.\d{3})\d+$/, '$1') + offset);
+	if (!Number.isFinite(date.getTime())) throw new Error("Invalid Oracle wall time");
+	return date;
 }

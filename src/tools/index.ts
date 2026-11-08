@@ -190,15 +190,10 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 	}))];
 }
 
-// Oracle DATE/plain TIMESTAMP are fetched as client-local Dates. Local getters
-// preserve their stored wall clock; only timezone-aware types identify an instant.
-function renderCell(value: unknown, columnType?: string): string {
+// The session provider normalizes Oracle wall-clock types to instants as well.
+function renderCell(value: unknown, _columnType?: string): string {
 	if (value == null) return "NULL";
-	if (!(value instanceof Date)) return String(value).replace(/\s+/g, " ");
-	if (columnType === "TIMESTAMP WITH TIME ZONE" || columnType === "TIMESTAMP WITH LOCAL TIME ZONE") return value.toISOString();
-	const pad = (n: number, width = 2) => String(n).padStart(width, "0");
-	const wall = `${pad(value.getFullYear(), 4)}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
-	return columnType === "TIMESTAMP" ? `${wall}.${pad(value.getMilliseconds(), 3)}` : wall;
+	return value instanceof Date ? value.toISOString() : String(value).replace(/\s+/g, " ");
 }
 
 // Keep the tagged query intact: folding in JS avoids LISTAGG's

@@ -25,12 +25,12 @@ for (const target of ['d1-19c-lab', 'p1-19c-prod']) {
 				CAST(TO_TIMESTAMP_TZ(:instant, 'YYYY-MM-DD"T"HH24:MI:SS.FF3TZH:TZM') AS TIMESTAMP WITH LOCAL TIME ZONE) LTZ
 				FROM dual`, { wall, instant: '2026-10-06T04:30:56.298+00:00' });
 			const row = result.rows[0] as Date[];
-			expect(row[0]!.getTime()).toBe(wall.getTime());
-			expect(row[1]!.getTime()).toBe(new Date(2026, 9, 6).getTime());
-			expect(row[2]!.getTime()).toBe(wall.getTime());
+			expect(row[0]!.getTime()).toBe(Date.parse('2026-10-06T04:30:56.298Z'));
+			expect(row[1]!.getTime()).toBe(Date.parse('2026-10-06T00:00:00Z'));
+			expect(row[2]!.getTime()).toBe(Date.parse('2026-10-06T04:30:56.298Z'));
 			for (const index of [3, 4]) expect(row[index]!.toISOString()).toBe('2026-10-06T04:30:56.298Z');
 			expect(boundedResult(result, 16000).content[0]!.text.split('\n')[1]).toBe(
-				'2026-10-06 04:30:56.298 | 2026-10-06 00:00:00 | 2026-10-06 04:30:56.298 | 2026-10-06T04:30:56.298Z | 2026-10-06T04:30:56.298Z');
+				'2026-10-06T04:30:56.298Z | 2026-10-06T00:00:00.000Z | 2026-10-06T04:30:56.298Z | 2026-10-06T04:30:56.298Z | 2026-10-06T04:30:56.298Z');
 			if (target === 'd1-19c-lab') {
 				const bare = await session.query(`SELECT incident_id FROM v$diag_incident
 					WHERE create_time >= TIMESTAMP '2026-10-06 00:00:00'
