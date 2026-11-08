@@ -1,7 +1,8 @@
 import { it, expect, vi, afterEach } from 'vitest';
 import { loadConfig } from '../../src/config/index.js';
-import { createHealthCheckTool, checkedHealth, healthText, boundedHealthResult } from '../../src/tools/healthCheck.js';
+import { createHealthCheckTool, checkedHealth, healthText, boundedHealthResult, healthChecksWithNames } from '../../src/tools/healthCheck.js';
 import type { ToolContext } from '../../src/contracts.js';
+import { collectors } from '../../src/check/index.js';
 import type { CheckRun } from '../../src/check/index.js';
 afterEach(() => vi.unstubAllEnvs());
 function context() {
@@ -65,4 +66,58 @@ it('caps escaped and multibyte text including the result envelope at the minimum
 		expect(Buffer.byteLength(JSON.stringify(output))).toBeLessThanOrEqual(cap);
 		expect(output.content[0]!.text).not.toContain('\uFFFD');
 	}
+});
+
+for (const [id, phrase, command] of [
+	['tablespace:USERS', 'percent used of maximum tablespace allocation', 'space'],
+	['tablespaces', 'percent used of maximum tablespace allocation', 'space'],
+	['temp:TEMP', 'active temp percent used', 'space'],
+	['undo:UNDO', 'active plus unexpired undo percent used', 'space'],
+	['recovery', 'recovery area percent used after reclaimable space', 'space'],
+	['blocking', 'longest blocked session wait in seconds', 'sessions'],
+	['backupAge', 'hours since oldest latest full/level-0 backup', 'backup'],
+	['archiveGaps', 'missing archived-log sequence ranges', 'backup'],
+	['failedJobs', 'failed scheduler runs in the lookback window', 'jobs'],
+	['alertErrors', 'ORA- error occurrences in the alert log lookback window', 'alertlog'],
+	['incidents', 'diagnostic incidents in the lookback window', 'alertlog'],
+	['maintenance', 'invalid objects plus unusable index/partition/subpartition units (non-Oracle-maintained owners)', 'jobs'],
+	['expiry', 'days until nearest unlocked application-account password expiry', 'security'],
+	['defaultPasswords', 'open accounts using default passwords', 'security'],
+]) it(`${id} explains its measure and drill-down for every emitted status`, () => {
+	for (const status of ['WARN', 'CRIT', 'UNKNOWN', 'SKIPPED', 'OK'] as const) {
+		const run: CheckRun = {version:1,capturedAt:'now',status:'WARN',targets:[{target:'lab',status:'WARN',checks:[{
+			id:id!,status,observedStatus:'UNKNOWN',value:null,display:'UNKNOWN',unit:'',threshold:null,
+			scope:'This PDB',command:`piagent ${command} --target lab`,note:'Window: 1h; ORA-00942',
+		}]}]};
+		const text = healthText(run);
+		expect(text).toContain(`measures: ${phrase}`);
+		expect(text).toContain(`piagent ${command} --target lab`);
+		expect(text).toContain('Window: 1h; ORA-00942');
+	}
+});
+
+it('reuses capped safe names and excludes Oracle-maintained index owners without new queries', async () => {
+	const ctx = context(), query = vi.fn();
+	ctx.sessions.get = async () => ({target:ctx.config.targets[0]!,identity:{isCdb:false},close:async()=>{},query}) as never;
+	const section = (rows: Record<string, unknown>[]) => ({status:'ok',truncated:false,rows});
+	const jobs = vi.fn(async () => ({sections:{
+		runs:section(Array.from({length:8}, (_,i) => ({OWNER:'APP',JOB_NAME:`JOB${i}`,STATUS:'FAILED'})).concat([{OWNER:'APP',JOB_NAME:'password=hidden',STATUS:'FAILED'}])),
+		invalidObjects:section([{OWNER:'APP',OBJECT_COUNT:2}]),
+		indexes:section([{OWNER:'SYS',INDEX_NAME:'INTERNAL'}, {OWNER:'APP',INDEX_NAME:'IDX'}]),
+		indexPartitions:section([{INDEX_OWNER:'APP',INDEX_NAME:'IDX',PARTITION_NAME:'P1'}]),
+		indexSubpartitions:section([{INDEX_OWNER:'APP',INDEX_NAME:'IDX',PARTITION_NAME:'P1',SUBPARTITION_NAME:'S1'}]),
+	}}));
+	const security = vi.fn(async () => ({checks:[{id:'accounts',status:'ok',evidence:[{label:'users',status:'ok',rows:[['APP','N','OPEN',null,null],['SYS','Y','OPEN',null,null]]}],findings:[]},
+		{id:'default-passwords',status:'ok',evidence:[],findings:Array.from({length:8}, (_,i) => ({subject:`USER${i}`}))}]}));
+	const unavailable = async () => { throw new Error('ORA-00942'); };
+	const readers = {...collectors,space:unavailable,sessions:unavailable,backup:unavailable,alerts:unavailable,incidents:unavailable,jobs,security} as unknown as typeof collectors;
+	const run = await healthChecksWithNames(ctx, [ctx.config.targets[0]!.name], undefined, readers);
+	const text = healthText(run);
+	expect(text).toContain('APP.JOB0, APP.JOB1, APP.JOB2, APP.JOB3, APP.JOB4');
+	expect(text).not.toContain('JOB5'); expect(text).not.toContain('hidden');
+	expect(text).toContain('APP.IDX, APP.IDX.P1, APP.IDX.P1.S1');
+	expect(text).not.toContain('SYS.INTERNAL');
+	expect(text).toContain('USER0, USER1, USER2, USER3, USER4'); expect(text).not.toContain('USER5');
+	expect(jobs).toHaveBeenCalledTimes(1); expect(security).toHaveBeenCalledTimes(2);
+	expect(query).not.toHaveBeenCalled();
 });
