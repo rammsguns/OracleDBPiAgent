@@ -223,3 +223,10 @@ it('uses labelled per-datafile fallback only in a PDB with empty RMAN jobs', asy
 	run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
 	expect(run.targets[0]!.checks.find(c=>c.id==='backupAge')!.status).toBe('UNKNOWN');
 });
+
+it('discloses instance-wide ADR coverage in PDB alert and incident notes',async()=>{
+	const {context,readers}=fake(),get=context.sessions.get;
+	context.sessions.get=async(...args)=>({...await get(...args),identity:{isCdb:true,containerName:'PIPDB1'}} as never);
+	const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+	for(const id of ['alertErrors','incidents'])expect(run.targets[0]!.checks.find(c=>c.id===id)!.note).toContain('CDB-wide/instance ADR evidence (CON_ID 0/1)');
+});

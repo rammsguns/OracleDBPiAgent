@@ -55,6 +55,7 @@ function messageCell(row) {
 	for (const path of [...traces].sort((a, b) => b.length - a.length)) text = text.replaceAll(path, path.split(/[\\/]/).pop());
 	text = text.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 	const preview = el('div', text || '(Trace file reference)', 'alert-message-preview');
+	if (row.scope) cell.append(el('small', row.scope));
 	cell.append(preview);
 	const full = el('details', undefined, 'alert-full-message');
 	full.hidden = true;
@@ -92,7 +93,7 @@ export function renderAlertEvidence(content, evidence) {
 	}));
 	entries.querySelector('table').className = 'alert-entries';
 	section.append(entries);
-	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status'], evidence.incidents.map(row => [compactTime(row.createTime), row.incidentId, row.problemKey, `${row.statusName || ({ 1: 'Inflight', 2: 'Ready', 3: 'Tracked', 4: 'Closed', 5: 'Data removed', 6: 'Purged', 7: 'Incomplete' })[row.status] || 'Unknown'} (${row.status ?? 'null'})`])));
+	section.append(grid('ADR incidents', ['Created', 'Incident', 'Problem key', 'Status'], evidence.incidents.map(row => [compactTime(row.createTime), row.incidentId, row.problemKey + (row.scope ? ' — ' + row.scope : ''), `${row.statusName || ({ 1: 'Inflight', 2: 'Ready', 3: 'Tracked', 4: 'Closed', 5: 'Data removed', 6: 'Purged', 7: 'Incomplete' })[row.status] || 'Unknown'} (${row.status ?? 'null'})`])));
 	if (evidence.correlations?.length) {
 		section.append(el('h4', 'Correlations'));
 		for (const item of evidence.correlations) section.append(el('p', `${item.kind === 'jobRun' ? 'Job run' : 'Code'}: ${item.label}${item.at ? ' · ' + item.at : ''} · Alert entries ${item.entryIndexes.map(index => index + 1).join(', ') || 'none'}`));
