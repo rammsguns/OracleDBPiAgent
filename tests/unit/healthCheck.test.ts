@@ -121,3 +121,24 @@ it('reuses capped safe names and excludes Oracle-maintained index owners without
 	expect(jobs).toHaveBeenCalledTimes(1); expect(security).toHaveBeenCalledTimes(2);
 	expect(query).not.toHaveBeenCalled();
 });
+
+function criticalDefaultPasswords(note = ''): CheckRun {
+	return {version:1,capturedAt:'now',status:'CRIT',targets:[{target:'lab',status:'CRIT',checks:[{
+		id:'defaultPasswords',status:'CRIT',value:5,display:'5 accounts',unit:'accounts',threshold:null,
+		scope:'Database-wide (non-CDB)',command:'piagent security --target lab',note,
+	}]}]};
+}
+it('keeps CRIT in the defaultPasswords check line after credential redaction', () => {
+	const output = boundedHealthResult(criticalDefaultPasswords(), 4096);
+	expect(output.content[0]!.text).toContain('lab defaultPasswords CRIT 5 accounts; measures: open accounts using default passwords');
+	expect(output.content[0]!.text).toContain('piagent security --target lab');
+	expect(output.details).toEqual({status:'CRIT',truncated:false});
+});
+it('still redacts credential-looking names and evidence while preserving defaultPasswords CRIT', () => {
+	const run = criticalDefaultPasswords('Names (up to 5): APP.API_KEY=name_canary; password=evidence_canary');
+	run.targets[0]!.target = 'token=target_canary';
+	const text = healthText(run);
+	expect(text).toContain('defaultPasswords CRIT 5 accounts');
+	for (const secret of ['name_canary', 'evidence_canary', 'target_canary']) expect(text).not.toContain(secret);
+	expect(text).toContain('[REDACTED]');
+});

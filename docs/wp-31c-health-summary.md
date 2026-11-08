@@ -26,7 +26,8 @@ available, and the adapter does not invent them or issue another query.
 
 Sequential live captures on 2026-11-08, with default thresholds, using
 `checkedHealth` and the complete serialized `boundedHealthResult` envelope.
-The baseline was captured before editing. The after capture used the new adapter.
+The baseline was captured before editing. The after capture used the new adapter
+at `ad018f9`, before the label-only review follow-up below.
 No result was truncated. Windows and snapshots naturally differ between captures.
 
 Counts use offline **cl100k_base** tokenization as a reproducible size proxy,
@@ -58,3 +59,26 @@ The full integration npm script selects all integrations (including LLM tests),
 so its initial invocation was stopped and the relevant DB-only files were run
 explicitly. No contract changes requested. Agent answer quality
 and actual Strata tokens remain for the coordinator's A/B gate.
+
+## Antigravity minor follow-up
+
+The review of `ad018f9` found that the credential-assignment redactor interpreted
+`defaultPasswords: CRIT` as a password key/value pair and masked `CRIT`.
+The tool now renders that fixed label as `defaultPasswords CRIT 5 accounts`
+(without the colon). Other check labels retain their existing formatting.
+The entire assembled result still passes through both existing credential
+redactors; no redaction patterns or dynamic-field protections were weakened.
+
+Two regression tests verify that the bounded tool result retains per-check CRIT
+and that credential-looking names, target names and evidence values remain
+redacted while the status stays visible. No shared contract, CLI output,
+collector, agent guidance or dependency changes were needed.
+
+Follow-up validation:
+
+- `npm run typecheck`: passed (exit 0).
+- `npm test -- --maxWorkers=2`: 141 files, 2696 tests passed (103.15s).
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/health-summary.test.ts tests/integration/check.test.ts tests/integration/c1-pdb-live.test.ts --no-file-parallelism`: 3 files, 5 tests passed (77.38s).
+
+No LLM calls, pushes or merges. No contract changes requested. Model-level A/B
+verification remains with the coordinator.

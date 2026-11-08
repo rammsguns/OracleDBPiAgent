@@ -78,8 +78,10 @@ export async function checkedHealth(ctx: ToolContext, targets: readonly string[]
 export function healthText(run: CheckRun): string {
 	const checks = run.targets.flatMap(t => t.checks);
 	const counts = ['CRIT', 'WARN', 'UNKNOWN', 'OK'].map(s => `${checks.filter(c => c.status === s).length} ${s}`).join(', ');
+	// Avoid rendering the fixed password-check label as a credential assignment.
+	const label = (id: string) => id === 'defaultPasswords' ? id : `${id}:`;
 	const line = (s: string) => s.replace(/[\r\n\t]+/g, ' ');
-	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN').map(c => line(`${t.target} ${c.id}: ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
+	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN').map(c => line(`${t.target} ${label(c.id)} ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
 }
 /** Keep complete check lines where possible and bound the entire serialized result. */
 export function boundedHealthResult(run: CheckRun, cap: number) {
