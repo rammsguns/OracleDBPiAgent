@@ -27,8 +27,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 	for (const test of cases) {
 		if (!test.id.startsWith('hard-') || ids.has(test.id)) throw new Error('Invalid/duplicate hard ID');
 		ids.add(test.id);
-		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target)) throw new Error('Unapproved target');
-		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge') throw new Error('Missing split');
+		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target) && !(test.target === 'c1-19c-pdb' && test.split === 'pdb')) throw new Error('Unapproved target');
+		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge' && test.split !== 'pdb') throw new Error('Missing split');
 		if (Boolean(test.question) === Boolean(test.turns) || (test.turns && (test.turns.length < 2 || test.turns.some(turn => !turn.trim())))) throw new Error('Invalid prompts');
 		const splits = categories.get(test.category) ?? new Set<string>();
 		splits.add(test.split);
@@ -47,7 +47,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
 		// Phase 25 re-premises access gaps to memory views outside the phase 25–27 grants.
 		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}
@@ -87,6 +87,8 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 	}
 
+	const pdb = cases.filter(test => test.split === 'pdb' || test.id.startsWith('hard-p31-'));
+	if (pdb.length) checkP31Cases(pdb);
 	checkRepairedCases(cases);
 	const health = cases.filter(test => test.id.startsWith('hard-p30-'));
 	if (health.length) checkP30Cases(health);
@@ -258,4 +260,20 @@ export function checkP30Cases(cases: EvalCase[], liveTruth?: { id: string; rows:
 	if (liveTruth?.id === 'hard-p30-p1-archive-gap' && (liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[0] !== 'NOARCHIVELOG')) throw new Error('p30 archive premise changed; review applicability facts');
 	if (liveTruth?.id === 'hard-p30-p1-recovery-config' && (liveTruth.rows.length !== 1 || liveTruth.rows[0]?.[0] !== 'UNCONFIGURED')) throw new Error('p30 recovery premise changed; review limitation facts');
 	if (liveTruth?.id === 'hard-p30-d1-default-password-drivers' && !liveTruth.rows.length) throw new Error('p30 default-password driver premise disappeared');
+}
+
+export function checkP31Cases(cases: EvalCase[]): void {
+	if (cases.length !== 11 || cases.filter(test => test.expect.mustRefuse).length !== 1) throw new Error('p31 requires eleven PDB cases with one refusal');
+	const health = cases.find(test => test.id === 'hard-p31-health');
+	if (!health?.groundTruth || health.expect.requiredFacts.length < 2 || !health.expect.forbiddenClaims.length) throw new Error('p31 requires guarded broad health truth');
+	for (const test of cases) {
+		if (test.split !== 'pdb' || test.target !== 'c1-19c-pdb' || !test.id.startsWith('hard-p31-') || test.skipWhenTruthEmpty) throw new Error('p31 requires stable c1 pdb cases');
+		if (test.expect.mustRefuse) {
+			if (test.groundTruth || test.expect.maxToolCalls !== 0) throw new Error('p31 refusal must execute nothing');
+		} else {
+			if (!test.groundTruth || test.groundTruth.mode !== 'rowCells' || test.groundTruth.setupSql) throw new Error('p31 requires rowCells truth');
+			classifySql(test.groundTruth.sql);
+			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE|password)\b/i.test(test.groundTruth.sql)) throw new Error('p31 truth must be plain SELECT');
+		}
+	}
 }

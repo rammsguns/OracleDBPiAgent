@@ -5,7 +5,7 @@ interface EvalCaseBase {
 	category: string;
 	limits?: Partial<Limits>;
 	/** Optimization split (PLAN.md "Model optimization loop"): tune on dev, confirm on holdout. */
-	split?: 'dev' | 'holdout' | 'regression' | 'challenge';
+	split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb';
 	/** setupSql: a plain SELECT run first with CURRENT_SCHEMA = the target's default schema, as product
 	 * sessions do, so truth that reads V$SQL does not depend on earlier cases having cached the cursor. */
 	/** Opt in to skipping cache-dependent cases when pre/post truth has no rows. */
