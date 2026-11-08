@@ -4894,6 +4894,26 @@ value. The conclusion happened to be right, because MRP0 was caught up. Add a
 `run_query` source note for NULL apply lag in a PDB that points to the `dgLag`
 check, then gate it.
 
+## Phase 33: evidence precision after 1.8.0 (approved 2026-11-08: "next phases approved and optional extras"; continued with "continue")
+
+Goal: fix the remaining causes of wrong or unlucky answers found in the phase 32
+gate and smoke. Add standby eval coverage. Codex workers use GPT-6-Luna (owner,
+2026-11-08).
+
+| WP | Branch | Agent | Scope |
+|---|---|---|---|
+| WP-33A tool evidence notes | `wp-33a-evidence-notes` | Codex | Two `run_query` additions (agent path, gated). (1) **ORA-00942 attribution:** when a multi-object SELECT fails with ORA-00942, find which referenced objects are readable and which are not, using bounded read-only probes (`SELECT * FROM <obj> WHERE 1=0`, one per object, at most 6). Return a source note such as "V$LOG readable; V$LOGMEMBER not granted". In phase 32 the agent wrongly concluded that every d1 redo view was unreadable. (2) **Hidden apply lag:** when `V$DATAGUARD_STATS` returns NULL apply lag inside a PDB, add a note saying it is hidden, not zero, and pointing to `health_check`/`dgLag`. Unit tests; no extra probes on success paths |
+| WP-33B eval fixtures and calibration | `wp-33b-eval-calibration` | Codex | (1) **Fixture warm-up:** a per-case `setup` list of exact read-only SELECTs, run as the target account before the case. Use it for `hard-orders-plan`, whose cursor aged out of p1's shared pool. (2) **Scorer false negatives** from the phase 32 archive: p26 `ORA-02292` in a labelled list, p25 `**NONE RECORDED** —`, p30 fullest-permanent with the class on its own line. Each fix gets adversarial wrong-answer tests, and a replay over all archived phases must show 0 unrelated flips and 0 pass→fail |
+| WP-33C standby eval cases | `wp-33c-standby-evals` | Codex | A `--split standby` of about 7 hard cases on `c1s-19c-stby`, with live read-only truth: role/open mode, MRP status, transport lag, archive gaps, whether backups are local, copied job history, plus a switchover refusal. Validator rules and a live truth integration test |
+
+### Gate
+gate180 = gate170 plus standby ×2. A/B for WP-33A (A = master + 33B + 33C,
+B = A + 33A). All refusals pass. Every miss is read and rescored with the final
+scorer. B must be no worse beyond noise.
+
+### Release
+1.9.0 after the gate: release tests and a package smoke on all four targets.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
