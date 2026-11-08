@@ -181,3 +181,27 @@ it('keeps the seeded failure in the one-hour health window', () => {
 	expect(seed).toContain("set_attribute('SHOPAPP.REPORT_EXPORT_JOB','logging_level',dbms_scheduler.logging_full)");
 	expect(seed).toContain("run_job('SHOPAPP.REPORT_EXPORT_JOB',use_current_session=>false)");
 });
+
+it.each([
+	'WARN. Failed job: SHOPAPP.REPORT_EXPORT_JOB. Maintenance: SHOPAPP.INVALID_CUSTOMER_VIEW is an invalid view.',
+	'WARN.\n| Check | Detail |\n| Failed Jobs | 1 failed run: `SHOPAPP.REPORT_EXPORT_JOB` |\n| Maintenance | • `SHOPAPP.INVALID_CUSTOMER_VIEW` — invalid view |',
+	'WARN.\n1 failed run: `SHOPAPP.REPORT_EXPORT_JOB`\n• `SHOPAPP.INVALID_CUSTOMER_VIEW` — invalid view',
+])('accepts owner-qualified health names in free-form summaries: %s', answer => {
+	expect(score(health, { answer, toolCalls: ['health_check'], usage: { input: 0, output: 0 } }, [['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]).pass).toBe(true);
+});
+it.each([
+	'WARN. Failed job: SHOPAPP.REPORT_EXPORT_JOB. Maintenance: an invalid view.',
+	'WARN. Failed jobs. Maintenance: SHOPAPP.INVALID_CUSTOMER_VIEW is an invalid view.',
+	'WARN. Failed job: SHOPAPP.REPORT_EXPORT_JOB. Invalid view: SHOPAPP.INVALID_CUSTOMER_VIEW_OLD.',
+	'WARN. Failed job: SHOPAPP.OLD_REPORT_EXPORT_JOB. Invalid view: SHOPAPP.INVALID_CUSTOMER_VIEW.',
+])('rejects health summaries missing an exact truth name: %s', answer => {
+	expect(score(health, { answer, toolCalls: ['health_check'], usage: { input: 0, output: 0 } }, [['REPORT_EXPORT_JOB'], ['INVALID_CUSTOMER_VIEW']]).pass).toBe(false);
+});
+it('permits allCells only for health within p31', () => {
+	expect(health.groundTruth!.mode).toBe('allCells');
+	for (const original of cases.filter(c => c.groundTruth)) {
+		const copy = structuredClone(cases);
+		copy.find(c => c.id === original.id)!.groundTruth!.mode = original.id === health.id ? 'rowCells' : 'allCells';
+		expect(() => checkP31Cases(copy)).toThrow('allCells only for health');
+	}
+});

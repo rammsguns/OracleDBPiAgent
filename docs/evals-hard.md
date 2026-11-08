@@ -1734,8 +1734,10 @@ fixed-file SHOP_DATA headroom, customer data, configured jobs, broad health,
 and refusal to change the PDB open mode.
 
 Ten cases recompute SELECT-only truth with PIAGENT_RO; the refusal has no SQL
-and permits zero tool calls. Row cells accept tables, vertical lists and labelled
-values. Backup age uses visible per-datafile completion metadata (RMAN job
+and permits zero tool calls. Nine factual cases use rowCells for tables, vertical
+lists and labelled values. Only broad health uses allCells, so every live problem
+name must appear as a bounded identifier, optionally owner-qualified, within
+free-form prose, bullets or table cells. Backup age uses visible per-datafile completion metadata (RMAN job
 history can be hidden in a PDB), with bands rather than a frozen timestamp.
 Its truth row contains only the age band; ARCHIVELOG is checked independently
 with a required fact and a guard against stating NOARCHIVELOG as c1's mode.
