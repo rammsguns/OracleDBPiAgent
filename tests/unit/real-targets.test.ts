@@ -19,7 +19,7 @@ it.each([
 ])('rejects invalid %s %j', (key,value) => { expect(() => validateTarget({...target,[key as string]:value})).toThrow(); });
 it.each(['localhost','127.0.0.1','db.example.com','[::1]'])('accepts host %s',host => { expect(() => validateTarget({...target,host})).not.toThrow(); });
 it('accepts common users and valid boundaries',()=>{ expect(()=>validateTarget({...target,username:'C##READER',port:65535})).not.toThrow(); });
-it('loads private source and fallback',()=>{const f=fixture();expect(loadTargets(f.env)[0]).toEqual(target); expect(loadTargets({})).toHaveLength(2);});
+it('loads private source and fallback',()=>{const f=fixture();expect(loadTargets(f.env)[0]).toEqual(target); expect(loadTargets({})).toHaveLength(3);});
 it.each([0o620,0o602,0o666])('refuses writable mode %s',mode=>{const f=fixture();chmodSync(f.file,mode);expect(()=>loadTargets(f.env)).toThrow();});
 it('refuses symlinks and directories',()=>{const f=fixture();const link=join(f.home,'link');symlinkSync(f.file,link);expect(()=>loadTargets({...f.env,PIAGENT_TARGETS_FILE:link})).toThrow();mkdirSync(join(f.home,'dir'));expect(()=>loadTargets({...f.env,PIAGENT_TARGETS_FILE:join(f.home,'dir')})).toThrow();});
 it.each([[],Array(21).fill(target),[target,target]])('rejects target count or duplicate',targets=>{const f=fixture();writeFileSync(f.file,JSON.stringify({version:1,targets}));expect(()=>loadTargets(f.env)).toThrow();});

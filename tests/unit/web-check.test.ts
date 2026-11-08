@@ -26,7 +26,7 @@ it('returns real-engine verdicts for one or all targets, redacts and closes once
 	for (const query of ['?target=d1-19c-lab','?target=p1-19c-prod','?target=__all_targets__']) {
 		const response=await f.call(query); expect(response.status).toBe(200);
 		const text=await response.text(), run=JSON.parse(text).result as CheckRun;
-		expect(run.status).toBe('UNKNOWN'); expect(run.targets).toHaveLength(query==='?target=__all_targets__'?2:1);
+		expect(run.status).toBe('UNKNOWN'); expect(run.targets).toHaveLength(query==='?target=__all_targets__'?3:1);
 		expect(text).not.toContain('never-print'); expect(text).toContain('ORA-00942');
 	}
 	expect(f.closeAll).toHaveBeenCalledTimes(3);
