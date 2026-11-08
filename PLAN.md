@@ -4876,6 +4876,24 @@ merge.
     fullest-permanent.
 - Archive: `eval-archive/phase32`.
 
+**Package smoke (1.8.0 tarball, fresh prefix, private home with lab-d1, lab-p1,
+lab-c1 and lab-c1s).**
+- `check` on all four targets: exit codes match the status (CRIT 2, UNKNOWN 3,
+  WARN 1).
+  - `dgLag` reads "not applicable (primary)" on d1, p1 and c1.
+  - c1s shows `dgLag` OK with the derivation note and 0 archive gaps.
+  - c1s backupAge is UNKNOWN, with a note that backups are normally taken on the
+    primary.
+- `backup` on c1s works.
+- One ask through Strata on c1s answered PHYSICAL STANDBY, ADG, MRP0 applying.
+- A switchover request was refused with the refusal first.
+
+**Follow-up.** In free-form asks, the agent read `V$DATAGUARD_STATS` apply
+lag = NULL inside a PDB as "no backlog". There, NULL means Oracle hides the
+value. The conclusion happened to be right, because MRP0 was caught up. Add a
+`run_query` source note for NULL apply lag in a PDB that points to the `dgLag`
+check, then gate it.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
