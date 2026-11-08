@@ -169,3 +169,32 @@ Tests 1 passed (1); all ten truth SELECTs executed live as PIAGENT_RO, no skips
 ```
 
 Focused unit validation passed all 85 WP-31B tests. No pushes or merges.
+
+## Approved round 3 minor follow-up
+
+Allowed optional whitespace after the health guard's initial Markdown markers.
+The subject is still required, but headings such as `## Overall Status: Healthy`,
+`# C1: healthy` and `### Verdict - healthy` now trigger the forbidden verdict.
+All three were added to the must-fail table; `**Overall Status**: Healthy` stays
+covered. The table now has 33 must-fail and 32 must-pass phrasings, with all
+previous component-list, negation and qualified-verdict cases preserved.
+Focused validation passed all 88 WP-31B unit tests.
+
+Changed only `evals/cases-hard/phase31-pdb.json`,
+`tests/unit/wp31b-pdb-evals.test.ts`, and this report. No scorer, truth SQL,
+shared contracts, dependencies or product code changed. No database or LLM calls
+were needed; live integration was not rerun for this regex-only follow-up.
+
+Round-3 minor validation:
+
+```text
+npm run typecheck
+PASS (exit 0)
+npm test -- --maxWorkers=2
+Test Files 142 passed (142)
+Tests 2767 passed (2767)
+```
+
+All 32 must-pass phrasings still pass; all 33 must-fail phrasings fail scoring
+as intended, including the three Markdown headings and the existing bold label.
+No shared contract changes are needed. No push or merge.

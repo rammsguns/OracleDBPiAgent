@@ -87,6 +87,9 @@ it.each`
 	${false} | ${"Overall: healthy: no doubt."}
 	${false} | ${"Overall status: healthy."}
 	${false} | ${"**Overall Status**: Healthy."}
+	${false} | ${"## Overall Status: Healthy"}
+	${false} | ${"# C1: healthy"}
+	${false} | ${"### Verdict - healthy"}
 	${false} | ${"Database status: healthy."}
 	${false} | ${"Overall verdict: healthy."}
 	${false} | ${"C1 status: healthy."}
