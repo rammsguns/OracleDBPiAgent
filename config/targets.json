@@ -22,6 +22,17 @@
       "passwordFile": "p1_harness_ro.pw",
       "defaultSchema": "SHOPAPP",
       "environment": "production-like"
+    },
+    {
+      "name": "c1-19c-pdb",
+      "description": "Oracle 19c multitenant PDB with ARCHIVELOG and RMAN backups; dedicated C1 SHOPAPP lab.",
+      "host": "localhost",
+      "port": 1524,
+      "serviceName": "PIPDB1",
+      "username": "PIAGENT_RO",
+      "passwordFile": "c1_piagent_ro.pw",
+      "defaultSchema": "SHOPAPP",
+      "environment": "production-like"
     }
   ]
 }
