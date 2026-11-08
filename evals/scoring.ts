@@ -34,6 +34,8 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		(_match, prefix: string, digits: string) => `${prefix.toUpperCase()}-${digits.padStart(5, '0')}`);
 	const p19 = test.id.startsWith('hard-p19-');
 	let answer = test.id.startsWith('hard-p18-') ? normalizeCodes(result.answer) : p19 ? p19UtcTimestamps(normalizeHyphens(result.answer)) : normalizeHyphens(result.answer);
+	// Scheduler history calls the error-code column ERROR#; accept that label here only.
+	if (test.id === 'hard-p31-failed-job') answer = answer.replace(/^(\s*(?:[-*]\s*)?)error#\s*:/gim, '$1Error code:');
 	// This single-table case needs the two flags, not a repeated table name.
 	// Canonicalize only explicit vertical attributes; keep each table separate.
 	if (test.id === 'hard-p21-products-stats') {
@@ -79,6 +81,7 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		} else if (test.groundTruth.mode === 'rowCells') {
 			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
 				preserveQualified: test.id.startsWith('hard-p18-'),
+				p31ErrorCode: test.id === 'hard-p31-failed-job',
 				p19,
 				historySignature: test.id === 'hard-p21-history-signature',
 				p23: test.id.startsWith('hard-p23-'),
@@ -127,6 +130,7 @@ function truthLabels(sql: string): string[] {
 /** Opt-in row matching. Structured fields match whole values, never fragments of
  * another field (notably OP=INDEX versus OP=INDEX UNIQUE SCAN). */
 interface RowMatchOptions {
+	p31ErrorCode?: boolean;
 	preserveQualified?: boolean;
 	p19?: boolean;
 	historySignature?: boolean;
@@ -174,6 +178,8 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (preserveQualified && /^(?:ORA|TNS)-\d{5}$/i.test(value)
 			&& text.toLowerCase().startsWith(value.toLowerCase())
 			&& /^[:\s]/.test(text.slice(value.length))) return true;
+		// Only this case's Oracle error-code cell accepts an unprefixed code.
+		if (options.p31ErrorCode && /^ORA-\d{5}$/i.test(value) && /^\d{5}$/.test(text)) return text === value.slice(4);
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};

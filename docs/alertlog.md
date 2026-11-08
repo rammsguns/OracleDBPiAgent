@@ -232,4 +232,4 @@ Row cap reached; partial result (folding covers only fetched rows).
 
 ## Live PDB verification (2026-11-08)
 
-In a PDB, alert rows are restricted to the current CON_ID in addition to the explicit timestamp window. CDB-wide ADR rows from other containers are excluded. Health checks filter ORA text before bounding the fetch; a truncated below-threshold sample remains UNKNOWN. See [WP-31A](wp-31a-pdb-live.md).
+In a PDB, alert and incident queries include CON_ID 0/1 (CDB-wide/instance) alongside the current CON_ID, within the explicit timestamp window. Other PDBs are excluded. Rows carry containerId and scope labels in JSON and Markdown; the web view also displays scope. Identical messages from different containers are not folded together. Oracle can hide instance rows from a PDB login even with SELECT grants: only visible/retained rows are counted, and empty results do not establish instance-wide absence. C1 currently exposes only CON_ID 3 to the PDB login, while SYS in CDB$ROOT sees CON_ID 1 as well. Health checks filter ORA text before bounding the fetch; a truncated below-threshold sample remains UNKNOWN. See [WP-31A](wp-31a-pdb-live.md).

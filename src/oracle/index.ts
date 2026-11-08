@@ -60,14 +60,13 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME'), TO_CHAR(SYSTIMESTAMP, 'TZH:TZM') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const r = id.rows[0];
 				const databaseOffset = r[7];
-				// node-oracledb materializes zone-less fields in the host TZ.
-				// Recover those wall-clock fields before interpreting the database offset.
+				await connection.execute(`ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS' NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF9'`);
+				// Request server-formatted text before the driver constructs any host-local Date.
+				// Consumers still receive normalized Date instants, preserving their existing API.
 				const fetchTypeHandler = (metadata: any) => {
 					if ([oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(metadata.dbType)) return {
-						converter: (value: Date | null) => value === null ? null : oracleWallTime(
-							[value.getFullYear(), String(value.getMonth()+1).padStart(2,'0'), String(value.getDate()).padStart(2,'0')].join('-') +
-							'T' + [value.getHours(),value.getMinutes(),value.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') +
-							'.' + String(value.getMilliseconds()).padStart(3,'0'), databaseOffset),
+						type: oracledb.STRING,
+						converter: (value: string | null) => oracleWallTime(value, databaseOffset),
 					};
 				};
 				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
@@ -84,12 +83,30 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 						try {
 							connection.callTimeout = timeout * 1000;
 							await connection.execute("SET TRANSACTION READ ONLY");
-							const result = await connection.execute(statement, binds, { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler });
+							// Read execute metadata without fetching values: STRING alone still passes
+							// dates through a host-local Date in this thin driver. Only wall-clock
+							// queries need a second execute with server-side TO_CHAR projections.
+							const executeOptions = { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, prefetchRows: 0, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler };
+							let result = await connection.execute(statement, binds, executeOptions);
 							resultSet = result.resultSet;
+							const metadata = result.metaData;
+							const wallColumns = metadata.map((c: any) => [oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(c.dbType));
+							if (wallColumns.some(Boolean)) {
+								await resultSet.close(); resultSet = undefined;
+								let wallQueryName = 'PIAGENT_WALL_QUERY';
+								while (statement.toUpperCase().includes(wallQueryName)) wallQueryName += '_';
+								const aliases = metadata.map((_: any, i: number) => 'PIAGENT_COL_' + i);
+								const wallStatement = `${wallQueryPrefix(statement, aliases, wallQueryName)} SELECT ${metadata.map((c: any, i: number) =>
+									(wallColumns[i] ? `TO_CHAR(${aliases[i]}, 'YYYY-MM-DD"T"HH24:MI:SS${c.dbType === oracledb.DB_TYPE_TIMESTAMP ? '.FF9' : ''}')` : aliases[i]) +
+									' AS "' + c.name.replace(/"/g, '""') + '"').join(',')} FROM ${wallQueryName}`;
+								// Formatted wall columns are VARCHAR now, so normal prefetch is safe.
+								result = await connection.execute(wallStatement, binds, { ...executeOptions, prefetchRows: 2 });
+								resultSet = result.resultSet;
+							}
 							const fetched = await resultSet.getRows(maxRows + 1);
 							const rows: unknown[][] = [];
-							for (const row of fetched) { const values = []; for (const value of row) values.push(await previewValue(value)); rows.push(values); }
-							return { columns: result.metaData.map((c: any) => c.name), columnTypes: result.metaData.map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
+							for (const row of fetched) { const values = []; for (const [i, value] of row.entries()) values.push(wallColumns[i] ? oracleWallTime(value as string | null, databaseOffset) : await previewValue(value)); rows.push(values); }
+							return { columns: (metadata.length ? metadata : result.metaData).map((c: any) => c.name), columnTypes: (metadata.length ? metadata : result.metaData).map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
 						} finally { try { await resultSet?.close(); } finally { try { await connection.rollback(); } finally { busy = false; } } }
 					},
 					async close() { if (!closed) { closed = true; sessions.delete(session); await connection.close(); } },
@@ -108,4 +125,24 @@ export function oracleWallTime(value: string | null, offset: string): Date | nul
 	const date = new Date(value.replace(/(\.\d{3})\d+$/, '$1') + offset);
 	if (!Number.isFinite(date.getTime())) throw new Error("Invalid Oracle wall time");
 	return date;
+}
+
+// Oracle 19c forbids nested WITH clauses. Hoist existing CTEs before our wrapper.
+// Lex only structural tokens; literals, quoted identifiers and comments stay intact.
+function wallQueryPrefix(statement: string, aliases: string[], name: string): string {
+	let depth = 0, first = true, withClause = false;
+	const tokens = /--[^\r\n]*|\/\*[\s\S]*?\*\/|"(?:[^"]|"")*"|'(?:[^']|'')*'|[()]|\b(?:WITH|SELECT)\b/gi;
+	for (const token of statement.matchAll(tokens)) {
+		const text = token[0];
+		if (/^(?:--|\/\*|"|')/.test(text)) continue;
+		if (first) { withClause = text.toUpperCase() === 'WITH'; first = false; }
+		if (text === '(') depth++;
+		else if (text === ')') depth--;
+		else if (text.toUpperCase() === 'SELECT' && depth === 0) {
+			const at = token.index!;
+			return (withClause ? statement.slice(0, at) + ', ' : 'WITH ') +
+				`${name} (${aliases.join(',')}) AS (${withClause ? statement.slice(at) : statement})`;
+		}
+	}
+	throw new Error('Cannot format Oracle wall-clock columns');
 }

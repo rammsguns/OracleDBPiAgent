@@ -84,4 +84,9 @@ For programmatic consumers, `src/check/index.ts` exports `runChecks(ctx, targets
 
 ## Live PDB verification (2026-11-08)
 
-PDB backup age can use labelled per-datafile full/level-0 metadata when RMAN jobs are empty. Alert-error collection filters ORA text in the requested window and current container before applying the cap; capped counts retain the existing lower-bound rule. TEMP measures active usage; UNDO measures active plus unexpired bytes, excluding reusable expired extents. See [WP-31A](wp-31a-pdb-live.md).
+PDB backup age can use labelled per-datafile full/level-0 metadata when RMAN jobs are empty. Alert-error collection filters ORA text in the requested window and current container plus CON_ID 0/1 (CDB-wide/instance) before applying the cap; capped counts retain the existing lower-bound rule. TEMP measures active usage; UNDO measures active plus unexpired bytes, excluding reusable expired extents. See [WP-31A](wp-31a-pdb-live.md).
+
+
+## Review follow-up: instance ADR visibility
+
+For a PDB target, alertErrors and incidents explicitly disclose mixed PDB and visible CDB-wide/instance ADR scope (CON_ID 0/1) in their notes and scope labels. Other PDBs are excluded. Oracle may hide instance rows from a local PDB login; an empty or clean visible result does not prove instance-wide absence. Existing row caps and lower-bound rules still apply to the combined visible window.

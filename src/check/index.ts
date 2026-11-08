@@ -169,12 +169,14 @@ export async function runChecks(ctx: ToolContext, targets: readonly string[], se
 			const count = r.rows.filter(x => x.codes.some(code => code.startsWith('ORA-'))).reduce((n,x) => n+x.count,0);
 			const reached = ['WARN','CRIT'].includes(classify(count,t.alertErrors));
 			const lowerBound = r.status === 'ok' && r.truncated && reached;
-			add('alertErrors', count, t.alertErrors, 'errors', 'alertlog', complete(r) || lowerBound, r.truncated ? `${evidenceReason(r)} Visible ORA count is at least ${count}; ${reached ? 'threshold already reached.' : 'below threshold; unseen rows may change the verdict.'}` : evidenceReason(r) || 'ORA occurrences in the lookback window.', false, false, lowerBound ? {display: `>= ${count} errors`,lowerBound:true} : undefined);
+			add('alertErrors', count, t.alertErrors, 'errors', 'alertlog', complete(r) || lowerBound, (_s.identity.isCdb ? 'PDB plus CDB-wide/instance ADR evidence (CON_ID 0/1); other PDBs excluded; Oracle may hide instance rows from this PDB, so absence is not established. ' : '') + (r.truncated ? `${evidenceReason(r)} Visible ORA count is at least ${count}; ${reached ? 'threshold already reached.' : 'below threshold; unseen rows may change the verdict.'}` : evidenceReason(r) || 'ORA occurrences in the lookback window.'), false, false, lowerBound ? {display: `>= ${count} errors`,lowerBound:true} : undefined);
+			if (_s.identity.isCdb) checks.at(-1)!.scope = scope + ' + visible CDB-wide/instance ADR';
 		});
 		await probe(['incidents'], 'alertlog', async (_s,c) => {
 			const r = await readers.incidents(c,target,{since:`${t.windowHours}h`,limit:c.config.limits.maxRows});
 			const lowerBound = r.status === 'ok' && r.truncated && r.rows.length > 0;
-			add('incidents',r.rows.length,null,'incidents','alertlog',complete(r) || lowerBound,evidenceReason(r),false,false,lowerBound ? {display:`>= ${r.rows.length} incidents`,lowerBound:true} : undefined);
+			add('incidents',r.rows.length,null,'incidents','alertlog',complete(r) || lowerBound,(_s.identity.isCdb ? 'PDB plus CDB-wide/instance ADR evidence (CON_ID 0/1); other PDBs excluded; Oracle may hide instance rows from this PDB, so absence is not established. ' : '') + evidenceReason(r),false,false,lowerBound ? {display:`>= ${r.rows.length} incidents`,lowerBound:true} : undefined);
+			if (_s.identity.isCdb) checks.at(-1)!.scope = scope + ' + visible CDB-wide/instance ADR';
 		});
 		await probe(['expiry','defaultPasswords'], 'security', async s => {
 			const r = await readers.security(s,{checks:['accounts','default-passwords']});

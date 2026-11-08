@@ -50,8 +50,8 @@ it('fails closed when the fixed no-backups premise changes or a source is missin
 
 it('pins the calibrated definitions and the exact archived answer fixture', () => {
 	const checksums = JSON.parse(readFileSync('tests/fixtures/wp2527j/checksums.json', 'utf8')) as Record<string, string>;
-	// WP-29E replaces the scorer; semantic regressions are covered separately.
-	checksums['evals/scoring.ts'] = '55e234cdc46ef0a57443233ec0c22b8eab0655f9058ac8955ff1a76be75123c6';
+	// WP-31B adds a case-local error-code option; archived semantic regressions remain covered.
+	checksums['evals/scoring.ts'] = '4ae74b25b3d74eac1f460e4b886aa8f2b7c4f40e274bc954916b6997e33e6e4a';
 	checksums['evals/cases-hard/phase26-jobs.json'] = '32a23b6db77a9b0d8ce6166a3ea07fc1ef4b6cf5b03ebecb71284c11a3c30b5b';
 	for (const [file, expected] of Object.entries(checksums)) {
 		expect(createHash('sha256').update(readFileSync(file)).digest('hex'), file).toBe(expected);

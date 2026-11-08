@@ -175,4 +175,7 @@ cumulative since startup.
 
 ## Live PDB verification (2026-11-08)
 
-C1/PIPDB1 was verified live. The V$LOCK collector uses a query-local RULE hint to avoid an Oracle 19.9 PDB plan that spills heavily to TEMP and times out (NJS-123); no grants or session optimizer settings are changed. See [WP-31A](wp-31a-pdb-live.md).
+C1/PIPDB1 was verified live. The Oracle 19c-specific V$LOCK collector uses a query-local `/*+ RULE */` hint to avoid an Oracle 19.9 PDB plan that spills heavily to TEMP and times out (NJS-123); no grants or session optimizer settings are changed. See [WP-31A](wp-31a-pdb-live.md).
+
+
+The hint is a workaround for the Oracle 19.9 PDB cost-based optimizer (CBO) stall observed on C1: the unhinted fixed-view query spills to TEMP and exceeds the 30-second statement timeout even as SYS; the hinted query returned in approximately 0.18 seconds. RULE is deprecated and is deliberately confined to this fixed query, with no session/database optimizer changes. The product supports Oracle 19c only. Revalidate this workaround when applying a different 19c release update; it is not a compatibility claim for later Oracle versions.

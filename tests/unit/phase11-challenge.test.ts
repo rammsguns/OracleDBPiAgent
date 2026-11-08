@@ -7,7 +7,7 @@ import { score } from '../../evals/scoring.js';
 
 it('adds a separately selectable split while preserving every prior case', async () => {
 	const cases = await loadHardCases();
-	const prior = cases.filter(test => test.split !== 'challenge' && !test.id.startsWith('hard-p21-') && !test.id.startsWith('hard-p25-grant-'));
+	const prior = cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && !test.id.startsWith('hard-p21-') && !test.id.startsWith('hard-p25-grant-'));
 	expect(prior).toHaveLength(61);
 	// WP-20E deliberately re-premises the parameter case after new grants.
 	expect(prior.find(test => test.id === 'hard-grant-p1-parameters')!.category).toBe('diagnosis');
