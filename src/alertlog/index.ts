@@ -15,7 +15,7 @@ export interface AlertLogOptions extends WindowOptions {
 	level?: 'default' | 'all' | number;
 }
 export interface AlertRow {
-	timestamp: string; firstTime: string; lastTime: string; count: number;
+	containerId?: number; scope?: string; timestamp: string; firstTime: string; lastTime: string; count: number;
 	level: number | null; codes: string[]; problemKey: string; incidentId: string | null;
 	traceFile: string | null; messageText: string; textTruncated: boolean;
 	/** Bounded unions across the group; singular fields retain the newest example. */
@@ -28,7 +28,7 @@ export function incidentStatusName(status: number | null): string {
 export function formatIncidentStatus(status: number | null): string {
 	return `${incidentStatusName(status)} (${status ?? 'null'})`;
 }
-export interface IncidentRow { incidentId: string; problemKey: string; createTime: string; status: number | null; statusName?: string }
+export interface IncidentRow { containerId?: number; scope?: string; incidentId: string; problemKey: string; createTime: string; status: number | null; statusName?: string }
 export interface AlertResult<T> {
 	note?: string; target: string; status: 'ok' | 'unavailable'; view: string; rows: T[];
 	window: { from: string; to: string }; limit: number; truncated: boolean;
@@ -71,7 +71,7 @@ async function read<T>(ctx: ToolContext, target: string, options: WindowOptions,
 	const binds = { fromTime: window.from.replace('Z', '+00:00'), toTime: window.to.replace('Z', '+00:00'), ...query.binds, fetchLimit };
 	const base: AlertResult<T> = { target, status: 'ok', view, rows: [], window, limit, truncated: false, sql, binds, grants: [], attempts: [] };
 	const session = await ctx.sessions.get(target);
-	if (session.identity?.isCdb) base.note = 'Current PDB ADR visibility only; empty results do not establish absence of CDB incidents or alerts. Not available / not granted when the PDB cannot expose this view.';
+	if (session.identity?.isCdb) base.note = 'Current PDB plus CDB-wide/instance ADR evidence (CON_ID 0/1); other PDBs excluded. Only visible/retained metadata is counted; Oracle may hide CDB-wide/instance rows from this PDB, so empty results cannot establish their absence.';
 	const audit = { at: new Date().toISOString(), runId: ctx.runId, target, tool: 'alertlog:read', sqlSha256: createHash('sha256').update(sql).digest('hex') };
 	try {
 		const result = await session.query(sql, binds, { maxRows: fetchLimit, timeoutSeconds: ctx.config.limits.statementTimeoutSeconds });
@@ -102,7 +102,7 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 		else if (level !== 'all') { clauses.push('MESSAGE_LEVEL <= :maxLevel'); binds.maxLevel = level; }
 		if (codes.length) clauses.push('(' + codes.map((code, i) => { const [prefix, digits] = code.split('-'); binds[`code${i}`] = `(^|[^A-Z0-9_])${prefix}-0*${Number(digits)}([^0-9]|$)`; return `REGEXP_LIKE(UPPER(MESSAGE_TEXT), :code${i})`; }).join(' OR ') + ')');
 		if (options.text) { clauses.push('INSTR(UPPER(MESSAGE_TEXT), UPPER(:text)) > 0'); binds.text = options.text; }
-		return { select: 'SELECT ORIGINATING_TIMESTAMP, MESSAGE_LEVEL, PROBLEM_KEY, MESSAGE_TEXT FROM V$DIAG_ALERT_EXT', where: clauses.join(' AND '), order: 'ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC', binds };
+		return { select: 'SELECT ORIGINATING_TIMESTAMP, MESSAGE_LEVEL, PROBLEM_KEY, MESSAGE_TEXT, CON_ID FROM V$DIAG_ALERT_EXT', where: [...clauses, "(SYS_CONTEXT('USERENV','CON_ID') IN ('0','1') OR CON_ID IN (0,1) OR CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID')))"].join(' AND '), order: 'ORIGINATING_TIMESTAMP DESC, RECORD_ID DESC', binds };
 	}, row => {
 		const raw = str(row[3]), redacted = redactCredentials(raw).replace(/[\r\n]+$/, '');
 		let messageText = '', bytes = 0;
@@ -113,7 +113,7 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 		const codes = codesIn(raw), problemKey = safe(row[2]);
 		const normalized = raw.replace(/[\r\n]+$/, '').replace(/\b(?:ORA|TNS|PLS)-\d+\b|\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*[a-f])[0-9a-f]{8,}\b|\d+/gi,
 			token => /^(?:ORA|TNS|PLS)-/i.test(token) ? token.toUpperCase() : /^(?:0x|.*[a-f])/i.test(token) ? '<hex>' : '<n>');
-		return { timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codes.slice(0, 20), problemKey, incidentId: incidentIds[0] ?? null, traceFile: traceFiles[0] ?? null, incidentIds: incidentIds.slice(0, 20), traceFiles: traceFiles.slice(0, 20), problemKeys: problemKey ? [problemKey] : [], metadataTruncated: codes.length > 20 || incidentIds.length > 20 || traceFiles.length > 20, messageText: messageText.replace(/[\r\n]+$/, ''), textTruncated: Buffer.byteLength(redacted) > 2048, _identity: createHash('sha256').update(JSON.stringify([normalized, [...codes].sort(), row[1] == null ? null : Number(row[1])])).digest('hex') };
+		return { ...adrScope(row[4]), timestamp, firstTime: timestamp, lastTime: timestamp, count: 1, level: row[1] == null ? null : Number(row[1]), codes: codes.slice(0, 20), problemKey, incidentId: incidentIds[0] ?? null, traceFile: traceFiles[0] ?? null, incidentIds: incidentIds.slice(0, 20), traceFiles: traceFiles.slice(0, 20), problemKeys: problemKey ? [problemKey] : [], metadataTruncated: codes.length > 20 || incidentIds.length > 20 || traceFiles.length > 20, messageText: messageText.replace(/[\r\n]+$/, ''), textTruncated: Buffer.byteLength(redacted) > 2048, _identity: createHash('sha256').update(JSON.stringify([normalized, [...codes].sort(), row[1] == null ? null : Number(row[1]), row[4]])).digest('hex') };
 	});
 	// Group throughout the bounded result, using complete text before preview clipping.
 	const folded: AlertRow[] = [], groups = new Map<string, AlertRow>();
@@ -136,10 +136,10 @@ export async function readAlertLog(ctx: ToolContext, target: string, options: Al
 }
 export function readIncidents(ctx: ToolContext, target: string, options: WindowOptions = {}): Promise<AlertResult<IncidentRow>> {
 	return read(ctx, target, options, 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM', ['V$DIAG_INCIDENT', 'V$DIAG_PROBLEM'], time => ({
-		select: 'SELECT i.INCIDENT_ID, p.PROBLEM_KEY, i.CREATE_TIME, i.STATUS FROM V$DIAG_INCIDENT i LEFT JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID = i.PROBLEM_ID AND p.CON_ID = i.CON_ID',
-		where: `i.CREATE_TIME >= ${time} AND i.CREATE_TIME < ${time.replace(':fromTime', ':toTime')}`,
+		select: 'SELECT i.INCIDENT_ID, p.PROBLEM_KEY, i.CREATE_TIME, i.STATUS, i.CON_ID FROM V$DIAG_INCIDENT i LEFT JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID = i.PROBLEM_ID AND p.CON_ID = i.CON_ID',
+		where: `i.CREATE_TIME >= ${time} AND i.CREATE_TIME < ${time.replace(':fromTime', ':toTime')} AND (SYS_CONTEXT('USERENV','CON_ID') IN ('0','1') OR i.CON_ID IN (0,1) OR i.CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID')))`,
 		order: 'i.CREATE_TIME DESC, i.INCIDENT_ID DESC', binds: {},
-	}), row => ({ incidentId: str(row[0]), problemKey: safe(row[1]), createTime: str(row[2]), status: row[3] == null ? null : Number(row[3]), statusName: incidentStatusName(row[3] == null ? null : Number(row[3])) }));
+	}), row => ({ ...adrScope(row[4]), incidentId: str(row[0]), problemKey: safe(row[1]), createTime: str(row[2]), status: row[3] == null ? null : Number(row[3]), statusName: incidentStatusName(row[3] == null ? null : Number(row[3])) }));
 }
 const escape = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\|/g, '&#124;').replace(/\r?\n/g, '<br>');
 export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResult<IncidentRow>): string {
@@ -147,12 +147,18 @@ export function renderAlertLogMarkdown(result: AlertResult<AlertRow> | AlertResu
 	if (lines[lines.length - 1] !== '') lines.push('');
 	if (!result.rows.length) lines.push('No rows returned.');
 	else if (result.view === 'V$DIAG_ALERT_EXT') {
-		lines.push('| First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |', '|---|---|---|---|---|---|---|---|');
-		for (const r of result.rows as AlertRow[]) lines.push(`| ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
+		lines.push('| Scope | First / last time | Level | Codes | Count | Problem | Incident | Trace | Message |', '|---|---|---|---|---|---|---|---|---|');
+		for (const r of result.rows as AlertRow[]) lines.push(`| ${escape(r.scope)} | ${r.count === 1 ? escape(r.timestamp) : escape(r.firstTime) + ' / ' + escape(r.lastTime)} | ${r.level} | ${r.codes.join(', ')} | ${r.count} | ${r.problemKeys.map(escape).join(', ')} | ${r.incidentIds.map(escape).join(', ')} | ${r.traceFiles.map(escape).join(', ')} | ${escape(r.messageText)}${r.textTruncated ? ' [text capped]' : ''}${r.metadataTruncated ? ' [metadata capped]' : ''} |`);
 	} else {
-		lines.push('| Created | Incident | Problem | Status |', '|---|---|---|---|');
-		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${formatIncidentStatus(r.status)} |`);
+		lines.push('| Scope | Created | Incident | Problem | Status |', '|---|---|---|---|---|');
+		for (const r of result.rows as IncidentRow[]) lines.push(`| ${escape(r.scope)} | ${escape(r.createTime)} | ${escape(r.incidentId)} | ${escape(r.problemKey)} | ${formatIncidentStatus(r.status)} |`);
 	}
 	if (result.truncated) lines.push('', 'Row cap reached; partial result (folding covers only fetched rows).');
 	return lines.join('\n') + '\n';
+}
+
+function adrScope(value: unknown): {containerId?: number; scope?: string} {
+	if (value === undefined || value === null) return {};
+	const containerId = Number(value);
+	return { containerId, scope: containerId <= 1 ? `CDB-wide/instance (CON_ID ${containerId})` : `PDB (CON_ID ${containerId})` };
 }

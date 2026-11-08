@@ -26,10 +26,10 @@ it('reports live Oracle timestamp metadata and renders run_query text in a UTC s
 		const tool = createDbTools({ config, sessions: provider, audit: { record: async () => {} }, runId: 'timestamp-live' }).find(t => t.name === 'run_query')!;
 		const output = await tool.execute('timestamp', { target: 'd1-19c-lab', sql });
 		const cells = (output.content[0] as { text: string }).text.split('\n')[1]!.split(' | ');
-		expect(cells[0]).toBe(output.details.rows[0][5]);
-		expect(cells[1]).toBe(output.details.rows[0][6]);
-		expect(cells[0]).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
-		expect(cells[1]).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}$/);
+		expect(cells[0]).toBe(new Date(String(output.details.rows[0][5]).replace(' ','T')+'Z').toISOString());
+		expect(cells[1]).toBe(new Date(String(output.details.rows[0][6]).replace(' ','T')+'Z').toISOString());
+		expect(cells[0]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+		expect(cells[1]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
 		for (const index of [2, 3, 4]) expect(cells[index]).toBe((output.details.rows[0][index] as Date).toISOString());
 		console.info('Live run_query:', (output.content[0] as { text: string }).text);
 	} finally { await provider.closeAll(); }

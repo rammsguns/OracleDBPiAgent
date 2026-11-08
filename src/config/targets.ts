@@ -70,7 +70,7 @@ export function loadTargets(env: NodeJS.ProcessEnv): TargetConfig[] {
 		seen.add(t.name);
 		if (packaged && !APPROVED_TARGETS.some(e => Object.entries(e).every(([k,v]) => (t as any)[k] === v))) throw new SafeConfigError({kind:'pin'});
 	}
-	if (packaged && raw.targets.length !== 2) throw new SafeConfigError('Expected the two approved 19c targets');
+	if (packaged && raw.targets.length !== APPROVED_TARGETS.length) throw new SafeConfigError('Expected all approved 19c targets');
 	if (packaged) packagedTargets.add(raw.targets);
 	return raw.targets;
 }

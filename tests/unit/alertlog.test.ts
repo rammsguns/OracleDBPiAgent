@@ -134,3 +134,26 @@ it.each(['alerts', 'incidents'] as const)('renders empty %s as a separated parag
 	const partial = renderAlertLogMarkdown({ ...result, truncated: true });
 	expect(partial).toContain('No rows returned.\n\nRow cap reached;');
 });
+
+it('filters PDB alerts by current CON_ID and bounds only the requested window',async()=>{
+	const f=fixture();
+	const r=await readAlertLog(f.ctx,'c1-19c-pdb',{level:'all',text:'ORA-',limit:100});
+	expect(r.sql).toContain("CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID'))");
+	expect(r.sql).toContain('ORIGINATING_TIMESTAMP >=');
+	expect(r.sql).toContain('ORIGINATING_TIMESTAMP <');
+	expect(r.sql).toContain('FETCH FIRST :fetchLimit ROWS ONLY');
+	expect(r.binds.text).toBe('ORA-');
+});
+
+it('retains and labels instance CON_ID 0/1 separately from PDB alerts and incidents',async()=>{
+	const f=fixture([0,1,3].map(id=>[...row('ORA-00600 shared message'),id]));
+	const r=await readAlertLog(f.ctx,'c1-19c-pdb');
+	expect(r.sql).toContain('OR CON_ID IN (0,1)');
+	expect(r.rows).toHaveLength(3);
+	expect(r.rows.map(x=>x.scope)).toEqual(['CDB-wide/instance (CON_ID 0)','CDB-wide/instance (CON_ID 1)','PDB (CON_ID 3)']);
+	expect(renderAlertLogMarkdown(r)).toContain('CDB-wide/instance');
+	const incidents=await readIncidents(fixture([[42,'key','2026-11-08T01:00:00Z',2,0]]).ctx,'c1-19c-pdb');
+	expect(incidents.sql).toContain('OR i.CON_ID IN (0,1)');
+	expect(incidents.rows[0]).toMatchObject({containerId:0,scope:'CDB-wide/instance (CON_ID 0)'});
+	expect(renderAlertLogMarkdown(incidents)).toContain('CDB-wide/instance');
+});

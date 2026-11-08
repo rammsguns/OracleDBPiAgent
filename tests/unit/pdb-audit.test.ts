@@ -51,7 +51,7 @@ it.each(['ORA-00942', 'ORA-01031', 'ORA-65040'])('degrades PDB sessions, securit
 	expect(security.checks[0]?.notes.join(' ')).toContain('CDB-wide');
 	const alerts = await readAlertLog(context(s), 'lab');
 	expect(alerts.status).toBe('unavailable');
-	expect(renderAlertLogMarkdown(alerts)).toContain('Current PDB ADR visibility only');
+	expect(renderAlertLogMarkdown(alerts)).toContain('Current PDB plus CDB-wide/instance ADR evidence');
 });
 
 import { SQL as spaceSql } from '../../src/space/sql.js';

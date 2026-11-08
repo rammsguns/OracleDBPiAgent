@@ -17,12 +17,12 @@ for (const timezone of ['UTC', 'America/New_York', 'Asia/Kolkata']) {
 			const wall = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 			const result = { columns: ['D', 'T', 'TZ', 'LTZ', 'UNKNOWN', 'NULL', 'TEXT'], columnTypes: ['DATE', 'TIMESTAMP', 'TIMESTAMP WITH TIME ZONE', 'TIMESTAMP WITH LOCAL TIME ZONE', 'OTHER', 'DATE', 'VARCHAR2'], rows: [[date, date, date, date, date, null, 'hello\nworld']], truncated: false, elapsedMs: 0 };
 			const output = boundedResult(result, 16000);
-			expect(output.content[0]!.text.split('\n')[1]).toBe(`${wall} | ${wall}.${pad(date.getMilliseconds(), 3)} | ${iso} | ${iso} | ${wall} | NULL | hello world`);
+			expect(output.content[0]!.text.split('\n')[1]).toBe(`${iso} | ${iso} | ${iso} | ${iso} | ${iso} | NULL | hello world`);
 			expect(output.details.rows[0][0]).toBeInstanceOf(Date);
 			expect(output.details.rows[0][0].getTime()).toBe(date.getTime());
 			expect(result.rows[0]![0]).toBe(date);
 			const legacy = boundedResult({ ...result, columnTypes: undefined, rows: [[date]] }, 16000);
-			expect(legacy.content[0]!.text.split('\n')[1]).toBe(wall);
+			expect(legacy.content[0]!.text.split('\n')[1]).toBe(iso);
 		}
 	});
 }

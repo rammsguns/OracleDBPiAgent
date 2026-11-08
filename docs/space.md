@@ -1,6 +1,6 @@
 # Space and capacity
 
-Use `npm run piagent -- space --target d1-19c-lab` (or `p1-19c-prod`). Markdown is the default. Options: `--section tablespaces,segments,temp,undo,redo,recovery`, `--top 1–100` (default 20), `--owner X`, `--all`, and mutually exclusive `--json` / `--markdown`. Owner names are simple unquoted Oracle identifiers, normalized to uppercase. An explicit owner includes Oracle-maintained owners.
+Use `npm run piagent -- space --target d1-19c-lab` (or `p1-19c-prod` / `c1-19c-pdb`). Markdown is the default. Options: `--section tablespaces,segments,temp,undo,redo,recovery`, `--top 1–100` (default 20), `--owner X`, `--all`, and mutually exclusive `--json` / `--markdown`. Owner names are simple unquoted Oracle identifiers, normalized to uppercase. An explicit owner includes Oracle-maintained owners.
 
 JSON carries raw bytes and query evidence. Markdown uses binary units and text bars. Findings do not change exit 0; usage errors exit 2, connection errors or all selected sections unavailable exit 1. Missing grants affect only their section. Catalog reads are bounded to 10,000 rows; truncation makes the report partial. A snapshot is a sequence of reads, so current usage can move between queries.
 
@@ -276,3 +276,7 @@ Log mode: NOARCHIVELOG.
 no recovery area configured
 
 </details>
+
+## Live PDB verification (2026-11-08)
+
+The general tablespace table measures TEMP used sort blocks and UNDO ACTIVE + UNEXPIRED extent bytes. Allocated temporary extents and reusable EXPIRED undo no longer imply exhaustion. PERMANENT tablespaces retain their existing usage-metrics/free-space calculation. See [WP-31A](wp-31a-pdb-live.md).

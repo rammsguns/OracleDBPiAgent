@@ -104,3 +104,11 @@ it('renders empty sections plainly with single blank lines', async () => {
 	expect(md).not.toContain('<details><summary>No rows');
 	expect(md).not.toMatch(/\n{3,}/);
 });
+
+it('presents TEMP active and UNDO unexpired/active usage rather than allocated extents',async()=>{
+	expect(SQL.tablespaces).toContain("s.used_blocks");
+	expect(SQL.tablespaces).toContain("u.status IN ('ACTIVE','UNEXPIRED')");
+	const r=await readSpaceUsage(fixture({tablespaces:[ts(0,'NO','TEMPORARY'),['U','UNDO','NO','/undo',100,'NO',100,0,0]]}),{sections:['tablespaces']});
+	expect(r.sections.tablespaces.rows.every(t=>t.usedBytes===0&&t.usedPercentMax===0)).toBe(true);
+	expect(r.findings).toEqual([]);
+});

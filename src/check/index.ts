@@ -150,7 +150,7 @@ export async function runChecks(ctx: ToolContext, targets: readonly string[], se
 			const gapEvidence = ['database','archives','history','datafiles','backups','sets','pieces'] as const;
 			const noHistory = !e.backups.rows.length && !e.jobs.rows.length && !e.sets.rows.length;
 			const historyReason = s.identity.isCdb && !e.backups.rows.length ? 'No backup rows visible in this PDB; PDB-hidden control-file metadata cannot establish absence.' : noHistory ? 'No backups recorded in the visible control-file history; external catalogs and aged-out records are not checked.' : 'No successful full/level-0 backup established for every visible datafile; external catalogs are not checked.';
-			add('backupAge', age, t.backupAge, 'hours', 'backup', good([...ageEvidence]) && (age === null || jobs.length > 0) && !(s.identity.isCdb && !dates.length), evidenceReason(...ageEvidence.map(id => e[id])) || (age === null || !jobs.length ? historyReason : 'Oldest latest full/level-0 completion across visible datafiles.'), true);
+			add('backupAge', age, t.backupAge, 'hours', 'backup', good([...ageEvidence]) && (age === null || jobs.length > 0 || (s.identity.isCdb && e.jobs.rows.length === 0)) && !(s.identity.isCdb && !dates.length), evidenceReason(...ageEvidence.map(id => e[id])) || (age === null ? historyReason : !jobs.length ? 'PDB fallback: oldest latest visible per-datafile full/level-0 completion; RMAN job details are empty. Media not verified.' : 'Oldest latest full/level-0 completion across visible datafiles.'), true);
 			const gapReason = evidenceReason(e.database) || (e.database.rows[0]?.LOG_MODE === 'NOARCHIVELOG' ? 'NOARCHIVELOG: archived-log sequence-gap check is not applicable.' : evidenceReason(...gapEvidence.map(id => e[id])) || (!dates.length || !dates.every(Number.isFinite) ? historyReason + ' A full-backup checkpoint is required for gap analysis.' : s.identity.isCdb && !e.archives.rows.length ? 'No archived-log rows visible in this PDB; PDB-hidden metadata cannot establish absence of gaps.' : ''));
 			add('archiveGaps', r.gaps.length, null, 'gaps', 'backup', good([...gapEvidence]) && e.database.rows[0]?.LOG_MODE === 'ARCHIVELOG' && dates.length > 0 && dates.every(Number.isFinite) && (!s.identity.isCdb || e.archives.rows.length > 0), gapReason, true);
 		});
@@ -165,16 +165,18 @@ export async function runChecks(ctx: ToolContext, targets: readonly string[], se
 			add('maintenance', count, t.maintenance, 'objects/index units', 'jobs', !!users && complete(users) && ids.every(id => complete(e[id]!)), evidenceReason(users,...ids.map(id => e[id])) || 'Index, partition and subpartition units counted separately.');
 		});
 		await probe(['alertErrors'], 'alertlog', async (_s,c) => {
-			const r = await readers.alerts(c,target,{ since: `${t.windowHours}h`, level: 'all', limit: c.config.limits.maxRows });
+			const r = await readers.alerts(c,target,{ since: `${t.windowHours}h`, level: 'all', text: 'ORA-', limit: c.config.limits.maxRows });
 			const count = r.rows.filter(x => x.codes.some(code => code.startsWith('ORA-'))).reduce((n,x) => n+x.count,0);
 			const reached = ['WARN','CRIT'].includes(classify(count,t.alertErrors));
 			const lowerBound = r.status === 'ok' && r.truncated && reached;
-			add('alertErrors', count, t.alertErrors, 'errors', 'alertlog', complete(r) || lowerBound, r.truncated ? `${evidenceReason(r)} Visible ORA count is at least ${count}; ${reached ? 'threshold already reached.' : 'below threshold; unseen rows may change the verdict.'}` : evidenceReason(r) || 'ORA occurrences in the lookback window.', true, false, lowerBound ? {display: `>= ${count} errors`,lowerBound:true} : undefined);
+			add('alertErrors', count, t.alertErrors, 'errors', 'alertlog', complete(r) || lowerBound, (_s.identity.isCdb ? 'PDB plus CDB-wide/instance ADR evidence (CON_ID 0/1); other PDBs excluded; Oracle may hide instance rows from this PDB, so absence is not established. ' : '') + (r.truncated ? `${evidenceReason(r)} Visible ORA count is at least ${count}; ${reached ? 'threshold already reached.' : 'below threshold; unseen rows may change the verdict.'}` : evidenceReason(r) || 'ORA occurrences in the lookback window.'), false, false, lowerBound ? {display: `>= ${count} errors`,lowerBound:true} : undefined);
+			if (_s.identity.isCdb) checks.at(-1)!.scope = scope + ' + visible CDB-wide/instance ADR';
 		});
 		await probe(['incidents'], 'alertlog', async (_s,c) => {
 			const r = await readers.incidents(c,target,{since:`${t.windowHours}h`,limit:c.config.limits.maxRows});
 			const lowerBound = r.status === 'ok' && r.truncated && r.rows.length > 0;
-			add('incidents',r.rows.length,null,'incidents','alertlog',complete(r) || lowerBound,evidenceReason(r),true,false,lowerBound ? {display:`>= ${r.rows.length} incidents`,lowerBound:true} : undefined);
+			add('incidents',r.rows.length,null,'incidents','alertlog',complete(r) || lowerBound,(_s.identity.isCdb ? 'PDB plus CDB-wide/instance ADR evidence (CON_ID 0/1); other PDBs excluded; Oracle may hide instance rows from this PDB, so absence is not established. ' : '') + evidenceReason(r),false,false,lowerBound ? {display:`>= ${r.rows.length} incidents`,lowerBound:true} : undefined);
+			if (_s.identity.isCdb) checks.at(-1)!.scope = scope + ' + visible CDB-wide/instance ADR';
 		});
 		await probe(['expiry','defaultPasswords'], 'security', async s => {
 			const r = await readers.security(s,{checks:['accounts','default-passwords']});

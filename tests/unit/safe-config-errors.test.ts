@@ -7,7 +7,7 @@ const expected = [
 	"PIAGENT_SECRET_DIR still holds the init placeholder /absolute/path/to/db-secrets. Edit your private .env or export PIAGENT_SECRET_DIR to your private database password directory.",
 	"LLM URL must be an HTTP loopback URL without credentials, query or fragment",
 	"Only Strata on port 8080 at /v1 is supported",
-	"Expected the two approved 19c targets",
+	"Expected all approved 19c targets",
 	"Invalid or unapproved target configuration",
 	"Unknown default target",
 	"Invalid thinking level",

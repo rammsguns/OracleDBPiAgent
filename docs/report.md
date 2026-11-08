@@ -463,3 +463,7 @@ Setup/preflight revision validation: `npm run typecheck` passed; `npm test`
 passed all 681 tests in 37 files, including all 51 schedule tests. Setup tests
 run only in temporary directories and prove existing log contents are preserved.
 No systemd command or live report was run.
+
+## Live PDB verification (2026-11-08)
+
+C1/PIPDB1 report output was verified live, including deliberate failed scheduler runs, invalid view, unusable index partition and stale PRODUCTS statistics. Oracle DATE/plain TIMESTAMP values are normalized centrally using the server offset; saved history retains ISO instants. See [WP-31A](wp-31a-pdb-live.md).
