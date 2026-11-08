@@ -4645,6 +4645,42 @@ outputs, the audit log, the diff and the history since v1.5.1.
   truth from `piagent check`), so a future gate exercises
   `health_check`.
 
+## Phase 31: production readiness on a real 19c CDB/PDB (approved 2026-11-08: "delete the rules 1,2,3, you have full control, next phases approved and optional extras")
+
+### Goal
+Prove the product on a real Oracle 19c multitenant database before anyone points it
+at production. Until now every live test has used the two non-CDB labs.
+
+### Lab C1 (coordinator ops)
+- New Docker container `oracle19c-cdb` from the existing 19c image, on port 1524,
+  with data in `/home/kiwi/oracle19c-cdb/oradata`. The CDB is `CDB19` and the PDB is
+  `PIPDB1`, created through a mounted DBCA template with
+  `createAsContainerDatabase=true` and a fixed memory size.
+- ARCHIVELOG, a sized fast recovery area, control-file autobackup, and an RMAN
+  level-0 backup followed by an incremental, so backup and archive-gap checks can
+  return real OK results.
+- A seeded app schema with a small OLTP workload and scheduler jobs, in the PDB.
+- A PDB-local `PIAGENT_RO` created and granted with `docs/grants-template-pdb.sql`
+  (explicit grants, no SELECT_CATALOG_ROLE). Passwords are generated into
+  `PIAGENT_SECRET_DIR` (`c1_*.pw`, mode 0600) and never printed.
+- The packaged target `c1-19c-pdb` (service `PIPDB1`) is added to
+  `config/targets.json`.
+
+### WPs
+| WP | Branch | Agent | Owns |
+|---|---|---|---|
+| WP-31A live CDB/PDB verification | `wp-31a-pdb-live` | Codex | Live integration tests on c1 for targets check (refuses `CDB$ROOT`, accepts the PDB), check, backup, space, jobs, top, sessions, security, alertlog, report, drift and web; fixes for any product bug found, especially CDB/PDB scope labels and PDB-hidden views |
+| WP-31B PDB evals | `wp-31b-pdb-evals` | Codex | A `pdb` eval split on c1 with DB-derived truth, a broad-health case ("is my database healthy?") whose truth comes from `piagent check`, and validator updates |
+| WP-31C health summary | `wp-31c-health-summary` | Codex | `health_check` summary names what each WARN/CRIT counts (e.g. invalid objects and unusable indexes), so answers don't guess (agent path, gated) |
+
+### Gate
+gate160 on d1/p1, plus the new pdb split. A/B for WP-31C. All refusals pass, every
+miss is read, and B is not worse beyond noise.
+
+### Release
+1.7.0 after the gate, with release tests (including c1 integration) and a package
+smoke on all three targets.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

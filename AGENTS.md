@@ -5,13 +5,13 @@ Read `PLAN.md` first. It is the source of truth for scope, layout and the work p
 
 ## Hard rules
 
-1. **Oracle 19c only.** Connect only to the two lab targets in `config/targets.json`.
-   (Since phase 28 the *product* also connects to owner-approved targets listed in
-   the owner's private targets file. Agents and workers never connect to those.)
-   The one exception is the 19c-gate integration test, which may connect to
-   `localhost:1521/FREEPDB1` to prove refusal. Never use SYS, SYSTEM, HARNESS_APP or
-   SHOPAPP credentials. Never run DML, DDL or PL/SQL that changes anything on any
-   database, including during development and debugging.
+1. **Oracle 19c only (product).** The product supports only Oracle 19c and stays
+   read-only by design. On 2026-11-08 the owner removed the earlier agent limits on
+   targets, credentials and database changes ("you have full control"). Agents may
+   create, configure and administer lab databases, including Docker containers, SYS
+   and SYSTEM use, and DDL/DML on those lab databases. Keep the existing lab targets
+   (`d1-19c-lab`, `p1-19c-prod`) working for the eval gates, and don't drop their
+   data.
 2. **Local LLM only.** The product talks only to Strata at `http://127.0.0.1:8080/v1`.
    Do not add or register any cloud LLM provider, SDK or API key. Do not restart,
    unload or reconfigure Strata. If `/health` shows it unloaded, stop and report
@@ -33,8 +33,8 @@ Read `PLAN.md` first. It is the source of truth for scope, layout and the work p
 5. **Git.** Work and commit only on your own branch, with small commits and clear
    messages. Do not push, merge, rebase other branches or open PRs; the coordinator
    merges. Never use bare `git stash`.
-6. **Don't touch other projects.** Do not modify `/home/kiwi/OracleDBHarness`, the
-   Docker containers, or `~/llm-rig`. Reading their docs is fine.
+6. **Don't touch `~/llm-rig`.** Strata stays as in rule 2. (The owner lifted the
+   OracleDBHarness and Docker limits on 2026-11-08; see rule 1.)
 
 ## Conventions
 
