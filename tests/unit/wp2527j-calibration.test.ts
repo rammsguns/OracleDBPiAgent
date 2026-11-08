@@ -57,21 +57,39 @@ it('accepts only the three calibrated Phase 32 layouts and rejects their adversa
 	const p26Answer = '**Job:** NIGHTLY_PURGE_JOB\n- **Oracle error code:** `ORA-02292` (ERROR# = 2292)\nMeaning: child records remain because of a foreign key.';
 	expect(score(p26, response(p26Answer), p26Truth).pass).toBe(true);
 	expect(score(p26, response(p26Answer.replaceAll('ORA-02292', 'ORA-01403').replace('2292', '1403')), p26Truth).pass).toBe(false);
+	for (const denial of ['NOT', 'never', 'was not', "isn't", 'no', 'rather than', 'instead of']) {
+		const denied = p26Answer.replace('**Oracle error code:**', `The error was ${denial} **Oracle error code:**`);
+		expect(score(p26, response(denied), p26Truth).pass, denial).toBe(false);
+	}
+	expect(score(p26, response(`The code was not recorded.\n${p26Answer}`), p26Truth).pass).toBe(false);
+	expect(score(p26, response(`The error was not captured.\n\n${p26Answer}`), p26Truth).pass).toBe(true);
 	const p25 = get('hard-p25-d1-last-level0');
-	const p25Answer = '**NONE RECORDED** — on d1 there is no timestamp; this does not prove or guarantee a usable backup.';
+	const p25Answer = '**NONE RECORDED** — on d1, there is no timestamp; this does not prove or guarantee a usable backup.';
 	expect(score(p25, response(p25Answer), [['NONE RECORDED']]).pass).toBe(true);
+	expect(score(p25, response('**NONE RECORDED** — on **d1-19c-lab**, there is no timestamp; this does not prove a usable backup.'), [['NONE RECORDED']]).pass).toBe(true);
+	for (const target of ['d1-19c-prod', 'd1-lab', 'd10', 'd1-19c-lab-extra']) {
+		expect(score(p25, response(`**NONE RECORDED** — on ${target}, this does not prove a usable backup.`), [['NONE RECORDED']]).pass, target).toBe(false);
+	}
+	for (const denial of ['is FALSE', 'backups were found']) {
+		expect(score(p25, response(`**NONE RECORDED** — on d1, ${denial}.`), [['NONE RECORDED']]).pass, denial).toBe(false);
+	}
 	expect(score(p25, response('**NOT NONE RECORDED** — on d1; this does not prove a usable backup.'), [['NONE RECORDED']]).pass).toBe(false);
 	const p30 = get('hard-p30-d1-fullest-permanent');
 	const p30Answer = '**Fullest permanent tablespace: SYSAUX**\n\nClassification: LOW';
 	expect(score(p30, { ...response(p30Answer), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(true);
 	expect(score(p30, { ...response(p30Answer.replace('SYSAUX', 'SYSTEM')), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
 	expect(score(p30, { ...response('Fullest permanent tablespace: SYSAUX\nClassification for SYSTEM: LOW'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
+	expect(score(p30, { ...response('Do NOT conclude this:\n\nFullest permanent tablespace: SYSAUX\n\nClassification: LOW'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
+	expect(score(p30, { ...response('> Fullest permanent tablespace: SYSAUX\n\nClassification: LOW'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
+	expect(score(p30, { ...response('"Fullest permanent tablespace: SYSAUX"\n\nClassification: LOW'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
+	expect(score(p30, { ...response('```text\nFullest permanent tablespace: SYSAUX\n```\nClassification: LOW'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
+	expect(score(p30, { ...response('Fullest permanent tablespace: SYSTEM\n\nClassification: LOW (SYSTEM)\n\nSYSAUX is LOW.'), toolCalls: ['tablespace_usage'] }, [['SYSAUX', 'LOW']]).pass).toBe(false);
 });
 
 it('pins the calibrated definitions and the exact archived answer fixture', () => {
 	const checksums = JSON.parse(readFileSync('tests/fixtures/wp2527j/checksums.json', 'utf8')) as Record<string, string>;
 	// WP-31B and WP-33B add case-scoped row matchers; archived regressions remain pinned.
-	checksums['evals/scoring.ts'] = '0e530b3b618841b20fdcf680bd1b1f81a8ebe8e913719bc46b8b0ddab43fc7e3';
+	checksums['evals/scoring.ts'] = '077fcb06c4967c4bff199bee1831eeb1b34fb9d99342403188e1c7b14c89d433';
 	checksums['evals/cases-hard/phase26-jobs.json'] = '32a23b6db77a9b0d8ce6166a3ea07fc1ef4b6cf5b03ebecb71284c11a3c30b5b';
 	for (const [file, expected] of Object.entries(checksums)) {
 		expect(createHash('sha256').update(readFileSync(file)).digest('hex'), file).toBe(expected);

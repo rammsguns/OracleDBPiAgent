@@ -69,7 +69,7 @@ it('runs exact per-case setup as the target before asking, outside the agent too
 	vi.spyOn(console, 'log').mockImplementation(() => {});
 	const suite = join(directory, 'suite');
 	await mkdir(suite);
-	await writeFile(join(suite, 'case.json'), JSON.stringify([{ id: 'hard-setup', target: 'p1', category: 'test', split: 'dev', setup: ['SELECT 1 FROM DUAL'], question: 'ask', expect: { requiredFacts: [], requiredTools: [], forbiddenClaims: [], mustRefuse: false } }]));
+	await writeFile(join(suite, 'case.json'), JSON.stringify([{ id: 'hard-setup', target: 'p1', category: 'test', split: 'dev', setup: ['SELECT 1 FROM DUAL'], groundTruth: { sql: 'SELECT value FROM dual', mode: 'rowCells' }, question: 'ask', expect: { requiredFacts: [], requiredTools: [], forbiddenClaims: [], mustRefuse: false } }]));
 	let resultsFile = '';
 	try {
 		const report = await runEvals({ suite, repeat: 1, ids: [] }, {
@@ -77,13 +77,14 @@ it('runs exact per-case setup as the target before asking, outside the agent too
 			targets: async () => [{ name: 'p1' }],
 			runtime: async () => ({
 				sessions: { get: async (target: string) => { events.push(`session:${target}`); return { query: async (sql: string) => { events.push(`setup:${sql}`); return { rows: [] }; } }; }, closeAll: async () => {} },
-				ask: async () => { events.push('ask'); return { answer: 'ok', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } }; },
+				ask: async () => { events.push('ask'); return { answer: 'WARM', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } }; },
 			}),
-			groundTruth: async () => [],
-			score: () => ({ pass: true }),
+			groundTruth: async () => { const ready = events.some(event => event === 'setup:SELECT 1 FROM DUAL'); events.push(`truth:${ready ? 'warm' : 'empty'}`); return ready ? [['WARM']] : []; },
+			score,
 		} as any);
 		resultsFile = report.resultsFile;
-		expect(events).toEqual(['session:p1', 'setup:SELECT 1 FROM DUAL', 'ask']);
+		expect(events).toEqual(['session:p1', 'setup:SELECT 1 FROM DUAL', 'truth:warm', 'ask', 'truth:warm']);
+		expect(report.records[0]!.pass).toBe(true);
 		expect(report.records[0]!.toolCalls).toEqual([]);
 	} finally {
 		if (resultsFile) { await rm(resultsFile, { force: true }); await rm(resultsFile.replace(/json$/, 'md'), { force: true }); }
