@@ -1,3 +1,4 @@
+import { createHealthCheckTool } from './healthCheck.js';
 import { Type } from "typebox";
 import { createHash } from "node:crypto";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -28,7 +29,7 @@ const definitions = [
 ] as const;
 
 export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
-	return definitions.map(([name, description, properties]) => ({
+	return [createHealthCheckTool(ctx), ...definitions.map(([name, description, properties]) => ({
 		name, label: name, description,
 		parameters: Type.Object({ target: str(), ...properties }, { additionalProperties: false }),
 		async execute(_id: string, p: any, signal?: AbortSignal) {
@@ -186,7 +187,7 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 				throw error;
 			}
 		},
-	}));
+	}))];
 }
 
 // Oracle DATE/plain TIMESTAMP are fetched as client-local Dates. Local getters

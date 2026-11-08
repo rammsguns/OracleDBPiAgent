@@ -90,9 +90,25 @@ export function renderTop(content, r) {
 		if (key === 'host') { node.append(el('p', `Host CPU busy: ${s.cpuPercent == null ? 'Unknown' : s.cpuPercent.toFixed(2) + '%'}`)); table(node, s.gauges, 'Host gauges'); }
 	}
 }
+export function renderCheck(content, r) {
+	const checks = r.targets.flatMap(t => t.checks);
+	const counts = ['CRIT', 'WARN', 'UNKNOWN', 'OK'].map(s => `${checks.filter(c => c.status === s).length} ${s}`).join(', ');
+	content.append(el('h3', `Check: ${r.status} · ${counts} (${r.targets.map(t => t.target).join(', ')})`), el('p', `Captured ${r.capturedAt} · Point-in-time and windowed probes.`));
+	const box = el('div', undefined, 'table-scroll'), grid = el('table'), head = el('thead'), row = el('tr');
+	box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Health checks');
+	for (const name of ['Target', 'Check', 'Status', 'Value', 'Threshold WARN/CRIT', 'Scope', 'Drill down', 'Note']) { const th = el('th', name); th.scope = 'col'; row.append(th); }
+	head.append(row); grid.append(head); const body = el('tbody');
+	for (const t of r.targets) for (const c of t.checks) {
+		const tr = el('tr');
+		for (const value of [t.target, c.id, c.status, c.display, c.threshold ? `${c.threshold.warn} / ${c.threshold.crit ?? 'incident only'}` : '> 0 = CRIT', c.scope, c.command, c.note]) tr.append(el('td', value));
+		tr.children[2].className = 'check-status check-' + (['OK', 'WARN', 'CRIT', 'UNKNOWN', 'SKIPPED'].includes(c.status) ? c.status.toLowerCase() : 'unknown'); body.append(tr);
+	}
+	grid.append(body); box.append(grid, el('p', 'Scroll horizontally to see all columns.', 'operations-hint')); content.append(box);
+}
 export function initOperations(api, targets) {
-	for (const [id, render] of [['backup', renderBackup], ['jobs', renderJobs], ['top', renderTop]]) {
-		const view = setupPanel(id, id === 'top' ? 'Sample' : 'Refresh ' + id, targets); view.form.className = 'operations-toolbar';
+	for (const [id, render] of [['check', renderCheck], ['backup', renderBackup], ['jobs', renderJobs], ['top', renderTop]]) {
+		const view = setupPanel(id, id === 'top' ? 'Sample' : 'Refresh ' + id, targets, id === 'check'); view.form.className = 'operations-toolbar';
+		if (id === 'check') { const all = el('option', 'All targets'); all.value = '__all_targets__'; view.target.append(all); }
 		let seconds;
 		if (id === 'top') { seconds = view.field('input', 'seconds', 'Sample seconds (5–120)'); seconds.type = 'number'; seconds.min = '5'; seconds.max = '120'; seconds.step = '1'; seconds.value = '15'; seconds.required = true; view.form.append(view.run); }
 		const cancel = el('button', 'Cancel'); cancel.id = id + '-cancel'; cancel.type = 'button'; cancel.disabled = true; view.form.append(cancel);

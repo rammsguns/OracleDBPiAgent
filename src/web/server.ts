@@ -1,3 +1,4 @@
+import { checkedHealth } from '../tools/healthCheck.js';
 import type { SessionProvider } from '../contracts.js';
 import { connectionGuidance, withConnectionFailures } from '../oracle/connectionErrors.js';
 import { readWebOperations, validateWebOperations } from './operations.js';
@@ -27,6 +28,7 @@ import { createSessions } from "../agent/dbToolsAdapter.js";
 import { JsonlAuditSink } from "../audit/index.js";
 
 export interface WebServerOptions extends SessionOptions {
+	runChecks?: typeof import('../check/index.js').runChecks;
 	readSpaceUsage?: typeof import('../space/index.js').readSpaceUsage;
 	readSessionActivity?: typeof import('../sessions/index.js').readSessionActivity;
 	readSecurityPosture?: typeof import('../security/index.js').readSecurityPosture;
@@ -100,16 +102,17 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
 			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
-			if (['/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
+			if (['/api/check', '/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';
 				if (req.method !== (isTriage ? 'POST' : 'GET')) throw new WebError(405, 'Method not allowed');
 				const data: Record<string, unknown> = isTriage ? await body(req, 400 * 1024) : Object.fromEntries(new URL(req.url!, 'http://localhost').searchParams);
 				const target = data.target ?? manager.config.defaultTarget;
-				if (typeof target !== 'string' || !['d1-19c-lab', 'p1-19c-prod'].includes(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, 'Invalid target');
+				const allChecks = raw === '/api/check' && target === '__all_targets__';
+				if (typeof target !== 'string' || (!allChecks && ((raw !== '/api/check' && !['d1-19c-lab', 'p1-19c-prod'].includes(target)) || !manager.config.targets.some(t => t.name === target)))) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
-					if (['/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
+					if (['/api/check', '/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
 						validateWebOperations(raw, data);
 					} else if (raw === '/api/space') {
 						validateWebSpace(data);
@@ -138,12 +141,15 @@ export function createWebServer(options: WebServerOptions = {}) {
 				try {
 					sessions = await (options.sessionFactory ?? createSessions)(manager.config);
 					const ctx = { config: manager.config, sessions, audit: new JsonlAuditSink(manager.config.auditFile), runId: randomUUID(), pinnedTarget: target };
-					if (['/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
+					if (['/api/check', '/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
 						const abort = new AbortController();
 						const cancel = () => { if (!res.writableEnded) abort.abort(); };
 						res.on('close', cancel);
 						try {
-							const output = await readWebOperations(ctx, target, raw, data, abort.signal);
+							const checkTargets = allChecks ? manager.config.targets.map(t => t.name) : [target];
+							const output = raw === '/api/check'
+								? { result: await checkedHealth({ ...ctx, pinnedTarget: allChecks ? undefined : target }, checkTargets, abort.signal, options.runChecks) }
+								: await readWebOperations(ctx, target, raw, data, abort.signal);
 							if (Buffer.byteLength(JSON.stringify(output)) > 1024 * 1024) throw new WebError(413, 'Insight output exceeds 1 MiB');
 							const finished = sessions; sessions = undefined; await finished.closeAll();
 							if (!abort.signal.aborted) return json(res, 200, output);

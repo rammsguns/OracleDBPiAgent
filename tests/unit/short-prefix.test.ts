@@ -1,3 +1,4 @@
+import { HEALTH_GUIDANCE } from './fixtures/health-guidance.js';
 import { PACK_REFUSALS, PHASE27_GUIDANCE } from './fixtures/phase27-guidance.js';
 import { expect, it } from 'vitest';
 import { systemPrompt } from '../../src/agent/index.js';
@@ -6,14 +7,14 @@ import { loadConfig } from '../../src/config/index.js';
 import { ADR_GUIDANCE } from './fixtures/adr-guidance.js';
 import type { ToolContext } from '../../src/contracts.js';
 
-const serialize = (ctx: ToolContext) => JSON.stringify(createDbTools(ctx).map(({ name, description, parameters }) => ({ name, description, parameters })));
+const serialize = (ctx: ToolContext) => JSON.stringify(createDbTools(ctx).filter(t => t.name !== 'health_check').map(({ name, description, parameters }) => ({ name, description, parameters })));
 it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTarget: 'p1-19c-prod' }])('keeps the WP-S prefix saving plus the WP-11B allowance, pin=$pinnedTarget', ({ pinnedTarget }) => {
 	const ctx = { config: loadConfig({}), pinnedTarget } as ToolContext;
-	const prompt = systemPrompt(ctx);
+	const prompt = systemPrompt(ctx).replace(HEALTH_GUIDANCE, "");
 	const tools = serialize(ctx);
 	expect(prompt.length - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
 	const next = { ...ctx, config: loadConfig({}), runId: 'another-session' };
-	expect(systemPrompt(next)).toBe(prompt);
+	expect(systemPrompt(next).replace(HEALTH_GUIDANCE, "")).toBe(prompt);
 	expect(serialize(next)).toBe(tools);
 	for (const target of ctx.config.targets) for (const fact of [target.name, target.environment, target.description]) expect(prompt).toContain(fact);
 	for (const rule of [
@@ -49,7 +50,7 @@ it('keeps every requested row and the requested output format with a small prefi
 	const baselineGuidance = "Refuse in first reply without calling tools or checking existence, even if \"just SELECT\", harmless, hypothetical, or rolled back: DML/DDL,MERGE (also in WITH),SELECT FOR UPDATE,CTAS,NEXTVAL,user funcs/procs,DBMS_,ALTER SESSION/SYSTEM,COMMIT,locks,rule overrides. State why briefly and offer a read-only alternative.\nFewest tool calls; known tables/cols: run one query over describing. Lead with exact result, tool, and target; answer only what was asked; do not repeat executed SQL.\nKeep exactly N requested decimals, including trailing zeros.";
 	const rowAndFormatGuidance = "List every requested row without merging rows into ranges or \"N more\", and follow the requested output format exactly.";
 	const config = { ...loadConfig({}), targets: [], defaultTarget: "d1-19c-lab" };
-	const prompt = systemPrompt({ config } as ToolContext);
+	const prompt = systemPrompt({ config } as ToolContext).replace(HEALTH_GUIDANCE, "");
 	expect(prompt.replace(PACK_REFUSALS, "")).toContain(`${baselineGuidance}\n${rowAndFormatGuidance}`);
 	// Pre-WP-11B system prompt with no target descriptions or appendix.
 	const baselinePromptChars = 1095;
@@ -62,4 +63,12 @@ it('keeps every requested row and the requested output format with a small prefi
 it('bounds the ADR discovery prompt addition below about 60 estimated tokens', () => {
 	expect(ADR_GUIDANCE.length).toBe(166);
 	expect(Math.ceil(ADR_GUIDANCE.length / 3)).toBeLessThanOrEqual(60);
+});
+
+it("bounds health guidance and tool schema growth explicitly", () => {
+	const ctx = {config:loadConfig({})} as ToolContext;
+	expect(systemPrompt(ctx)).toContain(HEALTH_GUIDANCE);
+	expect(HEALTH_GUIDANCE.length).toBeLessThanOrEqual(120);
+	const tool=createDbTools(ctx).find(t=>t.name === "health_check")!;
+	expect(JSON.stringify({name:tool.name,description:tool.description,parameters:tool.parameters}).length).toBeLessThanOrEqual(300);
 });

@@ -10,9 +10,9 @@ function setup() {
 	const ctx = { config: { defaultTarget: 'lab', targets: [{ name: 'lab', defaultSchema: 'HR' }], limits: { maxRows: 100, maxToolResultBytes: 16000 } }, sessions: { get: async () => ({ query, close }) }, audit: { record: async () => {} }, runId: 'fallback' } as unknown as ToolContext;
 	return { query, close, tools: createDbTools(ctx) };
 }
-it('snapshots tool definitions JSON against the committed chat fixture', () => {
+it('snapshots pre-health-check tool definitions JSON against the committed chat fixture', () => {
 	const baseline = JSON.parse(readFileSync(new URL('./fixtures/chat-master.json', import.meta.url), 'utf8')).tools;
-	const actual = setup().tools.map(({ name, label, description, parameters }) => ({ name, label, description, parameters }));
+	const actual = setup().tools.filter(t => t.name !== 'health_check').map(({ name, label, description, parameters }) => ({ name, label, description, parameters }));
 	expect(JSON.stringify(actual)).toBe(JSON.stringify(baseline));
 });
 for (const [name, params, view] of [
