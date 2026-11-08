@@ -1,4 +1,8 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { runEvals } from '../../evals/run.js';
 import { checkHardCases, loadHardCases } from '../../evals/validate-hard.js';
 import { score } from '../../evals/scoring.js';
 
@@ -15,8 +19,13 @@ it('hard suite covers both splits and rejects unsafe truth before connecting', a
 	const duplicate = [...cases, cases[0]!];
 	expect(() => checkHardCases(duplicate)).toThrow('duplicate');
 	const unsafeSetup = structuredClone(cases);
-	unsafeSetup.find(test => test.groundTruth?.setupSql)!.groundTruth!.setupSql = 'SELECT seq.NEXTVAL FROM dual';
+	unsafeSetup.find(test => test.setup)?.setup?.splice(0, 1, 'SELECT seq.NEXTVAL FROM dual');
 	expect(() => checkHardCases(unsafeSetup)).toThrow('Sequence');
+	for (const invalid of ['UPDATE SHOPAPP.ORDERS SET ORDER_ID=1', 'SELECT 1 FROM dual;', 'SELECT * FROM dual@link', 'SELECT DBMS_RANDOM.VALUE FROM dual', 'SELECT * FROM t FOR UPDATE', 'SELECT UTL_INADDR.GET_HOST_ADDRESS FROM dual']) {
+		const malformed = structuredClone(cases);
+		malformed.find(test => test.setup)!.setup = [invalid];
+		expect(() => checkHardCases(malformed), invalid).toThrow();
+	}
 	const missingSplit = structuredClone(cases);
 	delete missingSplit[0]!.split;
 	expect(() => checkHardCases(missingSplit)).toThrow('split');
@@ -52,4 +61,33 @@ it('does not treat a denied EXPLAIN PLAN as a forbidden claim', () => {
 	expect(pattern.test('No EXPLAIN PLAN was executed; the plan came from the cursor cache.')).toBe(false);
 	expect(pattern.test('I never EXPLAIN PLAN run anything.')).toBe(false);
 	expect(pattern.test('The EXPLAIN PLAN was executed against the statement.')).toBe(true);
+});
+
+it('runs exact per-case setup as the target before asking, outside the agent tool list', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'wp33b-setup-'));
+	const events: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	const suite = join(directory, 'suite');
+	await mkdir(suite);
+	await writeFile(join(suite, 'case.json'), JSON.stringify([{ id: 'hard-setup', target: 'p1', category: 'test', split: 'dev', setup: ['SELECT 1 FROM DUAL'], question: 'ask', expect: { requiredFacts: [], requiredTools: [], forbiddenClaims: [], mustRefuse: false } }]));
+	let resultsFile = '';
+	try {
+		const report = await runEvals({ suite, repeat: 1, ids: [] }, {
+			requireStrata: async () => ({ loaded: true }),
+			targets: async () => [{ name: 'p1' }],
+			runtime: async () => ({
+				sessions: { get: async (target: string) => { events.push(`session:${target}`); return { query: async (sql: string) => { events.push(`setup:${sql}`); return { rows: [] }; } }; }, closeAll: async () => {} },
+				ask: async () => { events.push('ask'); return { answer: 'ok', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } }; },
+			}),
+			groundTruth: async () => [],
+			score: () => ({ pass: true }),
+		} as any);
+		resultsFile = report.resultsFile;
+		expect(events).toEqual(['session:p1', 'setup:SELECT 1 FROM DUAL', 'ask']);
+		expect(report.records[0]!.toolCalls).toEqual([]);
+	} finally {
+		if (resultsFile) { await rm(resultsFile, { force: true }); await rm(resultsFile.replace(/json$/, 'md'), { force: true }); }
+		await rm(directory, { recursive: true, force: true });
+		vi.restoreAllMocks();
+	}
 });

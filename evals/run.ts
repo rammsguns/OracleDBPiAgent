@@ -111,6 +111,10 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 					const empty = { answer: '', toolCalls: [], toolDetails: [], toolResultTexts: [], groundingCorrections: 0, unverified: [], requests: [], usage: { input: 0, output: 0, cached: 0 } };
 					const beforeSkip = test.skipWhenTruthEmpty && test.groundTruth && truth.length === 0;
 					// Await each complete ask before starting another: Strata has one request slot.
+					if (!beforeSkip && test.setup?.length) {
+						const session = await app.sessions.get(test.target);
+						for (const statement of test.setup) await session.query(statement, {}, { maxRows: 1 });
+					}
 					const result = beforeSkip ? empty : await app.ask(test.turns ?? test.question, test.target, test.limits);
 					const truthAfter = !beforeSkip && test.groundTruth ? await dependencies.groundTruth(target, test.groundTruth.sql, test.groundTruth.setupSql) : undefined;
 					const afterSkip = test.skipWhenTruthEmpty && truthAfter?.length === 0;
