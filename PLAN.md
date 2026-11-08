@@ -4474,7 +4474,7 @@ values in the diff and history.
   1.5.0 and moves to phase 30 polish.
 - The WP-2527N detector Minors remain hypothetical (see Phases 25–27).
 
-## Phase 30: `piagent check`, threshold health check for monitoring (approved 2026-11-07: "continue with next phases")
+## Phase 30: `piagent check`, threshold health check for monitoring (approved 2026-11-07: "continue with next phases"; release: "continue and push v1.6.0 when the gate passes")
 
 ### Goal
 `piagent check --target T [--json] [--all-targets]` gives one fast,
