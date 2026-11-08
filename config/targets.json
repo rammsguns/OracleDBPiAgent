@@ -33,6 +33,17 @@
       "passwordFile": "c1_piagent_ro.pw",
       "defaultSchema": "SHOPAPP",
       "environment": "production-like"
+    },
+    {
+      "name": "c1s-19c-stby",
+      "description": "Physical standby CDB19S, Active Data Guard PIPDB1 lab.",
+      "host": "localhost",
+      "port": 1525,
+      "serviceName": "PIPDB1",
+      "username": "PIAGENT_RO",
+      "passwordFile": "c1_piagent_ro.pw",
+      "defaultSchema": "SHOPAPP",
+      "environment": "production-like"
     }
   ]
 }

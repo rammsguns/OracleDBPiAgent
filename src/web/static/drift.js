@@ -1,4 +1,4 @@
-const approved = new Set(['d1-19c-lab', 'p1-19c-prod', 'c1-19c-pdb']);
+const approved = new Set(['d1-19c-lab', 'p1-19c-prod', 'c1-19c-pdb', 'c1s-19c-stby']);
 function node(tag, text) {
 	const element = document.createElement(tag);
 	if (text !== undefined) element.textContent = text;

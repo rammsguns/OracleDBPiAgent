@@ -26,7 +26,7 @@ it.each([
 	expect(child.error).toBeUndefined();
 	expect(child.status, child.stderr).toBe(2);
 	expect(child.stdout).toBe('');
-	expect(child.stderr.trim()).toBe((args[0] === 'check' ? 'Usage/config error: ' : '') + 'Unknown target missing; configured targets: d1-19c-lab, p1-19c-prod, c1-19c-pdb (see piagent targets)');
+	expect(child.stderr.trim()).toBe((args[0] === 'check' ? 'Usage/config error: ' : '') + 'Unknown target missing; configured targets: d1-19c-lab, p1-19c-prod, c1-19c-pdb, c1s-19c-stby (see piagent targets)');
 });
 
 it('shared usage guidance preserves safe names and omits unsafe input', async () => {
