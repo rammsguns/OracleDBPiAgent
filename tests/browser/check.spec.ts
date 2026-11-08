@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 test.afterEach(async ({page, request}) => { await page.close(); await request.get(process.env.PIAGENT_BROWSER_CONTROL! + '/expire'); });
 const hostile = '<img src=x onerror=alert(1)>';
-const result = { version:1,capturedAt:'2026-11-07',status:'CRIT',targets:[{target:'d1-19c-lab',status:'CRIT',checks:['OK','WARN','CRIT','UNKNOWN','SKIPPED'].map(status => ({id:hostile,status,display:status==='SKIPPED'?'SKIPPED':'95%',threshold:{warn:85,crit:95},scope:'Physical standby CDB19S (read only with apply); This PDB (PIPDB1)',command:'piagent space --target d1-19c-lab',note:hostile}))}] };
+const result = { version:1,capturedAt:'2026-11-07',status:'CRIT',targets:[{target:'d1-19c-lab',status:'CRIT',checks:['OK','WARN','CRIT','UNKNOWN','SKIPPED'].map(status => ({id:status==='OK'?'dgLag':hostile,status,display:status==='SKIPPED'?'SKIPPED':status==='OK'?'not applicable (primary)':'95%',value:status==='OK'?null:95,threshold:{warn:85,crit:95},scope:status==='OK'?'Primary CDB19':'Physical standby CDB19S (read only with apply); This PDB (PIPDB1)',command:'piagent space --target d1-19c-lab',note:status==='OK'?'Not applicable (primary); standby transport/apply lag is not measured here.':hostile}))}] };
 for (const width of [390,1280]) for (const colorScheme of ['light','dark'] as const) test(`Check manual safe table ${width} ${colorScheme}`, async ({page}) => {
 	await page.emulateMedia({colorScheme}); await page.setViewportSize({width,height:900}); let calls=0, selected='';
 	await page.route('**/api/check?*', r => { calls++; selected=new URL(r.request().url()).searchParams.get('target')!; return r.fulfill({json:{result}}); });
@@ -9,7 +9,7 @@ for (const width of [390,1280]) for (const colorScheme of ['light','dark'] as co
 	await page.locator('#check-target').selectOption('__all_targets__'); await page.locator('#check-run').click();
 	await expect(page.locator('#check-status')).toContainText('Loaded'); expect(calls).toBe(1); expect(selected).toBe('__all_targets__');
 	const content=page.locator('#check-content'); await expect(content.locator('th')).toHaveText(['Target','Check','Status','Value','Threshold WARN/CRIT','Scope','Drill down','Note']);
-	await expect(content).toContainText('1 CRIT, 1 WARN, 1 UNKNOWN, 1 OK'); await expect(content).toContainText('Physical standby CDB19S (read only with apply)'); await expect(content).toContainText('SKIPPED'); await expect(content).toContainText(hostile); await expect(content.locator('img')).toHaveCount(0);
+	await expect(content).toContainText('1 CRIT, 1 WARN, 1 UNKNOWN, 1 OK'); await expect(content).toContainText('Physical standby CDB19S (read only with apply)'); await expect(content).toContainText('not applicable (primary)'); await expect(content).toContainText('SKIPPED'); await expect(content).toContainText(hostile); await expect(content.locator('img')).toHaveCount(0);
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	const contrast = await content.locator('.check-status').evaluateAll(cells => {
 		const luminance = (color:string) => {

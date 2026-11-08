@@ -41,6 +41,13 @@ it('suppresses OK rows, preserves skipped and UNKNOWN policy notes, redacts cred
 	const run: CheckRun = {version:1, capturedAt:'now', status:'UNKNOWN', targets:[{target:'lab',status:'UNKNOWN',checks:[{...base,id:'ok-row',status:'OK'},{...base,id:'missing',status:'UNKNOWN'},{...base,id:'disabled',status:'SKIPPED'},{...base,id:'mapped',status:'OK',observedStatus:'UNKNOWN',note:'Policy unknownAs=ok maps UNKNOWN to OK.'}]}]};
 	const text = healthText(run); expect(text).not.toContain('ok-row'); expect(text).toContain('SKIPPED'); expect(text).not.toContain('hidden'); expect(text).toContain('2 OK'); expect(text).toContain('mapped: OK UNKNOWN'); expect(text).toContain('Policy unknownAs=ok');
 });
+it('includes the primary dgLag not-applicable label while keeping it OK', () => {
+	const run: CheckRun = {version:1,capturedAt:'now',status:'OK',targets:[{target:'primary',status:'OK',checks:[{
+		id:'dgLag',status:'OK',value:null,display:'not applicable (primary)',unit:'seconds',threshold:{warn:300,crit:1800},
+		scope:'Primary CDB19',command:'piagent backup --target primary',note:'Not applicable (primary); standby transport/apply lag is not measured here.',
+	}]}]};
+	const text=healthText(run);expect(text).toContain('dgLag: OK not applicable (primary)');expect(text).toContain('Not applicable (primary)');
+});
 it('caps UTF-8 output and does not put uncapped rows in details', async () => {
 	const ctx = context(); ctx.config.limits.maxToolResultBytes = 400;
 	const result = await createHealthCheckTool(ctx).execute('id', {});

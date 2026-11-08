@@ -145,7 +145,9 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 		});
 		await probe(['dgLag'], 'backup', async s => {
 			const lag = await readDgLag(s);
-			add('dgLag', lag.value, t.dgLag, 'seconds', 'backup', lag.value !== null, lag.note, true);
+			const notApplicable = lag.note.startsWith('Not applicable (primary)');
+			add('dgLag', lag.value, t.dgLag, 'seconds', 'backup', lag.value !== null || notApplicable, lag.note, true, false,
+				notApplicable ? {status:'OK',display:'not applicable (primary)'} : undefined);
 		});
 		await probe(['backupAge','archiveGaps'], 'backup', async s => {
 			const r = await readers.backup(s, now), e = r.evidence;

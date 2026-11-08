@@ -99,7 +99,7 @@ export function healthText(run: CheckRun): string {
 	// Avoid rendering the fixed password-check label as a credential assignment.
 	const label = (id: string) => id === 'defaultPasswords' ? id : `${id}:`;
 	const line = (s: string) => s.replace(/[\r\n\t]+/g, ' ');
-	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.map(t => `${t.target} role/scope: ${t.checks.find(c => c.status !== 'SKIPPED')?.scope ?? 'unknown'}`), ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN').map(c => line(`${t.target} ${label(c.id)} ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
+	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.map(t => `${t.target} role/scope: ${t.checks.find(c => c.status !== 'SKIPPED')?.scope ?? 'unknown'}`), ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN' || c.id === 'dgLag' && c.display.startsWith('not applicable')).map(c => line(`${t.target} ${label(c.id)} ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
 }
 /** Keep complete check lines where possible and bound the entire serialized result. */
 export function boundedHealthResult(run: CheckRun, cap: number) {

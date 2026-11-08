@@ -15,7 +15,11 @@ it('C1S standby scope, received archive continuity and honest lag/backup evidenc
 		expect(checks.find(c=>c.id==='backupAge')).toMatchObject({status:'UNKNOWN',note:expect.stringContaining('normally taken on the primary')});
 		const lag=await readDgLag(s);
 		// Oracle 19.9 exposes NULL apply lag inside this PDB even while root reports 0.
-		expect(checks.find(c=>c.id==='dgLag')!.status).toBe(lag.value===null?'UNKNOWN':'OK');
+		expect(checks.find(c=>c.id==='dgLag')).toMatchObject({status:'OK',value:expect.any(Number),note:expect.stringContaining('PDB hides apply lag')});
 		for(const target of ['c1-19c-pdb','d1-19c-lab','p1-19c-prod'])expect((await readDatabaseRole(await sessions.get(target))).role).toBe('PRIMARY');
+		for(const target of ['c1-19c-pdb','d1-19c-lab','p1-19c-prod']) {
+			const primaryCheck=(await runChecks({config,sessions,audit:{record:async()=>{}},runId:'primary-lag'},[target])).targets[0]!.checks.find(c=>c.id==='dgLag')!;
+			expect(primaryCheck).toMatchObject({status:'OK',value:null,display:'not applicable (primary)'});
+		}
 	} finally {await sessions.closeAll();}
 },120000);
