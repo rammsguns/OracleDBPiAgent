@@ -83,21 +83,26 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 						try {
 							connection.callTimeout = timeout * 1000;
 							await connection.execute("SET TRANSACTION READ ONLY");
-							// Thin driver 26 can locally stringify an already decoded Date even for STRING.
-							// TO_CHAR must therefore run on Oracle, before any date fields reach V8.
-							const info = await connection.getStatementInfo(statement);
-							const metadata = info.metaData ?? [];
-							const wallColumns = metadata.map((c: any) => [oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(c.dbType));
-							let wallQueryName = 'PIAGENT_WALL_QUERY';
-							while (statement.toUpperCase().includes(wallQueryName)) wallQueryName += '_';
-							const aliases = metadata.map((_: any, i: number) => 'PIAGENT_COL_' + i);
-							const wallStatement = wallColumns.some(Boolean)
-								? `${wallQueryPrefix(statement, aliases, wallQueryName)} SELECT ${metadata.map((c: any, i: number) =>
-									(wallColumns[i] ? `TO_CHAR(${aliases[i]}, 'YYYY-MM-DD"T"HH24:MI:SS${c.dbType === oracledb.DB_TYPE_TIMESTAMP ? '.FF9' : ''}')` : aliases[i]) +
-									' AS "' + c.name.replace(/"/g, '""') + '"').join(',')} FROM ${wallQueryName}`
-								: statement;
-							const result = await connection.execute(wallStatement, binds, { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler });
+							// Read execute metadata without fetching values: STRING alone still passes
+							// dates through a host-local Date in this thin driver. Only wall-clock
+							// queries need a second execute with server-side TO_CHAR projections.
+							const executeOptions = { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, prefetchRows: 0, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler };
+							let result = await connection.execute(statement, binds, executeOptions);
 							resultSet = result.resultSet;
+							const metadata = result.metaData;
+							const wallColumns = metadata.map((c: any) => [oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(c.dbType));
+							if (wallColumns.some(Boolean)) {
+								await resultSet.close(); resultSet = undefined;
+								let wallQueryName = 'PIAGENT_WALL_QUERY';
+								while (statement.toUpperCase().includes(wallQueryName)) wallQueryName += '_';
+								const aliases = metadata.map((_: any, i: number) => 'PIAGENT_COL_' + i);
+								const wallStatement = `${wallQueryPrefix(statement, aliases, wallQueryName)} SELECT ${metadata.map((c: any, i: number) =>
+									(wallColumns[i] ? `TO_CHAR(${aliases[i]}, 'YYYY-MM-DD"T"HH24:MI:SS${c.dbType === oracledb.DB_TYPE_TIMESTAMP ? '.FF9' : ''}')` : aliases[i]) +
+									' AS "' + c.name.replace(/"/g, '""') + '"').join(',')} FROM ${wallQueryName}`;
+								// Formatted wall columns are VARCHAR now, so normal prefetch is safe.
+								result = await connection.execute(wallStatement, binds, { ...executeOptions, prefetchRows: 2 });
+								resultSet = result.resultSet;
+							}
 							const fetched = await resultSet.getRows(maxRows + 1);
 							const rows: unknown[][] = [];
 							for (const row of fetched) { const values = []; for (const [i, value] of row.entries()) values.push(wallColumns[i] ? oracleWallTime(value as string | null, databaseOffset) : await previewValue(value)); rows.push(values); }

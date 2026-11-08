@@ -8,7 +8,7 @@ const config = {defaultTarget:'d1-19c-lab', secretDir:'/secrets',targets:[{name:
 beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mocks.read.mockResolvedValue('test-only');});
 function connection(version='19.9.1.0.0') {
 	const rs = {getRows:vi.fn().mockResolvedValue([[1],[2],[3]]),close:vi.fn()};
-	const c = {callTimeout:0,getStatementInfo:vi.fn().mockResolvedValue({metaData:[]}),execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
+	const c = {callTimeout:0,getStatementInfo:vi.fn().mockRejectedValue(new Error('Unexpected metadata describe')),execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
 	c.execute.mockResolvedValueOnce({rows:[[version]]}).mockResolvedValueOnce({rows:[['HARNESS_LAB','FALSE',null,'0','ORCL']]}).mockResolvedValueOnce({rows:[['CREATE SESSION']]}).mockResolvedValueOnce({rows:[]}).mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockResolvedValueOnce({rows:[['ORCL','orcl','host','NO','HARNESS_LAB','HR','ORCL','+00:00']]});
 	mocks.connect.mockResolvedValue(c); return {c,rs};
 }
@@ -135,9 +135,10 @@ it('fetches spring-forward gap wall time as text before constructing an instant'
 
 it('formats date columns on Oracle and preserves metadata, duplicate names, CTEs, nulls and numeric values',async()=>{
 	const {c,rs}=connection(),p=createSessionProvider(config),s=await p.get();
-	c.getStatementInfo.mockResolvedValue({metaData:[{name:'D',dbType:'DATE',dbTypeName:'DATE'},{name:'D',dbType:'TIMESTAMP',dbTypeName:'TIMESTAMP'},{name:'N',dbType:'NUMBER',dbTypeName:'NUMBER'}]});
+	const metadata=[{name:'D',dbType:'DATE',dbTypeName:'DATE'},{name:'D',dbType:'TIMESTAMP',dbTypeName:'TIMESTAMP'},{name:'N',dbType:'NUMBER',dbTypeName:'NUMBER'}];
+	const raw={getRows:vi.fn().mockRejectedValue(new Error('Raw dates must never be fetched')),close:vi.fn()};
 	rs.getRows.mockResolvedValue([['2026-03-08T02:30:00',null,42]]);
-	c.execute.mockResolvedValue({metaData:[{name:'D'},{name:'D'},{name:'N'}],resultSet:rs});
+	c.execute.mockResolvedValueOnce({} as any).mockResolvedValueOnce({metaData:metadata,resultSet:raw} as any).mockResolvedValueOnce({metaData:metadata,resultSet:rs});
 	const r=await s.query("WITH PIAGENT_WALL_QUERY AS (SELECT 'WITH SELECT' text FROM dual), t AS (SELECT 1 FROM dual) SELECT SYSDATE D, LOCALTIMESTAMP D, 42 N FROM t");
 	expect(r.columns).toEqual(['D','D','N']);
 	expect(r.columnTypes).toEqual(['DATE','TIMESTAMP','NUMBER']);
@@ -147,5 +148,22 @@ it('formats date columns on Oracle and preserves metadata, duplicate names, CTEs
 	expect(sql).toContain(`TO_CHAR(PIAGENT_COL_0, 'YYYY-MM-DD"T"HH24:MI:SS')`);
 	expect(sql).toContain(`TO_CHAR(PIAGENT_COL_1, 'YYYY-MM-DD"T"HH24:MI:SS.FF9')`);
 	expect(sql).toContain('PIAGENT_COL_2 AS "N"');
+	expect(c.getStatementInfo).not.toHaveBeenCalled();
+	expect(raw.getRows).not.toHaveBeenCalled();
+	expect(raw.close).toHaveBeenCalledOnce();
+	const reads=c.execute.mock.calls.filter(call=>(call[2] as any)?.resultSet);
+	expect(reads.map(call=>(call[2] as any).prefetchRows)).toEqual([0,2]);
+	await p.closeAll();
+});
+
+it('uses one execute per non-date query and never calls getStatementInfo',async()=>{
+	const {c}=connection(),p=createSessionProvider(config),s=await p.get();
+	const before=c.execute.mock.calls.length;
+	await s.query('SELECT 1 FROM dual');
+	await s.query('SELECT 2 FROM dual');
+	expect(c.getStatementInfo).not.toHaveBeenCalled();
+	const calls=c.execute.mock.calls.slice(before);
+	expect(calls.filter(call=>call[0]==='SET TRANSACTION READ ONLY')).toHaveLength(2);
+	expect(calls.filter(call=>(call[2] as any)?.resultSet)).toHaveLength(2);
 	await p.closeAll();
 });
