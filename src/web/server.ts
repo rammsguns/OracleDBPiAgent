@@ -73,6 +73,11 @@ function json(res: ServerResponse, status: number, data: unknown) {
 	res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
 	res.end(JSON.stringify(data));
 }
+function redactUsername(description: string, username: string): string {
+	const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	// Oracle identifiers can contain $ and # as well as regex word characters.
+	return description.replace(new RegExp(`(?<![\\w$#])${escaped}(?![\\w$#])`, 'gi'), 'read-only account');
+}
 export function createWebServer(options: WebServerOptions = {}) {
 	const manager = options.manager ?? new SessionManager({ ...options, triageRunner: options.triage ?? options.triageRunner });
 	const token = options.token ?? randomBytes(32).toString("hex");
@@ -101,7 +106,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (!hosts.includes(req.headers.host ?? "") || (req.headers.origin !== undefined && req.headers.origin !== `http://${req.headers.host}`)) throw new WebError(403, "Forbidden");
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
-			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: description.replaceAll(username, "read-only account") })));
+			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: redactUsername(description, username) })));
 			if (['/api/check', '/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';

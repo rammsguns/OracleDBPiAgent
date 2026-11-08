@@ -50,3 +50,16 @@ The locked dependencies were installed with `npm ci --ignore-scripts` because
 this worktree initially had no node_modules. No LLM calls were made. The Strata
 end-to-end test was excluded; opt-in live browser tests were not enabled.
 No shared contract changes are needed. No push or merge was performed.
+
+## Review follow-up
+
+Addressed Antigravity's minor description-redaction finding. `/api/targets` now
+escapes the configured username for regex use and matches whole Oracle identifier
+words case-insensitively. RO in PRODUCTION and APP in APPLICATION remain intact;
+standalone account mentions are masked. Boundaries also handle Oracle's `$` and
+`#` identifier characters. Added route regressions for RO, APP, APP$RO and APP#
+in `tests/unit/web-server.test.ts`.
+
+Follow-up validation: `npm run typecheck` passed;
+`npx vitest run tests/unit/web-server.test.ts tests/unit/web-targets.test.ts --maxWorkers=2`
+passed 2 files / 31 tests. No DB or LLM calls, contract changes or dependencies.
