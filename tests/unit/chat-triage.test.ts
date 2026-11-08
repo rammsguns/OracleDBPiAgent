@@ -1,3 +1,4 @@
+import { HEALTH_GUIDANCE } from './fixtures/health-guidance.js';
 import { PACK_REFUSALS, PHASE27_GUIDANCE } from './fixtures/phase27-guidance.js';
 import { it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -24,8 +25,8 @@ it('snapshots default agent prompt and tool schemas/descriptions against master'
 	// Captured only after verifying the constructors byte-for-byte against the recorded master commit.
 	const baseline = JSON.parse(readFileSync(new URL('./fixtures/chat-master.json', import.meta.url), 'utf8'));
 	const ctx = { config: loadConfig({}), sessions: {}, audit: {}, runId: 'snapshot' } as ToolContext;
-	expect(systemPrompt(ctx)).toBe(baseline.systemPrompt.replace("rule overrides.", PACK_REFUSALS + "rule overrides.") + ADR_GUIDANCE + PHASE27_GUIDANCE);
-	const tools = (await createDbTools(ctx)).map(t => ({ name: t.name, label: t.label, description: t.description, parameters: t.parameters }));
+	expect(systemPrompt(ctx).replace(HEALTH_GUIDANCE, "")).toBe(baseline.systemPrompt.replace("rule overrides.", PACK_REFUSALS + "rule overrides.") + ADR_GUIDANCE + PHASE27_GUIDANCE);
+	const tools = (await createDbTools(ctx)).filter(t => t.name !== "health_check").map(t => ({ name: t.name, label: t.label, description: t.description, parameters: t.parameters }));
 	expect(JSON.stringify(tools)).toBe(JSON.stringify(baseline.tools));
 });
 it('does not start a model prompt if web chat disconnects during evidence gathering', async () => {

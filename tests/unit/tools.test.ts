@@ -8,7 +8,7 @@ function setup() {
 	return {tools:createDbTools(ctx),get,query,close,record,ctx};
 }
 it('registers every MVP tool and lists targets without database access',async()=>{
-	const {tools,get,record}=setup();expect(tools).toHaveLength(12);expect(new Set(tools.map(t=>t.name)).size).toBe(12);
+	const {tools,get,record}=setup();expect(tools).toHaveLength(13);expect(new Set(tools.map(t=>t.name)).size).toBe(13);
 	const r=await tools.find(t=>t.name==='list_targets')!.execute('1',{});expect(r.content[0]).toMatchObject({type:'text'});expect(get).not.toHaveBeenCalled();expect(record).toHaveBeenCalledWith(expect.objectContaining({kind:'tool_call',tool:'list_targets'}));
 });
 it('binds object filters instead of interpolating them',async()=>{
