@@ -26,8 +26,8 @@ for (const target of targets) it(`dictionary permissions and hidden source throu
 		console.info(`${target.name} readable: ${readable.join(', ')}; unavailable: ${unavailable.join(', ') || 'none'}`);
 		expect(readable).toContain('DBA_SOURCE');
 		expect(readable).toContain('DBA_OBJECTS');
-		const prod = target.name === 'p1-19c-prod' || target.name === 'c1-19c-pdb';
-		const params = prod ? { schema: 'SHOPAPP', name: 'WORKLOAD', type: 'PACKAGE BODY', startLine: target.name === 'c1-19c-pdb' ? 1 : 24, lines: 6 } : { schema: 'HR', name: 'SECURE_EMPLOYEES', type: 'TRIGGER' };
+		const prod = target.defaultSchema === 'SHOPAPP';
+		const params = prod ? { schema: 'SHOPAPP', name: 'WORKLOAD', type: 'PACKAGE BODY', startLine: session.identity.isCdb ? 1 : 24, lines: 6 } : { schema: 'HR', name: 'SECURE_EMPLOYEES', type: 'TRIGGER' };
 		const hidden = await session.query('SELECT line FROM all_source WHERE owner=:owner AND name=:name AND type=:type', { owner: params.schema, name: params.name, type: params.type });
 		expect(hidden.rows).toEqual([]);
 		await session.close();
@@ -36,7 +36,7 @@ for (const target of targets) it(`dictionary permissions and hidden source throu
 		expect(result.details.view).toBe('DBA_SOURCE');
 		expect(result.details.rows.length).toBeGreaterThan(0);
 		if (prod) {
-			expect(result.details.rows.map((row: unknown[]) => row[1])).toEqual(target.name === 'c1-19c-pdb' ? [1,2,3,4,5,6] : [24, 25, 26, 27, 28, 29]);
+			expect(result.details.rows.map((row: unknown[]) => row[1])).toEqual(session.identity.isCdb ? [1,2,3,4,5,6] : [24, 25, 26, 27, 28, 29]);
 			if (target.name === 'p1-19c-prod') expect(result.details.rows.find((row: unknown[]) => row[1] === 27)?.[2]).toMatch(/DELETE/i);
 		} else expect(result.details.rows.map((row: unknown[]) => row[2]).join('')).toMatch(/secure_dml/i);
 		const listed = await tools.find(t => t.name === 'list_objects')!.execute('objects', { target: target.name, schema: params.schema, pattern: params.name, type: params.type });

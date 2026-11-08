@@ -10,7 +10,7 @@ test('drift pickers, literal object and column names, unavailable notes and phon
 	const dialogs: string[] = [];
 	page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.dismiss(); });
 	await page.goto(process.env.PIAGENT_BROWSER_URL!);
-	await expect(page.locator('#drift-left option')).toHaveCount(3);
+	await expect(page.locator('#drift-left option')).toHaveCount(4);
 	await page.locator('#drift-tab').click();
 	await page.locator('#drift-scope').selectOption('schema');
 	await page.locator('#drift-owner').fill('HR');

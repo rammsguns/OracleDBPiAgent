@@ -1,4 +1,5 @@
 import { withOracleAction } from '../oracle/observability.js';
+import { readDatabaseRole } from '../backup/role.js';
 import type { OracleSession } from '../contracts.js';
 import type { Check } from '../triage/read.js';
 import { SQL } from './sql.js';
@@ -22,7 +23,7 @@ export interface TablespaceRow { name:string; contents:string; bigfile:boolean; 
 export type SpaceRow=Record<string,string|number|boolean|null>;
 export interface SpaceFinding { id:string; severity:'high'|'medium'|'low'|'info'; subject:string; detail:string; advice:string }
 export interface SpaceSection<T> { status:'ok'|'unavailable'|'skipped'; rows:T[]; evidence:Check; supportingEvidence:Check[]; note?:string }
-export interface SpaceReport { status:'ok'|'partial'|'failed'; target:string; capturedAt:string; sections:{tablespaces:SpaceSection<TablespaceRow>;segments:SpaceSection<SpaceRow>;temp:SpaceSection<SpaceRow>;undo:SpaceSection<SpaceRow>;redo:SpaceSection<SpaceRow> & { logMode?:string };recovery:SpaceSection<SpaceRow>}; findings:SpaceFinding[] }
+export interface SpaceReport { status:'ok'|'partial'|'failed'; target:string; capturedAt:string; role?:string; sections:{tablespaces:SpaceSection<TablespaceRow>;segments:SpaceSection<SpaceRow>;temp:SpaceSection<SpaceRow>;undo:SpaceSection<SpaceRow>;redo:SpaceSection<SpaceRow> & { logMode?:string };recovery:SpaceSection<SpaceRow>}; findings:SpaceFinding[] }
 export function validateSpaceOptions(o:SpaceOptions) {
 	if(o.sections&&(!o.sections.length||o.sections.some(s=>!SECTION_IDS.includes(s as SectionId)))) throw new SpaceUsageError('section must be tablespaces, segments, temp, undo, redo or recovery');
 	if(o.top!==undefined&&(!Number.isInteger(o.top)||o.top<1||o.top>100)) throw new SpaceUsageError('top must be an integer from 1 to 100');
@@ -33,7 +34,8 @@ function check(label:string):Check { return {label,sql:'',binds:{},view:'',statu
 function section<T>(label:string):SpaceSection<T> { return {status:'skipped',rows:[],evidence:check(label),supportingEvidence:[]}; }
 async function readSpaceUsageImpl(session:OracleSession,options:SpaceOptions={}):Promise<SpaceReport> {
 	validateSpaceOptions(options);
-	const report:SpaceReport={status:'ok',target:session.target.name,capturedAt:new Date().toISOString(),sections:{tablespaces:section('tablespaces'),segments:section('segments'),temp:section('temp'),undo:section('undo'),redo:section('redo'),recovery:section('recovery')},findings:[]};
+	const role = await readDatabaseRole(session);
+	const report:SpaceReport={role:role.label,status:'ok',target:session.target.name,capturedAt:new Date().toISOString(),sections:{tablespaces:section('tablespaces'),segments:section('segments'),temp:section('temp'),undo:section('undo'),redo:section('redo'),recovery:section('recovery')},findings:[]};
 	async function read(id:SectionId,key:keyof typeof SQL,binds:Record<string,unknown>={},optional=false) {
 		const s=report.sections[id], c=check(key); c.sql=SQL[key]; c.binds=binds; c.view=[...c.sql.matchAll(/(?:FROM|JOIN)\s+([a-z][a-z0-9_$]*)/gi)].map(m=>m[1]).join(', ');
 		if(s.status==='skipped') {s.status='ok';s.evidence=c;} else s.supportingEvidence.push(c);
@@ -138,7 +140,7 @@ export function spaceFindings(r:SpaceReport):SpaceFinding[] {
 const escape=(v:unknown)=>String(v??'').replace(/[&<>|\r\n]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','|':'&#124;','\r':' ','\n':' '})[c]!);
 const bar=(n:number)=>'█'.repeat(Math.round(Math.min(100,Math.max(0,n))/10))+'░'.repeat(10-Math.round(Math.min(100,Math.max(0,n))/10))+' '+n.toFixed(1)+'%';
 export function renderSpaceMarkdown(r:SpaceReport):string {
-	const lines=['# Space — '+escape(r.target),'','Captured at '+r.capturedAt+' (UTC). Binary units (KiB, MiB, GiB, TiB).','Snapshot is a short sequence of queries, not one consistent read.','','## Findings',''];
+	const lines=['# Space — '+escape(r.target),'',r.role ?? 'Database role unknown','','Captured at '+r.capturedAt+' (UTC). Binary units (KiB, MiB, GiB, TiB).','Snapshot is a short sequence of queries, not one consistent read.','','## Findings',''];
 	for(const f of r.findings) lines.push('- **'+f.severity+': '+escape(f.subject)+'** — '+escape(f.detail)+' '+escape(f.advice));
 	if(!r.findings.length) lines.push('No findings.');
 	function table(rows:Record<string,unknown>[]) {

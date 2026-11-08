@@ -1,4 +1,5 @@
 import { withOracleAction } from '../oracle/observability.js';
+import { readDatabaseRole, readDgLag } from '../backup/role.js';
 import { SafeConfigError } from '../config/safeErrors.js';
 import { createHash } from 'node:crypto';
 import type { ToolContext, OracleSession } from '../contracts.js';
@@ -66,7 +67,7 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 		const checks: Verdict[] = [], t = settings(target);
 		let scope = 'Scope unknown (connection unavailable)';
 		let sessionPromise: Promise<OracleSession> | undefined;
-		const thresholdFor = (id: string) => ['tablespaces','temp','undo'].includes(id) ? t.space : id === 'recovery' ? t.recovery : ['blocking','backupAge','failedJobs','alertErrors','maintenance','expiry'].includes(id) ? t[id as 'blocking'|'backupAge'|'failedJobs'|'alertErrors'|'maintenance'|'expiry'] : null;
+		const thresholdFor = (id: string) => ['tablespaces','temp','undo'].includes(id) ? t.space : id === 'recovery' ? t.recovery : ['dgLag','blocking','backupAge','failedJobs','alertErrors','maintenance','expiry'].includes(id) ? t[id as 'dgLag'|'blocking'|'backupAge'|'failedJobs'|'alertErrors'|'maintenance'|'expiry'] : null;
 		const disabled = (id: string) => t.disable?.includes(checkName(id));
 		const add = (id: string, value: number | null, threshold: Verdict['threshold'], unit: string, command: string, valid = true, note = '', shared = false, descending = false, measurement?: { status?: Status; display?: string; lowerBound?: boolean }) => {
 			const known = valid && value !== null && Number.isFinite(value);
@@ -75,7 +76,7 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 			const status: CheckStatus = disabled(id) ? 'SKIPPED' : observed === 'UNKNOWN' ? policy.toUpperCase() as Status : observed;
 			const reason = known ? note : note || `${id}: collector returned a non-finite or absent ${unit || 'measurement'} value.`;
 			checks.push({ id, value: known && status !== 'SKIPPED' ? value : null, display: status === 'SKIPPED' ? 'SKIPPED' : measurement?.display ?? displayValue(known ? value : null,unit), threshold, unit,
-				scope: shared && scope.startsWith('This PDB') ? 'CDB-wide (shared by all PDBs)' : scope, command: `piagent ${command} --target ${target}`, status,
+				scope: shared && scope.includes('This PDB') ? scope.replace(/This PDB \([^)]*\)/, 'CDB-wide (shared by all PDBs)') : scope, command: `piagent ${command} --target ${target}`, status,
 				...(known && status !== 'SKIPPED' && measurement?.lowerBound ? {lowerBound: true} : {}),
 				...(observed === 'UNKNOWN' && status !== 'UNKNOWN' && status !== 'SKIPPED' ? {observedStatus: observed} : {}),
 				note: status === 'SKIPPED' ? 'Disabled by check.json; does not contribute to totals or overall status.' : reason + (observed === 'UNKNOWN' && policy !== 'unknown' ? ` Policy unknownAs=${policy} maps UNKNOWN to ${status}.` : '') });
@@ -105,6 +106,8 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 						failureReason = `${views || command}: ${code ?? (String(error).includes('CHECK_TIMEOUT') ? 'statement-timeout budget exhausted' : 'query failed')}.`;
 						await ctx.audit.record({ ...event, kind: 'tool_error', detail: /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED' }); throw error; }
 				} };
+				const role = await readDatabaseRole(session);
+				scope = role.label + '; ' + scope;
 				await fn(session, { ...ctx, sessions: { get: async () => session, closeAll: async () => {} } });
 			} catch (error) {
 				if (error instanceof SafeConfigError) throw error;
@@ -140,8 +143,13 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 			walk(section.rows);
 			add('blocking', Math.max(0,...waits), t.blocking, 'seconds', 'sessions', complete(section) && [section.evidence,...section.supportingEvidence].every(complete), evidenceReason(section));
 		});
+		await probe(['dgLag'], 'backup', async s => {
+			const lag = await readDgLag(s);
+			add('dgLag', lag.value, t.dgLag, 'seconds', 'backup', lag.value !== null, lag.note, true);
+		});
 		await probe(['backupAge','archiveGaps'], 'backup', async s => {
 			const r = await readers.backup(s, now), e = r.evidence;
+			const role = await readDatabaseRole(s);
 			const good = (ids: (keyof typeof e)[]) => ids.every(id => complete(e[id]));
 			const jobs = e.jobs.rows.filter(x => x.STATUS === 'COMPLETED' && ['DB FULL','DB INCR'].includes(String(x.INPUT_TYPE)));
 			// DB INCR jobs may be level 1: require level-0/full file coverage as well.
@@ -151,19 +159,25 @@ async function runChecksImpl(ctx: ToolContext, targets: readonly string[], setti
 			const gapEvidence = ['database','archives','history','datafiles','backups','sets','pieces'] as const;
 			const noHistory = !e.backups.rows.length && !e.jobs.rows.length && !e.sets.rows.length;
 			const historyReason = s.identity.isCdb && !e.backups.rows.length ? 'No backup rows visible in this PDB; PDB-hidden control-file metadata cannot establish absence.' : noHistory ? 'No backups recorded in the visible control-file history; external catalogs and aged-out records are not checked.' : 'No successful full/level-0 backup established for every visible datafile; external catalogs are not checked.';
-			add('backupAge', age, t.backupAge, 'hours', 'backup', good([...ageEvidence]) && (age === null || jobs.length > 0 || (s.identity.isCdb && e.jobs.rows.length === 0)) && !(s.identity.isCdb && !dates.length), evidenceReason(...ageEvidence.map(id => e[id])) || (age === null ? historyReason : !jobs.length ? 'PDB fallback: oldest latest visible per-datafile full/level-0 completion; RMAN job details are empty. Media not verified.' : 'Oldest latest full/level-0 completion across visible datafiles.'), true);
-			const gapReason = evidenceReason(e.database) || (e.database.rows[0]?.LOG_MODE === 'NOARCHIVELOG' ? 'NOARCHIVELOG: archived-log sequence-gap check is not applicable.' : evidenceReason(...gapEvidence.map(id => e[id])) || (!dates.length || !dates.every(Number.isFinite) ? historyReason + ' A full-backup checkpoint is required for gap analysis.' : s.identity.isCdb && !e.archives.rows.length ? 'No archived-log rows visible in this PDB; PDB-hidden metadata cannot establish absence of gaps.' : ''));
-			add('archiveGaps', r.gaps.length, null, 'gaps', 'backup', good([...gapEvidence]) && e.database.rows[0]?.LOG_MODE === 'ARCHIVELOG' && dates.length > 0 && dates.every(Number.isFinite) && (!s.identity.isCdb || e.archives.rows.length > 0), gapReason, true);
+			add('backupAge', role.standby || !role.role ? null : age, t.backupAge, 'hours', 'backup', good([...ageEvidence]) && (age === null || jobs.length > 0 || (s.identity.isCdb && e.jobs.rows.length === 0)) && !(s.identity.isCdb && !dates.length), (!role.role ? 'Database role unknown; local backup age cannot be established. ' : role.standby ? 'Standby control-file metadata may be copied from the primary or RMAN duplicate; no local full backup established. Backups are normally taken on the primary. ' : '') + evidenceReason(...ageEvidence.map(id => e[id])) || (age === null ? historyReason : !jobs.length ? 'PDB fallback: oldest latest visible per-datafile full/level-0 completion; RMAN job details are empty. Media not verified.' : 'Oldest latest full/level-0 completion across visible datafiles.'), true);
+			const gapReason = (!role.role ? 'Database role unknown; archive-gap semantics cannot be established.' : '') || evidenceReason(e.database) || (e.database.rows[0]?.LOG_MODE === 'NOARCHIVELOG' ? 'NOARCHIVELOG: archived-log sequence-gap check is not applicable.' : evidenceReason(...gapEvidence.map(id => e[id])) || (!dates.length || !dates.every(Number.isFinite) ? historyReason + ' A full-backup checkpoint is required for gap analysis.' : s.identity.isCdb && !e.archives.rows.length ? 'No archived-log rows visible in this PDB; PDB-hidden metadata cannot establish absence of gaps.' : ''));
+			const standbyGapNote = role.standby && r.gaps.length ? r.gaps.map(gap => {
+				const source = e.archiveGap.rows.some(row => Number(row['THREAD#']) === gap.thread && Number(row['LOW_SEQUENCE#']) <= gap.fromSequence && Number(row['HIGH_SEQUENCE#']) >= gap.toSequence) ? 'V$ARCHIVE_GAP' : 'RFS received-redo sequence continuity';
+				return `${source}: missing sequences ${gap.fromSequence}–${gap.toSequence} on thread ${gap.thread}.`;
+			}).join(' ') + (evidenceReason(e.archiveGap,e.archives) ? ' ' + evidenceReason(e.archiveGap,e.archives) : '') : '';
+			add('archiveGaps', r.gaps.length, null, 'gaps', 'backup', role.standby ? complete(e.archiveGap) && (r.gaps.length > 0 || complete(e.archives) && e.archives.rows.some(r => r.REGISTRAR === 'RFS')) : !!role.role && good([...gapEvidence]) && e.database.rows[0]?.LOG_MODE === 'ARCHIVELOG' && dates.length > 0 && dates.every(Number.isFinite) && (!s.identity.isCdb || e.archives.rows.length > 0), role.standby ? standbyGapNote || evidenceReason(e.archiveGap,e.archives) || (!e.archives.rows.some(r => r.REGISTRAR === 'RFS') ? 'No RFS received redo visible; standby sequence baseline cannot be established.' : 'V$ARCHIVE_GAP plus sequence continuity within RFS received redo only; duplicate history excluded.') : gapReason, true);
 		});
 		await probe(['failedJobs','maintenance'], 'jobs', async (_s,c) => {
+			const role = await readDatabaseRole(_s);
+			const replicated = role.standby ? 'Standby: scheduler history and object status are replicated from the primary; jobs do not run here. ' : '';
 			const r = await readers.jobs(c, target, { since: `${t.windowHours}h` }), e = r.sections;
-			add('failedJobs', e.runs!.rows.filter(x => x.STATUS === 'FAILED').length, t.failedJobs, 'runs', 'jobs', complete(e.runs!), evidenceReason(e.runs!));
+			add('failedJobs', e.runs!.rows.filter(x => x.STATUS === 'FAILED').length, t.failedJobs, 'runs', 'jobs', complete(e.runs!), replicated + evidenceReason(e.runs!));
 			const security = await readers.security(_s, { checks: ['accounts'] });
 			const users = security.checks[0]?.evidence.find(x => x.label === 'users');
 			const owners = new Set(users?.rows.filter(x => x[1] === 'N').map(x => String(x[0])));
 			const ids = ['invalidObjects','indexes','indexPartitions','indexSubpartitions'];
 			const count = ids.reduce((sum,id) => sum + e[id]!.rows.filter(x => owners.has(String(x.OWNER ?? x.INDEX_OWNER))).reduce((n,x) => n + (id === 'invalidObjects' ? Number(x.OBJECT_COUNT) : 1),0),0);
-			add('maintenance', count, t.maintenance, 'objects/index units', 'jobs', !!users && complete(users) && ids.every(id => complete(e[id]!)), evidenceReason(users,...ids.map(id => e[id])) || 'Index, partition and subpartition units counted separately.');
+			add('maintenance', count, t.maintenance, 'objects/index units', 'jobs', !!users && complete(users) && ids.every(id => complete(e[id]!)), replicated + (evidenceReason(users,...ids.map(id => e[id])) || 'Index, partition and subpartition units counted separately.'));
 		});
 		await probe(['alertErrors'], 'alertlog', async (_s,c) => {
 			const r = await readers.alerts(c,target,{ since: `${t.windowHours}h`, level: 'all', text: 'ORA-', limit: c.config.limits.maxRows });

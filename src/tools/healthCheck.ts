@@ -12,6 +12,7 @@ const measures: Record<string, string> = {
 	recovery: 'recovery area percent used after reclaimable space',
 	blocking: 'longest blocked session wait in seconds',
 	backupAge: 'hours since oldest latest full/level-0 backup across visible datafiles',
+	dgLag: 'maximum transport and apply lag in seconds, requiring running MRP',
 	archiveGaps: 'missing archived-log sequence ranges',
 	failedJobs: 'failed scheduler runs in the lookback window',
 	alertErrors: 'ORA- error occurrences in the alert log lookback window',
@@ -98,7 +99,7 @@ export function healthText(run: CheckRun): string {
 	// Avoid rendering the fixed password-check label as a credential assignment.
 	const label = (id: string) => id === 'defaultPasswords' ? id : `${id}:`;
 	const line = (s: string) => s.replace(/[\r\n\t]+/g, ' ');
-	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN').map(c => line(`${t.target} ${label(c.id)} ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
+	return redact([`Health ${run.status}: ${counts} (${run.targets.map(t => t.target).join(', ')}); point-in-time and windowed probes at ${run.capturedAt}.`, ...run.targets.map(t => `${t.target} role/scope: ${t.checks.find(c => c.status !== 'SKIPPED')?.scope ?? 'unknown'}`), ...run.targets.flatMap(t => t.checks.filter(c => c.status !== 'OK' || c.observedStatus === 'UNKNOWN').map(c => line(`${t.target} ${label(c.id)} ${c.status} ${c.display}; measures: ${measures[c.id.split(':')[0]!] ?? 'unavailable (unknown check type)'}; ${c.scope}; ${c.command}; ${c.note}`)))].join('\n'));
 }
 /** Keep complete check lines where possible and bound the entire serialized result. */
 export function boundedHealthResult(run: CheckRun, cap: number) {

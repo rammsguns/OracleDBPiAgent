@@ -48,19 +48,8 @@ added by an administrator. Review grants before using an altered lab.
 
 Live outputs and product follow-ups: [verification](../../docs/wp-31-lab-seed.md).
 
-The packaged loader currently pins exactly two targets; see the verification
-report for the required WP-31A change. Until merged, use the supported private
-file override to verify C1 (the copy contains no credentials):
-
-```sh
-c1_targets=$(mktemp)
-chmod 600 "$c1_targets"
-cp config/targets.json "$c1_targets"
-PIAGENT_TARGETS_FILE="$c1_targets" \
-PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets \
-  npx tsx src/cli/index.ts targets check --target c1-19c-pdb
-unlink "$c1_targets"
-```
+The packaged loader includes `c1-19c-pdb` and `c1s-19c-stby`; no private
+file override is required. Set PIAGENT_SECRET_DIR and use the PDB target directly.
 
 SHOP_DATA is created after the initial coordinator backup. A new RMAN backup
 covering this file is required before backup-age/archive-gap OK expectations.
@@ -74,3 +63,29 @@ partitions and a local index. It gathers missing table statistics and creates a
 successful every-minute job issuing 300 unique literal selects. Existing objects
 and jobs are left intact; rerunning does not rebuild data or reset statistics.
 SHOPAPP fixtures and workload jobs are untouched.
+
+## C1S physical standby (coordinator build)
+
+`oracle19c-cdb-stby` listens on host port 1525. Database unique name CDB19S
+is a physical standby of CDB19 (`oracle19c-cdb`, port 1524). Docker network
+`c1-dg` provides aliases `c1p` and `c1s`. The coordinator configured standby
+redo logs (SRLs), LOG_ARCHIVE_CONFIG/DG_CONFIG, primary LOG_ARCHIVE_DEST_2
+for redo transport, and FAL for missing redo retrieval, then performed RMAN
+active duplicate. Both databases have four thread-1 SRLs (groups 11–14),
+200 MiB each, and `LOG_ARCHIVE_CONFIG=DG_CONFIG=(CDB19,CDB19S)`. Primary dest 2
+is `SERVICE=C1S ASYNC NOAFFIRM VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE)
+DB_UNIQUE_NAME=CDB19S`; the standby has the reverse `SERVICE=C1P` destination
+with `DB_UNIQUE_NAME=CDB19`. FAL_SERVER is C1S on the primary and C1P on the
+standby; FAL_CLIENT is unset. These are observations, not product setup steps. The duplicate intentionally omitted the SPFILE clause:
+the auxiliary restart with that clause hit ORA-00600
+[ksb_shut_detached_process3] in SMCO.
+
+The standby runs real-time managed recovery (MRP0) and opens PIPDB1 READ ONLY
+with Active Data Guard; root OPEN_MODE is READ ONLY WITH APPLY. Primary dest 2
+reports VALID / NO GAP. The existing PIAGENT_RO account and password replicate.
+The startup hook at
+`/home/kiwi/oracle19c-cdb-stby/scripts/startup/01-standby-apply.sh`
+resumes apply and opens the PDB after image startup. The worker did not restart
+or reconfigure either container or Data Guard. Only three diagnostic SELECT
+grants were applied on the primary PDB and replicated. Use packaged target
+`c1s-19c-stby`; see [monitoring semantics](../../docs/check.md#physical-standby-phase-32).

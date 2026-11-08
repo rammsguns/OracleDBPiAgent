@@ -40,7 +40,7 @@ function fake() {
 		jobs:async () => ({sections:Object.fromEntries(['runs','invalidObjects','indexes','indexPartitions','indexSubpartitions'].map(id => [id,section()]))}),
 		alerts:async () => section(), incidents:async () => section(), security:async () => security,
 	};
-	const context = {config:{targets:[{name:'lab'},{name:'other'}],limits:{statementTimeoutSeconds:10,maxRows:100}},audit:{record:async () => {}},runId:'test',sessions:{get:async () => ({target:{name:'lab'},identity:{isCdb:false},query:async () => ({columns:[],rows:[],truncated:false,elapsedMs:0})})}} as unknown as ToolContext;
+	const context = {config:{targets:[{name:'lab'},{name:'other'}],limits:{statementTimeoutSeconds:10,maxRows:100}},audit:{record:async () => {}},runId:'test',sessions:{get:async () => ({target:{name:'lab'},identity:{isCdb:false},query:async () => ({columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PRIMARY','READ WRITE','LAB','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:0})})}} as unknown as ToolContext;
 	return {readers,context};
 }
 const now = new Date('2026-11-07T00:00:00Z');
@@ -48,13 +48,13 @@ it('runs sequentially, stable redacted Markdown and JSON with all checks', async
 	const {readers,context}=fake(); const order: string[]=[];
 	for (const key of Object.keys(readers) as (keyof typeof readers)[]) { const fn=readers[key]; Object.assign(readers,{[key]:async () => {order.push(key); return fn();}}); }
 	const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
-	expect(run.status).toBe('OK'); expect(run.targets[0]!.checks).toHaveLength(13); expect(order).toEqual(['space','sessions','backup','jobs','security','alerts','incidents','security']);
+	expect(run.status).toBe('OK'); expect(run.targets[0]!.checks).toHaveLength(14); expect(order).toEqual(['space','sessions','backup','jobs','security','alerts','incidents','security']);
 	expect(renderCheckMarkdown(run)).toContain('| Target |'); expect(JSON.parse(JSON.stringify(run))).toEqual(run);
 });
 it('all collector failures are UNKNOWN with sanitized errors', async () => {
 	for (const code of ['ORA-00942','ORA-01031','ORA-65040','password=do-not-print','CHECK_TIMEOUT']) {
 		const {context}=fake(); const readers=Object.fromEntries(Object.keys(collectors).map(key=>[key,async()=>{throw new Error(code);}])) as unknown as typeof collectors;
-		const r=await runChecks(context,['lab'],undefined,readers,now); expect(r.status).toBe('UNKNOWN'); expect(r.targets[0]!.checks.every(x=>x.status==='UNKNOWN')).toBe(true); expect(JSON.stringify(r)).not.toContain('do-not-print');
+		const r=await runChecks(context,['lab'],undefined,readers,now); expect(r.status).toBe('UNKNOWN'); expect(r.targets[0]!.checks.every(x=>x.id==='dgLag' ? x.status==='OK' : x.status==='UNKNOWN')).toBe(true); expect(JSON.stringify(r)).not.toContain('do-not-print');
 	}
 });
 it('per-view unavailable and truncated evidence never become OK', async () => {
@@ -94,7 +94,7 @@ it('labels PDB-local and CDB-wide checks distinctly and treats invisible backup 
 	const {context,readers}=fake(); const get=context.sessions.get;
 	context.sessions.get=async()=>{const s=await get();s.identity.isCdb=true;s.identity.containerName='APP_PDB';return s;};
 	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
-	expect(r.targets[0]!.checks.find(x=>x.id==='tablespace:USERS')!.scope).toBe('This PDB (APP_PDB)');expect(r.targets[0]!.checks.find(x=>x.id==='recovery')!.scope).toContain('CDB-wide');expect(r.targets[0]!.checks.find(x=>x.id==='archiveGaps')!.status).toBe('UNKNOWN');
+	expect(r.targets[0]!.checks.find(x=>x.id==='tablespace:USERS')!.scope).toContain('This PDB (APP_PDB)');expect(r.targets[0]!.checks.find(x=>x.id==='recovery')!.scope).toContain('CDB-wide');expect(r.targets[0]!.checks.find(x=>x.id==='archiveGaps')!.status).toBe('UNKNOWN');
 });
 it('passes a decreasing deadline to sequential statements and stops a timed-out probe',async()=>{
 	const {context,readers}=fake(); const timeouts:number[]=[];
@@ -126,7 +126,7 @@ it('formats raw JSON values and terminal Markdown with counts, pipes and backtic
 	const {context,readers}=fake(), space=readers.space;
 	readers.space=async()=>{const r=await space();r.sections.tablespaces.rows[0]!.usedPercentMax=3.712846619056;r.sections.tablespaces.rows[0]!.name='A|B`C';return r;};
 	const r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now), check=r.targets[0]!.checks[0]!;
-	expect(check.value).toBe(3.712846619056);expect(check.display).toBe('3.7 %');const text=renderCheckMarkdown(r);expect(text.split('\n')[0]).toBe('# Check: OK — 0 CRIT, 0 WARN, 0 UNKNOWN, 13 OK (lab)');expect(text).toContain('A\\|B\\`C');expect(text).toContain('> 0 = CRIT');expect(text).not.toContain('&gt;');expect(text).not.toContain('3.712846');
+	expect(check.value).toBe(3.712846619056);expect(check.display).toBe('3.7 %');const text=renderCheckMarkdown(r);expect(text.split('\n')[0]).toBe('# Check: OK — 0 CRIT, 0 WARN, 0 UNKNOWN, 14 OK (lab)');expect(text).toContain('A\\|B\\`C');expect(text).toContain('> 0 = CRIT');expect(text).not.toContain('&gt;');expect(text).not.toContain('3.712846');
 });
 it('reports exact max_state_alt aggregate and exits for mixed findings',async()=>{
 	const {context,readers}=fake(), jobs=readers.jobs, security=readers.security;
@@ -134,7 +134,7 @@ it('reports exact max_state_alt aggregate and exits for mixed findings',async()=
 	readers.jobs=async()=>{const r=await jobs();r.sections.runs!.rows=[{STATUS:'FAILED'}];return r;};
 	let r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.status).toBe('WARN');expect(exitCode(r.status)).toBe(1);
 	readers.security=async()=>{const r=await security();r.checks[1]!.findings=[{subject:'SCOTT'}] as never;return r;};
-	r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.status).toBe('CRIT');expect(exitCode(r.status)).toBe(2);expect(renderCheckMarkdown(r)).toContain('# Check: CRIT — 1 CRIT, 1 WARN, 1 UNKNOWN, 10 OK (lab)');expect(r.targets[0]!.checks.find(x=>x.id==='defaultPasswords')!.note).toBe('Accounts: SCOTT.');
+	r=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);expect(r.status).toBe('CRIT');expect(exitCode(r.status)).toBe(2);expect(renderCheckMarkdown(r)).toContain('# Check: CRIT — 1 CRIT, 1 WARN, 1 UNKNOWN, 11 OK (lab)');expect(r.targets[0]!.checks.find(x=>x.id==='defaultPasswords')!.note).toBe('Accounts: SCOTT.');
 });
 for (const code of ['ORA-00942','ORA-01031','ORA-65040']) it(`retains missing view and ${code} reason in collector results`,async()=>{
 	const {context,readers}=fake();readers.alerts=async()=>({status:'unavailable',view:'V$DIAG_ALERT_EXT',rows:[],truncated:false,attempts:[{view:'V$DIAG_ALERT_EXT',code}]}) as never;
@@ -168,7 +168,7 @@ for(const unknownAs of ['ok','warn','crit','unknown'] as const)it(`unknownAs=${u
 it('disabled checks are SKIPPED and excluded even with unknownAs=crit',async()=>{
 	const {context,readers}=fake();let backupCalls=0;readers.backup=async()=>{backupCalls++;throw new Error('must not run');};
 	const t={...DEFAULTS,disable:['backupAge','archiveGaps'] as const,checks:{backupAge:{unknownAs:'crit' as const}}};
-	const r=await runChecks(context,['lab'],()=>({...t,disable:[...t.disable]}),readers as unknown as typeof collectors,now);expect(backupCalls).toBe(0);expect(r.status).toBe('OK');expect(exitCode(r.status)).toBe(0);for(const id of t.disable){const c=r.targets[0]!.checks.find(x=>x.id===id)!;expect(c.status).toBe('SKIPPED');expect(c.display).toBe('SKIPPED');}expect(renderCheckMarkdown(r)).toContain('0 UNKNOWN, 11 OK (lab)');
+	const r=await runChecks(context,['lab'],()=>({...t,disable:[...t.disable]}),readers as unknown as typeof collectors,now);expect(backupCalls).toBe(0);expect(r.status).toBe('OK');expect(exitCode(r.status)).toBe(0);for(const id of t.disable){const c=r.targets[0]!.checks.find(x=>x.id===id)!;expect(c.status).toBe('SKIPPED');expect(c.display).toBe('SKIPPED');}expect(renderCheckMarkdown(r)).toContain('0 UNKNOWN, 12 OK (lab)');
 });
 it('all-disabled checks cause no connection and all named families can be disabled',async()=>{
 	const {context,readers}=fake();context.sessions.get=async()=>{throw new Error('must not open');};const r=await runChecks(context,['lab'],()=>({...DEFAULTS,disable:[...CHECK_NAMES]}),readers as unknown as typeof collectors,now);expect(r.status).toBe('OK');expect(r.targets[0]!.checks).toHaveLength(CHECK_NAMES.length);expect(r.targets[0]!.checks.every(c=>c.status==='SKIPPED')).toBe(true);expect(renderCheckMarkdown(r)).toContain('0 CRIT, 0 WARN, 0 UNKNOWN, 0 OK');
@@ -229,4 +229,34 @@ it('discloses instance-wide ADR coverage in PDB alert and incident notes',async(
 	context.sessions.get=async(...args)=>({...await get(...args),identity:{isCdb:true,containerName:'PIPDB1'}} as never);
 	const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
 	for(const id of ['alertErrors','incidents'])expect(run.targets[0]!.checks.find(c=>c.id===id)!.note).toContain('CDB-wide/instance ADR evidence (CON_ID 0/1)');
+});
+it('standby copied backups stay UNKNOWN and replicated jobs/maintenance retain labels',async()=>{
+	const {context,readers}=fake();
+	const get=context.sessions.get;
+	context.sessions.get=async target=>{const s=await get(target);s.query=async sql=>sql.includes('DATABASE_ROLE')?{columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY WITH APPLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:0}:{columns:[],rows:[],truncated:false,elapsedMs:0};return s;};
+	const original=readers.backup;
+	readers.backup=async()=>{const r=await original();Object.assign(r.evidence,{archiveGap:{status:'ok',truncated:false,rows:[]}});r.evidence.archives!.rows=[{REGISTRAR:'RFS'}] as never;return r;};
+	const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+	const checks=run.targets[0]!.checks;
+	expect(checks.find(c=>c.id==='backupAge')).toMatchObject({status:'UNKNOWN',value:null,note:expect.stringContaining('normally taken on the primary')});
+	expect(checks.find(c=>c.id==='archiveGaps')).toMatchObject({status:'OK',scope:expect.stringContaining('Physical standby CDB19S')});
+	for(const id of ['failedJobs','maintenance'])expect(checks.find(c=>c.id===id)!.note).toContain('replicated from the primary');
+	expect(checks.find(c=>c.id==='dgLag')!.status).toBe('UNKNOWN');
+});
+
+it('names V$ARCHIVE_GAP sequences when RFS history is empty or unavailable',async()=>{
+	for(const status of ['ok','unavailable']) {
+		const {context,readers}=fake(),get=context.sessions.get;
+		context.sessions.get=async target=>{const s=await get(target);s.query=async()=>({columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY WITH APPLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:0});return s;};
+		const original=readers.backup;
+		readers.backup=async()=>{const r=await original();Object.assign(r.evidence,{
+			archiveGap:{status:'ok',truncated:false,rows:[{'THREAD#':1,'LOW_SEQUENCE#':50,'HIGH_SEQUENCE#':55}]},
+			archives:{status,truncated:false,rows:[],view:'V$ARCHIVED_LOG',note:status==='unavailable'?'ORA-00942':undefined},
+		});r.gaps=[{thread:1,resetlogsScn:1,fromSequence:50,toSequence:55}] as never;return r;};
+		const run=await runChecks(context,['lab'],undefined,readers as unknown as typeof collectors,now);
+		const gap=run.targets[0]!.checks.find(c=>c.id==='archiveGaps')!;
+		expect(gap).toMatchObject({status:'CRIT',value:1,note:expect.stringContaining('V$ARCHIVE_GAP: missing sequences 50–55 on thread 1.')});
+		expect(gap.note).not.toContain('baseline cannot be established');
+		if(status==='unavailable')expect(gap.note).toContain('ORA-00942');
+	}
 });

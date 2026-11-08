@@ -1,6 +1,6 @@
 # Monitoring with piagent check
 
-`piagent check --target d1-19c-lab --json` runs sequential, read-only Oracle 19c collectors without an LLM. Use `--all-targets` instead of `--target` to check all configured owner-approved targets. The packaged labs are d1-19c-lab, p1-19c-prod and c1-19c-pdb.
+`piagent check --target d1-19c-lab --json` runs sequential, read-only Oracle 19c collectors without an LLM. Use `--all-targets` instead of `--target` to check all configured owner-approved targets. The packaged labs are d1-19c-lab, p1-19c-prod c1-19c-pdb and c1s-19c-stby.
 
 Text output is a Markdown table. JSON has a versioned envelope: `version: 1`, `capturedAt` (UTC), aggregate `status`, and ordered `targets`. Each target has `target`, `status`, and `checks`. Each check has a stable `id`, `status`, numeric `value` (or null for UNKNOWN/SKIPPED or an established absence of expiry), rounded `display` string, `unit`, `threshold`, `scope`, `command`, and `note`. Named tablespaces produce `tablespace:NAME`, `undo:NAME` and `temp:NAME` IDs. Missing/inapplicable sections have an UNKNOWN placeholder. Raw SQL, binds, job messages, alert messages and connection credentials are omitted. The default-password note names at most ten validated usernames, followed by `+N more`; only simple Oracle identifiers of at most 128 characters are accepted. Percentages, days and hours display one decimal; seconds display as integers. JSON retains the original numeric measurement alongside `display`. CLI Markdown escapes pipes and backticks without HTML entities.
 
@@ -48,7 +48,7 @@ Create `~/.piagent/check.json` (or `$PIAGENT_HOME/check.json`) as the current us
 }
 ```
 
-Known threshold keys are `space`, `recovery`, `blocking`, `backupAge`, `failedJobs`, `alertErrors`, `maintenance`, `expiry`, and `windowHours`; `disable` and `checks` configure monitoring policies. Pairs require exactly `warn` and `crit`; a pair override replaces the entire pair. All numeric thresholds must be finite, nonnegative, and no greater than 1000000 (percentages no greater than 100). WARN must be below CRIT, except expiry where CRIT must be below WARN. `alertErrors.crit` may be null (default: no count-based critical level; incidents remain critical). `windowHours` must be an integer from 1 through 720. Unknown keys and unconfigured target overrides are rejected. Per-target pairs override global pairs, which override built-ins. Threshold files contain no passwords or SQL.
+Known threshold keys are `space`, `recovery`, `blocking`, `backupAge`, `dgLag`, `failedJobs`, `alertErrors`, `maintenance`, `expiry`, and `windowHours`; `disable` and `checks` configure monitoring policies. Pairs require exactly `warn` and `crit`; a pair override replaces the entire pair. All numeric thresholds must be finite, nonnegative, and no greater than 1000000 (percentages no greater than 100). WARN must be below CRIT, except expiry where CRIT must be below WARN. `alertErrors.crit` may be null (default: no count-based critical level; incidents remain critical). `windowHours` must be an integer from 1 through 720. Unknown keys and unconfigured target overrides are rejected. Per-target pairs override global pairs, which override built-ins. Threshold files contain no passwords or SQL.
 
 ## Disabling checks and setting UNKNOWN policy
 
@@ -68,7 +68,7 @@ Monitoring policies can be placed in `defaults` or a configured target override.
 }
 ```
 
-`disable` accepts unique names from `tablespaces`, `temp`, `undo`, `recovery`, `blocking`, `backupAge`, `archiveGaps`, `failedJobs`, `alertErrors`, `incidents`, `maintenance`, `expiry`, `defaultPasswords`. Use the configured target name (the coordinator's private target aliases may differ). The three space families disable all their named tablespaces. Disabled rows show `SKIPPED`, a null value and `display: "SKIPPED"`; they are excluded from aggregate status and header counts. An entirely disabled collector is not invoked. A partially disabled collector may still read its shared views for enabled checks.
+`disable` accepts unique names from `tablespaces`, `temp`, `undo`, `recovery`, `blocking`, `backupAge`, `archiveGaps`, `dgLag`, `failedJobs`, `alertErrors`, `incidents`, `maintenance`, `expiry`, `defaultPasswords`. Use the configured target name (the coordinator's private target aliases may differ). The three space families disable all their named tablespaces. Disabled rows show `SKIPPED`, a null value and `display: "SKIPPED"`; they are excluded from aggregate status and header counts. An entirely disabled collector is not invoked. A partially disabled collector may still read its shared views for enabled checks.
 
 `checks.NAME.unknownAs` accepts exactly `ok`, `warn`, `crit`, or `unknown` (default). It only maps an UNKNOWN result; it never changes a measured WARN or CRIT. Mapped JSON retains `observedStatus: "UNKNOWN"`, `value: null`, `display: "UNKNOWN"` and the original reason, with an explicit policy note. Header counts and exit codes use the effective mapped status. A disabled check stays SKIPPED regardless of `unknownAs`.
 
@@ -78,7 +78,7 @@ Per-target `disable` replaces the defaults list; an empty list enables the check
 
 `piagent check --all-targets --json --out /private/health` appends exactly one redacted JSON record per invocation to `check.jsonl`, containing all selected targets. The directory is created mode 0700; a new file is created mode 0600. Existing files must be owner-owned regular files mode 0600; symlinks are refused. Protect the parent directory yourself. Every string in output is passed through the shared credential redactors before display and append.
 
-Collectors, targets, queries and pages run sequentially. Each collector gets one statement-timeout budget; every query receives the remaining budget and no further query begins after it expires. Native driver call timeout handles an in-flight database call; cancellation is never implemented as an abandoned Promise racing the next probe. Connection establishment and native cleanup use existing provider limits. This is a sequence of bounded snapshots, not one transactionally consistent snapshot. The preflight `check` group is exactly the union of space, backup, sessions, jobs, alertlog and security views; no new grants are needed.
+Collectors, targets, queries and pages run sequentially. Each collector gets one statement-timeout budget; every query receives the remaining budget and no further query begins after it expires. Native driver call timeout handles an in-flight database call; cancellation is never implemented as an abandoned Promise racing the next probe. Connection establishment and native cleanup use existing provider limits. This is a sequence of bounded snapshots, not one transactionally consistent snapshot. The preflight `check` group is exactly the union of space, backup, sessions, jobs, alertlog and security views; standby probes additionally need the three SELECT grants below.
 
 For programmatic consumers, `src/check/index.ts` exports `runChecks(ctx, targets, thresholdsForTarget?)`, `CheckRun`, `Verdict`, `Status`, `collectors`, `renderCheckMarkdown` and `exitCode`. The context uses the existing `ToolContext` contract. Cancellation wrappers can be supplied through its session provider. Collectors never close the underlying shared session; the caller owns `closeAll()`.
 
@@ -90,3 +90,40 @@ PDB backup age can use labelled per-datafile full/level-0 metadata when RMAN job
 ## Review follow-up: instance ADR visibility
 
 For a PDB target, alertErrors and incidents explicitly disclose mixed PDB and visible CDB-wide/instance ADR scope (CON_ID 0/1) in their notes and scope labels. Other PDBs are excluded. Oracle may hide instance rows from a local PDB login; an empty or clean visible result does not prove instance-wide absence. Existing row caps and lower-bound rules still apply to the combined visible window.
+
+## Physical standby (Phase 32)
+
+Role, open mode, DB_UNIQUE_NAME and protection mode are read once per session
+from V$DATABASE and included in every check scope, backup/space output and
+health_check text. The web Check tab displays the same scope. Hidden identity
+is labelled UNKNOWN; backup age cannot become healthy without a known role.
+
+`dgLag` measures the maximum of transport and apply lag from V$DATAGUARD_STATS,
+with WARN 300 seconds and CRIT 1800 seconds (inclusive). Configure `dgLag` as
+any other threshold pair, disable it with `disable`, or map UNKNOWN with
+`checks.dgLag.unknownAs`. MRP0 must be visible and running in V$MANAGED_STANDBY.
+Missing/NULL lag, missing grants, capped results or absent MRP produce UNKNOWN.
+A primary returns OK, zero, explicitly labelled not applicable. This prevents
+normal primary installations acquiring an inapplicable UNKNOWN.
+
+Standby archive gaps combine V$ARCHIVE_GAP with continuity of distinct RFS
+received sequences in the current incarnation, per thread. RMAN duplicate's
+SRMN records and copied primary V$LOG_HISTORY do not establish the standby's
+baseline. Deleted received log files still count as received; they do not imply
+an apply gap. Missing RFS history produces UNKNOWN, not a healthy zero. Primary
+backup-chain media availability retains its separate checkpoint-based semantics:
+deleted logs can genuinely break a primary restore chain.
+
+Standby backupAge is UNKNOWN: visible per-datafile completion times and RMAN
+history may have been copied during duplicate or redo apply. The backup command
+still reports that evidence, with a note that backups are normally taken on the
+primary; it does not claim these are local standby backups. Failed scheduler
+runs and maintenance still retain their measured severity and explicitly label
+the history and object status as replicated from the primary.
+
+Minimal additional PDB grants: SELECT on SYS.V_$ARCHIVE_GAP,
+SYS.V_$DATAGUARD_STATS and SYS.V_$MANAGED_STANDBY. V_$DATABASE is already granted.
+Preflight includes these views. On C1, grants were applied on the primary PDB
+and replicated to C1S. Oracle 19.9 C1S exposes NULL apply lag from the PDB while
+the root shows zero; this correctly stays UNKNOWN. It is not inferred from
+OPEN_MODE or transport lag. No container or recovery configuration was changed.

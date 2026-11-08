@@ -1,4 +1,5 @@
 import { withOracleAction } from '../oracle/observability.js';
+import { readDatabaseRole } from '../backup/role.js';
 import { requireConfiguredTarget } from '../config/targetUsage.js';
 import { markdownNumber } from '../backup/markdown.js';
 import { formatDuration } from './duration.js';
@@ -49,8 +50,16 @@ async function readJobsImpl(ctx: ToolContext, target: string, options: JobsOptio
 	if (owner !== undefined && !/^[A-Z][A-Z0-9_$#]{0,127}$/.test(owner)) throw new JobsUsageError('--owner must be an unquoted Oracle identifier');
 	const to = new Date(), from = new Date(to.getTime() - hours * 3600000);
 	const session = await ctx.sessions.get(target);
+	const role = await readDatabaseRole({ ...session, query: async (sql, binds, options) => {
+		const event = { at: new Date().toISOString(), runId: ctx.runId, target, tool: 'jobs:role', sqlSha256: createHash('sha256').update(sql).digest('hex') };
+		try {
+			const result = await session.query(sql, binds ?? {}, {maxRows:ctx.config.limits.maxRows, timeoutSeconds:ctx.config.limits.statementTimeoutSeconds, ...options});
+			await ctx.audit.record({ ...event, kind: 'tool_call', rows: result.rows.length, truncated: result.truncated, elapsedMs: result.elapsedMs });
+			return result;
+		} catch (error) { await ctx.audit.record({ ...event, kind: 'tool_error', detail: /ORA-\d{5}/.exec(String(error))?.[0] ?? 'QUERY_FAILED' }); throw error; }
+	} });
 	const result: JobsResult = { target, identity: session.identity, window: { from: from.toISOString(), to: to.toISOString() }, owner, failedOnly: options.failedOnly ?? false,
-		note: 'Current state and maintenance debt are snapshots; history uses [from, to). Owner filters apply only to owner-bearing views. Failed-only filters scheduler jobs with recorded failures, failed/broken/retry states or a latest retained failed run and non-successful runs/logs, failed autotask and statistics history; maintenance context remains visible. Next run is a scheduler estimate, not a guarantee. Empty rows do not prove absence beyond visible/retained history.' + (session.identity?.isCdb ? ' Current PDB visibility only; empty rows do not establish CDB-wide absence.' : ''), sections: {} };
+		note: role.label + '. ' + (role.standby ? 'Scheduler history and object status are replicated from the primary; jobs do not run on this physical standby. ' : '') + 'Current state and maintenance debt are snapshots; history uses [from, to). Owner filters apply only to owner-bearing views. Failed-only filters scheduler jobs with recorded failures, failed/broken/retry states or a latest retained failed run and non-successful runs/logs, failed autotask and statistics history; maintenance context remains visible. Next run is a scheduler estimate, not a guarantee. Empty rows do not prove absence beyond visible/retained history.' + (session.identity?.isCdb ? ' Current PDB visibility only; empty rows do not establish CDB-wide absence.' : ''), sections: {} };
 	try {
 		for (const [name, def] of Object.entries(jobQueries)) {
 			const lastRunFailed = `(SELECT MAX(latest_run.STATUS) KEEP (DENSE_RANK LAST ORDER BY latest_run.LOG_DATE, latest_run.LOG_ID) FROM DBA_SCHEDULER_JOB_RUN_DETAILS latest_run WHERE latest_run.OWNER = DBA_SCHEDULER_JOBS.OWNER AND latest_run.JOB_NAME = DBA_SCHEDULER_JOBS.JOB_NAME) = 'FAILED'`;

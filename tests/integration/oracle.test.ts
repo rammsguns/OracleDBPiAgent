@@ -80,9 +80,9 @@ for (const target of targets) it(`full LONG view source page 2: ${target.name}`,
 		try { session = await provider.get(target.name); }
 		catch (error) { if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('Oracle listener unavailable'); return; } throw error; }
 		// A SYS dictionary view visible to both approved accounts; no fixture DDL.
-		const source = await session.query(`SELECT text_length, text FROM ${target.name === "c1-19c-pdb" ? "dba_views" : "all_views"} WHERE owner='SYS' AND view_name='ALL_CUBE_DEPENDENCIES' AND text_length<=1048576`, {}, { maxRows: 1 });
+		const source = await session.query(`SELECT text_length, text FROM ${session.identity.isCdb ? "dba_views" : "all_views"} WHERE owner='SYS' AND view_name='ALL_CUBE_DEPENDENCIES' AND text_length<=1048576`, {}, { maxRows: 1 });
 		const [length, text] = source.rows[0]!;
-		if (target.name === 'c1-19c-pdb' && text === null) {
+		if (session.identity.isCdb && text === null) {
 			// Inherited SYS metadata-link views expose length but hide LONG text in this PDB.
 			await session.close();
 			const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'pdb-hidden-long'}).find(t=>t.name==='get_source')!;

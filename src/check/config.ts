@@ -2,15 +2,15 @@ import { constants, openSync, fstatSync, readFileSync, closeSync } from 'node:fs
 import { join } from 'node:path';
 import { agentHome } from '../config/paths.js';
 export class CheckUsageError extends Error {}
-export const CHECK_NAMES = ['tablespaces','temp','undo','recovery','blocking','backupAge','archiveGaps','failedJobs','alertErrors','incidents','maintenance','expiry','defaultPasswords'] as const;
+export const CHECK_NAMES = ['tablespaces','temp','undo','recovery','blocking','backupAge','archiveGaps','dgLag','failedJobs','alertErrors','incidents','maintenance','expiry','defaultPasswords'] as const;
 export type CheckName = typeof CHECK_NAMES[number];
 export type UnknownAs = 'ok' | 'warn' | 'crit' | 'unknown';
 export interface CheckPolicy { unknownAs: UnknownAs }
 export interface Threshold { warn: number; crit: number | null }
-export interface Thresholds { space: Threshold; recovery: Threshold; blocking: Threshold; backupAge: Threshold; failedJobs: Threshold; alertErrors: Threshold; maintenance: Threshold; expiry: Threshold; windowHours: number; disable: CheckName[]; checks: Partial<Record<CheckName, CheckPolicy>> }
+export interface Thresholds { space: Threshold; recovery: Threshold; blocking: Threshold; backupAge: Threshold; dgLag: Threshold; failedJobs: Threshold; alertErrors: Threshold; maintenance: Threshold; expiry: Threshold; windowHours: number; disable: CheckName[]; checks: Partial<Record<CheckName, CheckPolicy>> }
 export const DEFAULTS: Thresholds = {
 	space: { warn: 85, crit: 95 }, recovery: { warn: 80, crit: 90 }, blocking: { warn: 60, crit: 300 },
-	backupAge: { warn: 26, crit: 50 }, failedJobs: { warn: 1, crit: 3 }, alertErrors: { warn: 1, crit: null },
+	dgLag: { warn: 300, crit: 1800 }, backupAge: { warn: 26, crit: 50 }, failedJobs: { warn: 1, crit: 3 }, alertErrors: { warn: 1, crit: null },
 	maintenance: { warn: 1, crit: 20 }, expiry: { warn: 14, crit: 3 }, windowHours: 1, disable: [], checks: {},
 };
 export interface CheckConfig { defaults?: Partial<Thresholds>; targets?: Record<string, Partial<Thresholds>> }

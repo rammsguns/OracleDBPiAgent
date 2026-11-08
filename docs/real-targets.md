@@ -3,7 +3,7 @@
 This is the phase 28 setup path for a human DBA and database owner. The owner
 approves the endpoint and metadata exposure; the DBA provisions access; the CLI
 only reads. The packaged diagnostic targets are `d1-19c-lab`, `p1-19c-prod` and
-`c1-19c-pdb` (plus the dedicated non-19c refusal test).
+`c1-19c-pdb` and `c1s-19c-stby` (plus the dedicated non-19c refusal test).
 
 **Availability:** private targets and account/view preflight shipped in 1.4.0;
 backup, jobs and top are included in 1.5.0. Check `piagent --version` and
@@ -219,8 +219,7 @@ credential-free audit records; these do not replace least-privilege DBA review.
 
 ## Verification limits and troubleshooting
 
-Live PDB behaviour remains **unverified until the owner's first run**. The current
-lab evidence is 19.9.1 non-CDB only. RAC, Data Guard standby, other release updates,
+New owner endpoints require their own verification. C1 PDB and C1S physical standby evidence is documented below. RAC, other release updates,
 TCPS/wallets and remote network setups have not been verified; TCPS/wallet support
 is outside this setup path. There is no promise that each fixed view is meaningful
 inside a PDB. Local undo, ADR visibility and CDB-wide views require particular
@@ -263,3 +262,16 @@ usual per-section unavailable notes. `targets check --json` keeps its structured
 failure on stdout and also writes the guidance to stderr. Doctor reports setup
 failures per target. Web responses and chat `/top` and `/triage` show the same
 safe guidance; interactive sessions remain usable after a handled error.
+
+## Verified physical standby lab C1S
+
+Packaged `c1s-19c-stby` uses localhost:1525/PIPDB1, PIAGENT_RO,
+`c1_piagent_ro.pw`, defaultSchema SHOPAPP. It is the Active Data Guard physical
+standby CDB19S of CDB19, opened READ ONLY WITH APPLY. Credentials stay only in
+PIAGENT_SECRET_DIR. Connect to the PDB service, never CDB$ROOT.
+
+Check, backup and space label the database role, unique name, open mode and
+protection mode. See [standby monitoring](check.md#physical-standby-phase-32)
+for gap baselines, copied backup evidence, replicated scheduler/object state,
+lag thresholds and PDB NULL apply-lag limitations. Empty or hidden statistics
+remain UNKNOWN. The product never starts recovery or changes Data Guard.

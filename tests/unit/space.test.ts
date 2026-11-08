@@ -57,7 +57,7 @@ it('renders findings first, text bars, hidden empty columns, paths and escaped v
 
 it('pages catalog evidence before aggregating tablespace files',async()=>{
 	const s=fixture();let calls=0;
-	s.query=async(sql,binds)=>{calls++;expect(sql).toContain(SQL.tablespaces);if(calls===1) return {rows:[ts(50)],columns:['T'],truncated:true,elapsedMs:0};expect(binds).toEqual({spaceOffset:1});return {rows:[['T','PERMANENT','NO','/other',100,'NO',0,50,50]],columns:['T'],truncated:false,elapsedMs:0};};
+	s.query=async(sql,binds)=>{if(sql.includes('DATABASE_ROLE')) return {columns:[],rows:[],truncated:false,elapsedMs:0};calls++;expect(sql).toContain(SQL.tablespaces);if(calls===1) return {rows:[ts(50)],columns:['T'],truncated:true,elapsedMs:0};expect(binds).toEqual({spaceOffset:1});return {rows:[['T','PERMANENT','NO','/other',100,'NO',0,50,50]],columns:['T'],truncated:false,elapsedMs:0};};
 	const r=await readSpaceUsage(s,{sections:['tablespaces']});expect(calls).toBe(2);expect(r.status).toBe('ok');expect(r.sections.tablespaces.rows[0]?.fileCount).toBe(2);
 });
 

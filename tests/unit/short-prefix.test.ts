@@ -12,7 +12,7 @@ it.each([{ pinnedTarget: undefined }, { pinnedTarget: 'd1-19c-lab' }, { pinnedTa
 	const ctx = { config: loadConfig({}), pinnedTarget } as ToolContext;
 	const prompt = systemPrompt(ctx).replace(HEALTH_GUIDANCE, "");
 	const tools = serialize(ctx);
-	expect(prompt.length - ctx.config.targets.filter(t=>t.name==='c1-19c-pdb').reduce((n,t)=>n+`; ${t.name} (${t.environment}):${t.description}`.length,0) - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
+	expect(prompt.length - ctx.config.targets.filter(t=>['c1-19c-pdb','c1s-19c-stby'].includes(t.name)).reduce((n,t)=>n+`; ${t.name} (${t.environment}):${t.description}`.length,0) - ADR_GUIDANCE.length - PACK_REFUSALS.length - PHASE27_GUIDANCE.length + tools.length).toBeLessThanOrEqual(Math.floor((5793 + (pinnedTarget ? ` This run is pinned to target ${pinnedTarget}.`.length : 0)) * 0.85) + 120);
 	const next = { ...ctx, config: loadConfig({}), runId: 'another-session' };
 	expect(systemPrompt(next).replace(HEALTH_GUIDANCE, "")).toBe(prompt);
 	expect(serialize(next)).toBe(tools);

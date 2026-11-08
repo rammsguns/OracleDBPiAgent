@@ -18,9 +18,9 @@ it('missing grants produce UNKNOWN compact sourced text, no OK rows', async () =
 	const ctx = context(), tool = createHealthCheckTool(ctx);
 	const result = await tool.execute('id', {}, new AbortController().signal);
 	const text = result.content[0] as {text: string};
-	expect(text.text).toContain('Health UNKNOWN:'); expect(text.text).toContain('13 UNKNOWN');
+	expect(text.text).toContain('Health UNKNOWN:'); expect(text.text).toContain('14 UNKNOWN');
 	expect(text.text).toContain('ORA-00942'); expect(text.text).toContain('point-in-time and windowed');
-	expect(text.text.split('\n')).toHaveLength(14);
+	expect(text.text.split('\n')).toHaveLength(16);
 });
 it('respects pinned targets and rejects unknown targets before database access', async () => {
 	const ctx = context(); ctx.pinnedTarget = 'p1-19c-prod';
@@ -121,7 +121,7 @@ it('combines invalid objects with every index unit type and caps all name lists 
 	expect(text).not.toContain('SYS.INTERNAL');
 	expect(text).toContain('USER0, USER1, USER2, USER3, USER4'); expect(text).not.toContain('USER5');
 	expect(jobs).toHaveBeenCalledTimes(1); expect(security).toHaveBeenCalledTimes(2);
-	expect(query).toHaveBeenCalledTimes(1);
+	expect(query).toHaveBeenCalledTimes(2);
 	expect(query).toHaveBeenCalledWith(expect.stringContaining("u.ORACLE_MAINTAINED = 'N'"), {}, expect.objectContaining({maxRows:ctx.config.limits.maxRows, timeoutSeconds:expect.any(Number)}));
 });
 

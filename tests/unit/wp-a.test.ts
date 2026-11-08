@@ -18,7 +18,7 @@ describe("WP-A configuration", () => {
 	it("resolves secrets without reading them and validates limits/defaults", () => {
 		const cfg = loadConfig({ PIAGENT_SECRET_DIR: "./missing-secret-directory" });
 		expect(cfg.secretDir).toMatch(/\/missing-secret-directory$/);
-		expect(cfg.targets).toHaveLength(3);
+		expect(cfg.targets).toHaveLength(4);
 		expect(() => loadConfig({ PIAGENT_MAX_TOOL_CALLS: "0" })).toThrow();
 		expect(() => loadConfig({ PIAGENT_DEFAULT_TARGET: "other" })).toThrow();
 	});
