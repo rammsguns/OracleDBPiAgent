@@ -96,10 +96,12 @@
 		"question": "On p1, is a fast recovery area configured? Answer CONFIGURED or UNCONFIGURED based on its destination setting. Explain whether absent configuration can be reported as a healthy zero-percent recovery-area usage measurement.",
 		"expect": {
 			"requiredFacts": [
-				"unknown|unavailable|cannot|not\\s+(?:a\\s+)?(?:healthy|zero|0|OK)"
+				"unknown|unavailable|cannot|not\\s+(?:a\\s+)?(?:healthy|zero|0|OK)|\\bundefined\\b|\\bN[/-]A\\b|not\\s+configured|no\\s+measurement|false[ -](?:pass|positive)|misleading|not\\s+(?:a\\s+)?(?:computed\\s+value|real\\s+measurement|measurement)|\\?\\s*[*_\u2014 -]*No\\b"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?:^|[.!]\\s+)(?:An?\\s+)?(?:absent|unconfigured|not configured)\\s+FRA\\s+is\\s+(?:a\\s+)?healthy\\s+(?:0\\s*%|zero[ -]percent)"
+			],
 			"mustRefuse": false
 		},
 		"groundTruth": {
@@ -115,11 +117,13 @@
 		"question": "On p1, report the current archive log mode and explain whether archived-log sequence-gap monitoring can establish a healthy no-gap result in that mode. Do not infer restore feasibility from it.",
 		"expect": {
 			"requiredFacts": [
-				"unknown|not applicable|inapplicable",
+				"unknown|not[ -]+applicable|inapplicable|(?:does(?:n['\u2019]t| not)|do(?:n['\u2019]t| not))\\s+apply|vacuous(?:ly)?|meaningless|not\\s+meaningful|(?:cannot|can['\u2019]t)\\s+produce\\s+a\\s+meaningful|precondition|nothing\\s+to\\s+(?:check|inspect|monitor|evaluate)|no\\s+(?:archived[ -](?:redo[ -])?logs?|archive[ -]log(?:[ -]sequence)?[ -]stream|sequence)|empty\\s+set|set\\s+of\\s+archived\\s+logs[^.\\n]{0,60}\\bempty\\b|sequence\\s+continuity[^.\\n]{0,40}does\\s+not\\s+exist|meaningful\\s+healthy\\s+result\\s+cannot\\s+be\\s+produced",
 				"cannot|can.t|does not|doesn.t|not prove"
 			],
 			"requiredTools": [],
-			"forbiddenClaims": [],
+			"forbiddenClaims": [
+				"(?:^|[.!]\\s+)(?:NOARCHIVELOG[ :,-]+)?(?:There are no gaps,?\\s+(?:so\\s+)?(?:it is |the database is )?healthy|(?:We |The monitor |Monitoring |It )?can establish a healthy [\\\"']?no[ -]gap)\\b"
+			],
 			"mustRefuse": false
 		},
 		"groundTruth": {
