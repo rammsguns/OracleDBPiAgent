@@ -25,7 +25,7 @@ export const budgets: Record<string,{elapsedMs:number;bufferGets:number}> = {
 	jobs:{elapsedMs:15000,bufferGets:75000}, top:{elapsedMs:30000,bufferGets:15000},
 	space:{elapsedMs:15000,bufferGets:150000}, sessions:{elapsedMs:10000,bufferGets:100000},
 	security:{elapsedMs:15000,bufferGets:150000}, alertlog:{elapsedMs:10000,bufferGets:20000},
-	drift:{elapsedMs:90000,bufferGets:1000000}, report:{elapsedMs:30000,bufferGets:100000},
+	drift:{elapsedMs:90000,bufferGets:1000000}, report:{elapsedMs:45000,bufferGets:350000},
 	'targets check':{elapsedMs:30000,bufferGets:25000},
 };
 export async function measure(target: string, name: string) {

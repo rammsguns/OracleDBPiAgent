@@ -11,7 +11,10 @@ begin
  select count(*) into n from dba_tablespaces where tablespace_name='BULK_DATA';
  if n=0 then ddl('create tablespace BULK_DATA datafile ''/opt/oracle/oradata/CDB19/PIPDB1/bulk_data01.dbf'' size 512M autoextend on next 256M maxsize 8G'); end if;
  select count(*) into n from dba_users where username='BULKAPP';
- if n=0 then ddl('create user BULKAPP no authentication default tablespace BULK_DATA quota unlimited on BULK_DATA'); end if;
+ if n=0 then
+  ddl('create user BULKAPP no authentication default tablespace BULK_DATA quota unlimited on BULK_DATA');
+  ddl('grant create session, create table, create view, create procedure, create sequence, create job to BULKAPP');
+ end if;
  if missing('EVENTS','TABLE') then
   ddl('create table BULKAPP.EVENTS (id number, customer_id number, event_type varchar2(30), payload varchar2(200), created_at date) tablespace BULK_DATA');
   execute immediate 'insert into BULKAPP.EVENTS select level,mod(level,10000),''TYPE''||mod(level,10),rpad(''event'',100,''x''),date ''2025-01-01''+mod(level,730) from dual connect by level<=4000000';

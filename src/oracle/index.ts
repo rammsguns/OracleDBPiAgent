@@ -1,3 +1,4 @@
+import { registerTopSnapshot, TOP_SQL } from './topSnapshot.js';
 import { oracleAction } from './observability.js';
 import { recordConnectionFailure, PasswordFileError } from './connectionErrors.js';
 import { validateTarget, usesPackagedTargets } from '../config/targets.js';
@@ -85,47 +86,49 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				};
 				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
 				await connection.rollback();
+				async function query(sql: string, binds = {}, options: QueryOptions = {}, rowCeiling = config.limits.maxRows): Promise<QueryResult> {
+					const statement = classifySql(sql);
+					if (closed || busy) throw new Error("Session is closed or busy");
+					const maxRows = options.maxRows ?? config.limits.maxRows;
+					const timeout = options.timeoutSeconds ?? config.limits.statementTimeoutSeconds;
+					if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > rowCeiling || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new SafeConfigError("Invalid query limits");
+					busy = true; const start = performance.now(); let resultSet: any;
+					try {
+						connection.action = oracleAction() === 'query' ? sessionAction : oracleAction();
+						connection.callTimeout = timeout * 1000;
+						await connection.execute("SET TRANSACTION READ ONLY");
+						// Read execute metadata without fetching values: STRING alone still passes
+						// dates through a host-local Date in this thin driver. Only wall-clock
+						// queries need a second execute with server-side TO_CHAR projections.
+						const executeOptions = { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, prefetchRows: 0, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler };
+						let result = await connection.execute(statement, binds, executeOptions);
+						resultSet = result.resultSet;
+						const metadata = result.metaData;
+						const wallColumns = metadata.map((c: any) => [oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(c.dbType));
+						if (wallColumns.some(Boolean)) {
+							await resultSet.close(); resultSet = undefined;
+							let wallQueryName = 'PIAGENT_WALL_QUERY';
+							while (statement.toUpperCase().includes(wallQueryName)) wallQueryName += '_';
+							const aliases = metadata.map((_: any, i: number) => 'PIAGENT_COL_' + i);
+							const wallStatement = `${wallQueryPrefix(statement, aliases, wallQueryName)} SELECT ${metadata.map((c: any, i: number) =>
+								(wallColumns[i] ? `TO_CHAR(${aliases[i]}, 'YYYY-MM-DD"T"HH24:MI:SS${c.dbType === oracledb.DB_TYPE_TIMESTAMP ? '.FF9' : ''}')` : aliases[i]) +
+								' AS "' + c.name.replace(/"/g, '""') + '"').join(',')} FROM ${wallQueryName}`;
+							// Formatted wall columns are VARCHAR now, so normal prefetch is safe.
+							result = await connection.execute(wallStatement, binds, { ...executeOptions, prefetchRows: 2 });
+							resultSet = result.resultSet;
+						}
+						const fetched = await resultSet.getRows(maxRows + 1);
+						const rows: unknown[][] = [];
+						for (const row of fetched) { const values = []; for (const [i, value] of row.entries()) values.push(wallColumns[i] ? oracleWallTime(value as string | null, databaseOffset) : await previewValue(value)); rows.push(values); }
+						return { columns: (metadata.length ? metadata : result.metaData).map((c: any) => c.name), columnTypes: (metadata.length ? metadata : result.metaData).map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
+					} finally { try { await resultSet?.close(); } finally { try { await connection.rollback(); } finally { busy = false; } } }
+				}
 				const session: OracleSession = {
 					target, identity,
-					async query(sql: string, binds = {}, options: QueryOptions = {}): Promise<QueryResult> {
-						const statement = classifySql(sql);
-						if (closed || busy) throw new Error("Session is closed or busy");
-						const maxRows = options.maxRows ?? config.limits.maxRows;
-						const timeout = options.timeoutSeconds ?? config.limits.statementTimeoutSeconds;
-						if (!Number.isInteger(maxRows) || maxRows < 1 || maxRows > config.limits.maxRows || !Number.isFinite(timeout) || timeout <= 0 || timeout > config.limits.statementTimeoutSeconds) throw new SafeConfigError("Invalid query limits");
-						busy = true; const start = performance.now(); let resultSet: any;
-						try {
-							connection.action = oracleAction() === 'query' ? sessionAction : oracleAction();
-							connection.callTimeout = timeout * 1000;
-							await connection.execute("SET TRANSACTION READ ONLY");
-							// Read execute metadata without fetching values: STRING alone still passes
-							// dates through a host-local Date in this thin driver. Only wall-clock
-							// queries need a second execute with server-side TO_CHAR projections.
-							const executeOptions = { resultSet: true, outFormat: oracledb.OUT_FORMAT_ARRAY, prefetchRows: 0, fetchArraySize: Math.min(maxRows + 1, 100), fetchTypeHandler };
-							let result = await connection.execute(statement, binds, executeOptions);
-							resultSet = result.resultSet;
-							const metadata = result.metaData;
-							const wallColumns = metadata.map((c: any) => [oracledb.DB_TYPE_DATE, oracledb.DB_TYPE_TIMESTAMP].includes(c.dbType));
-							if (wallColumns.some(Boolean)) {
-								await resultSet.close(); resultSet = undefined;
-								let wallQueryName = 'PIAGENT_WALL_QUERY';
-								while (statement.toUpperCase().includes(wallQueryName)) wallQueryName += '_';
-								const aliases = metadata.map((_: any, i: number) => 'PIAGENT_COL_' + i);
-								const wallStatement = `${wallQueryPrefix(statement, aliases, wallQueryName)} SELECT ${metadata.map((c: any, i: number) =>
-									(wallColumns[i] ? `TO_CHAR(${aliases[i]}, 'YYYY-MM-DD"T"HH24:MI:SS${c.dbType === oracledb.DB_TYPE_TIMESTAMP ? '.FF9' : ''}')` : aliases[i]) +
-									' AS "' + c.name.replace(/"/g, '""') + '"').join(',')} FROM ${wallQueryName}`;
-								// Formatted wall columns are VARCHAR now, so normal prefetch is safe.
-								result = await connection.execute(wallStatement, binds, { ...executeOptions, prefetchRows: 2 });
-								resultSet = result.resultSet;
-							}
-							const fetched = await resultSet.getRows(maxRows + 1);
-							const rows: unknown[][] = [];
-							for (const row of fetched) { const values = []; for (const [i, value] of row.entries()) values.push(wallColumns[i] ? oracleWallTime(value as string | null, databaseOffset) : await previewValue(value)); rows.push(values); }
-							return { columns: (metadata.length ? metadata : result.metaData).map((c: any) => c.name), columnTypes: (metadata.length ? metadata : result.metaData).map((c: any) => c.dbTypeName), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows, elapsedMs: performance.now() - start };
-						} finally { try { await resultSet?.close(); } finally { try { await connection.rollback(); } finally { busy = false; } } }
-					},
+					query,
 					async close() { if (!closed) { closed = true; sessions.delete(session); await connection.close(); } },
 				};
+				registerTopSnapshot(session, () => query(TOP_SQL, {}, { maxRows: 10000 }, 10000));
 				sessions.add(session); return session;
 			} catch (error) { await connection.close(); throw error; }
 		},

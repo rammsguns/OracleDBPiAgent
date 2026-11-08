@@ -135,7 +135,7 @@ async function readAlertLogImpl(ctx: ToolContext, target: string, options: Alert
 	}
 	return { ...result, rows: folded };
 }
-export function readIncidents(ctx: ToolContext, target: string, options: WindowOptions = {}): Promise<AlertResult<IncidentRow>> {
+function readIncidentsImpl(ctx: ToolContext, target: string, options: WindowOptions = {}): Promise<AlertResult<IncidentRow>> {
 	return read(ctx, target, options, 'V$DIAG_INCIDENT JOIN V$DIAG_PROBLEM', ['V$DIAG_INCIDENT', 'V$DIAG_PROBLEM'], time => ({
 		select: 'SELECT i.INCIDENT_ID, p.PROBLEM_KEY, i.CREATE_TIME, i.STATUS, i.CON_ID FROM V$DIAG_INCIDENT i LEFT JOIN V$DIAG_PROBLEM p ON p.PROBLEM_ID = i.PROBLEM_ID AND p.CON_ID = i.CON_ID',
 		where: `i.CREATE_TIME >= ${time} AND i.CREATE_TIME < ${time.replace(':fromTime', ':toTime')} AND (SYS_CONTEXT('USERENV','CON_ID') IN ('0','1') OR i.CON_ID IN (0,1) OR i.CON_ID = TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID')))`,
@@ -165,3 +165,5 @@ function adrScope(value: unknown): {containerId?: number; scope?: string} {
 }
 
 export const readAlertLog = (...args: Parameters<typeof readAlertLogImpl>) => withOracleAction('alertlog', () => readAlertLogImpl(...args));
+
+export const readIncidents = (...args: Parameters<typeof readIncidentsImpl>) => withOracleAction('alertlog', () => readIncidentsImpl(...args));
