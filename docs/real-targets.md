@@ -131,7 +131,19 @@ PIAGENT_DEFAULT_TARGET=app-pdb
 
 Keep `.env` at mode 0600. Existing shell environment settings take precedence;
 check for old target-file/default-target overrides without printing secrets.
-Use the same private-home configuration for the CLI and web server.
+Use the same private-home configuration for the CLI and web server:
+
+```bash
+piagent web
+```
+
+All web tabs accept the loaded private target names, including diagnostic panels,
+Drift, Report/history and chat selection. The private list replaces the packaged
+labs in every selector and API; a name outside the loaded list returns HTTP 400
+`Invalid target`. Check's All targets uses this same list. Restart the web server
+after editing the configuration. Target configuration and account validation are
+the same as the CLI; web does not grant database access or bypass preflight.
+See [web UI](web-ui.md).
 
 ## 3. Preflight without an LLM
 

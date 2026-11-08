@@ -109,7 +109,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 				const data: Record<string, unknown> = isTriage ? await body(req, 400 * 1024) : Object.fromEntries(new URL(req.url!, 'http://localhost').searchParams);
 				const target = data.target ?? manager.config.defaultTarget;
 				const allChecks = raw === '/api/check' && target === '__all_targets__';
-				if (typeof target !== 'string' || (!allChecks && ((raw !== '/api/check' && !['d1-19c-lab', 'p1-19c-prod', 'c1-19c-pdb'].includes(target)) || !manager.config.targets.some(t => t.name === target)))) throw new WebError(400, 'Invalid target');
+				if (typeof target !== 'string' || (!allChecks && !manager.config.targets.some(t => t.name === target))) throw new WebError(400, 'Invalid target');
 				if (isTriage && typeof data.issue === 'string' && Buffer.byteLength(data.issue) > 65536) throw new WebError(413, 'Issue exceeds 64 KiB');
 				try {
 					if (['/api/check', '/api/backup', '/api/jobs', '/api/top'].includes(raw)) {
@@ -182,9 +182,8 @@ export function createWebServer(options: WebServerOptions = {}) {
 			if (raw === "/api/drift") {
 				if (req.method !== "POST") throw new WebError(405, "Method not allowed");
 				const data = await body(req);
-				const approved = new Set(["d1-19c-lab", "p1-19c-prod", "c1-19c-pdb"]);
 				for (const target of [data.left, data.right]) {
-					if (typeof target !== "string" || !approved.has(target) || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
+					if (typeof target !== "string" || !manager.config.targets.some(t => t.name === target)) throw new WebError(400, "Invalid target");
 				}
 				if (typeof data.scope !== "string" || data.scope.length > 136) throw new WebError(400, "Invalid scope");
 				try { parseScope(data.scope); } catch { throw new WebError(400, "Invalid scope"); }
