@@ -13,7 +13,7 @@ it('serves every diagnostic API with private-home lab aliases without LLM', asyn
 	let web: ReturnType<typeof createWebServer> | undefined;
 	try {
 		const packaged = JSON.parse(await readFile(new URL('../../config/targets.json', import.meta.url), 'utf8'));
-		const names = ['lab-d1', 'lab-p1', 'lab-c1'];
+		const names = ['lab-d1', 'lab-p1', 'lab-c1', 'lab-c1s'];
 		const targets = packaged.targets.map((t: object, i: number) => ({ ...t, name: names[i] }));
 		await writeFile(join(home, 'targets.json'), JSON.stringify({ version: 1, targets }), { mode: 0o600 });
 		const config = loadConfig({ PIAGENT_HOME: home, PIAGENT_SECRET_DIR: process.env.PIAGENT_SECRET_DIR });
