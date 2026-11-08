@@ -96,30 +96,33 @@ for (const [id, phrase, command] of [
 	}
 });
 
-it('reuses capped safe names and excludes Oracle-maintained index owners without new queries', async () => {
-	const ctx = context(), query = vi.fn();
+it('combines invalid objects with every index unit type and caps all name lists deterministically', async () => {
+	const ctx = context(), query = vi.fn(async () => ({columns:['OWNER','OBJECT_NAME','OBJECT_TYPE'],rows:[['APP','INVALID_CUSTOMER_VIEW','VIEW']],truncated:false,elapsedMs:0}));
 	ctx.sessions.get = async () => ({target:ctx.config.targets[0]!,identity:{isCdb:false},close:async()=>{},query}) as never;
 	const section = (rows: Record<string, unknown>[]) => ({status:'ok',truncated:false,rows});
 	const jobs = vi.fn(async () => ({sections:{
-		runs:section(Array.from({length:8}, (_,i) => ({OWNER:'APP',JOB_NAME:`JOB${i}`,STATUS:'FAILED'})).concat([{OWNER:'APP',JOB_NAME:'password=hidden',STATUS:'FAILED'}])),
-		invalidObjects:section([{OWNER:'APP',OBJECT_COUNT:2}]),
+		runs:section(Array.from({length:8}, (_,i) => ({OWNER:'APP',JOB_NAME:`JOB${7-i}`,STATUS:'FAILED'})).concat([{OWNER:'APP',JOB_NAME:'password=hidden',STATUS:'FAILED'}])),
+		invalidObjects:section([{OWNER:'APP',OBJECT_COUNT:1}]),
 		indexes:section([{OWNER:'SYS',INDEX_NAME:'INTERNAL'}, {OWNER:'APP',INDEX_NAME:'IDX'}]),
 		indexPartitions:section([{INDEX_OWNER:'APP',INDEX_NAME:'IDX',PARTITION_NAME:'P1'}]),
 		indexSubpartitions:section([{INDEX_OWNER:'APP',INDEX_NAME:'IDX',PARTITION_NAME:'P1',SUBPARTITION_NAME:'S1'}]),
 	}}));
 	const security = vi.fn(async () => ({checks:[{id:'accounts',status:'ok',evidence:[{label:'users',status:'ok',rows:[['APP','N','OPEN',null,null],['SYS','Y','OPEN',null,null]]}],findings:[]},
-		{id:'default-passwords',status:'ok',evidence:[],findings:Array.from({length:8}, (_,i) => ({subject:`USER${i}`}))}]}));
+		{id:'default-passwords',status:'ok',evidence:[],findings:Array.from({length:8}, (_,i) => ({subject:`USER${7-i}`}))}]}));
 	const unavailable = async () => { throw new Error('ORA-00942'); };
 	const readers = {...collectors,space:unavailable,sessions:unavailable,backup:unavailable,alerts:unavailable,incidents:unavailable,jobs,security} as unknown as typeof collectors;
 	const run = await healthChecksWithNames(ctx, [ctx.config.targets[0]!.name], undefined, readers);
 	const text = healthText(run);
 	expect(text).toContain('APP.JOB0, APP.JOB1, APP.JOB2, APP.JOB3, APP.JOB4');
 	expect(text).not.toContain('JOB5'); expect(text).not.toContain('hidden');
-	expect(text).toContain('APP.IDX, APP.IDX.P1, APP.IDX.P1.S1');
+	expect(text).toContain('APP.IDX, APP.IDX.P1, APP.IDX.P1.S1, APP.INVALID_CUSTOMER_VIEW (VIEW)');
+	expect(text).toContain('APP.JOB4 +3 more');
+	expect(text).toContain('USER4 +3 more');
 	expect(text).not.toContain('SYS.INTERNAL');
 	expect(text).toContain('USER0, USER1, USER2, USER3, USER4'); expect(text).not.toContain('USER5');
 	expect(jobs).toHaveBeenCalledTimes(1); expect(security).toHaveBeenCalledTimes(2);
-	expect(query).not.toHaveBeenCalled();
+	expect(query).toHaveBeenCalledTimes(1);
+	expect(query).toHaveBeenCalledWith(expect.stringContaining("u.ORACLE_MAINTAINED = 'N'"), {}, expect.objectContaining({maxRows:ctx.config.limits.maxRows, timeoutSeconds:expect.any(Number)}));
 });
 
 function criticalDefaultPasswords(note = ''): CheckRun {
@@ -141,4 +144,37 @@ it('still redacts credential-looking names and evidence while preserving default
 	expect(text).toContain('defaultPasswords CRIT 5 accounts');
 	for (const secret of ['name_canary', 'evidence_canary', 'target_canary']) expect(text).not.toContain(secret);
 	expect(text).toContain('[REDACTED]');
+});
+
+it.each(['complete', 'capped', 'unavailable', 'many'] as const)('names mixed maintenance units with %s invalid-object details', async mode => {
+	const ctx = context();
+	ctx.sessions.get = async () => ({target:ctx.config.targets[0]!,identity:{isCdb:false},close:async()=>{},query:async () => ({columns:['OWNER','OBJECT_NAME','OBJECT_TYPE'],rows:mode === 'many' ? Array.from({length:7}, (_,i) => ['SHOPAPP', `INVALID_VIEW_${i}`, 'VIEW']) : [['SHOPAPP','INVALID_CUSTOMER_VIEW','VIEW']],truncated:mode === 'capped',elapsedMs:0})}) as never;
+	if (mode === 'unavailable') {
+		const get = ctx.sessions.get;
+		ctx.sessions.get = async target => ({...await get(target), query:async () => {throw new Error('ORA-00942');}});
+	}
+	const section = (rows: Record<string, unknown>[]) => ({status:'ok',truncated:false,rows});
+	const unavailable = async () => { throw new Error('ORA-00942'); };
+	const readers = {...collectors,space:unavailable,sessions:unavailable,backup:unavailable,alerts:unavailable,incidents:unavailable,
+		jobs:async()=>({sections:{runs:section([]),invalidObjects:section([{OWNER:'SHOPAPP',OBJECT_COUNT:mode === 'many' ? 7 : mode === 'capped' ? 3 : 1}]),indexes:section([]),indexPartitions:section([{INDEX_OWNER:'SHOPAPP',INDEX_NAME:'HISTORY_ORDER_IX',PARTITION_NAME:'P_202601'}]),indexSubpartitions:section([])}}),
+		security:async()=>({checks:[{id:'accounts',status:'ok',evidence:[{label:'users',status:'ok',rows:[['SHOPAPP','N','OPEN',null,null]]}],findings:[]},{id:'default-passwords',status:'ok',evidence:[],findings:[]}]}),
+	} as unknown as typeof collectors;
+	const run = await healthChecksWithNames(ctx, [ctx.config.targets[0]!.name], undefined, readers);
+	const maintenance = run.targets[0]!.checks.find(c => c.id === 'maintenance')!;
+	expect(maintenance.value).toBe(mode === 'many' ? 8 : mode === 'capped' ? 4 : 2);
+	expect(maintenance.status).toBe('WARN');
+	if (mode === 'complete') expect(maintenance.note).toContain('Names (up to 5): SHOPAPP.HISTORY_ORDER_IX.P_202601, SHOPAPP.INVALID_CUSTOMER_VIEW (VIEW).');
+	if (mode === 'capped') {
+		expect(maintenance.note).toContain('SHOPAPP.INVALID_CUSTOMER_VIEW (VIEW) +2 more');
+		expect(maintenance.note).toContain('Invalid-object names incomplete/unavailable');
+	}
+	if (mode === 'unavailable') {
+		expect(maintenance.note).toContain('SHOPAPP.HISTORY_ORDER_IX.P_202601 +1 more');
+		expect(maintenance.note).toContain('Invalid-object names incomplete/unavailable');
+		expect(maintenance.note).not.toContain('INVALID_CUSTOMER_VIEW');
+	}
+	if (mode === 'many') {
+		expect(maintenance.note).toContain('SHOPAPP.INVALID_VIEW_3 (VIEW) +3 more');
+		expect(maintenance.note).not.toContain('INVALID_VIEW_4');
+	}
 });

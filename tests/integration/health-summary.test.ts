@@ -17,5 +17,10 @@ for (const target of ['d1-19c-lab', 'c1-19c-pdb']) it(`health_check names mainte
 		expect(text).toMatch(/maintenance: (WARN|CRIT)/);
 		expect(text).toContain('measures: invalid objects plus unusable index/partition/subpartition units (non-Oracle-maintained owners)');
 		expect(text).toContain(`piagent jobs --target ${target}`);
+		if (target === 'c1-19c-pdb') {
+			const maintenance = text.split('\n').find(line => line.includes('maintenance:'))!;
+			expect(maintenance).toContain('SHOPAPP.INVALID_CUSTOMER_VIEW (VIEW)');
+			expect(maintenance).toContain('SHOPAPP.HISTORY_ORDER_IX.P_202601');
+		}
 	} finally { await sessions.closeAll(); }
 }, 120000);

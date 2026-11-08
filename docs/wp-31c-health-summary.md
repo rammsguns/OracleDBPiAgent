@@ -11,16 +11,17 @@ ranges rather than summing all missing sequence numbers.
 
 Only the agent tool adapter changes. CLI Markdown/JSON, check thresholds,
 collectors, shared contracts and the existing agent guidance stay unchanged.
-No additional database queries are issued. No dependencies were added.
+The original adapter issued no additional queries; the gate follow-up below
+adds one bounded invalid-object detail query. No dependencies were added.
 
 The adapter reuses existing failed scheduler run names and unusable index unit
 names, filtering maintenance owners with the same user metadata as the check.
 Default-password account names are also capped at five in the tool summary.
 Names are deduplicated, validated as simple Oracle identifier components and
-passed through existing credential redactors. Invalid objects are already
-aggregated by owner/type in the collector: individual object names are not
-available, and the adapter does not invent them or issue another query.
-`Names (up to 5)` describes examples, not complete evidence.
+passed through existing credential redactors. The original version could not
+name invalid objects because their collector aggregates by owner/type; the gate
+follow-up below closes that gap with a detail query. `Names (up to 5)` describes
+examples, not complete evidence.
 
 ## Size measurement
 
@@ -82,3 +83,57 @@ Follow-up validation:
 
 No LLM calls, pushes or merges. No contract changes requested. Model-level A/B
 verification remains with the coordinator.
+
+
+## Gate follow-up: complete maintenance name sources
+
+Merged `master` first with `git merge master` (merge commit `b59e1d6`); no
+conflicts. The merged tree includes WP-31A/31B.
+
+Maintenance names now combine invalid objects (`OWNER.OBJECT_NAME (TYPE)`),
+unusable indexes, partitions and subpartitions. Invalid-object names come from
+one extra read-only `DBA_OBJECTS`/`DBA_USERS` query when grouped invalid counts
+are positive and maintenance is enabled. It excludes Oracle-maintained owners,
+orders by owner/name/type, uses the configured row cap, and runs through the
+existing audited session inside the jobs probe's remaining statement budget.
+The original grouped measurements and CLI contracts remain unchanged.
+
+All existing name-bearing checks (maintenance, failed jobs, default passwords)
+now sort their full source set deterministically, deduplicate, cap at five and
+append `+N more` when names are omitted. Failed jobs still use every FAILED run
+that contributes to its count; recurring failures of the same job share one
+name. Default-password names still use all findings. No other existing names
+list draws from a subset of its counted categories.
+
+Unavailable or capped invalid-name evidence is explicitly labelled incomplete;
+the numeric maintenance verdict is retained when the count evidence is complete.
+For maintenance, the omitted-unit tail also accounts for counted units absent
+from the bounded name evidence. Names remain validated and credential-redacted.
+Queries are separate snapshots; names and grouped counts can change between them.
+
+Live C1 verification: `npm run piagent -- check --target c1-19c-pdb` returns WARN
+(exit 1), including maintenance `2 objects/index units`. The agent adapter's
+same check-style Markdown renderer (`renderCheckMarkdown(checkedHealth(...))`)
+shows both names in that row; the CLI itself continues using the original
+collector notes, as required by this agent-path package's scope:
+
+```text
+| c1-19c-pdb | maintenance | WARN | 2 objects/index units | 1 / 20 | This PDB (PIPDB1) | piagent jobs --target c1-19c-pdb | Index, partition and subpartition units counted separately. Names (up to 5): SHOPAPP.HISTORY_ORDER_IX.P_202601, SHOPAPP.INVALID_CUSTOMER_VIEW (VIEW). |
+```
+
+Tests cover mixed invalid-view/partition names, every maintenance unit category,
+reversed input ordering, five-name caps and omitted tails for all name lists,
+capped/unavailable invalid-object details, owner filtering and query row bounds.
+The live health-summary test now asserts both C1 defect names on the maintenance
+line.
+
+Gate follow-up validation:
+
+- `npm run typecheck`: passed.
+- `npm test -- --maxWorkers=2`: 142 files, 2793 tests passed (101.90s).
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/health-summary.test.ts tests/integration/c1-pdb-live.test.ts tests/integration/c1-review.test.ts --no-file-parallelism`: 3 files, 5 tests passed (76.70s).
+- Live CLI check: WARN, exit 1 as expected. Live adapter text and check-style
+  Markdown both contain the invalid view and unusable partition names.
+
+No shared contract changes requested. Actual model answer quality remains for
+the coordinator's A/B gate. No LLM calls or pushes.

@@ -19,15 +19,26 @@ const measures: Record<string, string> = {
 	expiry: 'days until nearest unlocked application-account password expiry',
 	defaultPasswords: 'open accounts using default passwords',
 };
-/** Names come only from existing collector rows; never query extra evidence. */
+/** Supplement grouped invalid-object counts inside the existing audited probe budget. */
 export async function healthChecksWithNames(ctx: ToolContext, targets: readonly string[], settings: Parameters<typeof runChecks>[2], readers = collectors): Promise<CheckRun> {
 	const jobs = new Map<string, Awaited<ReturnType<typeof collectors.jobs>>>();
 	const owners = new Map<string, Set<string>>();
 	const defaults = new Map<string, string[]>();
+	const invalidNames = new Map<string, { rows: Record<string, unknown>[]; incomplete: boolean }>();
 	const run = await runChecks(ctx, targets, settings, { ...readers,
 		jobs: async (context, target, options) => {
 			const result = await readers.jobs(context, target, options);
-			jobs.set(target, result); return result;
+			jobs.set(target, result);
+			if (!settings?.(target).disable?.includes('maintenance') && result.sections.invalidObjects?.rows.some(r => Number(r.OBJECT_COUNT) > 0)) {
+				try {
+					const session = await context.sessions.get(target);
+					const data = await session.query("SELECT o.OWNER, o.OBJECT_NAME, o.OBJECT_TYPE FROM DBA_OBJECTS o JOIN DBA_USERS u ON u.USERNAME = o.OWNER WHERE o.STATUS = 'INVALID' AND u.ORACLE_MAINTAINED = 'N' ORDER BY o.OWNER, o.OBJECT_NAME, o.OBJECT_TYPE", {}, {maxRows:context.config.limits.maxRows});
+					invalidNames.set(target, {rows:data.rows.map(row => Object.fromEntries(data.columns.map((column, i) => [column, row[i]]))), incomplete:data.truncated});
+				} catch {
+					invalidNames.set(target, {rows:[], incomplete:true});
+				}
+			}
+			return result;
 		},
 		security: async (session, options) => {
 			const result = await readers.security(session, options);
@@ -39,17 +50,22 @@ export async function healthChecksWithNames(ctx: ToolContext, targets: readonly 
 		},
 	});
 	for (const target of run.targets) for (const check of target.checks) {
-		if (check.status === 'OK' && check.observedStatus !== 'UNKNOWN') continue;
+		if (check.status === 'SKIPPED' || (check.status === 'OK' && check.observedStatus !== 'UNKNOWN')) continue;
 		const sections = jobs.get(target.target)?.sections;
-		let names: string[] = [];
+		let names: {parts: unknown[]; type?: string}[] = [];
 		if (check.id === 'defaultPasswords') {
-			names = defaults.get(target.target) ?? [];
+			names = (defaults.get(target.target) ?? []).map(name => ({parts:[name]}));
 			if (check.note.startsWith('Accounts: ')) check.note = '';
 		}
-		if (check.id === 'failedJobs') names = (sections?.runs?.rows ?? []).filter(r => r.STATUS === 'FAILED').map(r => `${r.OWNER}.${r.JOB_NAME}`);
-		if (check.id === 'maintenance') names = ['indexes', 'indexPartitions', 'indexSubpartitions'].flatMap(id => (sections?.[id as keyof typeof sections]?.rows ?? []).filter(r => owners.get(target.target)?.has(String(r.OWNER ?? r.INDEX_OWNER))).map(r => [r.OWNER ?? r.INDEX_OWNER, r.INDEX_NAME, r.PARTITION_NAME, r.SUBPARTITION_NAME].filter(x => x != null).join('.')));
-		const safe = [...new Set(names.filter(n => n.split('.').every(part => /^[A-Za-z][A-Za-z0-9_$#]{0,127}$/.test(part))))].slice(0, 5);
-		if (safe.length) check.note += `${check.note ? ' ' : ''}Names (up to 5): ${safe.join(', ')}.`;
+		if (check.id === 'failedJobs') names = (sections?.runs?.rows ?? []).filter(r => r.STATUS === 'FAILED').map(r => ({parts:[r.OWNER, r.JOB_NAME]}));
+		if (check.id === 'maintenance') {
+			names = ['indexes', 'indexPartitions', 'indexSubpartitions'].flatMap(id => (sections?.[id as keyof typeof sections]?.rows ?? []).filter(r => owners.get(target.target)?.has(String(r.OWNER ?? r.INDEX_OWNER))).map(r => ({parts:[r.OWNER ?? r.INDEX_OWNER, r.INDEX_NAME, r.PARTITION_NAME, r.SUBPARTITION_NAME].filter(x => x != null)})));
+			names.push(...(invalidNames.get(target.target)?.rows ?? []).filter(r => owners.get(target.target)?.has(String(r.OWNER))).map(r => ({parts:[r.OWNER, r.OBJECT_NAME], type:String(r.OBJECT_TYPE)})));
+			if (invalidNames.get(target.target)?.incomplete) check.note += ' Invalid-object names incomplete/unavailable; drill down for full evidence.';
+		}
+		const safe = [...new Set(names.filter(n => n.parts.every(part => typeof part === 'string' && /^[A-Za-z][A-Za-z0-9_$#]{0,127}$/.test(part))).map(n => n.parts.join('.') + (n.type && /^[A-Z][A-Z _]{0,30}$/.test(n.type) ? ` (${n.type})` : '')))].sort();
+		const remaining = Math.max(safe.length, check.id === 'maintenance' ? check.value ?? 0 : 0) - Math.min(5, safe.length);
+		if (safe.length) check.note += `${check.note ? ' ' : ''}Names (up to 5): ${safe.slice(0, 5).join(', ')}${remaining > 0 ? ` +${remaining} more` : ''}.`;
 	}
 	return redact(run);
 }
