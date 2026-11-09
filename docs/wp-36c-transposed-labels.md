@@ -4,16 +4,27 @@
 
 `rowMatches` now recognizes two-column `Attribute | Value` tables for one- or
 two-field truth rows. It normalizes case, Markdown, underscores, spaces and
-punctuation in row labels. Each truth column must bind to a distinct row whose
-label equals the normalized truth label, contains its words, or uses a clear
-word prefix (so `NEXT_RUN` matches `Next Run Time`). The value still passes
-through the cell matcher, including positive `Yes (`TRUE`)` annotations and
-negation checks. Explicit dash explanations are accepted when they repeat the
-asserted value and contain no negation, as in `YES — GLOBAL_STATS = YES`.
+punctuation in row labels. Every truth-column word must match a whole label
+word. Extra words are limited to the neutral set `time`, `date`, `status`,
+`state`, `value`, `setting`, `recorded`, and `current`; negated and historical
+qualifiers fail. It handles assignments across columns together, preferring
+exact labels and then labels with fewer extra words. Equally ranked duplicate
+rows must all agree with truth. The scorer retains explicit Oracle wording such
+as `Current container` and `Parent CDB` for the corresponding database fields.
+
+Cell values still use the existing matcher, including positive
+`Yes (`TRUE`)` annotations. Explicit dash explanations are accepted when they
+repeat the asserted value and contain no negation, including `NO — STALE_STATS
+= NO`. That guard was added in this branch; the `NO` repetition asymmetry is
+fixed. The reported three-column loose multiset behavior was also reproduced
+with both master and branch scorers; it is inherited and unchanged here.
 
 The real `hard-p26-p1-next-run-semantics` definition is exercised with the exact
 Phase 35 gate B answer from `2026-11-09T17-53-00-249Z-3ea1d9e4-ec82-499d-97b2-bba4dd239409.json`.
 Wrong `NOT RECORDED`, `PRESENT` under `Owner`, and `Not TRUE` all fail.
+Tests also reject every reviewed negation/history qualifier, non-neutral label
+extras, `Runaway` prefix lookalikes, and conflicting duplicate rows in either
+order. A swapped-order `RUN`/`NEXT_RUN` table passes through global assignment.
 
 ## Files changed
 
@@ -36,9 +47,9 @@ I read both flipped answers. The Phase 30 answer correctly reports stale and glo
 ## Validation
 
 - Master comparison for the existing archived-answer test: pass on `/home/kiwi/orca/projects/OracleDBPiAgent` (master, read-only).
-- Focused `tests/unit/row-cells.test.ts`: **16 passed**.
+- Focused `tests/unit/row-cells.test.ts`: **18 passed**.
 - `npm run typecheck`: passed.
-- `npm test -- --maxWorkers=2`: **148 files passed, 2,957 tests passed**.
+- `npm test -- --maxWorkers=2`: **148 files passed, 2,959 tests passed**.
 - Eval suite and Strata e2e were not run; no LLM calls were made.
 
 ## Contracts and unverified items

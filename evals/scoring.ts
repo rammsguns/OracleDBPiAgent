@@ -191,8 +191,12 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (annotation && !numeric(value) && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(clean(actual))
 			&& clean(annotation[1]!).toLowerCase() === clean(value).toLowerCase()) return true;
 		const explainedValue = new RegExp(`^${escapeRegex(value)}\\s*[-–—:]\\s*(.+)$`, 'i').exec(clean(actual));
-		if (explainedValue && !numeric(value) && !/\b(?:not|no|never|except|without|was|formerly|previously|false|incorrect|wrong)\b/i.test(explainedValue[1]!)
-			&& new RegExp(`\\b${escapeRegex(value)}\\b`, 'i').test(explainedValue[1]!)) return true;
+		const explanation = explainedValue?.[1] ?? '';
+		const negativeExplanation = /\b(?:not|never|except|without|was|formerly|previously|false|incorrect|wrong)\b/i.test(explanation)
+			|| (value.toUpperCase() !== 'NO' && /\bno\b/i.test(explanation))
+			|| (value.toUpperCase() === 'NO' && /\bno\b/i.test(explanation.replace(/(?:=|:)\s*NO\b/gi, '')));
+		if (explainedValue && !numeric(value) && !negativeExplanation
+			&& new RegExp(`\\b${escapeRegex(value)}\\b`, 'i').test(explanation)) return true;
 		if (historySignature && label === 'defaulted' && value === 'N' && /^(?:no|none)$/i.test(text)) return true;
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
@@ -219,17 +223,34 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 	};
 	const labelWords = (text: string) => text.replace(/[`*]/g, '').replace(/_/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
 	const rowLabelScore = (actual: string, expected: string) => {
-		const actualWords = labelWords(actual), expectedWords = labelWords(expected);
-		if (!actualWords.length || !expectedWords.length) return -1;
-		const tokenScore = (actualWord: string, expectedWord: string) => {
-			if (actualWord === expectedWord) return 4;
-			if (actualWord.startsWith(expectedWord) || expectedWord.startsWith(actualWord)) return 2;
-			if (expectedWord === 'database' && actualWord === 'cdb') return 2;
-			if (expectedWord === 'database' && actualWord === 'db') return 1;
-			return 0;
+		const allWords = labelWords(actual), expectedWords = labelWords(expected);
+		const expectedKey = expectedWords.join(' ');
+		if (!allWords.length || !expectedWords.length) return -1;
+		const truthWords = new Set(expectedWords);
+		const guarded = new Set(['not', 'no', 'non', 'never', 'un', 'was', 'formerly', 'previous', 'previously', 'last', 'prior', 'old', 'former']);
+		if (allWords.some(word => guarded.has(word) && !truthWords.has(word))) return -1;
+		let actualWords = labelWords(actual.replace(/\s*\([^()]*\)\s*$/, ''));
+		const phraseAliases: Record<string, string[]> = {
+			'current container': ['container', 'name'],
+			'parent cdb': ['database', 'name'],
+			'parent database': ['database', 'name'],
 		};
-		const score = expectedWords.reduce((sum, expectedWord) => sum + Math.max(0, ...actualWords.map(word => tokenScore(word, expectedWord))), 0);
-		return score > 0 ? score : -1;
+		actualWords = phraseAliases[actualWords.join(' ')] ?? actualWords;
+		const neutral = new Set(['time', 'date', 'status', 'state', 'value', 'setting', 'recorded', 'current']);
+		const remaining = [...actualWords];
+		for (const word of expectedWords) {
+			const index = remaining.indexOf(word);
+			if (index >= 0) remaining.splice(index, 1);
+			else return -1;
+		}
+		if (remaining.some(word => !neutral.has(word))) return -1;
+		const exact = actualWords.length === expectedWords.length && actualWords.every((word, index) => word === expectedWords[index]);
+		return exact ? 1_000_000 : 100_000 - remaining.length;
+	};
+	const namedValueScore = (cell: string, label: string, expected: unknown) => {
+		if (!/^[A-Za-z_][\w$#]*$/.test(label)) return -1;
+		const escaped = escapeRegex(String(expected));
+		return new RegExp(`\\b${escapeRegex(label)}\\s*=\\s*['\"]?${escaped}['\"]?(?![\\w.])`, 'i').test(clean(cell)) ? 50_000 : -1;
 	};
 	// Expand only whole, positive lists in table cells for single-column truth.
 	// Do this before record splitting: a slash must not detach DELETE from
@@ -395,17 +416,33 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		// row label, allowing descriptive labels such as "Next Run Time".
 		if (singleRow && row.length <= 2 && header.length === 2 && /^attribute$/i.test(header[keyColumn] ?? '') && valueColumns.length === 1 && /^value$/i.test(header[valueColumns[0]!] ?? '')) {
 			const valueColumn = valueColumns[0]!;
-			const availableRows = block.slice(1).map(cells => [...cells]);
-			const bound = row.map((_expected, index) => {
-				const scores = availableRows.map(cells => rowLabelScore(cells[keyColumn] ?? '', labels[index] ?? ''));
-				const best = Math.max(...scores);
-				const found = best > 0 ? scores.indexOf(best) : -1;
-				if (found < 0) return undefined;
-				return availableRows.splice(found, 1)[0];
-			});
-			if (bound.every(cells => cells !== undefined)) return bound.every((cells, index) => same(cells[valueColumn] ?? '', row[index], labels[index] ?? ''));
-			if (bound.some(cells => cells !== undefined)
-				|| block.slice(1).some(cells => row.some((expected, index) => same(cells[valueColumn] ?? '', expected, labels[index] ?? '')))) return false;
+			const dataRows = block.slice(1);
+			const scoresByColumn = row.map((expected, index) => dataRows.map(cells => Math.max(
+				rowLabelScore(cells[keyColumn] ?? '', labels[index] ?? ''),
+				namedValueScore(cells[valueColumn] ?? '', labels[index] ?? '', expected),
+			)));
+			const assignments: { rows: number[]; scores: number[]; total: number }[] = [];
+			const assign = (column: number, usedRows: Set<number>, rows: number[], scores: number[], total: number) => {
+				if (column === row.length) { assignments.push({ rows, scores, total }); return; }
+				for (let rowIndex = 0; rowIndex < dataRows.length; rowIndex++) {
+					const labelScore = scoresByColumn[column]![rowIndex]!;
+					if (usedRows.has(rowIndex) || labelScore < 0) continue;
+					assign(column + 1, new Set([...usedRows, rowIndex]), [...rows, rowIndex], [...scores, labelScore], total + labelScore);
+				}
+			};
+			assign(0, new Set(), [], [], 0);
+			if (assignments.length) {
+				const bestTotal = Math.max(...assignments.map(candidate => candidate.total));
+				const bestAssignments = assignments.filter(candidate => candidate.total === bestTotal);
+				return bestAssignments.every(candidate => candidate.rows.every((rowIndex, index) => {
+					const truthValue = row[index];
+					const score = candidate.scores[index]!;
+					const duplicatesAgree = dataRows.every((cells, duplicateIndex) => scoresByColumn[index]![duplicateIndex] !== score
+						|| same(cells[valueColumn] ?? '', truthValue, labels[index] ?? ''));
+					return duplicatesAgree && same(dataRows[rowIndex]![valueColumn] ?? '', truthValue, labels[index] ?? '');
+				}));
+			}
+			if (dataRows.some(cells => row.some((expected, index) => same(cells[valueColumn] ?? '', expected, labels[index] ?? '')))) return false;
 		}
 		// In a vertical relationship table, child and parent attributes describe
 		// distinct records. Group only table/column attributes of the same role.

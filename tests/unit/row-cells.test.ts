@@ -79,7 +79,29 @@ In short, a recorded \`NEXT_RUN_DATE\` confirms the scheduler has a future firin
 	const explanation = 'This is an estimate, not a guarantee of success or execution.\n';
 	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Next Run Time | NOT RECORDED |')).toBe(false);
 	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Owner | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Owner | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Owner (ENABLED) | TRUE |\n| Next Run Time | PRESENT |')).toBe(false);
 	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | Not TRUE |\n| Next Run Time | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE — not TRUE |\n| Next Run Time | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled status owner | TRUE |\n| Next Run Time | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Next Runaway Time | PRESENT |')).toBe(false);
+	for (const label of ['Not Enabled', 'No Enabled', 'Non Enabled', 'Never Enabled', 'Un-enabled', 'Enabled was', 'Formerly Enabled', 'Previous Enabled', 'Previously Enabled', 'Last Enabled', 'Prior Enabled', 'Old Enabled', 'Former Enabled']) {
+		expect(scored(explanation + `| Attribute | Value |\n|---|---|\n| ${label} | TRUE |\n| Next Run Time | PRESENT |`), label).toBe(false);
+	}
+	for (const table of [
+		'| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Enabled | FALSE |\n| Next Run Time | PRESENT |',
+		'| Attribute | Value |\n|---|---|\n| Enabled | FALSE |\n| Enabled | TRUE |\n| Next Run Time | PRESENT |',
+	]) expect(scored(explanation + table), table).toBe(false);
+});
+it('assigns swapped RUN and NEXT_RUN rows by exact label before subset matches', () => {
+	const runCase: EvalCase = { ...test, groundTruth: { sql: 'SELECT run AS run, next_run AS next_run FROM dual', mode: 'rowCells' } };
+	const rows = [['RUN_VALUE', 'NEXT_RUN_VALUE']];
+	const answer = '| Attribute | Value |\n|---|---|\n| Next Run Time | NEXT_RUN_VALUE |\n| Run | RUN_VALUE |';
+	expect(score(runCase, result(answer), rows).pass).toBe(true);
+});
+it('accepts an asserted NO with a positive repeated dash annotation', () => {
+	const noCase: EvalCase = { ...test, groundTruth: { sql: 'SELECT stale_stats, global_stats FROM dual', mode: 'rowCells' } };
+	expect(score(noCase, result('| Attribute | Value |\n|---|---|\n| Stale Stats | NO — STALE_STATS = NO |\n| Global Stats | NO — GLOBAL_STATS = NO |'), [['NO', 'NO']]).pass).toBe(true);
 });
 it('normalizes numeric text in prose without losing precision', () => {
 	expect(score(test, result('Alpha has 1.2000 and −55,500.00.'), [['Alpha', '1.2', -55500]]).pass).toBe(true);
