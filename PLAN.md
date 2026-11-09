@@ -5049,6 +5049,23 @@ used the real `V$BACKUP_*` names.
 - 34C false negatives: the bulleted p19 layout and copular classification
   wording.
 
+## Phase 35: honest missing-object notes and template false negatives (approved 2026-11-08: "next phases approved and optional extras"; continued with "continue")
+
+Goal: stop the WP-33A ORA-00942 note from reporting a nonexistent view as "not
+visible to this account", and fix the two known 34C false negatives.
+
+| WP | Branch | Agent | Scope |
+|---|---|---|---|
+| WP-35A nonexistent dictionary views | `wp-35a-missing-views` | Codex | In the ORA-00942 attribution note, split the not-visible objects that are `V$`/`GV$` names into two groups, using one bounded read-only lookup of `ALL_SYNONYMS WHERE OWNER='PUBLIC' AND SYNONYM_NAME IN (...)`. With no public synonym: "does not exist in Oracle 19c (check the view name)". With one: "exists but is not granted to this account". Other objects keep "not visible (missing or not granted)". At most one extra query, only when the attribution already found non-visible V$ names. Real case: `V$RMAN_BACKUP_DATAFILES` on d1. Unit tests plus a live d1 integration test |
+| WP-35C template false negatives | `wp-35c-template-fixes` | Codex | Correct answers that must pass: p19 in bulleted layout (object name and stale/present facts on one bullet line) and p30 copular classification ("is classified as LOW", "falls in the LOW band", "LOW classification"). Keep every existing MUST FAIL failing. The archive replay (phases 25–34) must show 0 pass→fail |
+
+### Gate
+gate200 = gate190. A = master + 35C, B = A + 35A. All refusals pass. Every
+miss is read. B must be no worse beyond noise.
+
+### Release
+1.11.0 after the gate.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
