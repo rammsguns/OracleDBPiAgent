@@ -7,6 +7,35 @@ function setup() {
 	const ctx = {config:{defaultTarget:'lab',targets:[{name:'lab',defaultSchema:'HR',environment:'development',description:'Lab'}],limits:{maxRows:10,maxToolResultBytes:1000}},sessions:{get},audit:{record},runId:'test'} as unknown as ToolContext;
 	return {tools:createDbTools(ctx),get,query,close,record,ctx};
 }
+it('adds standby provenance notes only for matching successful reads and caches role lookup', async () => {
+	const {tools,query,get}=setup();
+	const session={query,close:vi.fn(),identity:{isCdb:true,containerName:'PIPDB1'}};
+	get.mockResolvedValue(session);
+	const tool=tools.find(t=>t.name==='run_query')!;
+	const backup=await tool.execute('1',{sql:'SELECT * FROM sys."V$BACKUP_SET" b'});
+	expect(backup.details.sourceNote).toBeUndefined();
+	query.mockResolvedValueOnce({columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1});
+	const scheduler=await tool.execute('2',{sql:'WITH j AS (SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS) SELECT * FROM j'});
+	expect(scheduler.details.sourceNote).toContain('written on the primary and replicated by redo apply');
+	const second=await tool.execute('3',{sql:'SELECT * FROM GV$BACKUP_SET'});
+	expect(second.details.sourceNote).toContain('do not show a backup taken on this standby');
+	expect(query.mock.calls.filter(([sql])=>String(sql).includes('DATABASE_ROLE')).length).toBe(1);
+});
+it('skips provenance on primary and unrelated SQL, and silently ignores unknown role', async () => {
+	const primary=setup();
+	primary.get.mockResolvedValue({query:primary.query,close:primary.close,identity:{databaseRole:'PRIMARY'}});
+	const tool=primary.tools.find(t=>t.name==='run_query')!;
+	const unrelated=await tool.execute('1',{sql:'SELECT 1 FROM dual'});
+	expect(unrelated.details.sourceNote).toBeUndefined();
+	const backup=await tool.execute('2',{sql:'SELECT * FROM V$BACKUP_SET'});
+	expect(backup.details.sourceNote).toBeUndefined();
+	expect(primary.query).toHaveBeenCalledOnce();
+	const unknown=setup();
+	unknown.get.mockResolvedValue({query:unknown.query,close:unknown.close,identity:{}});
+	unknown.query.mockRejectedValueOnce(new Error('role hidden'));
+	const result=await unknown.tools.find(t=>t.name==='run_query')!.execute('1',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_LOG'});
+	expect(result.details.sourceNote).toBeUndefined();
+});
 it('registers every MVP tool and lists targets without database access',async()=>{
 	const {tools,get,record}=setup();expect(tools).toHaveLength(13);expect(new Set(tools.map(t=>t.name)).size).toBe(13);
 	const r=await tools.find(t=>t.name==='list_targets')!.execute('1',{});expect(r.content[0]).toMatchObject({type:'text'});expect(get).not.toHaveBeenCalled();expect(record).toHaveBeenCalledWith(expect.objectContaining({kind:'tool_call',tool:'list_targets'}));

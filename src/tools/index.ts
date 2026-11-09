@@ -10,6 +10,7 @@ import { classifySql } from "../oracle/sqlPolicy.js";
 import { queriesFileMaxbytes } from "../space/queryNote.js";
 
 import { readPdbOverview } from "./overview.js";
+import { readDatabaseRole } from "../backup/role.js";
 
 const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
 
@@ -146,6 +147,16 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = dictionaryDomainHint(sql, 0) ?? await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
 						if (name === "run_query" && isNullApplyLag(sql, result as QueryResult) && session.identity?.isCdb && session.identity.containerName && !['CDB$ROOT', 'PDB$SEED'].includes(session.identity.containerName.toUpperCase())) {
 							sourceNote = "Inside a PDB, Oracle hides apply lag (NULL). This does not mean zero lag. Use health_check/piagent check dgLag; its bounded apply value is based on the V$MANAGED_STANDBY view.";
+						}
+						if (name === "run_query") {
+							const provenance = standbyProvenanceKind(sql);
+							if (provenance) {
+								const identityRole = (session.identity as typeof session.identity & { databaseRole?: string; database_role?: string }).databaseRole ?? (session.identity as typeof session.identity & { database_role?: string }).database_role;
+								const role = identityRole ? { standby: identityRole.toUpperCase().includes('STANDBY') } : await readDatabaseRole(session);
+								if (role.standby) sourceNote = [sourceNote, provenance === 'backup'
+									? "Standby provenance: this database is a physical standby. Backup records in its control file can be copied from the primary by duplicate or control-file restore, so they do not show a backup taken on this standby. Backups are normally taken on the primary; use the backup tool / piagent backup for qualified evidence."
+									: "Standby provenance: scheduler history on a physical standby was written on the primary and replicated by redo apply; jobs do not run on this standby."].filter(Boolean).join(' ');
+							}
 						}
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
@@ -435,6 +446,17 @@ export function referencedObjects(sql: string): string[] | undefined {
 		i=end;
 	}
 	return [...new Set(found)];
+}
+
+function standbyProvenanceKind(sql: string): 'backup' | 'scheduler' | undefined {
+	const names = new Set(sqlTokens(sql).map(token => identifierValue(token).toUpperCase()));
+	const backups = new Set(['V$BACKUP_SET','V$BACKUP_PIECE','V$BACKUP_DATAFILE','V$BACKUP_REDOLOG','V$BACKUP_SET_DETAILS','V$BACKUP_PIECE_DETAILS','V$BACKUP_FILES','V$RMAN_BACKUP_JOB_DETAILS','V$RMAN_STATUS','V$RMAN_OUTPUT','V$RMAN_CONFIGURATION','V$DATAFILE_COPY','V$CONTROLFILE_RECORD_SECTION']);
+	for (const name of [...names]) {
+		const view = name.replace(/^SYS\./, '');
+		if (backups.has(view) || [...backups].some(backup => backup.startsWith('V$') && view === `G${backup}`)) return 'backup';
+		if (/^(?:DBA|ALL|USER)_SCHEDULER_JOB_(?:RUN_DETAILS|LOG)$/.test(view)) return 'scheduler';
+	}
+	return undefined;
 }
 
 function renderIdentifier(token: string): string {

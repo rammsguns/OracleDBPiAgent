@@ -84,3 +84,30 @@ it('notes Oracle-hidden NULL apply lag from wildcard V$DATAGUARD_STATS on c1s-19
 		throw e;
 	} finally { await provider.closeAll(); }
 },30000);
+
+it('notes copied backup and scheduler provenance on c1s and none on c1', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const provider=createSessionProvider(liveConfig('c1s-19c-stby'));
+	try {
+		const tool=createDbTools({config:liveConfig('c1s-19c-stby'),sessions:provider,audit:{record:async()=>{}},runId:'wp34a-c1s'}).find(t=>t.name==='run_query')!;
+		const backup=await tool.execute('live',{sql:'SELECT COUNT(*) FROM V$BACKUP_SET'});
+		const jobs=await tool.execute('live',{sql:'SELECT COUNT(*) FROM DBA_SCHEDULER_JOB_RUN_DETAILS'});
+		expect(backup.details.sourceNote).toContain('copied from the primary');
+		expect(backup.details.sourceNote).toContain('backup tool / piagent backup');
+		expect(jobs.details.sourceNote).toContain('replicated by redo apply');
+	} catch (e) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('c1s Oracle listener unavailable'); return; }
+		throw e;
+	} finally { await provider.closeAll(); }
+	const primary=createSessionProvider(liveConfig('c1-19c-prod'));
+	try {
+		const tool=createDbTools({config:liveConfig('c1-19c-prod'),sessions:primary,audit:{record:async()=>{}},runId:'wp34a-c1'}).find(t=>t.name==='run_query')!;
+		for (const sql of ['SELECT COUNT(*) FROM V$BACKUP_SET','SELECT COUNT(*) FROM DBA_SCHEDULER_JOB_RUN_DETAILS']) {
+			const result=await tool.execute('live',{sql});
+			expect(result.details.sourceNote).toBeUndefined();
+		}
+	} catch (e) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('c1 Oracle listener unavailable'); return; }
+		throw e;
+	} finally { await primary.closeAll(); }
+},30000);
