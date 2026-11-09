@@ -10,8 +10,10 @@ import { classifySql } from "../oracle/sqlPolicy.js";
 import { queriesFileMaxbytes } from "../space/queryNote.js";
 
 import { readPdbOverview } from "./overview.js";
+import { readDatabaseRole } from "../backup/role.js";
 
 const MAX_VIEW_SOURCE_BYTES = 1024 * 1024;
+const standbyRoleCache = new WeakMap<object, Map<string, Promise<{ standby: boolean }>>>();
 
 const str = () => Type.Optional(Type.String());
 const integer = (max: number) => Type.Optional(Type.Integer({ minimum: 1, maximum: max }));
@@ -146,6 +148,25 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 						if (name === "run_query" && !(result as QueryResult).rows.length) sourceNote = dictionaryDomainHint(sql, 0) ?? await emptyDictionaryHint(session, sql, binds, ctx.config.limits.statementTimeoutSeconds, signal);
 						if (name === "run_query" && isNullApplyLag(sql, result as QueryResult) && session.identity?.isCdb && session.identity.containerName && !['CDB$ROOT', 'PDB$SEED'].includes(session.identity.containerName.toUpperCase())) {
 							sourceNote = "Inside a PDB, Oracle hides apply lag (NULL). This does not mean zero lag. Use health_check/piagent check dgLag; its bounded apply value is based on the V$MANAGED_STANDBY view.";
+						}
+						if (name === "run_query") {
+							const provenance = standbyProvenanceKind(sql);
+							if (provenance) {
+								const identityRole = (session.identity as typeof session.identity & { databaseRole?: string })?.databaseRole;
+								let providerCache = standbyRoleCache.get(ctx.sessions as object);
+								if (!providerCache) { providerCache = new Map(); standbyRoleCache.set(ctx.sessions as object, providerCache); }
+								let cached = providerCache.get(target);
+								if (!cached) {
+									cached = identityRole
+									? Promise.resolve({ standby: identityRole.toUpperCase().includes('STANDBY') })
+										: readDatabaseRole(session, { maxRows: 1, timeoutSeconds: Math.min(2, ctx.config.limits.statementTimeoutSeconds ?? 2) });
+									providerCache.set(target, cached);
+								}
+								const role = await cached;
+								if (role.standby) sourceNote = [sourceNote, provenance === 'backup'
+									? "Standby provenance: this database is a physical standby. Backup records in its control file can be copied from the primary by duplicate or control-file restore, so they do not show a backup taken on this standby. Backups are normally taken on the primary; use the backup tool / piagent backup for qualified evidence."
+									: "Standby provenance: scheduler history on a physical standby was written on the primary and replicated by redo apply; jobs do not run on this standby."].filter(Boolean).join(' ');
+							}
 						}
 						if (name === "explain_plan" && (result as QueryResult).rows.some(r => /cannot fetch plan|ORA-\d+|error:/i.test(String(r[0])))) {
 							// Some cursor/grant combinations return diagnostics instead of a plan.
@@ -402,11 +423,23 @@ function identifierValue(token: string): string {
 }
 
 /** Returns undefined whenever a source construct cannot be classified safely. */
-export function referencedObjects(sql: string): string[] | undefined {
+export function referencedObjects(sql: string, includeCtes = false): string[] | undefined {
 	const tokens=sqlTokens(sql);
-	// CTE bodies and scopes need full query-block resolution. Decline attribution
-	// for every WITH statement rather than probing a CTE alias or missing a real source.
-	if(tokens.some(token=>token.toUpperCase()==='WITH')) return;
+	if (!includeCtes && tokens.some(token => token.toUpperCase() === 'WITH')) return;
+	const ctes = new Set<string>();
+	if (tokens.some(token => token.toUpperCase() === 'WITH')) {
+		for (let i=0;i<tokens.length;i++) if (tokens[i]!.toUpperCase()==='WITH') {
+			let j=i+1;
+			while (j<tokens.length) {
+				if (!strictObjectPart.test(tokens[j]!) || ['RECURSIVE','SELECT'].includes(tokens[j]!.toUpperCase())) break;
+				ctes.add(identifierValue(tokens[j]!).toUpperCase()); j++;
+				if (tokens[j]==='(') { let depth=1; j++; while(j<tokens.length&&depth){if(tokens[j]==='(')depth++;else if(tokens[j]===')')depth--;j++;} }
+				if (tokens[j]?.toUpperCase()!=='AS') break;
+				j++; if(tokens[j]==='('){let depth=1;j++;while(j<tokens.length&&depth){if(tokens[j]==='(')depth++;else if(tokens[j]===')')depth--;j++;}}
+				if(tokens[j]===','){j++;continue;} break;
+			}
+		}
+	}
 	const found: string[]=[];
 	const endsFrom = new Set(['WHERE','GROUP','ORDER','CONNECT','START','HAVING','UNION','MINUS','INTERSECT','FETCH','MODEL','PIVOT','QUALIFY']);
 	const sourceKeywords = new Set(`SELECT WITH RECURSIVE AS ON USING JOIN INNER LEFT RIGHT FULL OUTER CROSS NATURAL APPLY LATERAL TABLE XMLTABLE JSON_TABLE WHERE GROUP ORDER CONNECT START HAVING UNION MINUS INTERSECT FETCH ALL ANY BETWEEN BY CASE CUBE DISTINCT ELSE END EXISTS FIRST FOLLOWING FOR GROUPING IN INTERVAL IS LIKE LOCK MATCH_RECOGNIZE NEXT NO NULL NULLS OF OFFSET OR OVER PARTITION PIVOT PRECEDING RANGE ROW ROWS SIBLINGS SOME SUBPARTITION THEN TO UNBOUNDED UNIQUE UNPIVOT WHEN WITHIN ONLY SAMPLE THE ACCESS ADD ALTER AUDIT CHAR CHECK CLUSTER COLUMN COMMENT COMPRESS CREATE CURRENT DATE DECIMAL DEFAULT DELETE DESC DROP EXCLUSIVE FILE FLOAT GRANT IDENTIFIED IMMEDIATE INCREMENT INDEX INITIAL INSERT INTEGER INTO LEVEL LONG MAXEXTENTS MLSLABEL MODIFY NOWAIT NUMBER OFFLINE ONLINE OPTION PCTFREE PRIOR PRIVILEGES PUBLIC RAW RENAME RESOURCE REVOKE ROWID ROWNUM SESSION SHARE SIZE SMALLINT SUCCESSFUL SYNONYM SYSDATE TRIGGER UID UPDATE USER VALIDATE VALUES VARCHAR VARCHAR2 VIEW WHENEVER`.split(/\s+/));
@@ -431,10 +464,22 @@ export function referencedObjects(sql: string): string[] | undefined {
 		if (next==='@' || next==='(') return;
 		if(parts.length>2) return;
 		const object=parts.map(renderIdentifier).join('.');
-		found.push(object);
+		if (!ctes.has(parts.at(-1) ? identifierValue(parts.at(-1)!).toUpperCase() : '')) found.push(object);
 		i=end;
 	}
 	return [...new Set(found)];
+}
+
+function standbyProvenanceKind(sql: string): 'backup' | 'scheduler' | undefined {
+	const objects = referencedObjects(sql, true);
+	if (!objects) return undefined;
+	const backupPattern = /^G?V\$(?:BACKUP_[A-Z0-9_$#]+|RMAN_[A-Z0-9_$#]+|DATAFILE_COPY|CONTROLFILE_RECORD_SECTION)$/;
+	for (const name of objects.map(object => object.split('.').map(part => identifierValue(part).toUpperCase()).join('.'))) {
+		const view = name.replace(/^SYS\./, '').replace(/^(G?V)_\$/, '$1$');
+		if (backupPattern.test(view)) return 'backup';
+		if (/^(?:DBA|ALL|USER)_SCHEDULER_JOB_(?:RUN_DETAILS|LOG)$/.test(view)) return 'scheduler';
+	}
+	return undefined;
 }
 
 function renderIdentifier(token: string): string {

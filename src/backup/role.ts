@@ -1,13 +1,14 @@
-import type { OracleSession } from '../contracts.js';
+import type { OracleSession, QueryOptions } from '../contracts.js';
 export interface DatabaseRole { role: string; openMode: string; uniqueName: string; protectionMode: string; standby: boolean; label: string }
 const cache = new WeakMap<object, Promise<DatabaseRole>>();
 /** Identity is shared by audited wrappers; one detection per underlying session. */
-export function readDatabaseRole(session: OracleSession): Promise<DatabaseRole> {
+export function readDatabaseRole(session: OracleSession, options?: QueryOptions): Promise<DatabaseRole> {
 	let pending = cache.get(session.identity ?? session);
 	if (!pending) {
 		pending = (async () => {
 			try {
-				const r = await session.query('SELECT DATABASE_ROLE, OPEN_MODE, DB_UNIQUE_NAME, PROTECTION_MODE FROM V$DATABASE');
+				const sql = 'SELECT DATABASE_ROLE, OPEN_MODE, DB_UNIQUE_NAME, PROTECTION_MODE FROM V$DATABASE';
+				const r = options ? await session.query(sql, {}, options) : await session.query(sql);
 				if (r.truncated || !r.rows.length) throw new Error('Incomplete role');
 				const row = Object.fromEntries(r.columns.map((c,i) => [c.toUpperCase(), String(r.rows[0]![i] ?? '')]));
 				const role = row.DATABASE_ROLE ?? '', openMode = row.OPEN_MODE ?? '', uniqueName = row.DB_UNIQUE_NAME ?? '', protectionMode = row.PROTECTION_MODE ?? '';
