@@ -7,7 +7,7 @@ import { score } from '../../evals/scoring.js';
 
 it('adds a separately selectable split while preserving every prior case', async () => {
 	const cases = await loadHardCases();
-	const prior = cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && !test.id.startsWith('hard-p21-') && !test.id.startsWith('hard-p25-grant-'));
+	const prior = cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby' && !test.id.startsWith('hard-p21-') && !test.id.startsWith('hard-p25-grant-'));
 	expect(prior).toHaveLength(61);
 	// WP-20E deliberately re-premises the parameter case after new grants.
 	expect(prior.find(test => test.id === 'hard-grant-p1-parameters')!.category).toBe('diagnosis');
@@ -19,7 +19,7 @@ it('adds a separately selectable split while preserving every prior case', async
 	const historical = JSON.parse(readFileSync('tests/fixtures/wp20e-previous-parameters.json', 'utf8'));
 	expect(createHash('sha256').update(JSON.stringify(prior.map(test => pre29e.find((old: { id: string }) => old.id === test.id) ?? repaired.find((old: { id: string }) => old.id === test.id) ?? premises.find((old: { id: string }) => old.id === test.id) ?? (test.id === historical.id ? historical : test.id === 'hard-p8-description-language' ? { ...test, expect: { ...test.expect, requiredTools: ['run_query'] } } : test)))).digest('hex')).toBe('46c4d7b26393b6d14e12b3a0dfeb3c275d2810a4bd14d00e6062b20a85cdb2f3');
 	expect(() => checkHardCases(cases)).not.toThrow();
-	for (const split of ['dev', 'holdout', 'regression', 'challenge']) {
+	for (const split of ['dev', 'holdout', 'regression', 'challenge', 'standby']) {
 		expect(parseArgs(['--split', split]).split).toBe(split);
 	}
 	expect(parseArgs([]).split).toBeUndefined();

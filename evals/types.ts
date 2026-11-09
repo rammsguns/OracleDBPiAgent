@@ -7,7 +7,7 @@ interface EvalCaseBase {
 	/** Exact SELECTs executed as the target account immediately before this case's agent run. */
 	setup?: string[];
 	/** Optimization split (PLAN.md "Model optimization loop"): tune on dev, confirm on holdout. */
-	split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb';
+	split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb' | 'standby';
 	/** Opt in to skipping cache-dependent cases when pre/post truth has no rows. */
 	skipWhenTruthEmpty?: boolean;
 	groundTruth?: { sql: string; mode: 'scalar' | 'allCells' | 'rowCells'; setupSql?: string };
