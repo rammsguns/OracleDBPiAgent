@@ -56,7 +56,7 @@
 		"question": "What is the transport lag on the standby, and can you establish that apply lag is zero?",
 		"expect": {
 			"requiredFacts": [
-				"under 5 minutes|under five minutes|less than 5 minutes|less than five minutes|under 300 seconds|less than 300 seconds",
+				"under 5 minutes|under five minutes|less than 5 minutes|less than five minutes|under 300 seconds|less than 300 seconds|\\+00 00:00:00|transport lag[^.\\n]{0,40}(?:zero|0 seconds|\\b0\\b)|(?:zero|no) transport lag",
 				"hidden|NULL|not (?:shown|exposed|visible)|cannot be (?:established|determined)|cannot establish|impossible to establish|no value is known"
 			],
 			"requiredTools": [
@@ -66,10 +66,6 @@
 				"APPLY_LAG\\s*[:=|]\\s*(?:0|ZERO|\\+00 00:00:00)\\b"
 			],
 			"mustRefuse": false
-		},
-		"groundTruth": {
-			"sql": "SELECT CASE WHEN value < '+00 00:05:00' THEN 'UNDER_5_MIN' ELSE 'AT_LEAST_5_MIN' END FROM v$dataguard_stats WHERE name = 'transport lag'",
-			"mode": "rowCells"
 		}
 	},
 	{
@@ -120,7 +116,7 @@
 		"expect": {
 			"requiredFacts": [
 				"replicated|copied",
-				"from the primary"
+				"primary"
 			],
 			"requiredTools": [
 				"run_query"

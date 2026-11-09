@@ -13,9 +13,10 @@ fixtures use live read-only truth on `c1s-19c-stby` as `PIAGENT_RO` in
   call budget, stable SELECT-only truth, required standby views, and concise
   affirmative field/value guards.
 - Review fixes: scheduler history and local-backup conclusions use facts rather
-  than drifting/unasked counts; transport lag truth is a SQL-computed
-  under-five-minute band; role wording permits accurate primary-source
-  references; validator requires the local-backup forbidden-claim guard.
+  than drifting/unasked counts; transport lag is graded from natural lag facts
+  while a live under-five-minute SQL check is an integration precondition; role
+  wording permits accurate primary-source references; validator requires the
+  local-backup forbidden-claim guard.
 - Added two correct and two incorrect natural answer examples per case, scored
   through the production eval scorer.
 - Round 3 redesign: positive required facts carry correctness; broad natural
@@ -25,10 +26,16 @@ fixtures use live read-only truth on `c1s-19c-stby` as `PIAGENT_RO` in
   value; the lag case rejects only structured `APPLY_LAG` zero values; and the
   switchover refusal has no forbidden-claim patterns, relying on refusal facts
   and the zero-call limit.
-- Added a C1S integration test that confirms the login/container and executes
-  the three truth SELECTs for role/open mode, MRP status, and banded transport
-  lag. Archive gaps, local backups, and replicated job history are graded with
-  stable facts and forbidden-claim guards without row matching.
+- Added a C1S integration test that confirms the login/container, executes the
+  role/open-mode and MRP truth SELECTs, and checks live transport lag is below
+  five minutes as a lab precondition. The transport eval has no synthetic
+  `UNDER_5_MIN` row truth to match. Archive gaps, local backups, and replicated
+  job history are graded with stable facts and forbidden-claim guards without
+  row matching.
+- Follow-up: transport-lag required facts accept a zero/sub-minute duration such
+  as `+00 00:00:00`, and job-history requires `primary` without requiring the
+  phrase `from the primary`. Both phase 33 gate answers are exercised through
+  the real scorer.
 - Added validator unit coverage for valid cases and unsafe or incomplete
   standby fixtures.
 
@@ -51,9 +58,9 @@ No shared contract changes or dependencies are required. `evals/types.ts` and
 Revalidation after review fixes:
 
 - `npm run typecheck`: PASS.
-- Focused `hard-evals` unit file: PASS, 6 tests, including scorer answer pairs
-  for all seven cases.
-- `npm test -- --maxWorkers=2`: PASS, 147 files and 2,927 tests.
+- Focused `hard-evals` unit file: PASS, 7 tests,
+  including the two phase 33 gate answers through the real scorer.
+- `npm test -- --maxWorkers=2`: PASS, 147 files and 2,928 tests.
 - C1S truth integration test: PASS, 1 test.
 - `git diff --check`: PASS.
 
