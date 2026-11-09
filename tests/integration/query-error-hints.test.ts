@@ -87,14 +87,18 @@ it('notes Oracle-hidden NULL apply lag from wildcard V$DATAGUARD_STATS on c1s-19
 
 it('notes copied backup and scheduler provenance on c1s and none on c1', async context => {
 	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
-	const provider=createSessionProvider(liveConfig('c1s-19c-stby'));
+	const standbyRoleSql:string[]=[];
+	const provider=createSessionProvider(liveConfig('c1s-19c-stby'), undefined, {tag:'wp34a_role_count',statement:sql=>{if(/DATABASE_ROLE/i.test(sql))standbyRoleSql.push(sql);}});
 	try {
 		const tool=createDbTools({config:liveConfig('c1s-19c-stby'),sessions:provider,audit:{record:async()=>{}},runId:'wp34a-c1s'}).find(t=>t.name==='run_query')!;
 		const backup=await tool.execute('live',{sql:'SELECT COUNT(*) FROM V$BACKUP_SET'});
 		const jobs=await tool.execute('live',{sql:'SELECT COUNT(*) FROM DBA_SCHEDULER_JOB_RUN_DETAILS'});
+		const pieces=await tool.execute('live',{sql:'SELECT COUNT(*) FROM V$BACKUP_PIECE'});
 		expect(backup.details.sourceNote).toContain('copied from the primary');
 		expect(backup.details.sourceNote).toContain('backup tool / piagent backup');
 		expect(jobs.details.sourceNote).toContain('replicated by redo apply');
+		expect(pieces.details.sourceNote).toContain('copied from the primary');
+		expect(standbyRoleSql).toHaveLength(1);
 	} catch (e) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('c1s Oracle listener unavailable'); return; }
 		throw e;

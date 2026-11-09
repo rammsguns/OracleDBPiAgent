@@ -1,4 +1,5 @@
 import type { OracleSession } from '../contracts.js';
+export const databaseRoleSelect = '(SELECT DATABASE_ROLE FROM V$DATABASE)';
 export interface DatabaseRole { role: string; openMode: string; uniqueName: string; protectionMode: string; standby: boolean; label: string }
 const cache = new WeakMap<object, Promise<DatabaseRole>>();
 /** Identity is shared by audited wrappers; one detection per underlying session. */

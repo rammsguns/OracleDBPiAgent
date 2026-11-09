@@ -12,14 +12,11 @@ it('adds standby provenance notes only for matching successful reads and caches 
 	const session={query,close:vi.fn(),identity:{isCdb:true,containerName:'PIPDB1'}};
 	get.mockResolvedValue(session);
 	query.mockImplementation(async (sql:string) => sql.includes('V$DATABASE')
-		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PRIMARY','READ WRITE','CDB19','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
+		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
 		: {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const tool=tools.find(t=>t.name==='run_query')!;
 	const backup=await tool.execute('1',{sql:'SELECT * FROM sys."V$BACKUP_SET" b'});
-	expect(backup.details.sourceNote).toBeUndefined();
-	query.mockImplementation(async (sql:string) => sql.includes('V$DATABASE')
-		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
-		: {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
+	expect(backup.details.sourceNote).toContain('copied from the primary');
 	const scheduler=await tool.execute('2',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS'});
 	expect(scheduler.details.sourceNote).toContain('written on the primary and replicated by redo apply');
 	const second=await tool.execute('3',{sql:'SELECT * FROM GV$BACKUP_SET'});
@@ -40,6 +37,31 @@ it('skips provenance on primary and unrelated SQL, and silently ignores unknown 
 	unknown.query.mockImplementation(async (sql:string) => { if(sql.includes('V$DATABASE')) throw new Error('role hidden'); return {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1}; });
 	const result=await unknown.tools.find(t=>t.name==='run_query')!.execute('1',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_LOG'});
 	expect(result.details.sourceNote).toBeUndefined();
+});
+it('matches quoted sources and CTE source bodies but ignores matching CTE and projection aliases', async () => {
+	const {tools,get,query,ctx}=setup();
+	const session={query,close:vi.fn(),identity:{databaseRole:'PHYSICAL STANDBY'}};
+	get.mockResolvedValue(session);
+	const tool=tools.find(t=>t.name==='run_query')!;
+	for (const sql of [
+		'SELECT * FROM "V$BACKUP_SET"',
+		'SELECT * FROM sys."V$BACKUP_SET"',
+		'SELECT * FROM "DBA_SCHEDULER_JOB_RUN_DETAILS"',
+		'WITH b AS (SELECT * FROM V$BACKUP_SET) SELECT * FROM b',
+		'WITH recent AS (SELECT * FROM V$RMAN_STATUS) SELECT * FROM recent',
+		'WITH j AS (SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS) SELECT * FROM j',
+	]) {
+		const result=await tool.execute('1',{sql});
+		expect(result.details.sourceNote).toContain('Standby provenance:');
+	}
+	for (const sql of [
+		'WITH x AS (SELECT 1 AS dba_scheduler_job_run_details FROM dual) SELECT * FROM x',
+		'WITH dba_scheduler_job_log AS (SELECT 1 id FROM dual) SELECT * FROM dba_scheduler_job_log',
+		'SELECT 1 AS V$BACKUP_SET FROM dual',
+	]) {
+		const result=await tool.execute('1',{sql});
+		expect(result.details.sourceNote).toBeUndefined();
+	}
 });
 it('registers every MVP tool and lists targets without database access',async()=>{
 	const {tools,get,record}=setup();expect(tools).toHaveLength(13);expect(new Set(tools.map(t=>t.name)).size).toBe(13);
