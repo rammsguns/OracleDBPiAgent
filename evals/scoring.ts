@@ -214,6 +214,14 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
+	const labelWords = (text: string) => text.replace(/[`*]/g, '').replace(/_/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+	const matchesRowLabel = (actual: string, expected: string) => {
+		const actualWords = labelWords(actual), expectedWords = labelWords(expected);
+		return actualWords.length > 0 && expectedWords.length > 0
+			&& (actualWords.join(' ') === expectedWords.join(' ')
+				|| expectedWords.every(word => actualWords.includes(word))
+				|| expectedWords.every((word, index) => actualWords[index] === word));
+	};
 	// Expand only whole, positive lists in table cells for single-column truth.
 	// Do this before record splitting: a slash must not detach DELETE from
 	// a negation elsewhere in the same cell (e.g. "not INSERT / DELETE").
@@ -374,6 +382,19 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		}
 		const keyColumn = header.findIndex(cell => /^(?:item|step|metric|attribute|field|property|category|source(?: view)?)$/i.test(cell));
 		const valueColumns = header.flatMap((cell, index) => /^(?:value|recorded value|detail|rows|row count)$/i.test(cell) ? [index] : []);
+		// Generic two-column Attribute/Value tables bind each truth field by its
+		// row label, allowing descriptive labels such as "Next Run Time".
+		if (singleRow && row.length <= 2 && header.length === 2 && /^attribute$/i.test(header[keyColumn] ?? '') && valueColumns.length === 1 && /^value$/i.test(header[valueColumns[0]!] ?? '')) {
+			const valueColumn = valueColumns[0]!;
+			const availableRows = block.slice(1).map(cells => [...cells]);
+			const bound = row.map((_expected, index) => {
+				const found = availableRows.findIndex(cells => matchesRowLabel(cells[keyColumn] ?? '', labels[index] ?? ''));
+				if (found < 0) return undefined;
+				return availableRows.splice(found, 1)[0];
+			});
+			if (bound.every(cells => cells !== undefined)) return bound.every((cells, index) => same(cells[valueColumn] ?? '', row[index], labels[index] ?? ''));
+			return false;
+		}
 		// In a vertical relationship table, child and parent attributes describe
 		// distinct records. Group only table/column attributes of the same role.
 		if (roleColumn >= 0 && keyColumn >= 0 && valueColumns.length) {

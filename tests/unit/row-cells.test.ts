@@ -52,6 +52,35 @@ it('handles negative numbers and numeric text without accepting a longer value',
 	expect(score(test, result('| A | −1,234.500 |'), [['A', '-1234.5']]).pass).toBe(true);
 	expect(score(test, result('| A | -1234.5001 |'), [['A', '-1234.5']]).pass).toBe(false);
 });
+it('matches generic transposed Attribute/Value row labels through the real p26 case', async () => {
+	const cases = await loadHardCases();
+	const nextRun = cases.find(item => item.id === 'hard-p26-p1-next-run-semantics')!;
+	const truth = [['TRUE', 'PRESENT']];
+	const scored = (answer: string) => score(nextRun, { ...result(answer), toolCalls: ['run_query'] }, truth).pass;
+	const correct = `## SHOPAPP.NIGHTLY_PURGE_JOB on p1-19c-prod
+
+| Attribute | Value |
+|-----------|-------|
+| **Enabled** | Yes (\`TRUE\`) |
+| **Next Run Time** | PRESENT |
+
+### Interpretation of the Recorded Next Run Time
+
+The \`NEXT_RUN_DATE\` value in \`DBA_SCHEDULER_JOBS\` is a **scheduler estimate**, not a guarantee of actual execution or success. Specifically:
+
+- **What it means:** It is the next time the Oracle Scheduler *intends* to fire the job, computed from the job's schedule (frequency, calendar, or interval). It is derived purely from the schedule definition and does not account for runtime conditions.
+- **What it does NOT guarantee:**
+  - The job will actually start at that time (the scheduler job slave process may be unavailable, the job queue may be full, or the job coordinator may be delayed).
+  - The job will succeed (it may fail due to errors in its PL/SQL body, dependency failures, resource constraints, etc.).
+  - The value won't change before execution (if the schedule is modified, the job is disabled/re-enabled, or a calendar expression shifts, the next-run date is recalculated).
+
+In short, a recorded \`NEXT_RUN_DATE\` confirms the scheduler has a future firing time planned; it is a **planned estimate**, not a commitment that the job will execute at that moment or complete successfully.`;
+	expect(scored(correct)).toBe(true);
+	const explanation = 'This is an estimate, not a guarantee of success or execution.\n';
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Next Run Time | NOT RECORDED |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | TRUE |\n| Owner | PRESENT |')).toBe(false);
+	expect(scored(explanation + '| Attribute | Value |\n|---|---|\n| Enabled | Not TRUE |\n| Next Run Time | PRESENT |')).toBe(false);
+});
 it('normalizes numeric text in prose without losing precision', () => {
 	expect(score(test, result('Alpha has 1.2000 and −55,500.00.'), [['Alpha', '1.2', -55500]]).pass).toBe(true);
 	expect(score(test, result('| A | 9007199254740993 |'), [['A', '9007199254740992']]).pass).toBe(false);
