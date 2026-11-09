@@ -157,9 +157,9 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 								if (!providerCache) { providerCache = new Map(); standbyRoleCache.set(ctx.sessions as object, providerCache); }
 								let cached = providerCache.get(target);
 								if (!cached) {
-									cached = identityRole
-										? Promise.resolve({ standby: identityRole.toUpperCase().includes('STANDBY') })
-										: readDatabaseRole(session);
+										cached = identityRole
+											? Promise.resolve({ standby: identityRole.toUpperCase().includes('STANDBY') })
+											: readDatabaseRole(session);
 									providerCache.set(target, cached);
 								}
 								const role = await cached;
@@ -475,7 +475,7 @@ function standbyProvenanceKind(sql: string): 'backup' | 'scheduler' | undefined 
 	if (!objects) return undefined;
 	const backupPattern = /^G?V\$(?:BACKUP_[A-Z0-9_$#]+|RMAN_[A-Z0-9_$#]+|DATAFILE_COPY|CONTROLFILE_RECORD_SECTION)$/;
 	for (const name of objects.map(object => object.split('.').map(part => identifierValue(part).toUpperCase()).join('.'))) {
-		const view = name.replace(/^SYS\./, '');
+		const view = name.replace(/^SYS\./, '').replace(/^(G?V)_\$/, '$1$');
 		if (backupPattern.test(view)) return 'backup';
 		if (/^(?:DBA|ALL|USER)_SCHEDULER_JOB_(?:RUN_DETAILS|LOG)$/.test(view)) return 'scheduler';
 	}

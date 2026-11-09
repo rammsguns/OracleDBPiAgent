@@ -34,25 +34,32 @@ it('skips provenance on primary and unrelated SQL, and silently ignores unknown 
 	expect(primary.query).toHaveBeenCalledTimes(2); // The two requested SELECTs; known primary identity skips the role probe.
 	const unknown=setup();
 	unknown.get.mockResolvedValue({query:unknown.query,close:unknown.close,identity:{}});
-	unknown.query.mockImplementation(async (sql:string) => { if(sql.includes('V$DATABASE')) throw new Error('role hidden'); return {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1}; });
+	unknown.query.mockImplementation(async (sql:string) => { if(sql.includes('V$DATABASE')) throw new Error('ORA-00942: table or view does not exist'); return {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1}; });
 	const result=await unknown.tools.find(t=>t.name==='run_query')!.execute('1',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_LOG'});
 	expect(result.details.sourceNote).toBeUndefined();
+	expect(unknown.close).toHaveBeenCalledOnce();
+	expect(unknown.query.mock.calls[1]?.[2]).toEqual({maxRows:1,timeoutSeconds:2});
 });
 it('matches quoted sources and CTE source bodies but ignores matching CTE and projection aliases', async () => {
-	const {tools,get,query,ctx}=setup();
+	const {tools,get,query}=setup();
 	const session={query,close:vi.fn(),identity:{databaseRole:'PHYSICAL STANDBY'}};
 	get.mockResolvedValue(session);
+	query.mockImplementation(async (sql:string) => sql.includes('V$DATABASE')
+		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','STBY','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
+		: {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const tool=tools.find(t=>t.name==='run_query')!;
 	for (const sql of [
 		'SELECT * FROM "V$BACKUP_SET"',
 		'SELECT * FROM sys."V$BACKUP_SET"',
+		'SELECT * FROM SYS.V_$BACKUP_SET',
+		'SELECT * FROM SYS.V_$RMAN_STATUS',
 		'SELECT * FROM "DBA_SCHEDULER_JOB_RUN_DETAILS"',
 		'WITH b AS (SELECT * FROM V$BACKUP_SET) SELECT * FROM b',
 		'WITH recent AS (SELECT * FROM V$RMAN_STATUS) SELECT * FROM recent',
 		'WITH j AS (SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS) SELECT * FROM j',
 	]) {
 		const result=await tool.execute('1',{sql});
-		expect(result.details.sourceNote).toContain('Standby provenance:');
+		expect(result.details.sourceNote, sql).toContain('Standby provenance:');
 	}
 	for (const sql of [
 		'WITH x AS (SELECT 1 AS dba_scheduler_job_run_details FROM dual) SELECT * FROM x',

@@ -17,9 +17,9 @@ Role is captured as part of the connection identity query once per target per se
 ## Tests
 
 - `npm run typecheck` — passed.
-- `npm test -- --maxWorkers=2` — passed: 147 files, 2,950 tests.
+- `npm test -- --maxWorkers=2` — 146 files passed; one unrelated failure in `tests/unit/jobs.test.ts` (`maxRows` expected 200, received 1); 2,949 passed, 1 failed (2,950 total).
 - `npx vitest run tests/unit/tools.test.ts tests/unit/preflight-catalog.test.ts --maxWorkers=2` — passed: 79 tests.
-- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/query-error-hints.test.ts --no-file-parallelism --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'` — passed: 20 tests. Live c1s/c1 assertions passed, including one role lookup across three standby tool calls, quoted view matching, standby notes, and no notes on c1 primary.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/query-error-hints.test.ts --no-file-parallelism --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'` — passed: 20 tests. Live c1s/c1 assertions passed, including one role lookup across three standby tool calls, quoted and `SYS.V_$` view matching, standby notes, and no notes on c1 primary.
 - `git diff --check` — passed.
 
 ## Contract changes
@@ -28,4 +28,4 @@ None. `databaseRole` is carried on a local `DatabaseIdentity` adapter in `src/or
 
 ## Unverified
 
-No full integration suite was run in this review round. The local Strata e2e test was excluded as requested; no LLM calls were made.
+The full unit suite has the unrelated `jobs.test.ts` failure recorded above. No full integration suite was run in this review round. The local Strata e2e test was excluded as requested; no LLM calls were made.

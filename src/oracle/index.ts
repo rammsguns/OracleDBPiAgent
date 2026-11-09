@@ -12,7 +12,6 @@ import { constants } from "node:fs";
 import { resolve, basename } from "node:path";
 import { UnsupportedVersionError, type AppConfig, type OracleSession, type SessionProvider, type QueryOptions, type QueryResult, type DatabaseIdentity } from "../contracts.js";
 import { classifySql } from "./sqlPolicy.js";
-import { databaseRoleSelect } from '../backup/role.js';
 
 export function gate19c(target: string, version: string): void {
 	if (!/^19\./.test(version)) throw new UnsupportedVersionError(target, version);
@@ -28,7 +27,6 @@ export async function previewValue(value: any): Promise<unknown> {
 /** approvedEndpoints is overridable only so the gate integration test can reach a non-19c DB. */
 export function createSessionProvider(config: AppConfig, approvedEndpoints?: readonly ApprovedEndpoint[], instrumentation?: { tag: string; statement: (sql: string, elapsedMs: number, error?: string) => void }): SessionProvider {
 	const sessions = new Set<OracleSession>();
-	const roleCache = new Map<string, string | undefined>();
 	return {
 		async get(targetName = config.defaultTarget) {
 			const target = config.targets.find(t => t.name === targetName);
@@ -74,12 +72,8 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 				await checkAccount(connection, target.username, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = "${target.defaultSchema}"`);
 				await connection.execute("ALTER SESSION SET TIME_ZONE = '+00:00'");
-				const captureRole = !roleCache.has(target.name);
-				const idSql = `SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME'), TO_CHAR(SYSTIMESTAMP, 'TZH:TZM')${captureRole ? `, ${databaseRoleSelect}` : ''} FROM dual`;
-				const id = await connection.execute(idSql, {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
+				const id = await connection.execute("SELECT SYS_CONTEXT('USERENV','DB_NAME'), SYS_CONTEXT('USERENV','INSTANCE_NAME'), SYS_CONTEXT('USERENV','SERVER_HOST'), CASE WHEN SYS_CONTEXT('USERENV','CON_ID')='0' THEN 'NO' ELSE 'YES' END, SYS_CONTEXT('USERENV','SESSION_USER'), SYS_CONTEXT('USERENV','CURRENT_SCHEMA'), SYS_CONTEXT('USERENV','CON_NAME'), TO_CHAR(SYSTIMESTAMP, 'TZH:TZM') FROM dual", {}, { outFormat: oracledb.OUT_FORMAT_ARRAY });
 				const r = id.rows[0];
-				const databaseRole = captureRole ? String(r[8] ?? '') || undefined : roleCache.get(target.name);
-				if (captureRole) roleCache.set(target.name, databaseRole);
 				const databaseOffset = r[7];
 				await connection.execute(`ALTER SESSION SET NLS_DATE_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS' NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF9'`);
 				// Request server-formatted text before the driver constructs any host-local Date.
@@ -90,7 +84,7 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 						converter: (value: string | null) => oracleWallTime(value, databaseOffset),
 					};
 				};
-				const identity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6], databaseRole } as DatabaseIdentity & { databaseRole?: string };
+				const identity: DatabaseIdentity = { target: target.name, versionFull: version, dbName: r[0], instanceName: r[1], hostName: r[2], isCdb: r[3] === "YES", currentUser: r[4], currentSchema: r[5], containerName: r[6] };
 				await connection.rollback();
 				async function query(sql: string, binds = {}, options: QueryOptions = {}): Promise<QueryResult> {
 					const statement = classifySql(sql);
