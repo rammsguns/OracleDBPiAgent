@@ -4,6 +4,34 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-09
+
+Phase 35: honest missing-view notes and eval template false negatives.
+
+### Changed
+
+- **ORA-00942 notes tell a missing view from a missing grant.** In 1.9.0 and
+  1.10.0, every unreadable object was reported as "Not visible to this
+  account", even a `V$` name that does not exist in Oracle 19c (the agent
+  sometimes invents names like `V$RMAN_BACKUP_DATAFILES`). For `V$`/`GV$`
+  names, `run_query` now makes one bound lookup in `ALL_SYNONYMS` for the
+  public synonym, and words the note to match:
+  - "Not granted to this account (view exists)" when the synonym exists;
+  - "No such view in Oracle 19c (check the name)" when it does not;
+  - quoted mixed-case names are flagged as case-sensitive;
+  - `SYS.V$name` gets a hint to drop the `SYS.` prefix.
+  - Other objects now read "Not visible to this account (missing or not
+    granted)".
+  - The lookup runs only when a failed query already names a `V$`/`GV$`
+    object. If the lookup itself fails, the note keeps the old wording.
+
+### Fixed
+
+- **Eval scoring false negatives (eval harness).** Correct answers to
+  `hard-p19-object-statistics` written as bullets, and to
+  `hard-p30-d1-fullest-permanent` written as "is classified as LOW" or
+  "falls in the LOW band", now pass. A negated classification still fails.
+
 ## [1.10.0] - 2026-11-09
 
 Phase 34: standby provenance and truth-templated eval facts.

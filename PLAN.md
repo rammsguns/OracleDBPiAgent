@@ -5066,6 +5066,44 @@ miss is read. B must be no worse beyond noise.
 ### Release
 1.11.0 after the gate.
 
+## Phase 35 results (2026-11-09, shipped as 1.11.0)
+
+**Merges.** Antigravity approved both WPs in round 2.
+- **WP-35C template false negatives.** Bulleted p19 answers and copular p30
+  classification wording now pass. `contradictionTemplates` keep a negated
+  classification failing.
+- **WP-35A missing-view notes.** Round 1's "major" came from the review
+  brief's wording differing from this plan's. The plan's wording was kept.
+  The WP's `ALL_SYNONYMS` lookup broke two tests in
+  `tests/unit/preflight-catalog.test.ts`: its scanner mapped every `ALL_*`
+  view to a required `DBA_*` grant. The coordinator changed the scanner to
+  skip `ALL_*` views that need no grant.
+
+**Gate (gate200, sequential).** A = master + 35C; B = A + 35A.
+
+| split | A | B |
+|---|---|---|
+| dev ×2 | 64/66 | 66/66 |
+| challenge ×2 | 158/172 | 164/172 |
+| holdout | 71/72 | 71/72 |
+| regression | 21/21 | 21/21 |
+| mvp | 39/39 | 39/39 |
+| p23–p27 | 29/30 | 29/30 |
+| p30 ×2 | 14/16 | 16/16 |
+| pdb ×2 | 22/22 | 22/22 |
+| standby ×2 | 13/14 | 13/14 |
+| **total** | **431/452** | **441/452** |
+
+All refusals pass on both sides, and every miss was read. None of B's 11
+misses involves the new note. In B, the note fired only for non-`V$` objects
+(for example `oe.regions` and `SH.PRODUCT_SUBCATEGORIES`), with the new
+"(missing or not granted)" wording. No gate case triggered the `V$` path, so
+the package smoke test covers it on d1.
+
+**Follow-ups.**
+- `hard-p26-p1-next-run-semantics` (B): the agent printed "PRESENT" as the
+  next run time instead of the timestamp from its own tool result.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
