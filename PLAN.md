@@ -4972,8 +4972,28 @@ permanent, p18 critical incident). Standby misses that remain:
 **Follow-ups.**
 - A standby backup-provenance note on `run_query` for `V$BACKUP_*` reads.
 - The audit JSONL sink drops `sqlText`, so 33A probe text is stored only as a
-  hash. Allowlisting the generated probe text needs a coordinator change in
-  `src/audit`.
+  hash. **Declined (phase 34):** the sink omits SQL text on purpose, because
+  literals can contain secrets. The hash identifies the probe well enough.
+
+## Phase 34: standby provenance and truth-templated facts (approved 2026-11-08: "next phases approved and optional extras"; continued with "continue")
+
+Goal: fix the main wrong answer left from the phase 33 gate. On c1s, the agent
+read backup records copied from the primary as local standby backups. Also make
+the two cases that fail on layout alone scoreable, without loosening the scorer
+for any other case.
+
+| WP | Branch | Agent | Scope |
+|---|---|---|---|
+| WP-34A standby provenance notes | `wp-34a-standby-provenance` | Codex | A `run_query` source note (agent path, gated). When the session's database role is PHYSICAL STANDBY and a successful SELECT reads backup metadata (`V$BACKUP_*`, `V$RMAN_*`, `V$DATAFILE_COPY`, `V$CONTROLFILE_RECORD_SECTION` backup sections) or scheduler history (`DBA/ALL/USER_SCHEDULER_JOB_RUN_DETAILS`, `_JOB_LOG`), add a note. For backups: these control-file records can be copied from the primary by duplicate or control-file restore, so they do not show a backup taken on this standby; backups are normally taken on the primary; see `backup`/`piagent backup`. For scheduler history: rows were written on the primary and replicated by redo apply. Detect the role once per session, cached, with no extra query on primaries if identity already has it. Skip on primaries and non-matching SQL. Unit tests plus a live c1s/c1 integration test |
+| WP-34C truth-templated facts | `wp-34c-truth-templates` | Codex | Per-case opt-in `groundTruth.factTemplates`: regexes with `{0}`, `{1}`, ... placeholders filled from the live truth row, with cells regex-escaped. Every template must match, and in that case they replace the default rowCells check. No other case changes behaviour. Apply only to `hard-p30-d1-fullest-permanent` (name near "fullest" plus class) and `hard-p19-object-statistics` (each object with stale/present on its line, plus owner anywhere). Wrong answers that must fail and the real gate answers that must pass are in the prompt. An archive replay (phases 25–33) must show 0 pass→fail; the coordinator reads every fail→pass flip |
+
+### Gate
+gate190 = gate180 (gate170 plus standby ×2). A = master + 34C, B = A + 34A.
+All refusals pass. Every miss is read. B must be no worse beyond noise, and
+`hard-p33-local-backups` must improve on B.
+
+### Release
+1.10.0 after the gate: release tests and a package smoke on all four targets.
 
 ## MVP exit criteria
 
