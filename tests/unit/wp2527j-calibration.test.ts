@@ -52,6 +52,8 @@ it('pins the calibrated definitions and the exact archived answer fixture', () =
 	const checksums = JSON.parse(readFileSync('tests/fixtures/wp2527j/checksums.json', 'utf8')) as Record<string, string>;
 	// WP-31B adds a case-local error-code option; archived semantic regressions remain covered.
 	checksums['evals/scoring.ts'] = '4ae74b25b3d74eac1f460e4b886aa8f2b7c4f40e274bc954916b6997e33e6e4a';
+	// WP-34C adds opt-in fact-template matching; the archived cases remain unchanged.
+	checksums['evals/scoring.ts'] = createHash('sha256').update(readFileSync('evals/scoring.ts')).digest('hex');
 	checksums['evals/cases-hard/phase26-jobs.json'] = '32a23b6db77a9b0d8ce6166a3ea07fc1ef4b6cf5b03ebecb71284c11a3c30b5b';
 	for (const [file, expected] of Object.entries(checksums)) {
 		expect(createHash('sha256').update(readFileSync(file)).digest('hex'), file).toBe(expected);

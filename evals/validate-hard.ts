@@ -52,6 +52,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 			}
 			// Match the independent ground-truth reader's deliberately narrower SELECT policy.
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.sql)) throw new Error('Truth must be plain SELECT');
+			if (test.groundTruth.factTemplates !== undefined) validateFactTemplates(test);
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
@@ -114,6 +115,46 @@ export function checkHardCases(cases: EvalCase[]): void {
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+const FACT_TEMPLATE_CASES = new Set(['hard-p30-d1-fullest-permanent', 'hard-p19-object-statistics']);
+export function validateFactTemplates(test: EvalCase): void {
+	const groundTruth = test.groundTruth;
+	if (!groundTruth) return;
+	const { factTemplates, contradictionTemplates, captureChecks } = groundTruth;
+	if (factTemplates === undefined && contradictionTemplates === undefined && captureChecks === undefined) return;
+	if (!FACT_TEMPLATE_CASES.has(test.id) || groundTruth.mode !== 'rowCells') throw new Error(`Truth templates are not allowed for ${test.id}`);
+	const rowSize = test.id === 'hard-p30-d1-fullest-permanent' ? 2 : 4;
+	const validatePattern = (pattern: string, kind: string) => {
+		if (typeof pattern !== 'string' || /\(\?[=!<]/.test(pattern)) throw new Error(`${kind} cannot use lookaround: ${test.id}`);
+		const indexes = [...pattern.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1]));
+		if (!indexes.length || indexes.some(index => index >= rowSize)) throw new Error(`${kind} references a missing cell: ${test.id}`);
+		try { new RegExp(pattern.replace(/\{(\d+)\}/g, () => 'CELL'), 'i'); }
+		catch { throw new Error(`Invalid ${kind}: ${test.id}`); }
+	};
+	if (factTemplates !== undefined) {
+		if (!Array.isArray(factTemplates) || !factTemplates.length) throw new Error(`Fact templates are invalid: ${test.id}`);
+		for (const pattern of factTemplates) validatePattern(pattern, 'Fact template');
+	}
+	if (contradictionTemplates !== undefined) {
+		if (!Array.isArray(contradictionTemplates) || !contradictionTemplates.length) throw new Error(`Contradiction templates are invalid: ${test.id}`);
+		for (const pattern of contradictionTemplates) validatePattern(pattern, 'Contradiction template');
+	}
+	if (captureChecks !== undefined) {
+		if (!Array.isArray(captureChecks) || !captureChecks.length) throw new Error(`Capture checks are invalid: ${test.id}`);
+		for (const check of captureChecks) {
+			if (!check || typeof check.equals !== 'string') throw new Error(`Capture check is invalid: ${test.id}`);
+			if (typeof check.pattern !== 'string' || /\(\?[=!<]/.test(check.pattern)) throw new Error(`Capture check cannot use lookaround: ${test.id}`);
+			const patternIndexes = [...check.pattern.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1]));
+			if (patternIndexes.some(index => index >= rowSize)) throw new Error(`Capture check references a missing cell: ${test.id}`);
+			const substituted = check.pattern.replace(/\{(\d+)\}/g, () => 'CELL');
+			try { new RegExp(substituted, 'i'); } catch { throw new Error(`Invalid capture check: ${test.id}`); }
+			const groups = [...substituted.matchAll(/(^|[^\\])\((?!\?)/g)].length;
+			if (groups !== 1) throw new Error(`Capture check must have exactly one capture group: ${test.id}`);
+			const equalsIndexes = [...check.equals.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1]));
+			if (!equalsIndexes.length || equalsIndexes.some(index => index >= rowSize)) throw new Error(`Capture check equals references a missing cell: ${test.id}`);
+		}
+	}
 }
 
 /** Phase 33: stable live evidence from a read-only physical standby PDB. */

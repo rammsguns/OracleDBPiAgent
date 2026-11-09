@@ -34,7 +34,7 @@ it('grades bounded truth and rejects a wrong range or omitted default account', 
 	const response = (answer: string) => ({ answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
 	expect(score(cases[2]!, response('OVER 14 DAYS'), [['OVER 14 DAYS']]).pass).toBe(true);
 	expect(score(cases[2]!, response('WITHIN 3 DAYS'), [['OVER 14 DAYS']]).pass).toBe(false);
-	expect(score(cases[4]!, response('| SYSAUX | LOW |'), [['SYSAUX', 'LOW']]).pass).toBe(true);
+	expect(score(cases[4]!, response('SYSAUX is the fullest permanent tablespace. Classification: LOW (below 50%)'), [['SYSAUX', 'LOW']]).pass).toBe(true);
 	expect(score(cases[4]!, response('| SYSAUX | HIGH |'), [['SYSAUX', 'LOW']]).pass).toBe(false);
 	expect(score(cases[0]!, response('Critical: HR, SH'), [['HR'], ['SH']]).pass).toBe(true);
 	expect(score(cases[0]!, response('Critical: HR'), [['HR'], ['SH']]).pass).toBe(false);

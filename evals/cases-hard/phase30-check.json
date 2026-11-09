@@ -85,7 +85,25 @@
 		},
 		"groundTruth": {
 			"sql": "SELECT tablespace_name, CASE WHEN pct<50 THEN 'LOW' WHEN pct<85 THEN 'MID' WHEN pct<95 THEN 'HIGH' ELSE 'FULL' END AS used_range FROM (SELECT t.tablespace_name,100*NVL(MAX(m.used_space*t.block_size),GREATEST(0,SUM(f.bytes)-NVL(MAX(x.free_bytes),0)))/SUM(CASE WHEN f.autoextensible='YES' THEN GREATEST(f.bytes,f.maxbytes) ELSE f.bytes END) pct FROM dba_tablespaces t JOIN dba_data_files f ON f.tablespace_name=t.tablespace_name LEFT JOIN dba_tablespace_usage_metrics m ON m.tablespace_name=t.tablespace_name LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) x ON x.tablespace_name=t.tablespace_name WHERE t.contents='PERMANENT' GROUP BY t.tablespace_name ORDER BY pct DESC,t.tablespace_name) FETCH FIRST 1 ROW ONLY",
-			"mode": "rowCells"
+			"mode": "rowCells",
+			"factTemplates": [
+				"\\b{0}\\b[^\\n]{0,100}\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b|\\b(?:the\\s+)?(?:fullest|most\\s+full|highest|largest|greatest)(?:\\s+permanent)?(?:\\s+tablespace)?\\b[^.!?\\n]{0,100}?(?:\\bis\\b|:|=)\\s+{0}\\b|(?:^|\\n)\\s*[*#`_\\[]*Fullest[^:\\n]{0,100}:\\s*{0}\\b[^\\n]*|\\bfullest\\b[^\\n]{0,300}\\bis:\\s*(?:\\n[^\\n]*){0,5}\\|\\s*{0}\\b",
+				"(?:classification|class|classified|band|level)\\W{0,10}{1}\\b|\\bclassified\\s+as\\s+{1}\\b|\\bClassification:\\s*{1}\\b|\\b{1}\\b\\s*\\((?:below|under|<)\\s*50%?\\b|\\b{1}\\b[^.\\n]{0,40}\\bband\\b|(?:→|->|—|–|-)\\s*{1}\\b"
+			],
+			"contradictionTemplates": [
+				"\\b{0}\\b[^.\\n]{0,50}\\b(?:is\\s+not\\s+(?:the\\s+)?(?:fullest|most\\s+full)|(?:second|third|2nd|3rd|least)\\s+(?:fullest|most\\s+full))\\b",
+				"\\b{0}\\b[^.\\n]{0,40}\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b{0}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b"
+			],
+			"captureChecks": [
+				{
+					"pattern": "\\b([A-Z][A-Z0-9_$#]*)\\s+is\\s+(?:the\\s+)?(?:fullest|most\\s+full)\\b",
+					"equals": "{0}"
+				},
+				{
+					"pattern": "\\b(?:fullest|most\\s+full|highest|largest|greatest)\\b[^.!?\\n]{0,100}?(?:\\bis\\b|:|=)\\s*([A-Z][A-Z0-9_$#]*)",
+					"equals": "{0}"
+				}
+			]
 		}
 	},
 	{
@@ -96,7 +114,7 @@
 		"question": "On p1, is a fast recovery area configured? Answer CONFIGURED or UNCONFIGURED based on its destination setting. Explain whether absent configuration can be reported as a healthy zero-percent recovery-area usage measurement.",
 		"expect": {
 			"requiredFacts": [
-				"(?:usage|percentage|percent[- ]used|measurement)[^.\\n]{0,40}\\b(?:undefined|unknown|unavailable)\\b|\\bN[/-]A\\b|no\\s+measurement\\s+exists|(?:produces?|is|a)\\s+(?:a\\s+)?false[ -](?:pass|positive)|(?<!not )(?<!not\\s)\\bmisleading\\s+to\\s+report|(?:reporting|conflating)[^.\\n]{0,90}(?:misleading|false[ -](?:pass|positive))|not\\s+(?:a\\s+)?(?:computed\\s+value|real\\s+measurement|measurement|(?:healthy|valid|real)\\s+(?:0\\s*%|zero|measurement))|(?:cannot|can['\u2019]t|must\\s+not)\\s+(?:be\\s+)?(?:reported|treated|counted|report|treat|count)\\s+(?:it\\s+)?as\\s+(?:a\\s+)?healthy|Can[^?\\n]{0,90}(?:absent|unconfigured)[^?\\n]{0,90}(?:reported|treated|counted)[^?\\n]{0,30}healthy\\s+(?:0\\s*%|zero[- ]percent)[^?\\n]{0,40}\\?\\s*[*_\u2014 -]*No(?=[*_]*(?:[.!]|[^\\S\\n]*(?:\\n|$)))"
+				"(?:usage|percentage|percent[- ]used|measurement)[^.\\n]{0,40}\\b(?:undefined|unknown|unavailable)\\b|\\bN[/-]A\\b|no\\s+measurement\\s+exists|(?:produces?|is|a)\\s+(?:a\\s+)?false[ -](?:pass|positive)|(?<!not )(?<!not\\s)\\bmisleading\\s+to\\s+report|(?:reporting|conflating)[^.\\n]{0,90}(?:misleading|false[ -](?:pass|positive))|not\\s+(?:a\\s+)?(?:computed\\s+value|real\\s+measurement|measurement|(?:healthy|valid|real)\\s+(?:0\\s*%|zero|measurement))|(?:cannot|can['’]t|must\\s+not)\\s+(?:be\\s+)?(?:reported|treated|counted|report|treat|count)\\s+(?:it\\s+)?as\\s+(?:a\\s+)?healthy|Can[^?\\n]{0,90}(?:absent|unconfigured)[^?\\n]{0,90}(?:reported|treated|counted)[^?\\n]{0,30}healthy\\s+(?:0\\s*%|zero[- ]percent)[^?\\n]{0,40}\\?\\s*[*_— -]*No(?=[*_]*(?:[.!]|[^\\S\\n]*(?:\\n|$)))"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
@@ -117,7 +135,7 @@
 		"question": "On p1, report the current archive log mode and explain whether archived-log sequence-gap monitoring can establish a healthy no-gap result in that mode. Do not infer restore feasibility from it.",
 		"expect": {
 			"requiredFacts": [
-				"unknown|not[ -]+applicable|inapplicable|(?:does(?:n['\u2019]t| not)|do(?:n['\u2019]t| not))\\s+apply|vacuous(?:ly)?|meaningless|not\\s+meaningful|(?:cannot|can['\u2019]t)\\s+produce\\s+a\\s+meaningful|precondition|nothing\\s+to\\s+(?:check|inspect|monitor|evaluate)|no\\s+(?:archived[ -](?:redo[ -])?logs?\\s+(?:exist|to)|archive(?:d)?[ -]log(?:[ -]sequence)?[ -]stream)|empty\\s+set|set\\s+of\\s+archived\\s+logs[^.\\n]{0,60}\\bempty\\b|sequence\\s+continuity[^.\\n]{0,40}does\\s+not\\s+exist|meaningful\\s+healthy\\s+result\\s+cannot\\s+be\\s+produced"
+				"unknown|not[ -]+applicable|inapplicable|(?:does(?:n['’]t| not)|do(?:n['’]t| not))\\s+apply|vacuous(?:ly)?|meaningless|not\\s+meaningful|(?:cannot|can['’]t)\\s+produce\\s+a\\s+meaningful|precondition|nothing\\s+to\\s+(?:check|inspect|monitor|evaluate)|no\\s+(?:archived[ -](?:redo[ -])?logs?\\s+(?:exist|to)|archive(?:d)?[ -]log(?:[ -]sequence)?[ -]stream)|empty\\s+set|set\\s+of\\s+archived\\s+logs[^.\\n]{0,60}\\bempty\\b|sequence\\s+continuity[^.\\n]{0,40}does\\s+not\\s+exist|meaningful\\s+healthy\\s+result\\s+cannot\\s+be\\s+produced"
 			],
 			"requiredTools": [],
 			"forbiddenClaims": [
