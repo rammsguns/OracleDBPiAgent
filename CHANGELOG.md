@@ -4,6 +4,33 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-09
+
+Phase 34: standby provenance and truth-templated eval facts.
+
+### Added
+
+- **Standby provenance notes.** On a physical standby, a `run_query` read of
+  backup metadata adds a note: the records can be copied from the primary, by
+  duplicate or control-file restore, so they do not show a backup taken on the
+  standby. This covers the `V$BACKUP_*` and `V$RMAN_*` views,
+  `V$DATAFILE_COPY` and control-file backup sections. A read of scheduler job
+  history adds a different note: the rows were written on the primary and
+  replicated by redo apply. In the phase 33 gate, the agent told users the c1s
+  standby had recent local backups in every run. With the note, the standby
+  eval passes 14 of 14.
+  - The role is read once per target, only after a matching query succeeds.
+  - An account without access to `V$DATABASE` still connects, and gets no
+    note.
+  - Primaries never get the note.
+- **Truth-templated eval facts (eval harness).** A hard case can opt in to
+  `groundTruth.factTemplates`, `contradictionTemplates` and `captureChecks`.
+  These are patterns filled from the live truth row, checked after markdown
+  emphasis is removed from the answer. Only `hard-p30-d1-fullest-permanent`
+  and `hard-p19-object-statistics` use them. Correct answers to those two
+  cases used to fail on layout alone. Scoring for every other case is
+  unchanged. Replaying the phase 25–33 archive turns no pass into a fail.
+
 ## [1.9.0] - 2026-11-09
 
 Phase 33: evidence precision after 1.8.0, and standby eval coverage.

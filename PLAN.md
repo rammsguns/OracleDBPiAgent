@@ -4995,6 +4995,60 @@ All refusals pass. Every miss is read. B must be no worse beyond noise, and
 ### Release
 1.10.0 after the gate: release tests and a package smoke on all four targets.
 
+## Phase 34 results (2026-11-09, shipped as 1.10.0)
+
+Release approved with "continue and push v1.10.0 when the gate passes".
+
+**Merges.** Antigravity reviewed both WPs; four rounds each, every finding fixed.
+- **WP-34A standby provenance notes.**
+  - Round 2 moved the role read out of the session identity query. That stops
+    an account without `V$DATABASE` access from failing to connect.
+  - Round 3 caught a shared-helper regression (a forced `maxRows: 1` broke
+    the jobs wrapper) that the worker had first reported as unrelated.
+- **WP-34C truth templates.**
+  - The coordinator replaced the case-specific code in `scoring.ts` with
+    generic data-driven fields in the case files: `factTemplates`,
+    `contradictionTemplates` and `captureChecks`.
+  - Markdown emphasis is removed before checking.
+  - The archive replay turns no pass into a fail, and 30 fails into passes
+    (p19 and p30 only).
+  - Known false negatives (round 4 minors): a bulleted p19 layout and
+    "is classified as LOW" wording.
+
+**Gate (gate190, sequential).** A = master + 34C; B = A + 34A.
+
+| split | A | B |
+|---|---|---|
+| dev ×2 | 66/66 | 64/66 |
+| challenge ×2 | 165/172 | 163/172 |
+| holdout | 70/72 | 69/72 |
+| regression | 21/21 | 20/21 |
+| mvp | 39/39 | 39/39 |
+| p23–p27 | 30/30 | 28/30 |
+| p30 ×2 | 15/16 | 15/16 |
+| pdb ×2 | 22/22 | 22/22 |
+| standby ×2 | 10/14 | **14/14** |
+| **total** | **438/452** | **434/452** |
+
+All refusals pass on both sides. Every miss was read. B's standby gain is the
+goal: `hard-p33-local-backups` went from 0/2 to 2/2, and `hard-p33-mrp` from
+0/2 to 2/2.
+
+On the non-standby splits B scored 8 fewer. A scan of every B record shows the
+provenance note fired only in the c1s cases, all of which passed. B's tool
+output on primaries is identical to A's, so the gap is sampling noise. Example:
+in `hard-p25-d1-no-backups-recorded`, B's agent invented the views
+`V$RMAN_BACKUP_DATAFILES`, `..._SET_DETAILS` and `..._PIECE_DETAILS`, while A
+used the real `V$BACKUP_*` names.
+
+**Follow-ups.**
+- The WP-33A ORA-00942 note says "Not visible to this account" for V$ names
+  that do not exist at all. For `V$`/`GV$` names it should check for the
+  public synonym, so it can say "no such view" instead of implying a missing
+  grant.
+- 34C false negatives: the bulleted p19 layout and copular classification
+  wording.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
