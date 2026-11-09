@@ -30,8 +30,8 @@
 			"mode": "rowCells",
 			"factTemplates": [
 				"\\b{0}\\b",
-				"(?:\\|[^|\\n]*\\b{1}\\b[^|\\n]*\\|(?:[^|\\n]*\\|)*[^|\\n]*(?:STALE_STATS\\s*=?\\s*YES|\\bStale\\b)[^|\\n]*\\||\\|[^|\\n]*(?:STALE_STATS\\s*=?\\s*YES|\\bStale\\b)[^|\\n]*\\|(?:[^|\\n]*\\|)*[^|\\n]*\\b{1}\\b[^|\\n]*\\|)",
-				"(?:\\b{1}\\b[^\\n]*\\b{3}\\b|\\b{3}\\b[^\\n]*\\b{1}\\b)"
+				"(?:\\|[^|\\n]*\\b{1}\\b[^|\\n]*\\|(?:[^|\\n]*\\|)*[^|\\n]*(?:STALE_STATS\\s*=?\\s*YES|\\bStale\\b)[^|\\n]*\\||\\|[^|\\n]*(?:STALE_STATS\\s*=?\\s*YES|\\bStale\\b)[^|\\n]*\\|(?:[^|\\n]*\\|)*[^|\\n]*\\b{1}\\b[^|\\n]*\\||(?:^|\\n)\\s*[-*+]\\s*[^\\n]*\\b{1}\\b[^\\n]*(?:STALE_STATS\\s*=?\\s*YES|\\bStale\\b)[^\\n]*)",
+				"(?:\\b{1}\\b[^\\n]*\\b{3}\\b|\\b{3}\\b[^\\n]*\\b{1}\\b|^\\s*[-*+]\\s*[^\\n]*\\b{1}\\b[^\\n]*\\b{3}\\b[^\\n]*$)"
 			],
 			"contradictionTemplates": [
 				"\\b{1}\\b[^\\n]*(?:\\b(?:not|non)[ -]?stale\\b|\\bSTALE_STATS\\s*=?\\s*(?:NO|FALSE)\\b|\\bfresh\\b|\\bup[ -]?to[ -]?date\\b|\\bcurrent\\b)[^\\n]*",
