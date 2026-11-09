@@ -43,15 +43,26 @@ and d1 integration expectations for the new wording.
 - No eval suite or LLM calls were run. `evals/validate-hard.ts` was not run;
   its full execution also opens configured Oracle targets.
 
-## Coordinator contract change needed
-
-`evals/run.ts` owns the CLI split union and parser. Add `p36` there to make
-`npm run eval -- --split p36` selectable. `src/contracts.ts`, `package.json`,
-and `PLAN.md` were not changed.
+No remaining contract changes. This WP added `p36` to `evals/run.ts` and its
+parser; `src/contracts.ts`, `package.json`, and `PLAN.md` were not changed.
 
 ## Unverified
 
 The scorer unit test loads the actual case file through `loadHardCases()` and
-calls the production `score()` implementation. No model behavior or full eval
-suite result is claimed. The CLI split is not selectable until the coordinator
-updates `evals/run.ts`.
+calls the production `score()` implementation. It checks Markdown rows with
+leading pipes and formatting markers, prose assertions, and required-fact
+positive controls. The CLI parse-only `--help` check exited without invoking
+Oracle or Strata. No model behavior or full eval suite result is claimed.
+
+## Review round 1
+
+Expanded structured forbidden claims for leading-pipe Markdown tables with
+backticks/bold markers and the reviewed prose formulations. The MUST FAIL
+smoke sample now includes the misleading table plus a sentence satisfying all
+positive facts, and asserts the named forbidden check fails. Added `p36` to
+`evals/run.ts`; its `--help` path exits before `runEvals`.
+
+Review-fix verification: typecheck passed; unit suite passed (148 files,
+2,957 tests); live query-error-hints integration passed (21 tests);
+`npx tsx evals/run.ts --suite evals/cases-hard --split p36 --help` printed usage
+and exited without evaluation.

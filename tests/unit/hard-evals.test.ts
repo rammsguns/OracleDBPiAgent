@@ -221,14 +221,23 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 		'Cause: V$RMAN_BACKUP_DATAFILES does not exist in Oracle 19c. Not the cause (readable): V$BACKUP_DATAFILE is readable.',
 	];
 	for (const answer of accepted) expect(score(smoke, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
-	const wrong = 'Object | Status\\nV$RMAN_BACKUP_DATAFILES | Does not exist\\nV$BACKUP_DATAFILE | Does not exist';
-	expect(score(smoke, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass).toBe(false);
+	const wrong = 'V$RMAN_BACKUP_DATAFILES does not exist; V$BACKUP_DATAFILE is valid.\n\n| Object | Status |\n| --- | --- |\n| `V$RMAN_BACKUP_DATAFILES` | Does not exist |\n| **V$BACKUP_DATAFILE** | Does not exist |';
+	const wrongScore = score(smoke, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+	expect(wrongScore.pass).toBe(false);
+	expect(wrongScore.checks.filter(check => check.check.startsWith('forbidden:') && !check.pass).map(check => check.check)).toContain(`forbidden: ${smoke.expect.forbiddenClaims[0]}`);
+	for (const forbidden of ['Neither view exists', 'Both views do not exist', 'neither V$RMAN_BACKUP_DATAFILES nor V$BACKUP_DATAFILE is a valid view', 'V$BACKUP_DATAFILE does not exist']) {
+		const answer = `V$RMAN_BACKUP_DATAFILES does not exist; V$BACKUP_DATAFILE is valid. ${forbidden}`;
+		const result = score(smoke, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+		expect(result.checks.find(check => check.check === `forbidden: ${smoke.expect.forbiddenClaims.find(pattern => new RegExp(pattern, 'i').test(forbidden))}`)?.pass, forbidden).toBe(false);
+	}
 	for (const test of cases.filter(test => test !== smoke)) {
 		const cause = test.id.includes('logmember') ? 'V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES';
 		const readable = test.id.includes('logmember') ? 'V$LOG' : 'V$RMAN_BACKUP_JOB_DETAILS';
 		const answer = `${cause} does not exist in Oracle 19c. ${readable} is valid and readable.`;
 		expect(score(test, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, test.id).toBe(true);
-		const wrong = `${cause} is invalid. ${readable} does not exist.\n${readable} | Does not exist`;
-		expect(score(test, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, test.id).toBe(false);
+		const wrong = `${cause} does not exist in Oracle 19c. ${readable} is valid.\n| **${readable}** | Invalid |`;
+		const wrongScore = score(test, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+		expect(wrongScore.pass, test.id).toBe(false);
+		expect(wrongScore.checks.some(check => !check.pass && check.check.startsWith('forbidden:'))).toBe(true);
 	}
 });

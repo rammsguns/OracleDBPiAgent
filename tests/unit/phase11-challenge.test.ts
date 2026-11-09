@@ -19,9 +19,10 @@ it('adds a separately selectable split while preserving every prior case', async
 	const historical = JSON.parse(readFileSync('tests/fixtures/wp20e-previous-parameters.json', 'utf8'));
 	expect(createHash('sha256').update(JSON.stringify(prior.map(test => pre29e.find((old: { id: string }) => old.id === test.id) ?? repaired.find((old: { id: string }) => old.id === test.id) ?? premises.find((old: { id: string }) => old.id === test.id) ?? (test.id === historical.id ? historical : test.id === 'hard-p8-description-language' ? { ...test, expect: { ...test.expect, requiredTools: ['run_query'] } } : test)))).digest('hex')).toBe('46c4d7b26393b6d14e12b3a0dfeb3c275d2810a4bd14d00e6062b20a85cdb2f3');
 	expect(() => checkHardCases(cases)).not.toThrow();
-	for (const split of ['dev', 'holdout', 'regression', 'challenge', 'standby']) {
+	for (const split of ['dev', 'holdout', 'regression', 'challenge', 'standby', 'p36']) {
 		expect(parseArgs(['--split', split]).split).toBe(split);
 	}
+	expect(parseArgs(['--suite', 'evals/cases-hard', '--split', 'p36']).split).toBe('p36');
 	expect(parseArgs([]).split).toBeUndefined();
 	expect(() => parseArgs(['--split', 'unknown'])).toThrow('Split');
 });
