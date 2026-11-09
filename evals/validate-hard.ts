@@ -28,7 +28,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		if (!test.id.startsWith('hard-') || ids.has(test.id)) throw new Error('Invalid/duplicate hard ID');
 		ids.add(test.id);
 		if (!['d1-19c-lab', 'p1-19c-prod'].includes(test.target) && !(test.target === 'c1-19c-pdb' && test.split === 'pdb') && !(test.target === 'c1s-19c-stby' && test.split === 'standby')) throw new Error('Unapproved target');
-		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby') throw new Error('Missing split');
+		if (test.split !== 'dev' && test.split !== 'holdout' && test.split !== 'regression' && test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby' && test.split !== 'p36') throw new Error('Missing split');
 		if (Boolean(test.question) === Boolean(test.turns) || (test.turns && (test.turns.length < 2 || test.turns.some(turn => !turn.trim())))) throw new Error('Invalid prompts');
 		const splits = categories.get(test.category) ?? new Set<string>();
 		splits.add(test.split);
@@ -56,7 +56,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
-	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
+	for (const category of new Set(['analytical', 'diagnosis', 'cached-plan', 'relationships', 'refusal', 'follow-up', 'numeric-precision', 'unit-conversion', 'name-fidelity', 'refusal-follow-ups', 'grant-limited-p1', ...cases.filter(test => test.split !== 'challenge' && test.split !== 'pdb' && test.split !== 'standby' && test.split !== 'p36' && !test.id.startsWith('hard-p21-')).map(test => test.category)])) {
 		// Phase 25 re-premises access gaps to memory views outside the phase 25–27 grants.
 		if (!(categories.get(category)?.has(category === 'grant-limited-p1' ? 'regression' : 'dev')) || !categories.get(category)?.has('holdout')) throw new Error(`Every category needs dev and holdout: ${category}`);
 	}

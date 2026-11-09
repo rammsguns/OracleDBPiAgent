@@ -635,7 +635,7 @@ explicit deterministic ordering, and fixed decimal rendering where requested.
 New forbidden patterns use adjacent negation guards and directly preceding
 conditionals only; a distant negation cannot hide a later affirmative claim.
 
-`--split` accepts `dev`, `holdout` and `regression` (later also `challenge`, `pdb` and, since 1.9.0, `standby`). Future promotion gates run:
+`--split` accepts `dev`, `holdout` and `regression` (later also `challenge`, `pdb`, `standby` and, since Phase 36, `p36`). Future promotion gates run:
 
 1. Hard dev 4×4 A/B.
 2. Fresh 12-case holdout ×3.
@@ -1784,3 +1784,14 @@ C1 seed prerequisites must remain present. PDB-visible evidence does not establi
 CDB-wide absence, and backup metadata does not prove media readability or restore
 success. Live tests skip explicitly for missing credentials/listener/PDB; SQL,
 grant, fixture and empty-result failures fail the test.
+
+## Phase 36: cause-first ORA-00942 cases (WP-36A)
+
+`phase36-errors.json` adds three `p36` cases on d1. Each requires `run_query`
+then scores the unavailable object and the separately usable view. The cases cover
+the package smoke pair (`V$RMAN_BACKUP_DATAFILES` / `V$BACKUP_DATAFILE`),
+`V$LOGMEMBER` / `V$LOG`, and the missing RMAN name / readable
+`V$RMAN_BACKUP_JOB_DETAILS`. Product-account probes on d1 confirmed all six
+readability classifications immediately before adding the cases. No ground-truth
+SQL is needed because these cases score the tool's error attribution and fixed
+object visibility, not changing database values.

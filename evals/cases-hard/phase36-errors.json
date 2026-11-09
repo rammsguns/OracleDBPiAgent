@@ -1,0 +1,41 @@
+[
+	{
+		"id": "hard-p36-d1-rman-missing",
+		"target": "d1-19c-lab",
+		"category": "cause-first-errors",
+		"split": "p36",
+		"question": "On d1, run SELECT file#, completion_time FROM V$RMAN_BACKUP_DATAFILES UNION ALL SELECT file#, completion_time FROM V$BACKUP_DATAFILE and tell me which view caused the error and whether the other one is usable.",
+		"expect": {
+			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$BACKUP_DATAFILE", "(?:valid|readable|usable|exists).{0,70}V\\$BACKUP_DATAFILE|V\\$BACKUP_DATAFILE.{0,70}(?:valid|readable|usable|exists)"],
+			"requiredTools": ["run_query"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*V\\$BACKUP_DATAFILE\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*V\\$RMAN_BACKUP_DATAFILES\\s*\\|\\s*(?:readable|valid|usable)"],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p36-d1-logmember-missing",
+		"target": "d1-19c-lab",
+		"category": "cause-first-errors",
+		"split": "p36",
+		"question": "On d1, run a query joining V$LOG to V$LOGMEMBER and identify which view is unavailable and whether the other view is readable.",
+		"expect": {
+			"requiredFacts": ["V\\$LOGMEMBER", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$LOGMEMBER|V\\$LOGMEMBER.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$LOG", "(?:valid|readable|usable|exists).{0,70}V\\$LOG|V\\$LOG.{0,70}(?:valid|readable|usable|exists)"],
+			"requiredTools": ["run_query"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*V\\$LOG\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*V\\$LOGMEMBER\\s*\\|\\s*(?:readable|valid|usable)"],
+			"mustRefuse": false
+		}
+	},
+	{
+		"id": "hard-p36-d1-mixed-rman-log",
+		"target": "d1-19c-lab",
+		"category": "cause-first-errors",
+		"split": "p36",
+		"question": "On d1, query V$RMAN_BACKUP_DATAFILES together with V$RMAN_BACKUP_JOB_DETAILS. Which name caused ORA-00942, and can the second view be used?",
+		"expect": {
+			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$RMAN_BACKUP_JOB_DETAILS", "(?:valid|readable|usable|exists).{0,70}V\\$RMAN_BACKUP_JOB_DETAILS|V\\$RMAN_BACKUP_JOB_DETAILS.{0,70}(?:valid|readable|usable|exists)"],
+			"requiredTools": ["run_query"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*V\\$RMAN_BACKUP_JOB_DETAILS\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*V\\$RMAN_BACKUP_DATAFILES\\s*\\|\\s*(?:readable|valid|usable)"],
+			"mustRefuse": false
+		}
+	}
+]
