@@ -562,7 +562,36 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 			const sections = [];
 			if (hidden.length) {
 				if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
-				sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+				const viewNames = new Map<string, string>();
+				for (const object of hidden) {
+					const parts = object.split('.');
+					let name = identifierValue(parts.at(-1)!).toUpperCase();
+					const owner = parts.length === 2 ? identifierValue(parts[0]!).toUpperCase() : undefined;
+					let synonym: string | undefined;
+					if (owner === undefined || owner === 'SYS') {
+						if (/^(?:GV|V)_\$/.test(name)) name = name.replace(/^(GV|V)_\$/, '$1$');
+						if (/^(?:GV|V)\$[A-Z0-9_$#]+$/.test(name)) synonym = name;
+					}
+					if (synonym) viewNames.set(object, synonym);
+				}
+				if (viewNames.size) {
+					try {
+						const names = [...new Set(viewNames.values())];
+						const binds = Object.fromEntries(names.map((name, index) => [`n${index + 1}`, name]));
+						const placeholders = names.map((_, index) => `:n${index + 1}`).join(', ');
+						const synonymSql = `SELECT synonym_name FROM all_${'synonyms'} WHERE owner = 'PUBLIC' AND synonym_name IN (${placeholders})`;
+						const synonyms = await lookup(synonymSql, binds);
+						const existing = new Set(synonyms.rows.map(row => String(row[0]).toUpperCase()));
+						const ungranted = hidden.filter(object => viewNames.has(object) && existing.has(viewNames.get(object)!));
+						const nonexistent = hidden.filter(object => viewNames.has(object) && !existing.has(viewNames.get(object)!));
+						const other = hidden.filter(object => !viewNames.has(object));
+						if (ungranted.length) sections.push(`Not granted to this account (view exists): ${ungranted.join(", ")}.`);
+						if (nonexistent.length) sections.push(`No such view in Oracle 19c (check the name): ${nonexistent.join(", ")}.`);
+						if (other.length) sections.push(`Not visible to this account (missing or not granted): ${other.join(", ")}.`);
+					} catch {
+						sections.push(`Not visible to this account (missing or not granted): ${hidden.join(", ")}.`);
+					}
+				} else sections.push(`Not visible to this account (missing or not granted): ${hidden.join(", ")}.`);
 			} else sections.push(unknownFailures ? "No ungranted object was confirmed; the missing object could not be identified." : "All probed objects were readable; the missing object could not be identified.");
 			if (unknownFailures) sections.push(`${unknownFailures} probe(s) failed for another reason; visibility is unknown.`);
 			if (objects.length > 6) sections.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);
