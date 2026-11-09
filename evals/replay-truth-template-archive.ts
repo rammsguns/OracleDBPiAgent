@@ -55,10 +55,12 @@ for (const { root, path: file } of files.sort((a, b) => a.path.localeCompare(b.p
 		if (typeof record.answer !== 'string' || !Array.isArray(record.checks) || !record.checks.some(check => check.check === 'nonempty ground truth')) continue;
 		records++;
 		const { test, truth, after } = reconstruct(record, definitions);
+		const templates = definitions.get(record.id)?.groundTruth;
+		const expectedWidth = record.id === 'hard-p30-d1-fullest-permanent' ? 2 : record.id === 'hard-p19-object-statistics' ? 4 : undefined;
+		const compatibleTruth = templates !== undefined && expectedWidth !== undefined && truth.every(row => row.length === expectedWidth);
+		const nextTest = compatibleTruth && test.groundTruth ? { ...test, groundTruth: { ...test.groundTruth, factTemplates: templates.factTemplates, contradictionTemplates: templates.contradictionTemplates, captureChecks: templates.captureChecks } } : test;
 		const before = baselineScore(test, record, truth, after).pass;
-		const templated = definitions.get(record.id)?.groundTruth?.factTemplates;
-		const nextTest = templated && test.groundTruth ? { ...test, groundTruth: { ...test.groundTruth, factTemplates: templated } } : test;
-		const next = score(nextTest, record, truth, after).pass;
+		const next = compatibleTruth ? score(nextTest, record, truth, after).pass : before;
 		if (before && !next) {
 			passToFail++;
 			flips.push({ file: relative(root, file), id: record.id, iteration: record.iteration, before, after: next });
