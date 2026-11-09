@@ -73,7 +73,7 @@ it('attributes multi-object ORA-00942 with bounded audited probes', async () => 
 		.mockRejectedValueOnce(new Error('ORA-01031: insufficient privileges'))
 		.mockResolvedValueOnce({columns:['SYNONYM_NAME'],rows:[['V$LOGMEMBER']],truncated:false,elapsedMs:1});
 	const e=await s.run('SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#');
-	expect(e.message).toContain('Readable: v$log. Not granted to this account (view exists): v$logmember.');
+	expect(e.message).toContain('Not granted to this account (view exists): v$logmember. Not the cause (readable): v$log.');
 	expect(s.query.mock.calls.map(call=>call[0])).toEqual(['SELECT l.sequence# FROM v$log l JOIN v$logmember m ON m.group#=l.group#','SELECT * FROM v$log WHERE 1=0','SELECT * FROM v$logmember WHERE 1=0',"SELECT synonym_name FROM all_synonyms WHERE owner = 'PUBLIC' AND synonym_name IN (:n1)"]);
 	expect(s.query.mock.calls[1]![2]).toEqual({maxRows:100,timeoutSeconds:15});
 	expect(s.record).toHaveBeenCalledTimes(4);
@@ -87,9 +87,10 @@ it('classifies missing and ungranted V$ synonyms in one bound lookup', async () 
 		.mockRejectedValueOnce(new Error('ORA-00942: hidden'))
 		.mockResolvedValueOnce({columns:['SYNONYM_NAME'],rows:[['V$LOGMEMBER']],truncated:false,elapsedMs:1});
 	const error=await s.run('SELECT * FROM DUAL d JOIN SYS."V_$LOGMEMBER" m ON 1=1 JOIN "V$RMAN_BACKUP_DATAFILES" x ON 1=1');
-	expect(error.message).toContain('Readable: DUAL.');
+	expect(error.message).toContain('Not the cause (readable): DUAL.');
 	expect(error.message).toContain('Not granted to this account (view exists): SYS."V_$LOGMEMBER".');
 	expect(error.message).toContain('No such view in Oracle 19c (check the name): "V$RMAN_BACKUP_DATAFILES".');
+	expect(error.message.indexOf('No such view')).toBeLessThan(error.message.indexOf('Not the cause (readable)'));
 	expect(s.query.mock.calls[4]![0]).toBe("SELECT synonym_name FROM all_synonyms WHERE owner = 'PUBLIC' AND synonym_name IN (:n1, :n2)");
 	expect(s.query.mock.calls[4]![1]).toEqual({n1:'V$LOGMEMBER',n2:'V$RMAN_BACKUP_DATAFILES'});
 	expect(s.query.mock.calls[4]![2]).toEqual({maxRows:100,timeoutSeconds:2});
@@ -163,14 +164,14 @@ it('does not imply the missing object was identified when every probe succeeds',
 	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValue({columns:[],rows:[],truncated:false,elapsedMs:1});
 	const error=await s.run('SELECT * FROM V$LOG a JOIN V$SESSION b ON 1=1');
 	expect(error.message).toContain('the missing object could not be identified');
-	expect(error.message).not.toContain('Readable:');
+	expect(error.message).not.toContain('Not the cause (readable):');
 });
 it('probes and reports quoted schema and object identifiers without changing case or escaping', async () => {
 	const s=setup('ORA-00942: table or view does not exist');
 	s.query.mockReset().mockRejectedValueOnce(s.error).mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1}).mockRejectedValueOnce(new Error('ORA-00942: hidden'));
 	const error=await s.run('SELECT * FROM "MySchema"."my""table" x JOIN V$LOG l ON 1=1');
 	expect(s.query.mock.calls.slice(1).map(call=>call[0])).toEqual(['SELECT * FROM "MySchema"."my""table" WHERE 1=0','SELECT * FROM V$LOG WHERE 1=0',"SELECT synonym_name FROM all_synonyms WHERE owner = 'PUBLIC' AND synonym_name IN (:n1)"]);
-	expect(error.message).toContain('Readable: "MySchema"."my""table".');
+	expect(error.message).toContain('Not the cause (readable): "MySchema"."my""table".');
 });
 it('skips single-object ORA-00942 and injection-shaped identifiers', async () => {
 	const one=setup('ORA-00942: table or view does not exist'); await one.run('SELECT * FROM v$log'); expect(one.query).toHaveBeenCalledTimes(1);

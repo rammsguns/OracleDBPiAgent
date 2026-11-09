@@ -37,8 +37,9 @@ it('attributes the readable V$LOG and hidden V$LOGMEMBER view on d1-19c-lab', as
 	try {
 		const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'wp33a-d1'}).find(t=>t.name==='run_query')!;
 		const error=await tool.execute('live',{sql:'SELECT l.group#, m.member FROM V$LOG l JOIN V$LOGMEMBER m ON m.group#=l.group#'}).then(()=>{throw new Error('Expected ORA-00942');},e=>e as Error);
-		expect(error.message).toContain('Readable: V$LOG.');
+		expect(error.message).toContain('Not the cause (readable): V$LOG.');
 		expect(error.message).toContain('No such view in Oracle 19c (check the name): V$LOGMEMBER.');
+		expect(error.message.indexOf('No such view')).toBeLessThan(error.message.indexOf('Not the cause (readable)'));
 	} catch (e) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('d1 Oracle listener unavailable'); return; }
 		throw e;
@@ -62,9 +63,10 @@ it('distinguishes nonexistent RMAN view from a real ungranted V$ view on d1-19c-
 		await session.close();
 		const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'wp35a-d1'}).find(t=>t.name==='run_query')!;
 		const error=await tool.execute('live',{sql:`SELECT 1 FROM V$RMAN_BACKUP_JOB_DETAILS UNION ALL SELECT 1 FROM V$RMAN_BACKUP_DATAFILES UNION ALL SELECT 1 FROM ${ungranted}`} ).then(()=>{throw new Error('Expected ORA-00942');},e=>e as Error);
-		expect(error.message).toContain('Readable: V$RMAN_BACKUP_JOB_DETAILS.');
+		expect(error.message).toContain('Not the cause (readable): V$RMAN_BACKUP_JOB_DETAILS.');
 		expect(error.message).toContain('No such view in Oracle 19c (check the name): V$RMAN_BACKUP_DATAFILES.');
 		expect(error.message).toContain(`Not granted to this account (view exists): ${ungranted}.`);
+		expect(error.message.indexOf('No such view')).toBeLessThan(error.message.indexOf('Not the cause (readable)'));
 	} catch (error) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('d1 Oracle listener unavailable'); return; }
 		throw error;
