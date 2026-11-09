@@ -5,9 +5,9 @@
 - Added three eval-only, opt-in fields to `groundTruth` in `evals/types.ts`: `factTemplates` (all must match), `contradictionTemplates` (any match fails), and `captureChecks` (every captured value must equal its truth-substituted expected cell, case-insensitively after Markdown bold/backtick stripping).
 - All templates substitute regex-escaped cells from live truth rows. Validation checks the case allowlist, compiles patterns, validates cell indexes, rejects lookaround, and requires exactly one capture group for each capture check.
 - Only `hard-p30-d1-fullest-permanent` and `hard-p19-object-statistics` opt in. The default `rowCells` scorer is unchanged for all other cases.
-- P30 supports winner-first statements, ordinary “The fullest ... is SYSAUX” prose, explicit labels, and a heading followed by a single winner row. Data-driven capture checks reject recognized winner/inverted-label names that differ from truth; contradictions reject truth winner negation and second/third/least rankings.
+- For opted-in template cases, the scorer normalizes the answer once before applying all three template fields: paired bold/underscore emphasis, single-word emphasis, and inline-code markers are removed. P30 fact/capture patterns therefore treat plain, bold, underscore-emphasized, and backtick-quoted names alike without adding formatting alternatives. P30 supports winner-first statements, ordinary “The fullest ... is SYSAUX” prose, explicit labels, a heading followed by a single winner row, and superlative-first sentences such as “the permanent tablespace with the highest usage is SYSAUX.” Capture expected values are compared as substituted literal strings, not regex-escaped strings.
 - P19 has separate per-object fact templates for stale status and PRESENT, plus owner presence anywhere. Data-driven contradictions reject not/non-stale, `STALE_STATS = NO|FALSE`, fresh/up-to-date/current, and MISSING/NULL/never-analyzed claims against the live YES/PRESENT rows.
-- Tests load real production case JSON through `loadHardCases()` and score through the real scorer with live-shaped truth rows. Coverage includes the p30 required answer styles and adversarial wrong/negated/ordinal winners, p19 column order and contradiction synonyms, and validator failures.
+- Tests load real production case JSON through `loadHardCases()` and score through the real scorer with live-shaped truth rows. Coverage includes p30 plain/bold/underscore/code-marked winners, backtick-marked wrong winners, superlative-first wording, negated/ordinal winners, p19 column order and contradiction synonyms, and validator failures.
 - Added `evals/replay-truth-template-archive.ts` to compare the Phase 33 scorer (`8b6ef1c`) with this scorer across archived results.
 
 ## Files changed
@@ -63,9 +63,9 @@ Residual accepted cases: P19 owner matching checks only that SHOPAPP appears som
 
 ## Verification
 
-- `npm run typecheck`: passed (`tsc -p tsconfig.json --noEmit`; rerun after review fixes).
-- `npm test -- --maxWorkers=2`: passed after review fixes, 148 files / 2,950 tests.
+- `npm run typecheck`: passed after Round 3 (`tsc -p tsconfig.json --noEmit`).
+- `npm test -- --maxWorkers=2`: passed after Round 3, 148 files / 2,950 tests (0 failures).
 - The filtered hard-eval integration test passed in the preceding WP-34C verification (1 test, with the Strata end-to-end test excluded). It was not rerun for this review round because the changes only affect scoring, fixtures, validation, and unit tests.
-- Final archive replay after Round 2 fixes: 4,583 records, pass→fail 0, fail→pass 29 (19 p19, 10 p30).
+- Final archive replay after Round 3 fixes: 4,583 records, pass→fail 0, fail→pass 29 (19 p19, 10 p30).
 
 No live DB query was executed during replay; archive replay and scorer tests use stored truth rows. No LLM call was made.

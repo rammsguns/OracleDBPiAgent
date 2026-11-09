@@ -25,6 +25,12 @@ function p19UtcTimestamps(answer: string): string {
 	}).join('\n');
 }
 
+function normalizeFactTemplateAnswer(answer: string): string {
+	return answer.replace(/(^|[^\w])(\*\*|__)(.+?)\2(?=$|[^\w])/g, '$1$3')
+		.replace(/(^|[^\w])([*_])(.+?)\2(?=$|[^\w])/g, '$1$3')
+		.replace(/`([^`\n]+)`/g, '$1');
+}
+
 // truthAfter is the same ground truth re-read after the ask: live data (p1's SHOPAPP
 // workload) may change while the agent runs, so a scalar count may be anywhere between.
 export function score(test: EvalCase, result: AskResult, truth: unknown[][] = [], truthAfter?: unknown[][]) {
@@ -80,22 +86,23 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
 			if (test.groundTruth.factTemplates) {
+				const factAnswer = normalizeFactTemplateAnswer(answer);
 				for (const row of truth) {
 					for (const template of test.groundTruth.factTemplates) {
 						const pattern = template.replace(/\{(\d+)\}/g, (_match, index: string) => escapeRegex(String(row[Number(index)] ?? '')));
-						checks.push({ check: `fresh ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && new RegExp(pattern, 'i').test(answer) });
+						checks.push({ check: `fresh ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && new RegExp(pattern, 'i').test(factAnswer) });
 					}
 				}
 				for (const row of truth) {
 					for (const template of test.groundTruth.contradictionTemplates ?? []) {
 						const pattern = template.replace(/\{(\d+)\}/g, (_match, index: string) => escapeRegex(String(row[Number(index)] ?? '')));
-						checks.push({ check: `no contradictory ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && !new RegExp(pattern, 'i').test(answer) });
+						checks.push({ check: `no contradictory ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && !new RegExp(pattern, 'i').test(factAnswer) });
 					}
 					for (const captureCheck of test.groundTruth.captureChecks ?? []) {
 						const pattern = captureCheck.pattern.replace(/\{(\d+)\}/g, (_match, index: string) => escapeRegex(String(row[Number(index)] ?? '')));
-						const expected = captureCheck.equals.replace(/\{(\d+)\}/g, (_match, index: string) => escapeRegex(String(row[Number(index)] ?? ''))).replace(/[\*`]/g, '');
-						const matches = [...answer.matchAll(new RegExp(pattern, 'gi'))];
-						checks.push({ check: `capture ground truth: ${captureCheck.pattern} = ${expected} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && matches.every(match => (match[1] ?? '').replace(/[\*`]/g, '').toLocaleUpperCase() === expected.toLocaleUpperCase()) });
+						const expected = captureCheck.equals.replace(/\{(\d+)\}/g, (_match, index: string) => String(row[Number(index)] ?? ''));
+						const matches = [...factAnswer.matchAll(new RegExp(pattern, 'gi'))];
+						checks.push({ check: `capture ground truth: ${captureCheck.pattern} = ${expected} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && matches.every(match => (match[1] ?? '').toLocaleUpperCase() === expected.toLocaleUpperCase()) });
 					}
 				}
 

@@ -28,6 +28,10 @@ it('scores p30 winner sentence and class through the real case definition', () =
 	expect(check(fullest, d1Truth, 'The **fullest permanent tablespace** by percentage is:\n\n| Tablespace | Used % | Classification |\n|---|---|---|\n| **SYSAUX** | **3.75%** | **LOW** |\n\nSYSAUX tops the list at 3.75%, below 50% → LOW.')).toBe(true);
 	expect(check(fullest, d1Truth, '**SYSAUX** has the highest used percentage. Classification: **LOW**')).toBe(true);
 	expect(check(fullest, d1Truth, 'The fullest permanent tablespace is SYSAUX. Classification: LOW')).toBe(true);
+	for (const markedWinner of ['**SYSAUX**', '`SYSAUX`', '__SYSAUX__', '_SYSAUX_']) {
+		expect(check(fullest, d1Truth, `The fullest permanent tablespace is ${markedWinner}. Classification: LOW`)).toBe(true);
+	}
+	expect(check(fullest, d1Truth, 'The permanent tablespace with the highest usage is SYSAUX. Classification: LOW')).toBe(true);
 	for (const answer of [
 		'SYSTEM is the fullest permanent tablespace.\n| SYSAUX | ... | 3.8% |\nClassification: LOW',
 		'Fullest permanent tablespace: SYSTEM. SYSAUX has 3.8% usage. Classification: LOW',
@@ -39,6 +43,8 @@ it('scores p30 winner sentence and class through the real case definition', () =
 		'SYSTEM has the highest used percentage. SYSAUX | 3.8%. Classification: LOW',
 		'The fullest tablespace is SYSTEM. SYSAUX has the highest used bytes. Classification: LOW',
 		'Fullest: SYSTEM. SYSAUX has the highest percentage. Classification: LOW',
+		'`SYSTEM` is the fullest permanent tablespace. SYSAUX has the highest capacity. Classification: LOW',
+		'The fullest permanent tablespace is `SYSTEM`. SYSAUX has the highest capacity. Classification: LOW',
 		'SYSAUX is not the fullest permanent tablespace. Classification: LOW',
 		'SYSAUX is the second fullest permanent tablespace on d1. Classification: LOW',
 		'The fullest is SYSAUX; | Tablespace | Used % | Classification |\n|---|---|---|\n| SYSAUX | 3.8% | LOW |',
