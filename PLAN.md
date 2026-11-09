@@ -5103,6 +5103,13 @@ the package smoke test covers it on d1.
 **Follow-ups.**
 - `hard-p26-p1-next-run-semantics` (B): the agent printed "PRESENT" as the
   next run time instead of the timestamp from its own tool result.
+- Package smoke (d1, nonexistent `V$RMAN_BACKUP_DATAFILES` unioned with the
+  real `V$BACKUP_DATAFILE`): the tool note was correct ("Readable:
+  V$BACKUP_DATAFILE. No such view in Oracle 19c ..."). In one of two runs,
+  the agent still called both views missing.
+- Lab: C1 has no scheduled backups (installing the crontab was denied), so
+  `c1-pdb-live` fails backupAge about 24 hours after each manual level 0. The
+  release took a fresh level 0 first.
 
 ## MVP exit criteria
 
