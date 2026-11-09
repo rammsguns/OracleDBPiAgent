@@ -59,9 +59,15 @@ it('scores p30 winner sentence and class through the real case definition', () =
 		'I could not determine the fullest tablespace; SYSAUX and SYSTEM are LOW',
 		'SYSAUX is the fullest permanent tablespace. Classification: HIGH',
 		'SYSAUX is the fullest permanent tablespace. Classification: MEDIUM (not LOW)',
-		'SYSAUX is not classified as LOW.',
-		'SYSAUX is classified as not LOW.',
-		'SYSAUX is not in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not classified as LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is classified as not LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not within the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It does not fall in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It does not fall into the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It isn\'t LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is classified as not LOW.',
 	]) expect(check(fullest, d1Truth, answer), answer).toBe(false);
 });
 
@@ -71,6 +77,8 @@ it('scores p19 owner and per-object stale/presence facts independently of column
 	for (const answer of [
 		'SHOPAPP\n- PRODUCTS (table): stale (STALE_STATS = YES), LAST_ANALYZED PRESENT\n- SYS_C007655 (index): Stale (STALE_STATS = YES), statistics PRESENT',
 		'SHOPAPP\n- PRODUCTS: Stale (STALE_STATS=YES); LAST_ANALYZED is PRESENT\n- SYS_C007655: stale (STALE_STATS=YES), statistics PRESENT',
+		'SHOPAPP\n- Stale: PRODUCTS (LAST_ANALYZED PRESENT)\n- Stale: SYS_C007655 (statistics PRESENT)',
+		'SHOPAPP\n- Stale table PRODUCTS, LAST_ANALYZED PRESENT\n- Stale index SYS_C007655, LAST_ANALYZED PRESENT',
 	]) expect(check(stats, p1Truth, answer), answer).toBe(true);
 	const ownerResidual = 'Objects belong to owner HR:\n| PRODUCTS | Table | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\n| SYS_C007655 | Index | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\nThe query was parsed by SHOPAPP.';
 	expect(check(stats, p1Truth, ownerResidual)).toBe(true);

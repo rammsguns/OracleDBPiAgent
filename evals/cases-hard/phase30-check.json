@@ -92,7 +92,12 @@
 			],
 			"contradictionTemplates": [
 				"\\b{0}\\b[^.\\n]{0,50}\\b(?:is\\s+not\\s+(?:the\\s+)?(?:fullest|most\\s+full)|(?:second|third|2nd|3rd|least)\\s+(?:fullest|most\\s+full))\\b",
-				"\\b{0}\\b[^.\\n]{0,40}\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b{0}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b"
+				"\\b{0}\\b[^.\\n]{0,40}\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b{0}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b",
+				"\\bnot\\s+(?:classified\\s+as|in\\s+the|within\\s+the)\\s+{1}\\b",
+				"\\bdoes\\s*n.?t\\s+fall\\s+in(?:to)?\\s+the\\s+{1}\\b",
+				"\\bnot\\s+{1}\\b",
+				"\\bisn.?t\\s+{1}\\b",
+				"\\bclassified\\s+as\\s+not\\s+{1}\\b"
 			],
 			"captureChecks": [
 				{
