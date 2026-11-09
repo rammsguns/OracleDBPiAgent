@@ -8,7 +8,7 @@
 		"expect": {
 			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$BACKUP_DATAFILE", "(?:valid|readable|usable|exists).{0,70}V\\$BACKUP_DATAFILE|V\\$BACKUP_DATAFILE.{0,70}(?:valid|readable|usable|exists)"],
 			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$BACKUP_DATAFILE[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$BACKUP_DATAFILE\\s+(?:does not exist|is nonexistent|is invalid|is not a valid view)", "Neither view exists", "Both views do not exist", "neither.{0,50}is a valid view"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$BACKUP_DATAFILE[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$BACKUP_DATAFILE\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
 			"mustRefuse": false
 		}
 	},
@@ -21,7 +21,7 @@
 		"expect": {
 			"requiredFacts": ["V\\$LOGMEMBER", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$LOGMEMBER|V\\$LOGMEMBER.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$LOG", "(?:valid|readable|usable|exists).{0,70}V\\$LOG|V\\$LOG.{0,70}(?:valid|readable|usable|exists)"],
 			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOG[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOGMEMBER[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$LOG\\s+(?:does not exist|is nonexistent|is invalid|is not a valid view)", "Neither view exists", "Both views do not exist", "neither.{0,50}is a valid view"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOG[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOGMEMBER[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$LOG\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
 			"mustRefuse": false
 		}
 	},
@@ -34,7 +34,7 @@
 		"expect": {
 			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$RMAN_BACKUP_JOB_DETAILS", "(?:valid|readable|usable|exists).{0,70}V\\$RMAN_BACKUP_JOB_DETAILS|V\\$RMAN_BACKUP_JOB_DETAILS.{0,70}(?:valid|readable|usable|exists)"],
 			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$RMAN_BACKUP_JOB_DETAILS\\s+(?:does not exist|is nonexistent|is invalid|is not a valid view)", "Neither view exists", "Both views do not exist", "neither.{0,50}is a valid view"],
+			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$RMAN_BACKUP_JOB_DETAILS\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
 			"mustRefuse": false
 		}
 	}

@@ -66,3 +66,15 @@ Review-fix verification: typecheck passed; unit suite passed (148 files,
 2,957 tests); live query-error-hints integration passed (21 tests);
 `npx tsx evals/run.ts --suite evals/cases-hard --split p36 --help` printed usage
 and exited without evaluation.
+
+## Review round 2
+
+Expanded the sentence-bounded `neither ... (is|are) [a] valid` guard to cover
+both longest view names and added `is not valid` / `is not a valid` to each
+readable-view prose guard. The production-scorer unit test now sends every
+requested prose failure phrase to all three p36 cases, with a positive-fact
+sentence and an assertion naming the forbidden check that fails. Correct answers
+remain passing.
+
+Round 2 verification: `npm run typecheck` passed; `npm test -- --maxWorkers=2`
+passed (148 files, 2,957 tests).
