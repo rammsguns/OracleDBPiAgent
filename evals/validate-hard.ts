@@ -123,7 +123,7 @@ export function validateFactTemplates(test: EvalCase): void {
 	if (!templates) return;
 	if (!FACT_TEMPLATE_CASES.has(test.id) || test.groundTruth?.mode !== 'rowCells' || !Array.isArray(templates) || !templates.length || templates.some(template => typeof template !== 'string')) throw new Error(`Fact templates are not allowed for ${test.id}`);
 	for (const template of templates) {
-		if (/\(\?<([=!])|\(\?=/.test(template)) throw new Error(`Fact templates cannot use lookaround: ${test.id}`);
+		if (/\(\?[=!<]/.test(template)) throw new Error(`Fact templates cannot use lookaround: ${test.id}`);
 		const indexes = [...template.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1]));
 		if (!indexes.length || indexes.some(index => index >= (test.id === 'hard-p30-d1-fullest-permanent' ? 2 : 4))) throw new Error(`Fact template references a missing cell: ${test.id}`);
 		try {

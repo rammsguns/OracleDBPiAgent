@@ -3,10 +3,10 @@
 ## Built
 
 - Added opt-in `groundTruth.factTemplates` matching. Each template substitutes regex-escaped values from each live truth row and must match the answer. `rowCells` behavior is unchanged when the field is absent; templates replace the rowCells line check only for opted-in cases, while truth sampling and freshness remain unchanged.
-- Added pre-connection validation for allowlisted IDs, row indexes, regex compilation, and the prohibition on lookahead/lookbehind.
+- Added pre-connection validation for allowlisted IDs, row indexes, regex compilation, and rejection of all lookaround forms (positive/negative lookahead and lookbehind).
 - Enabled templates only for `hard-p30-d1-fullest-permanent` and `hard-p19-object-statistics`.
-- The p30 templates accept explicitly identified winners (including “fullest”, highest/largest/top phrasing, labeled winner headings, a first result following a “fullest … is:” heading, and “tops the list”) and require the live classification. A p30-specific contradiction check rejects an explicit different fullest winner and an inability-to-determine denial. Ordinary rowCells behavior remains unchanged for every other case.
-- Added tests through the real scorer for the required gate answers, winner/classification variants, wrong winners and classifications, denials, incomplete p19 objects, and validator rejection.
+- The p30 templates require a winner-first statement on the same line (for example, “SYSAUX has the highest …”) or an explicit “Fullest …: SYSAUX” label; table rows alone cannot establish the winner. The class template accepts labeled classifications and clear LOW threshold/band forms. A p30 guard rejects other named winners, comparative “fuller than” claims, speculative winners, and inability-to-determine denials. Residual: implicit comparative statements not using the recognized “X is fuller than Y” form can evade the contradiction guard; only positive winner-first forms can satisfy the template.
+- Unit tests load the production hard-case definitions through `loadHardCases()` and score them through the real scorer with the actual p30/p19 truth rows. Coverage includes winner/classification variants, wrong winners, denials, p19 column-order permutations, stale contradictions, incomplete objects, and validator rejection.
 - Added `evals/replay-truth-template-archive.ts` to compare the Phase 33 scorer (`8b6ef1c`) with this scorer across archived results.
 
 ## Files changed
@@ -18,7 +18,7 @@
 
 ## Archive replay
 
-All JSON results in archive phases 25–33 containing ground-truth checks were replayed: **4,583 records; pass→fail 0; fail→pass 31**. All flips are limited to the two allowlisted IDs: 21 p19 and 10 p30. No archived record passed before and failed under the new scorer.
+All JSON results in archive phases 25–33 containing ground-truth checks were replayed: **4,583 archived records; pass→fail 0; fail→pass 30**. All flips are limited to the two allowlisted IDs: 20 p19 and 10 p30. No archived record passed before and failed under the new scorer.
 
 Fail→pass files (relative to their phase directory):
 
@@ -42,7 +42,6 @@ Fail→pass files (relative to their phase directory):
 | `hard-p19-object-statistics` | `phase31/b-gate/2026-11-08T11-11-51-284Z-2f7bdeb2-5609-4a28-b5ca-4c632c313267.json` |
 | `hard-p19-object-statistics` | `phase32/gateA/2026-11-08T17-37-21-295Z-da5cdb0d-9834-4b24-b45b-6a7bb500b1db.json` |
 | `hard-p30-d1-fullest-permanent` | `phase32/gateA/2026-11-08T17-37-21-295Z-da5cdb0d-9834-4b24-b45b-6a7bb500b1db.json` |
-| `hard-p19-object-statistics` | `phase32/gateA/2026-11-08T18-04-40-481Z-d41cedf2-6278-425f-81fe-ae66d2ec6d33.json` |
 | `hard-p30-d1-fullest-permanent` | `phase32/gateA/2026-11-08T18-04-40-481Z-d41cedf2-6278-425f-81fe-ae66d2ec6d33.json` |
 | `hard-p30-d1-fullest-permanent` | `phase32/gateA/2026-11-08T18-43-25-300Z-f929befd-8cf6-409d-99bb-af53e9d76def.json` |
 | `hard-p19-object-statistics` | `phase32/gateB/2026-11-08T19-26-50-740Z-94493711-d592-47ce-82e1-9cfe325da975.json` |
@@ -56,7 +55,7 @@ Fail→pass files (relative to their phase directory):
 | `hard-p19-object-statistics` | `phase33/gateB/2026-11-09T03-10-31-616Z-5d61a729-6b52-4668-94f7-3277bfc25629.json` |
 | `hard-p30-d1-fullest-permanent` | `phase33/gateB/2026-11-09T03-10-31-616Z-5d61a729-6b52-4668-94f7-3277bfc25629.json` |
 
-Residual risk: broad indirect contradictions embedded in nuanced prose (for example, a conditional alternative metric where SYSTEM is fuller under allocated bytes) may not be fully distinguished. Direct assertions that another tablespace “is the fullest” and “could not determine” denials are rejected. The default rowCells scorer remains unchanged.
+Residual risk: p30 regex templates recognize winner-first same-line statements and explicit “Fullest …: {0}” labels; a highly indirect or conditional comparative claim outside the tested “X is fuller than Y” wording could still evade the contradiction guard. The default rowCells scorer remains unchanged outside the opt-in cases. P19 contradiction checks are table-cell bounded when the answer uses pipe-delimited rows; free-form prose is checked within each object line.
 
 ## Contract changes
 
@@ -64,9 +63,9 @@ Residual risk: broad indirect contradictions embedded in nuanced prose (for exam
 
 ## Verification
 
-- `npm run typecheck`: passed (`tsc -p tsconfig.json --noEmit`).
-- `npm test -- --maxWorkers=2`: passed, 148 files / 2,950 tests.
-- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/hard-evals.test.ts --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)' --maxWorkers=2`: passed, 1 file / 1 test. The Strata end-to-end test was excluded as required.
-- Final archive replay: 4,583 records, pass→fail 0, fail→pass 31 (21 p19, 10 p30).
+- `npm run typecheck`: passed (`tsc -p tsconfig.json --noEmit`; rerun after review fixes).
+- `npm test -- --maxWorkers=2`: passed after review fixes, 148 files / 2,950 tests.
+- The filtered hard-eval integration test passed in the preceding WP-34C verification (1 test, with the Strata end-to-end test excluded). It was not rerun for this review round because the changes only affect scoring, fixtures, validation, and unit tests.
+- Final archive replay after review fixes: 4,583 records, pass→fail 0, fail→pass 30 (20 p19, 10 p30).
 
 No live DB query was executed during replay; archive replay and scorer tests use stored truth rows. No LLM call was made.

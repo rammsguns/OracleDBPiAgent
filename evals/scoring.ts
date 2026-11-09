@@ -86,17 +86,28 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 						checks.push({ check: `fresh ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && new RegExp(pattern, 'i').test(answer) });
 					}
 				}
+				if (test.id === 'hard-p19-object-statistics') {
+					for (const row of truth) {
+						const objectName = escapeRegex(String(row[1] ?? ''));
+						const contradictedStale = answer.split(/\r?\n/).some(line => {
+							if (!new RegExp(`\\b${objectName}\\b`, 'i').test(line)) return false;
+							return line.split('|').some(cell => /\b(?:not|non)[ -]?stale\b|\bSTALE_STATS\s*=?\s*(?:NO|FALSE)\b/i.test(cell));
+						});
+						checks.push({ check: `no stale-statistics contradiction: ${String(row[1])}`, pass: !contradictedStale });
+					}
+				}
 				if (test.id === 'hard-p30-d1-fullest-permanent' && truth[0]?.[0] != null) {
-					const winner = escapeRegex(String(truth[0][0]));
-					const namesOtherWinner = new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+is\\s+(?:the\\s+)?(?:fullest|most\\s+full)(?:\\s+permanent)?(?:\\s+tablespace)?\\b`, 'i').test(answer);
-					const namedOtherRelativeWinner = new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+(?:is\\s+)?(?:the\\s+)?(?:top|highest|largest|greatest|biggest)\\s+(?:tablespace|by\\s+(?:used|usage|full|percentage|percent|ratio|capacity))\\b`, 'i').test(answer)
-						|| new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+has\\s+the\\s+(?:highest|largest|greatest|biggest|most)\\b[^\\n]{0,40}\\b(?:used|usage|full|percentage|percent|ratio|capacity)\\b`, 'i').test(answer);
-					const tableOnlyContradiction = namedOtherRelativeWinner
-						&& !new RegExp(`\\b${winner}\\b[^.\\n]{0,80}\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b|\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b[^.\\n]{0,80}\\b${winner}\\b`, 'i').test(answer);
-					const saysUnknown = /\b(?:could not|cannot|can't|unable to) determine\b[^\n]{0,100}\b(?:fullest|winner|most full)\b/i.test(answer)
-						|| /\b(?:I|we)\s+(?:could not|cannot|can't|unable to)\s+(?:determine|identify|establish)\b[^\n]{0,100}\b(?:fullest|winner|most full)\b/i.test(answer);
-					const contradictsClass = new RegExp(`\\b(?:HIGH|MID|MEDIUM|FULL)\\b[^.\\n]{0,40}\\bLOW\\b`, 'i').test(answer) || /\b(?:not|no|never)\s+LOW\b/i.test(answer);
-					checks.push({ check: `no contradicted fullest winner: ${String(truth[0][0])}`, pass: !namesOtherWinner && !tableOnlyContradiction && !saysUnknown && !contradictsClass });
+					const winner = String(truth[0][0]).toUpperCase();
+					const namedOtherWinner = [...answer.matchAll(/\b([A-Z][A-Z0-9_$#]*)\s+is\s+(?:the\s+)?(?:fullest|most\s+full)\b/gi)]
+						.some(match => match[1]!.toUpperCase() !== winner)
+						|| [...answer.matchAll(/^\s*[*#`_\[]*Fullest(?:\s+permanent)?\s+tablespace\s*:\s*[*#`_\[]*([A-Z][A-Z0-9_$#]*)/gim)]
+						.some(match => match[1]!.toUpperCase() !== winner)
+						|| [...answer.matchAll(/\b([A-Z][A-Z0-9_$#]*)\s+is\s+fuller\s+than\s+([A-Z][A-Z0-9_$#]*)/gi)]
+						.some(match => match[1]!.toUpperCase() !== winner);
+					const classContradiction = /\b(?:HIGH|MID|MEDIUM|FULL)\s*(?:→|->|—|–)\s*LOW\b/i.test(answer);
+					const saysUnknown = /\b(?:could not|cannot|can't|unable to) determine\b[^\n]{0,100}\b(?:fullest|winner|most full)\b/i.test(answer);
+					const uncertain = new RegExp(`(?:\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b${escapeRegex(String(truth[0][0]))}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b${escapeRegex(String(truth[0][0]))}\\b[^.\\n]{0,30}\\b(?:might|may|could|possibly)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b)`, 'i').test(answer);
+					checks.push({ check: `no contradicted fullest winner: ${String(truth[0][0])}`, pass: !namedOtherWinner && !saysUnknown && !uncertain && !classContradiction });
 				}
 			} else for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
 				preserveQualified: test.id.startsWith('hard-p18-'),
