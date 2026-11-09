@@ -157,9 +157,9 @@ export function createDbTools(ctx: ToolContext): AgentTool<any>[] {
 								if (!providerCache) { providerCache = new Map(); standbyRoleCache.set(ctx.sessions as object, providerCache); }
 								let cached = providerCache.get(target);
 								if (!cached) {
-										cached = identityRole
-											? Promise.resolve({ standby: identityRole.toUpperCase().includes('STANDBY') })
-											: readDatabaseRole(session);
+									cached = identityRole
+									? Promise.resolve({ standby: identityRole.toUpperCase().includes('STANDBY') })
+										: readDatabaseRole(session, { maxRows: 1, timeoutSeconds: Math.min(2, ctx.config.limits.statementTimeoutSeconds ?? 2) });
 									providerCache.set(target, cached);
 								}
 								const role = await cached;
