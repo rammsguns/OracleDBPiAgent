@@ -52,6 +52,7 @@ export function checkHardCases(cases: EvalCase[]): void {
 			}
 			// Match the independent ground-truth reader's deliberately narrower SELECT policy.
 			if (!/^SELECT\s/i.test(test.groundTruth.sql) || /;|@|\b(?:DBMS_|UTL_|FOR\s+UPDATE)/i.test(test.groundTruth.sql)) throw new Error('Truth must be plain SELECT');
+			if (test.groundTruth.factTemplates !== undefined) validateFactTemplates(test);
 		}
 		if (test.category === 'analytical' && test.groundTruth?.mode !== 'allCells') throw new Error('Analytical cases need allCells');
 	}
@@ -114,6 +115,22 @@ export function checkHardCases(cases: EvalCase[]): void {
 	const balanced = cases.filter(test => !test.id.startsWith('hard-p21-'));
 	const dev = balanced.filter(test => test.split === 'dev').length;
 	if (dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length < 0.55 || dev / balanced.filter(test => test.split === 'dev' || test.split === 'holdout').length > 0.72) throw new Error('Expected 55–72% dev (including Phase 5 balanced additions)');
+}
+
+const FACT_TEMPLATE_CASES = new Set(['hard-p30-d1-fullest-permanent', 'hard-p19-object-statistics']);
+export function validateFactTemplates(test: EvalCase): void {
+	const templates = test.groundTruth?.factTemplates;
+	if (!templates) return;
+	if (!FACT_TEMPLATE_CASES.has(test.id) || test.groundTruth?.mode !== 'rowCells' || !Array.isArray(templates) || !templates.length || templates.some(template => typeof template !== 'string')) throw new Error(`Fact templates are not allowed for ${test.id}`);
+	for (const template of templates) {
+		if (/\(\?<([=!])|\(\?=/.test(template)) throw new Error(`Fact templates cannot use lookaround: ${test.id}`);
+		const indexes = [...template.matchAll(/\{(\d+)\}/g)].map(match => Number(match[1]));
+		if (!indexes.length || indexes.some(index => index >= (test.id === 'hard-p30-d1-fullest-permanent' ? 2 : 4))) throw new Error(`Fact template references a missing cell: ${test.id}`);
+		try {
+			const sample = template.replace(/\{(\d+)\}/g, () => 'CELL');
+			new RegExp(sample, 'i');
+		} catch { throw new Error(`Invalid fact template: ${test.id}`); }
+	}
 }
 
 /** Phase 33: stable live evidence from a read-only physical standby PDB. */

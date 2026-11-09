@@ -79,7 +79,20 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 			const counts = [...normalized.matchAll(/(?<![\w.+\-−~])(?<!(?:about|approximately|approx\.?|estimated|roughly)\s+)(?<!(?:statistics|stats|optimizer|num_rows)[^.\n]{0,80})(\d+)\s+rows?\b(?!\s+(?:(?:have|has)\s+been\s+|were\s+)?(?:added|inserted|removed|deleted|more|fewer))/gi)].map(match => Number(match[1]));
 			checks.push({ check: 'no contradicting row count', pass: counts.every(inRange) });
 		} else if (test.groundTruth.mode === 'rowCells') {
-			for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
+			if (test.groundTruth.factTemplates) {
+				for (const row of truth) {
+					for (const template of test.groundTruth.factTemplates) {
+						const pattern = template.replace(/\{(\d+)\}/g, (_match, index: string) => escapeRegex(String(row[Number(index)] ?? '')));
+						checks.push({ check: `fresh ground truth template: ${template} [${JSON.stringify(row)}]`, pass: row.every(value => value != null) && new RegExp(pattern, 'i').test(answer) });
+					}
+				}
+				if (test.id === 'hard-p30-d1-fullest-permanent' && truth[0]?.[0] != null) {
+					const winner = escapeRegex(String(truth[0][0]));
+					const contradictsWinner = new RegExp(`\\b[A-Z][A-Z0-9_$#]*\\s+is\\s+the\\s+fullest\\b(?!\\s+(?:permanent\\s+)?tablespace\\b)`, 'i').test(answer)
+						|| new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+is\\s+(?:the\\s+)?fullest\\b`, 'i').test(answer);
+					checks.push({ check: `no contradicted fullest winner: ${String(truth[0][0])}`, pass: !contradictsWinner });
+				}
+			} else for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
 				preserveQualified: test.id.startsWith('hard-p18-'),
 				p31ErrorCode: test.id === 'hard-p31-failed-job',
 				p19,
@@ -102,6 +115,10 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 		checks.push({ check: 'nonempty ground truth', pass: truth.length > 0 });
 	}
 	return { pass: checks.every(check => check.pass), checks };
+}
+
+function escapeRegex(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Recover explicit aliases and simple column names without changing the truth contract.

@@ -10,7 +10,7 @@ interface EvalCaseBase {
 	split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb' | 'standby';
 	/** Opt in to skipping cache-dependent cases when pre/post truth has no rows. */
 	skipWhenTruthEmpty?: boolean;
-	groundTruth?: { sql: string; mode: 'scalar' | 'allCells' | 'rowCells'; setupSql?: string };
+	groundTruth?: { sql: string; mode: 'scalar' | 'allCells' | 'rowCells'; setupSql?: string; factTemplates?: string[] };
 	expect: { requiredFacts: string[]; requiredTools: string[]; forbiddenClaims: string[]; mustRefuse: boolean; maxToolCalls?: number };
 }
 export interface AskResult {
