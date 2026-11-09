@@ -111,7 +111,7 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	expect(() => checkP33Cases(refusalGuard)).toThrow('forbidden-claim checks');
 	const missingClaimGuard = structuredClone(cases);
 	missingClaimGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = [];
-	expect(() => checkP33Cases(missingClaimGuard)).toThrow('positive band/hidden facts');
+	expect(() => checkP33Cases(missingClaimGuard)).toThrow('positive natural lag/hidden facts');
 	const naturalLagGuard = structuredClone(cases);
 	naturalLagGuard.find(test => test.id === 'hard-p33-transport-lag')!.expect.forbiddenClaims = ['apply lag is zero'];
 	expect(() => checkP33Cases(naturalLagGuard)).toThrow('structured APPLY_LAG guard');
@@ -126,7 +126,10 @@ it('registers the standby split and rejects unsafe or incomplete phase33 cases',
 	expect(() => checkP33Cases(missingBackupGuard)).toThrow('primary location with a concise affirmative guard');
 	const archiveTruth = structuredClone(cases);
 	archiveTruth.find(test => test.id === 'hard-p33-archive-gaps')!.groundTruth = { sql: 'SELECT COUNT(*) FROM v$archive_gap', mode: 'rowCells' };
-	expect(() => checkP33Cases(archiveTruth)).toThrow('archive-gap cases must not require unasked row matching');
+	expect(() => checkP33Cases(archiveTruth)).toThrow('lag/backup/job-history/archive-gap cases must not require row matching');
+	const lagTruth = structuredClone(cases);
+	lagTruth.find(test => test.id === 'hard-p33-transport-lag')!.groundTruth = { sql: "SELECT CASE WHEN value < '+00 00:05:00' THEN 'UNDER_5_MIN' ELSE 'AT_LEAST_5_MIN' END FROM v$dataguard_stats WHERE name = 'transport lag'", mode: 'rowCells' };
+	expect(() => checkP33Cases(lagTruth)).toThrow('lag/backup/job-history/archive-gap cases must not require row matching');
 });
 
 it('scores phase33 correct answers, affirmative wrong answers, and structured guard cases', async () => {
@@ -153,11 +156,13 @@ it('scores phase33 correct answers, affirmative wrong answers, and structured gu
 			'Transport lag is under five minutes (UNDER_5_MIN). It is impossible to establish zero apply lag since apply lag is NULL.',
 			'Transport lag is under five minutes (UNDER_5_MIN). No apply lag value is known; we cannot establish that apply lag is zero.',
 			'Transport lag is under 5 minutes (UNDER_5_MIN). Apply lag is NULL in this PDB, so we cannot establish that apply lag is zero',
+			'Transport lag is +00 00:00:00 (zero) — confirmed by V$DATAGUARD_STATS. ... The formal apply lag metric returns NULL when queried from within a PDB. A NULL here does not mean zero.',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We verified that apply lag is zero. Apply lag is NULL.',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We observe zero apply lag. Apply lag is NULL.',
 				'Transport lag is under 5 minutes (UNDER_5_MIN). We confirmed apply lag is 0 seconds. Apply lag is NULL.',
 			],
 			wrong: ['Transport lag is over 5 minutes and apply lag is zero.', 'The standby has zero apply lag; the NULL value means there is no backlog.'],
+			// A synthetic band label is not required in a natural answer.
 			structuredWrong: ['Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG: 0', 'Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG=ZERO', 'Transport lag is UNDER_5_MIN and apply lag is NULL. APPLY_LAG | +00 00:00:00'],
 		},
 		'hard-p33-archive-gaps': {
@@ -187,6 +192,7 @@ it('scores phase33 correct answers, affirmative wrong answers, and structured gu
 				'The history is copied from the primary. It does not mean the jobs ran on this standby; jobs do not run there.',
 				'The failed-job history is replicated from the primary; scheduler jobs do not run here.',
 				'The jobs ran on this standby. The history was replicated from the primary; scheduler jobs do not run here.',
+				'Those rows visible on standby: Redo apply replicated the INSERTs ... | Primary — the job coordinator fired jobs there',
 			],
 			wrong: ['Yes, those failed jobs ran on this standby.', 'The scheduler jobs execute on the standby and failed there.'],
 		},
@@ -199,7 +205,6 @@ it('scores phase33 correct answers, affirmative wrong answers, and structured gu
 		const samples = answers[test.id]!;
 		const truth = test.id === 'hard-p33-role-open' ? [['PHYSICAL STANDBY', 'READ ONLY WITH APPLY']]
 			: test.id === 'hard-p33-mrp' ? [['MRP0', 'APPLYING_LOG']]
-			: test.id === 'hard-p33-transport-lag' ? [['UNDER_5_MIN']]
 			: [];
 		for (const answer of samples.correct) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(true);
 		for (const answer of samples.wrong) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);

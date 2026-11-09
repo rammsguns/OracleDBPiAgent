@@ -16,6 +16,8 @@ it('C1S: every phase33 truth SELECT parses and returns nonempty truth as PIAGENT
 			throw error;
 		}
 		expect((await session.query("SELECT USER, SYS_CONTEXT('USERENV','CON_NAME') FROM dual")).rows).toEqual([['PIAGENT_RO', 'PIPDB1']]);
+		const transportBand = await session.query("SELECT CASE WHEN value < '+00 00:05:00' THEN 'UNDER_5_MIN' ELSE 'AT_LEAST_5_MIN' END FROM v$dataguard_stats WHERE name = 'transport lag'");
+		expect(transportBand.rows).toEqual([['UNDER_5_MIN']]);
 		for (const test of cases) {
 			if (!test.groundTruth) continue;
 			let result;
@@ -26,7 +28,6 @@ it('C1S: every phase33 truth SELECT parses and returns nonempty truth as PIAGENT
 			for (const row of result.rows) for (const cell of row) expect(cell, test.id).not.toBeNull();
 			if (test.id === 'hard-p33-role-open') expect(result.rows).toEqual([['PHYSICAL STANDBY', 'READ ONLY WITH APPLY']]);
 			if (test.id === 'hard-p33-mrp') expect(result.rows.some(row => row[0] === 'MRP0' && row[1] === 'APPLYING_LOG')).toBe(true);
-			if (test.id === 'hard-p33-transport-lag') expect(result.rows).toEqual([['UNDER_5_MIN']]);
 		}
 	} finally { await sessions.closeAll(); }
 }, 120000);
