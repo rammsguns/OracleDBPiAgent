@@ -88,11 +88,16 @@
 			"mode": "rowCells",
 			"factTemplates": [
 				"\\b{0}\\b[^\\n]{0,100}\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b|\\b(?:the\\s+)?(?:fullest|most\\s+full|highest|largest|greatest)(?:\\s+permanent)?(?:\\s+tablespace)?\\b[^.!?\\n]{0,100}?(?:\\bis\\b|:|=)\\s+{0}\\b|(?:^|\\n)\\s*[*#`_\\[]*Fullest[^:\\n]{0,100}:\\s*{0}\\b[^\\n]*|\\bfullest\\b[^\\n]{0,300}\\bis:\\s*(?:\\n[^\\n]*){0,5}\\|\\s*{0}\\b",
-				"(?:classification|class|classified|band|level)\\W{0,10}{1}\\b|\\bclassified\\s+as\\s+{1}\\b|\\bClassification:\\s*{1}\\b|\\b{1}\\b\\s*\\((?:below|under|<)\\s*50%?\\b|\\b{1}\\b[^.\\n]{0,40}\\bband\\b|(?:→|->|—|–|-)\\s*{1}\\b"
+				"(?:classification|class|classified|band|level)(?:\\s+is)?\\W{0,10}{1}\\b|\\bclassified\\s+as\\s+{1}\\b|\\bfalls\\s+in\\s+the\\s+{1}\\s+band\\b|\\b{1}\\s+classification\\b|\\b{1}\\b\\s*\\((?:below|under|<)\\s*50%?\\b|\\b{1}\\b[^.\\n]{0,40}\\bband\\b|(?:→|->|—|–|-)\\s*{1}\\b|\\b(?:it|this)\\s+(?:is\\s+)?(?:classified\\s+as\\s+|falls\\s+in\\s+the\\s+){1}\\b"
 			],
 			"contradictionTemplates": [
 				"\\b{0}\\b[^.\\n]{0,50}\\b(?:is\\s+not\\s+(?:the\\s+)?(?:fullest|most\\s+full)|(?:second|third|2nd|3rd|least)\\s+(?:fullest|most\\s+full))\\b",
-				"\\b{0}\\b[^.\\n]{0,40}\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b{0}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b"
+				"\\b{0}\\b[^.\\n]{0,40}\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b|\\b(?:might|may|could|possibly|perhaps|maybe)\\b[^.\\n]{0,30}\\b{0}\\b[^.\\n]{0,30}\\b(?:fullest|most\\s+full)\\b",
+				"\\bnot\\s+(?:classified\\s+as|in\\s+the|within\\s+the)\\s+{1}\\b",
+				"\\bdoes\\s*n.?t\\s+fall\\s+in(?:to)?\\s+the\\s+{1}\\b",
+				"\\bnot\\s+{1}\\b",
+				"\\bisn.?t\\s+{1}\\b",
+				"\\bclassified\\s+as\\s+not\\s+{1}\\b"
 			],
 			"captureChecks": [
 				{

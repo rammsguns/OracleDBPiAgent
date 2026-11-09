@@ -28,6 +28,13 @@ it('scores p30 winner sentence and class through the real case definition', () =
 	expect(check(fullest, d1Truth, 'The **fullest permanent tablespace** by percentage is:\n\n| Tablespace | Used % | Classification |\n|---|---|---|\n| **SYSAUX** | **3.75%** | **LOW** |\n\nSYSAUX tops the list at 3.75%, below 50% → LOW.')).toBe(true);
 	expect(check(fullest, d1Truth, '**SYSAUX** has the highest used percentage. Classification: **LOW**')).toBe(true);
 	expect(check(fullest, d1Truth, 'The fullest permanent tablespace is SYSAUX. Classification: LOW')).toBe(true);
+	for (const answer of [
+		'SYSAUX is the fullest permanent tablespace on d1. It is classified as LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It falls in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. LOW classification.',
+		'SYSAUX is the fullest permanent tablespace on d1. Classification is LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. class: low',
+	]) expect(check(fullest, d1Truth, answer), answer).toBe(true);
 	for (const markedWinner of ['**SYSAUX**', '`SYSAUX`', '__SYSAUX__', '_SYSAUX_']) {
 		expect(check(fullest, d1Truth, `The fullest permanent tablespace is ${markedWinner}. Classification: LOW`)).toBe(true);
 	}
@@ -52,18 +59,35 @@ it('scores p30 winner sentence and class through the real case definition', () =
 		'I could not determine the fullest tablespace; SYSAUX and SYSTEM are LOW',
 		'SYSAUX is the fullest permanent tablespace. Classification: HIGH',
 		'SYSAUX is the fullest permanent tablespace. Classification: MEDIUM (not LOW)',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not classified as LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is classified as not LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not within the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It does not fall in the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It does not fall into the LOW band.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is not LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It isn\'t LOW.',
+		'SYSAUX is the fullest permanent tablespace on d1. It is classified as not LOW.',
 	]) expect(check(fullest, d1Truth, answer), answer).toBe(false);
 });
 
 it('scores p19 owner and per-object stale/presence facts independently of column order', () => {
 	const standard = '| `PRODUCTS` | Table | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\n| `SYS_C007655` | Index (UNIQUE, ...) | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\nThe plan was parsed by the SHOPAPP login.';
 	expect(check(stats, p1Truth, standard)).toBe(true);
+	for (const answer of [
+		'SHOPAPP\n- PRODUCTS (table): stale (STALE_STATS = YES), LAST_ANALYZED PRESENT\n- SYS_C007655 (index): Stale (STALE_STATS = YES), statistics PRESENT',
+		'SHOPAPP\n- PRODUCTS: Stale (STALE_STATS=YES); LAST_ANALYZED is PRESENT\n- SYS_C007655: stale (STALE_STATS=YES), statistics PRESENT',
+		'SHOPAPP\n- Stale: PRODUCTS (LAST_ANALYZED PRESENT)\n- Stale: SYS_C007655 (statistics PRESENT)',
+		'SHOPAPP\n- Stale table PRODUCTS, LAST_ANALYZED PRESENT\n- Stale index SYS_C007655, LAST_ANALYZED PRESENT',
+	]) expect(check(stats, p1Truth, answer), answer).toBe(true);
 	const ownerResidual = 'Objects belong to owner HR:\n| PRODUCTS | Table | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\n| SYS_C007655 | Index | **Stale** (`STALE_STATS = YES`) | **PRESENT** |\nThe query was parsed by SHOPAPP.';
 	expect(check(stats, p1Truth, ownerResidual)).toBe(true);
 	const reordered = '| **PRESENT** | `PRODUCTS` | Table | `STALE_STATS = YES` |\n| **PRESENT** | `SYS_C007655` | Index (UNIQUE, ...) | `STALE_STATS=YES` |\nSHOPAPP owner.';
 	expect(check(stats, p1Truth, reordered), JSON.stringify(score(stats, result(reordered, ['run_query']), p1Truth).checks)).toBe(true);
 	for (const answer of [
 		standard.replace('**Stale** (`STALE_STATS = YES`)', '**Not stale** (`STALE_STATS = NO`)'),
+		'Owner SHOPAPP\n- PRODUCTS: not stale (STALE_STATS = NO), LAST_ANALYZED PRESENT\n- SYS_C007655: stale, statistics PRESENT',
+		'Owner SHOPAPP\n- PRODUCTS: stale (STALE_STATS = YES), LAST_ANALYZED MISSING\n- SYS_C007655: stale, statistics PRESENT',
 		standard.replace('**Stale** (`STALE_STATS = YES`)', '**Non-stale** (`STALE_STATS = YES`)'),
 		standard.replace('STALE_STATS = YES', 'STALE_STATS = NO'),
 		'| PRODUCTS | Table | Not stale | PRESENT |\n| SYS_C007655 | Index | Not stale | PRESENT |\nSHOPAPP',
