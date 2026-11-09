@@ -562,7 +562,49 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 			const sections = [];
 			if (hidden.length) {
 				if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
-				sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+				const viewNames = new Map<string, { synonym: string; sysQualifiedPublicName: boolean; quotedCaseMismatch: boolean }>();
+				for (const object of hidden) {
+					const parts = object.split('.');
+					const token = parts.at(-1)!;
+					const value = identifierValue(token);
+					const quotedCaseMismatch = token.startsWith('"') && value !== value.toUpperCase() && /^(?:GV|V)\$[A-Z0-9_$#]+$/i.test(value);
+					let name = token.startsWith('"') ? value : value.toUpperCase();
+					const owner = parts.length === 2 ? identifierValue(parts[0]!).toUpperCase() : undefined;
+					const fixed = /^(GV|V)_\$([A-Z0-9_$#]+)$/.exec(name);
+					const publicView = /^(GV|V)\$[A-Z0-9_$#]+$/.test(name);
+					const synonym = fixed ? `${fixed[1]}$${fixed[2]}` : publicView ? name : undefined;
+					if (owner === 'SYS' && publicView) {
+						viewNames.set(object, { synonym: name, sysQualifiedPublicName: true, quotedCaseMismatch });
+						continue;
+					}
+					if (synonym && (owner === undefined || owner === 'SYS' && Boolean(fixed)) && !quotedCaseMismatch) {
+						viewNames.set(object, { synonym, sysQualifiedPublicName: owner === 'SYS' && publicView, quotedCaseMismatch: false });
+					} else if (quotedCaseMismatch) viewNames.set(object, { synonym: name.toUpperCase(), sysQualifiedPublicName: owner === 'SYS' && publicView, quotedCaseMismatch: true });
+				}
+				if (viewNames.size) {
+					try {
+						const names = [...new Set([...viewNames.values()].filter(view => !view.quotedCaseMismatch).map(view => view.synonym))];
+						const existing = new Set<string>();
+						if (names.length) {
+						const binds = Object.fromEntries(names.map((name, index) => [`n${index + 1}`, name]));
+						const placeholders = names.map((_, index) => `:n${index + 1}`).join(', ');
+							const synonyms = await lookup(`SELECT synonym_name FROM all_synonyms WHERE owner = 'PUBLIC' AND synonym_name IN (${placeholders})`, binds);
+							synonyms.rows.forEach(row => existing.add(String(row[0]).toUpperCase()));
+						}
+						const ungranted = hidden.filter(object => { const view = viewNames.get(object); return view && !view.quotedCaseMismatch && !view.sysQualifiedPublicName && existing.has(view.synonym); });
+						const usePrefix = hidden.filter(object => { const view = viewNames.get(object); return view?.sysQualifiedPublicName && existing.has(view.synonym); });
+						const caseMismatch = hidden.filter(object => viewNames.get(object)?.quotedCaseMismatch);
+						const nonexistent = hidden.filter(object => { const view = viewNames.get(object); return view && !view.quotedCaseMismatch && !existing.has(view.synonym); });
+						const other = hidden.filter(object => !viewNames.has(object));
+						if (ungranted.length) sections.push(`Not granted to this account (view exists): ${ungranted.join(", ")}.`);
+						if (usePrefix.length) sections.push(`Use ${usePrefix.map(object => viewNames.get(object)!.synonym).join(", ")} without the SYS. prefix: ${usePrefix.join(", ")}.`);
+						if (caseMismatch.length) sections.push(`No such view in Oracle 19c (quoted names are case-sensitive; check the name): ${caseMismatch.join(", ")}.`);
+						if (nonexistent.length) sections.push(`No such view in Oracle 19c (check the name): ${nonexistent.join(", ")}.`);
+						if (other.length) sections.push(`Not visible to this account (missing or not granted): ${other.join(", ")}.`);
+					} catch {
+						sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+					}
+				} else sections.push(`Not visible to this account (missing or not granted): ${hidden.join(", ")}.`);
 			} else sections.push(unknownFailures ? "No ungranted object was confirmed; the missing object could not be identified." : "All probed objects were readable; the missing object could not be identified.");
 			if (unknownFailures) sections.push(`${unknownFailures} probe(s) failed for another reason; visibility is unknown.`);
 			if (objects.length > 6) sections.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);

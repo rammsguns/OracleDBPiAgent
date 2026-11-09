@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { it, expect } from 'vitest';
 import { createSessionProvider } from '../../src/oracle/index.js';
 import { createDbTools } from '../../src/tools/index.js';
+import { classifySql } from '../../src/oracle/sqlPolicy.js';
 import type { AppConfig } from '../../src/contracts.js';
 const targets = JSON.parse(await readFile(new URL('../../config/targets.json', import.meta.url),'utf8')).targets;
 const liveConfig = (targetName:string) => ({targets,defaultTarget:targetName,secretDir:process.env.PIAGENT_SECRET_DIR,limits:{maxRows:1000,statementTimeoutSeconds:15,maxToolResultBytes:16000}} as AppConfig);
@@ -37,10 +38,36 @@ it('attributes the readable V$LOG and hidden V$LOGMEMBER view on d1-19c-lab', as
 		const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'wp33a-d1'}).find(t=>t.name==='run_query')!;
 		const error=await tool.execute('live',{sql:'SELECT l.group#, m.member FROM V$LOG l JOIN V$LOGMEMBER m ON m.group#=l.group#'}).then(()=>{throw new Error('Expected ORA-00942');},e=>e as Error);
 		expect(error.message).toContain('Readable: V$LOG.');
-		expect(error.message).toContain('Not visible to this account: V$LOGMEMBER.');
+		expect(error.message).toContain('No such view in Oracle 19c (check the name): V$LOGMEMBER.');
 	} catch (e) {
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('d1 Oracle listener unavailable'); return; }
 		throw e;
+	} finally { await provider.closeAll(); }
+},30000);
+
+it('distinguishes nonexistent RMAN view from a real ungranted V$ view on d1-19c-lab', async context => {
+	if (!process.env.PIAGENT_SECRET_DIR) { context.skip('PIAGENT_SECRET_DIR is unset'); return; }
+	const config=liveConfig('d1-19c-lab'), provider=createSessionProvider(config);
+	try {
+		const session=await provider.get('d1-19c-lab');
+		const candidates=await session.query("SELECT synonym_name FROM all_synonyms WHERE owner = 'PUBLIC' AND synonym_name LIKE 'V$%' ORDER BY synonym_name", {}, {maxRows:1000,timeoutSeconds:15});
+		const existing=new Set(candidates.rows.map(row=>String(row[0]).toUpperCase()));
+		let ungranted: string | undefined;
+		for (const name of existing) {
+			try { classifySql(`SELECT * FROM ${name} WHERE ROWNUM=0`); } catch { continue; }
+			try { await session.query(`SELECT * FROM ${name} WHERE ROWNUM=0`); }
+			catch (error) { if (/ORA-00942|ORA-01031/.test(String(error))) { ungranted=name; break; } throw error; }
+		}
+		if (!ungranted) { await session.close(); context.skip('No candidate public V$ synonym is available for an ungranted-view comparison'); return; }
+		await session.close();
+		const tool=createDbTools({config,sessions:provider,audit:{record:async()=>{}},runId:'wp35a-d1'}).find(t=>t.name==='run_query')!;
+		const error=await tool.execute('live',{sql:`SELECT 1 FROM V$RMAN_BACKUP_JOB_DETAILS UNION ALL SELECT 1 FROM V$RMAN_BACKUP_DATAFILES UNION ALL SELECT 1 FROM ${ungranted}`} ).then(()=>{throw new Error('Expected ORA-00942');},e=>e as Error);
+		expect(error.message).toContain('Readable: V$RMAN_BACKUP_JOB_DETAILS.');
+		expect(error.message).toContain('No such view in Oracle 19c (check the name): V$RMAN_BACKUP_DATAFILES.');
+		expect(error.message).toContain(`Not granted to this account (view exists): ${ungranted}.`);
+	} catch (error) {
+		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(error))) { context.skip('d1 Oracle listener unavailable'); return; }
+		throw error;
 	} finally { await provider.closeAll(); }
 },30000);
 
