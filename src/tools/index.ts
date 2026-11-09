@@ -450,10 +450,16 @@ export function referencedObjects(sql: string): string[] | undefined {
 
 function standbyProvenanceKind(sql: string): 'backup' | 'scheduler' | undefined {
 	const names = new Set(sqlTokens(sql).map(token => identifierValue(token).toUpperCase()));
-	const backups = new Set(['V$BACKUP_SET','V$BACKUP_PIECE','V$BACKUP_DATAFILE','V$BACKUP_REDOLOG','V$BACKUP_SET_DETAILS','V$BACKUP_PIECE_DETAILS','V$BACKUP_FILES','V$RMAN_BACKUP_JOB_DETAILS','V$RMAN_STATUS','V$RMAN_OUTPUT','V$RMAN_CONFIGURATION','V$DATAFILE_COPY','V$CONTROLFILE_RECORD_SECTION']);
-	for (const name of [...names]) {
+	if (sqlTokens(sql).some(token => token.toUpperCase() === 'WITH')) {
+		if ([...names].some(name => /^(?:DBA|ALL|USER)_SCHEDULER_JOB_(?:RUN_DETAILS|LOG)$/.test(name))) return 'scheduler';
+		return undefined;
+	}
+	const objects = referencedObjects(sql);
+	if (!objects) return undefined;
+	const backupPattern = /^G?V\$(?:BACKUP_(?:SET|PIECE|DATAFILE|REDOLOG|SET_DETAILS|PIECE_DETAILS|FILES)|RMAN_(?:BACKUP_JOB_DETAILS|STATUS|OUTPUT|CONFIGURATION)|DATAFILE_COPY|CONTROLFILE_RECORD_SECTION)$/;
+	for (const name of objects.map(object => object.toUpperCase())) {
 		const view = name.replace(/^SYS\./, '');
-		if (backups.has(view) || [...backups].some(backup => backup.startsWith('V$') && view === `G${backup}`)) return 'backup';
+		if (backupPattern.test(view)) return 'backup';
 		if (/^(?:DBA|ALL|USER)_SCHEDULER_JOB_(?:RUN_DETAILS|LOG)$/.test(view)) return 'scheduler';
 	}
 	return undefined;

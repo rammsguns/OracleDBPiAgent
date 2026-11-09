@@ -99,9 +99,9 @@ it('notes copied backup and scheduler provenance on c1s and none on c1', async c
 		if (/NJS-511|ECONNREFUSED|ORA-12541/.test(String(e))) { context.skip('c1s Oracle listener unavailable'); return; }
 		throw e;
 	} finally { await provider.closeAll(); }
-	const primary=createSessionProvider(liveConfig('c1-19c-prod'));
+	const primary=createSessionProvider(liveConfig('c1-19c-pdb'));
 	try {
-		const tool=createDbTools({config:liveConfig('c1-19c-prod'),sessions:primary,audit:{record:async()=>{}},runId:'wp34a-c1'}).find(t=>t.name==='run_query')!;
+		const tool=createDbTools({config:liveConfig('c1-19c-pdb'),sessions:primary,audit:{record:async()=>{}},runId:'wp34a-c1'}).find(t=>t.name==='run_query')!;
 		for (const sql of ['SELECT COUNT(*) FROM V$BACKUP_SET','SELECT COUNT(*) FROM DBA_SCHEDULER_JOB_RUN_DETAILS']) {
 			const result=await tool.execute('live',{sql});
 			expect(result.details.sourceNote).toBeUndefined();

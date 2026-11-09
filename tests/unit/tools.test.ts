@@ -11,11 +11,16 @@ it('adds standby provenance notes only for matching successful reads and caches 
 	const {tools,query,get}=setup();
 	const session={query,close:vi.fn(),identity:{isCdb:true,containerName:'PIPDB1'}};
 	get.mockResolvedValue(session);
+	query.mockImplementation(async (sql:string) => sql.includes('V$DATABASE')
+		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PRIMARY','READ WRITE','CDB19','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
+		: {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
 	const tool=tools.find(t=>t.name==='run_query')!;
 	const backup=await tool.execute('1',{sql:'SELECT * FROM sys."V$BACKUP_SET" b'});
 	expect(backup.details.sourceNote).toBeUndefined();
-	query.mockResolvedValueOnce({columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1});
-	const scheduler=await tool.execute('2',{sql:'WITH j AS (SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS) SELECT * FROM j'});
+	query.mockImplementation(async (sql:string) => sql.includes('V$DATABASE')
+		? {columns:['DATABASE_ROLE','OPEN_MODE','DB_UNIQUE_NAME','PROTECTION_MODE'],rows:[['PHYSICAL STANDBY','READ ONLY','CDB19S','MAXIMUM PERFORMANCE']],truncated:false,elapsedMs:1}
+		: {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1});
+	const scheduler=await tool.execute('2',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_RUN_DETAILS'});
 	expect(scheduler.details.sourceNote).toContain('written on the primary and replicated by redo apply');
 	const second=await tool.execute('3',{sql:'SELECT * FROM GV$BACKUP_SET'});
 	expect(second.details.sourceNote).toContain('do not show a backup taken on this standby');
@@ -29,10 +34,10 @@ it('skips provenance on primary and unrelated SQL, and silently ignores unknown 
 	expect(unrelated.details.sourceNote).toBeUndefined();
 	const backup=await tool.execute('2',{sql:'SELECT * FROM V$BACKUP_SET'});
 	expect(backup.details.sourceNote).toBeUndefined();
-	expect(primary.query).toHaveBeenCalledOnce();
+	expect(primary.query).toHaveBeenCalledTimes(2); // The two requested SELECTs; known primary identity skips the role probe.
 	const unknown=setup();
 	unknown.get.mockResolvedValue({query:unknown.query,close:unknown.close,identity:{}});
-	unknown.query.mockRejectedValueOnce(new Error('role hidden'));
+	unknown.query.mockImplementation(async (sql:string) => { if(sql.includes('V$DATABASE')) throw new Error('role hidden'); return {columns:['N'],rows:[[1]],truncated:false,elapsedMs:1}; });
 	const result=await unknown.tools.find(t=>t.name==='run_query')!.execute('1',{sql:'SELECT * FROM DBA_SCHEDULER_JOB_LOG'});
 	expect(result.details.sourceNote).toBeUndefined();
 });
