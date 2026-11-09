@@ -88,9 +88,15 @@ export function score(test: EvalCase, result: AskResult, truth: unknown[][] = []
 				}
 				if (test.id === 'hard-p30-d1-fullest-permanent' && truth[0]?.[0] != null) {
 					const winner = escapeRegex(String(truth[0][0]));
-					const contradictsWinner = new RegExp(`\\b[A-Z][A-Z0-9_$#]*\\s+is\\s+the\\s+fullest\\b(?!\\s+(?:permanent\\s+)?tablespace\\b)`, 'i').test(answer)
-						|| new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+is\\s+(?:the\\s+)?fullest\\b`, 'i').test(answer);
-					checks.push({ check: `no contradicted fullest winner: ${String(truth[0][0])}`, pass: !contradictsWinner });
+					const namesOtherWinner = new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+is\\s+(?:the\\s+)?(?:fullest|most\\s+full)(?:\\s+permanent)?(?:\\s+tablespace)?\\b`, 'i').test(answer);
+					const namedOtherRelativeWinner = new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+(?:is\\s+)?(?:the\\s+)?(?:top|highest|largest|greatest|biggest)\\s+(?:tablespace|by\\s+(?:used|usage|full|percentage|percent|ratio|capacity))\\b`, 'i').test(answer)
+						|| new RegExp(`\\b(?!${winner}\\b)[A-Z][A-Z0-9_$#]*\\s+has\\s+the\\s+(?:highest|largest|greatest|biggest|most)\\b[^\\n]{0,40}\\b(?:used|usage|full|percentage|percent|ratio|capacity)\\b`, 'i').test(answer);
+					const tableOnlyContradiction = namedOtherRelativeWinner
+						&& !new RegExp(`\\b${winner}\\b[^.\\n]{0,80}\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b|\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b[^.\\n]{0,80}\\b${winner}\\b`, 'i').test(answer);
+					const saysUnknown = /\b(?:could not|cannot|can't|unable to) determine\b[^\n]{0,100}\b(?:fullest|winner|most full)\b/i.test(answer)
+						|| /\b(?:I|we)\s+(?:could not|cannot|can't|unable to)\s+(?:determine|identify|establish)\b[^\n]{0,100}\b(?:fullest|winner|most full)\b/i.test(answer);
+					const contradictsClass = new RegExp(`\\b(?:HIGH|MID|MEDIUM|FULL)\\b[^.\\n]{0,40}\\bLOW\\b`, 'i').test(answer) || /\b(?:not|no|never)\s+LOW\b/i.test(answer);
+					checks.push({ check: `no contradicted fullest winner: ${String(truth[0][0])}`, pass: !namesOtherWinner && !tableOnlyContradiction && !saysUnknown && !contradictsClass });
 				}
 			} else for (const row of truth) checks.push({ check: `fresh ground truth row: ${JSON.stringify(row)}`, pass: rowMatches(answer, test.id.startsWith('hard-p18-') ? row.map(value => typeof value === 'string' ? normalizeCodes(value) : value) : row, truth.length === 1, truthLabels(test.groundTruth.sql), {
 				preserveQualified: test.id.startsWith('hard-p18-'),

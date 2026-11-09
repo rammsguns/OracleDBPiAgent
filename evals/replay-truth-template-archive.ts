@@ -59,7 +59,10 @@ for (const { root, path: file } of files.sort((a, b) => a.path.localeCompare(b.p
 		const templated = definitions.get(record.id)?.groundTruth?.factTemplates;
 		const nextTest = templated && test.groundTruth ? { ...test, groundTruth: { ...test.groundTruth, factTemplates: templated } } : test;
 		const next = score(nextTest, record, truth, after).pass;
-		if (before && !next) passToFail++;
+		if (before && !next) {
+			passToFail++;
+			flips.push({ file: relative(root, file), id: record.id, iteration: record.iteration, before, after: next });
+		}
 		if (!before && next) {
 			failToPass++;
 			flips.push({ file: relative(root, file), id: record.id, iteration: record.iteration, before, after: next });

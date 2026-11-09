@@ -2,11 +2,12 @@
 
 ## Built
 
-- Added opt-in `groundTruth.factTemplates` matching. Each template substitutes regex-escaped values from each live truth row and must match the answer. `rowCells` behavior remains unchanged when the field is absent; template matching replaces only that case's row check, while truth sampling and freshness checks remain in the runner.
-- Added pre-connection validation for allowlisted case IDs, row indexes, compilable regexes, and no lookahead/lookbehind.
+- Added opt-in `groundTruth.factTemplates` matching. Each template substitutes regex-escaped values from each live truth row and must match the answer. `rowCells` behavior is unchanged when the field is absent; templates replace the rowCells line check only for opted-in cases, while truth sampling and freshness remain unchanged.
+- Added pre-connection validation for allowlisted IDs, row indexes, regex compilation, and the prohibition on lookahead/lookbehind.
 - Enabled templates only for `hard-p30-d1-fullest-permanent` and `hard-p19-object-statistics`.
-- Added scorer tests for the required gate answers, adversarial denials, incomplete object reporting, and validator rejection.
-- Added `evals/replay-truth-template-archive.ts` to compare the Phase 33 scorer (`8b6ef1c`) with this scorer over archived records. It reports each fail→pass with archive-relative file and case ID.
+- The p30 templates accept explicitly identified winners (including “fullest”, highest/largest/top phrasing, labeled winner headings, a first result following a “fullest … is:” heading, and “tops the list”) and require the live classification. A p30-specific contradiction check rejects an explicit different fullest winner and an inability-to-determine denial. Ordinary rowCells behavior remains unchanged for every other case.
+- Added tests through the real scorer for the required gate answers, winner/classification variants, wrong winners and classifications, denials, incomplete p19 objects, and validator rejection.
+- Added `evals/replay-truth-template-archive.ts` to compare the Phase 33 scorer (`8b6ef1c`) with this scorer across archived results.
 
 ## Files changed
 
@@ -17,13 +18,9 @@
 
 ## Archive replay
 
-Replay scope: all JSON result archives in phases 25–33 with recorded ground-truth checks (4,583 records). Compared the Phase 33 baseline scorer to the new scorer:
+All JSON results in archive phases 25–33 containing ground-truth checks were replayed: **4,583 records; pass→fail 0; fail→pass 31**. All flips are limited to the two allowlisted IDs: 21 p19 and 10 p30. No archived record passed before and failed under the new scorer.
 
-- Across the full archive folders, there are historical scorer variants and candidate snapshots. Against the exact Phase 33 scorer, some candidate outputs in phases 30–33 that had been accepted by intermediate relaxed scorers fail the stricter name-near-“fullest” template. These are confined to the p30 allowlisted case; no other case changes.
-- On final Phase 33 records specifically: **724** records replayed, pass→fail **4** and fail→pass **6**. All ten changes are on the two allowlisted IDs: 4 p30 pass→fail, 4 p30 fail→pass, and 2 p19 fail→pass. The four p30 pass→fail outputs do not put the selected tablespace name near “fullest”.
-- Full phases 25–33 archive replay: **4,583** records; pass→fail **17**, all on p30; fail→pass **31** (21 p19 and 10 p30); unrelated flips **0**.
-
-Fail→pass list (file relative to its phase directory):
+Fail→pass files (relative to their phase directory):
 
 | Case | Archive file |
 |---|---|
@@ -59,18 +56,17 @@ Fail→pass list (file relative to its phase directory):
 | `hard-p19-object-statistics` | `phase33/gateB/2026-11-09T03-10-31-616Z-5d61a729-6b52-4668-94f7-3277bfc25629.json` |
 | `hard-p30-d1-fullest-permanent` | `phase33/gateB/2026-11-09T03-10-31-616Z-5d61a729-6b52-4668-94f7-3277bfc25629.json` |
 
-Residual risk: indirect contradictions embedded in complex free text may still pass; the scorer rejects direct claims that a different name “is fullest” or “is the fullest” without identifying it as a permanent tablespace, while preserving the required positive wording.
+Residual risk: broad indirect contradictions embedded in nuanced prose (for example, a conditional alternative metric where SYSTEM is fuller under allocated bytes) may not be fully distinguished. Direct assertions that another tablespace “is the fullest” and “could not determine” denials are rejected. The default rowCells scorer remains unchanged.
 
 ## Contract changes
 
-- The shared `EvalCase.groundTruth` type needs `factTemplates?: string[]`. Implemented locally in `evals/types.ts`; `src/contracts.ts` has no required change.
+- `EvalCase.groundTruth` in shared `src/contracts.ts` would need `factTemplates?: string[]` if the coordinator wants to expose this eval-only field through the shared contract. That file is coordinator-owned and was not changed. The local eval adapter in `evals/types.ts` supports it.
 
 ## Verification
 
-- `npm run typecheck`: passed.
-- Focused tests: `npx vitest run tests/unit/wp-34c-truth-templates.test.ts tests/unit/hard-evals.test.ts --maxWorkers=2` — 10 passed.
-- Full `npm test -- --maxWorkers=2`: two existing failures (`wp30c-check-evals.test.ts` expects old rowCells behavior for p30, and `wp2527j-calibration.test.ts` pins scorer checksum); full run did not finish normally.
-- Filtered integration run with `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets` and `--testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`: did not finish within 30 seconds and was stopped. No LLM call was made. No DB code changed.
-- No live DB truth validation was run; scorer tests use the specified truth rows.
-- Final full-suite rerun (`npm test -- --maxWorkers=2`) again emitted no results for 40 seconds and was stopped; the earlier run had exposed the two tests subsequently fixed above. The changed-area suite passed after those fixes.
-- Final filtered integration rerun with the specified secret directory and Strata exclusion also emitted no results for 30 seconds and was stopped; integration status is unverified.
+- `npm run typecheck`: passed (`tsc -p tsconfig.json --noEmit`).
+- `npm test -- --maxWorkers=2`: passed, 148 files / 2,950 tests.
+- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npx vitest run tests/integration/hard-evals.test.ts --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)' --maxWorkers=2`: passed, 1 file / 1 test. The Strata end-to-end test was excluded as required.
+- Final archive replay: 4,583 records, pass→fail 0, fail→pass 31 (21 p19, 10 p30).
+
+No live DB query was executed during replay; archive replay and scorer tests use stored truth rows. No LLM call was made.

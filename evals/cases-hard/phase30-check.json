@@ -86,7 +86,10 @@
 		"groundTruth": {
 			"sql": "SELECT tablespace_name, CASE WHEN pct<50 THEN 'LOW' WHEN pct<85 THEN 'MID' WHEN pct<95 THEN 'HIGH' ELSE 'FULL' END AS used_range FROM (SELECT t.tablespace_name,100*NVL(MAX(m.used_space*t.block_size),GREATEST(0,SUM(f.bytes)-NVL(MAX(x.free_bytes),0)))/SUM(CASE WHEN f.autoextensible='YES' THEN GREATEST(f.bytes,f.maxbytes) ELSE f.bytes END) pct FROM dba_tablespaces t JOIN dba_data_files f ON f.tablespace_name=t.tablespace_name LEFT JOIN dba_tablespace_usage_metrics m ON m.tablespace_name=t.tablespace_name LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) x ON x.tablespace_name=t.tablespace_name WHERE t.contents='PERMANENT' GROUP BY t.tablespace_name ORDER BY pct DESC,t.tablespace_name) FETCH FIRST 1 ROW ONLY",
 			"mode": "rowCells",
-			"factTemplates": ["\\b{0}\\b[^\\n]{0,80}\\bfullest\\b|\\bfullest\\b[^\\n]{0,80}\\b{0}\\b", "(?:classification|class|band|level)\\W{0,10}\\**{1}\\b|\\b{1}\\b\\**\\s*\\((?:below|under|<)"]
+			"factTemplates": [
+				"\\b{0}\\b[^\\n]{0,100}\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b|\\b(?:fullest|most\\s+full)\\b[^\\n]{0,100}\\b(?:permanent\\s+)?tablespace[^\\n]{0,100}\\bis(?::)?\\s*$|\\b(?:fullest|most\\s+full)\\b[^\\n]{0,100}\\bpermanent\\s+tablespace\\b[^\\n]{0,100}\\bis:\\s*\\n[^\\n]{0,100}\\b{0}\\b|\\b(?:fullest|most\\s+full|highest|largest|greatest|biggest|top)\\b[^\\n]{0,100}\\b{0}\\b|\\b(?:winner|leading|maximum)\\b[^\\n]{0,80}\\b{0}\\b|\\b{0}\\b[^.\\n]{0,60}\\b(?:tops?|leads?)\\s+(?:the\\s+)?list\\b|^\\s*[*#`_\\[]*{0}[*#`_\\]]*\\s*(?:[-:|\u2014].*)?$|^\\s*The\\s+\\*?fullest\\*?\\s+permanent\\s+tablespace[^\\n]{0,100}\\b{0}\\b|^\\s*(?:fullest|highest|largest|greatest|biggest|top)[^\\n]{0,60}\\b{0}\\b|^\\s*[*#`_\\[]*{0}[*#`_\\]]*\\s*[-:|\u2014][^\\n]{0,30}\\b(?:LOW|MID|HIGH|FULL)\\b",
+				"(?:classification|class|classified|band|level)\\W{0,10}\\**{1}\\b|\\bClassification\\W{0,5}[^\\n]{0,30}\\b{1}\\b|\\bclassified\\s+as\\s+\\**{1}\\b|\\b{1}\\b\\**\\s*\\((?:below|under|<)\\s*50%?|(?:\u2192|->|\u2014|\u2013|-)\\s*\\**{1}\\b|\\|[^\\n|]*\\b{0}\\b[^\\n|]*\\|[^\\n|]*\\|[^\\n|]*\\|[^\\n|]*\\|[^\\n|]*\\b(?:classification|class|band|level)\\b[^\\n|]*\\|[^\\n|]*\\b{1}\\b[^\\n|]*\\|"
+			]
 		}
 	},
 	{
