@@ -190,6 +190,9 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		const annotation = /\s+\(([^()]*)\)\s*$/.exec(clean(actual));
 		if (annotation && !numeric(value) && !/\b(?:not|no|never|except|without|was|formerly|previously)\b/i.test(clean(actual))
 			&& clean(annotation[1]!).toLowerCase() === clean(value).toLowerCase()) return true;
+		const explainedValue = new RegExp(`^${escapeRegex(value)}\\s*[-–—:]\\s*(.+)$`, 'i').exec(clean(actual));
+		if (explainedValue && !numeric(value) && !/\b(?:not|no|never|except|without|was|formerly|previously|false|incorrect|wrong)\b/i.test(explainedValue[1]!)
+			&& new RegExp(`\\b${escapeRegex(value)}\\b`, 'i').test(explainedValue[1]!)) return true;
 		if (historySignature && label === 'defaulted' && value === 'N' && /^(?:no|none)$/i.test(text)) return true;
 		if (/message$/i.test(label)) text = text.replace(/^(['"])([\s\S]*)\1$/, '$2');
 		// A line-labelled numeric fact may be written as an explicit Oracle stack
@@ -215,12 +218,18 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
 	const labelWords = (text: string) => text.replace(/[`*]/g, '').replace(/_/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
-	const matchesRowLabel = (actual: string, expected: string) => {
+	const rowLabelScore = (actual: string, expected: string) => {
 		const actualWords = labelWords(actual), expectedWords = labelWords(expected);
-		return actualWords.length > 0 && expectedWords.length > 0
-			&& (actualWords.join(' ') === expectedWords.join(' ')
-				|| expectedWords.every(word => actualWords.includes(word))
-				|| expectedWords.every((word, index) => actualWords[index] === word));
+		if (!actualWords.length || !expectedWords.length) return -1;
+		const tokenScore = (actualWord: string, expectedWord: string) => {
+			if (actualWord === expectedWord) return 4;
+			if (actualWord.startsWith(expectedWord) || expectedWord.startsWith(actualWord)) return 2;
+			if (expectedWord === 'database' && actualWord === 'cdb') return 2;
+			if (expectedWord === 'database' && actualWord === 'db') return 1;
+			return 0;
+		};
+		const score = expectedWords.reduce((sum, expectedWord) => sum + Math.max(0, ...actualWords.map(word => tokenScore(word, expectedWord))), 0);
+		return score > 0 ? score : -1;
 	};
 	// Expand only whole, positive lists in table cells for single-column truth.
 	// Do this before record splitting: a slash must not detach DELETE from
@@ -388,12 +397,15 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 			const valueColumn = valueColumns[0]!;
 			const availableRows = block.slice(1).map(cells => [...cells]);
 			const bound = row.map((_expected, index) => {
-				const found = availableRows.findIndex(cells => matchesRowLabel(cells[keyColumn] ?? '', labels[index] ?? ''));
+				const scores = availableRows.map(cells => rowLabelScore(cells[keyColumn] ?? '', labels[index] ?? ''));
+				const best = Math.max(...scores);
+				const found = best > 0 ? scores.indexOf(best) : -1;
 				if (found < 0) return undefined;
 				return availableRows.splice(found, 1)[0];
 			});
 			if (bound.every(cells => cells !== undefined)) return bound.every((cells, index) => same(cells[valueColumn] ?? '', row[index], labels[index] ?? ''));
-			return false;
+			if (bound.some(cells => cells !== undefined)
+				|| block.slice(1).some(cells => row.some((expected, index) => same(cells[valueColumn] ?? '', expected, labels[index] ?? '')))) return false;
 		}
 		// In a vertical relationship table, child and parent attributes describe
 		// distinct records. Group only table/column attributes of the same role.
