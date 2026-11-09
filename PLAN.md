@@ -4914,6 +4914,67 @@ scorer. B must be no worse beyond noise.
 ### Release
 1.9.0 after the gate: release tests and a package smoke on all four targets.
 
+## Phase 33 results (2026-11-09, shipped as 1.9.0)
+
+Release approved with "continue and push v1.9.0 when the gate passes".
+
+**Merges.** Antigravity reviewed every WP, and every finding was fixed before
+merge.
+- **WP-33A tool evidence notes** (approved in round 3):
+  - ORA-00942 attribution probes, at most 6; skipped for CTEs, table functions
+    and unclassifiable sources.
+  - The NULL apply-lag note covers `GV$`, aliases and `SELECT *`.
+  - Adds 0 bytes of prompt text.
+  - Accepted limit: a quoted `"V$DATAGUARD_STATS"` gets no note.
+- **WP-33B eval fixtures:** the per-case `setup` warm-up runs before truth is
+  sampled and before the ask. All three scorer calibrations were dropped by
+  coordinator decision, because each version still accepted some denials. The
+  scorer equals 1.8.0, and the archive replay shows 0 flips.
+- **WP-33C standby evals:** 7 cases on c1s. Six review rounds. Grading moved
+  from negation-aware forbidden-claim regexes, which failed in both
+  directions, to positive required facts. Only structured forbidden claims
+  remain (`DATABASE_ROLE: PRIMARY`, `APPLY_LAG: 0`, ...). Accepted and
+  documented residual: a wrong natural-text claim passes if the answer also
+  states every required fact.
+  The gate found two mis-scored cases, fixed before release:
+  - transport-lag truth was a synthetic `UNDER_5_MIN` label that no answer can
+    contain; it is now a lab precondition in the integration test;
+  - job history required the exact phrase "from the primary".
+
+**Gate (gate180, sequential).** A = master + 33B + 33C; B = A + 33A. The
+standby records were rescored with the fixed cases.
+
+| split | A | B |
+|---|---|---|
+| dev ×2 | 65/66 | 65/66 |
+| challenge ×2 | 156/172 | 158/172 |
+| holdout | 69/72 | 70/72 |
+| regression | 21/21 | 21/21 |
+| mvp | 39/39 | 38/39 |
+| p23–p27 | 29/30 | 30/30 |
+| p30 ×2 | 14/16 | 16/16 |
+| pdb ×2 | 22/22 | 22/22 |
+| standby ×2 (rescored) | 10/14 | 11/14 |
+| **total** | **425/452** | **431/452** |
+
+All refusals pass on both sides. Every miss was read. The non-standby misses
+are the known unstable cases on both sides (p19 object statistics, p30 fullest
+permanent, p18 critical incident). Standby misses that remain:
+
+- **hard-p33-local-backups (4/4 runs).** The agent reads the copied
+  control-file backup records on c1s (the standby was duplicated at 15:12,
+  after the primary's 15:06 level 0) as local backups. The `backup` check
+  already qualifies these records; the agent path does not. This is the main
+  follow-up.
+- **hard-p33-mrp (A ×2):** the answers lack the live status `APPLYING_LOG`.
+- **hard-p33-job-history (B ×1):** the agent answered without a query.
+
+**Follow-ups.**
+- A standby backup-provenance note on `run_query` for `V$BACKUP_*` reads.
+- The audit JSONL sink drops `sqlText`, so 33A probe text is stored only as a
+  hash. Allowlisting the generated probe text needs a coordinator change in
+  `src/audit`.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).

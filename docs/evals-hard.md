@@ -635,7 +635,7 @@ explicit deterministic ordering, and fixed decimal rendering where requested.
 New forbidden patterns use adjacent negation guards and directly preceding
 conditionals only; a distant negation cannot hide a later affirmative claim.
 
-`--split` accepts `dev`, `holdout` and `regression`. Future promotion gates run:
+`--split` accepts `dev`, `holdout` and `regression` (later also `challenge`, `pdb` and, since 1.9.0, `standby`). Future promotion gates run:
 
 1. Hard dev 4×4 A/B.
 2. Fresh 12-case holdout ×3.

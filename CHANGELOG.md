@@ -4,6 +4,33 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-09
+
+Phase 33: evidence precision after 1.8.0, and standby eval coverage.
+
+### Added
+
+- **Which objects are missing on ORA-00942.** When a `run_query` SELECT over
+  several objects fails with ORA-00942, the tool probes each referenced object
+  with `SELECT * FROM <object> WHERE 1=0`. It probes at most six, and returns a
+  note saying which are readable and which are not visible. Before this, the
+  agent could conclude that every view in a query was unreadable when only one
+  was. The probes skip queries with a `WITH` clause and sources they cannot
+  classify safely, and they never run when the query succeeds.
+- **Hidden apply lag is labelled.** When `V$DATAGUARD_STATS` or
+  `GV$DATAGUARD_STATS` returns a NULL `apply lag` inside a PDB, the result
+  carries a note: Oracle hides the value there, so NULL does not mean zero.
+  The note points to `health_check` and `piagent check dgLag`.
+- **Standby eval split (`--split standby`).** Seven hard cases on
+  `c1s-19c-stby` cover role and open mode, managed recovery, transport lag,
+  archive gaps, whether backups are local, copied scheduler history and a
+  switchover refusal. Expected values are read live and read-only, and a
+  validator and an integration test check them.
+- **Per-case eval warm-up (`setup`).** A hard case can list exact read-only
+  SELECTs that run as the target account before the case starts. This keeps
+  cursor-cache cases such as `hard-orders-plan` stable after the cursor ages
+  out of the shared pool.
+
 ## [1.8.0] - 2026-11-08
 
 Phase 32: production gaps found after the PDB pilot.
