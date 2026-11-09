@@ -99,12 +99,29 @@ it('falls back to legacy wording if public synonym lookup fails and skips lookup
 	const failed=setup('ORA-00942: table or view does not exist');
 	failed.query.mockReset().mockRejectedValueOnce(failed.error).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockRejectedValueOnce(new Error('dictionary unavailable'));
 	const error=await failed.run('SELECT * FROM V$LOGMEMBER a JOIN V$RMAN_BACKUP_DATAFILES b ON 1=1');
-	expect(error.message).toContain('Not visible to this account (missing or not granted): V$LOGMEMBER, V$RMAN_BACKUP_DATAFILES.');
+	expect(error.message).toContain('Not visible to this account: V$LOGMEMBER, V$RMAN_BACKUP_DATAFILES.');
 	const plain=setup('ORA-00942: table or view does not exist');
 	plain.query.mockReset().mockRejectedValueOnce(plain.error).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockRejectedValueOnce(new Error('ORA-00942 hidden'));
 	const plainError=await plain.run('SELECT * FROM missing_a JOIN missing_b ON 1=1');
 	expect(plainError.message).toContain('Not visible to this account (missing or not granted): missing_a, missing_b.');
 	expect(plain.query).toHaveBeenCalledTimes(3);
+});
+it('preserves quoted identifier case and diagnoses SYS.V$ separately from SYS.V_$', async () => {
+	const quoted=setup('ORA-00942: table or view does not exist');
+	quoted.query.mockReset().mockRejectedValueOnce(quoted.error).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockResolvedValueOnce({columns:['SYNONYM_NAME'],rows:[['V$LOG']],truncated:false,elapsedMs:1});
+	const quotedError=await quoted.run('SELECT * FROM V$LOG d JOIN "v$log" q ON 1=1');
+	expect(quotedError.message).toContain('No such view in Oracle 19c (quoted names are case-sensitive; check the name): "v$log".');
+	expect(quoted.query.mock.calls).toHaveLength(4);
+	expect(quoted.query.mock.calls[3]![0]).toContain('all_synonyms');
+	expect(quoted.query.mock.calls[3]![1]).toEqual({n1:'V$LOG'});
+	const sysPublic=setup('ORA-00942: table or view does not exist');
+	sysPublic.query.mockReset().mockRejectedValueOnce(sysPublic.error).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockResolvedValueOnce({columns:['SYNONYM_NAME'],rows:[['V$LOG']],truncated:false,elapsedMs:1});
+	const sysError=await sysPublic.run('SELECT * FROM DUAL d JOIN SYS.V$LOG q ON 1=1');
+	expect(sysError.message).toContain('Use V$LOG without the SYS. prefix: SYS.V$LOG.');
+	const sysFixed=setup('ORA-00942: table or view does not exist');
+	sysFixed.query.mockReset().mockRejectedValueOnce(sysFixed.error).mockResolvedValueOnce({columns:[],rows:[],truncated:false,elapsedMs:1}).mockRejectedValueOnce(new Error('ORA-00942 hidden')).mockResolvedValueOnce({columns:['SYNONYM_NAME'],rows:[['V$LOG']],truncated:false,elapsedMs:1});
+	const fixedError=await sysFixed.run('SELECT * FROM DUAL d JOIN SYS.V_$LOG q ON 1=1');
+	expect(fixedError.message).toContain('Not granted to this account (view exists): SYS.V_$LOG.');
 });
 it('parses nested subqueries and comma joins, caps ORA-00942 probes at six', async () => {
 	const s=setup('ORA-00942: table or view does not exist');
