@@ -140,7 +140,7 @@ function composedReferences(path: string, source: string): string[] {
 	if (path === 'plsql/dictionary.ts') for (const m of source.matchAll(/this\.read(?:<[^>]+>)?\('([A-Z_]+)'/g)) views.push(`DBA_${m[1]}`, `ALL_${m[1]}`);
 	if (path.startsWith('triage/')) for (const m of source.matchAll(/reader\.read\([^,]+,\s*'([A-Z_]+)'/g)) views.push(`DBA_${m[1]}`, `ALL_${m[1]}`);
 	if (path === 'tools/index.ts') {
-		for (const m of source.matchAll(/\b(?:FROM|JOIN)\s+ALL_([A-Z_]+)\b/gi)) views.push(`DBA_${m[1]!.toUpperCase()}`);
+		for (const m of source.matchAll(/\b(?:FROM|JOIN)\s+ALL_([A-Z_]+)\b/gi)) { if (!NO_GRANT_VIEWS.has(`ALL_${m[1]!.toUpperCase()}`)) views.push(`DBA_${m[1]!.toUpperCase()}`); }
 		const hints = /const emptyHintViews = new Set\(`([^`]+)`/.exec(source)![1]!;
 		views.push(...hints.trim().split(/\s+/).map(suffix => `DBA_${suffix}`));
 	}
