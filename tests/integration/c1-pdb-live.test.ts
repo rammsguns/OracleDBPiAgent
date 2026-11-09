@@ -25,7 +25,10 @@ it('C1 PDB: UTC backup age, measured health, deliberate defects and all web tabs
 		expect(Math.abs((Date.now()-latest)/3600000-Number(age.rows[0]![0]))).toBeLessThan(0.02);
 		const ctx={config,sessions,audit:{record:async()=>{}},runId:'c1-live'};
 		const run=await runChecks(ctx,['c1-19c-pdb']);
-		for(const id of ['backupAge','archiveGaps','blocking'])expect(run.targets[0]!.checks.find(c=>c.id===id),id).toMatchObject({status:'OK'});
+		// C1 has no scheduled backups: the expected status follows the measured level-0 age (warn 26h, crit 50h).
+		const ageHours=Number(age.rows[0]![0]);
+		if(Math.abs(ageHours-26)>0.1&&Math.abs(ageHours-50)>0.1)expect(run.targets[0]!.checks.find(c=>c.id==='backupAge'),'backupAge').toMatchObject({status:ageHours<26?'OK':ageHours<50?'WARN':'CRIT'});
+		for(const id of ['archiveGaps','blocking'])expect(run.targets[0]!.checks.find(c=>c.id===id),id).toMatchObject({status:'OK'});
 		expect(run.targets[0]!.checks.find(c=>c.id==='alertErrors')!.status).not.toBe('UNKNOWN');
 		for(const c of run.targets[0]!.checks.filter(c=>c.id.startsWith('undo:')||c.id.startsWith('temp:')))expect(c.status).toBe('OK');
 		web=createWebServer({config,port:0,token:'c1-test-only',sessionFactory:async()=>createSessionProvider(config)});

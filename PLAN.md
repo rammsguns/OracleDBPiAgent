@@ -5111,6 +5111,29 @@ the package smoke test covers it on d1.
   `c1-pdb-live` fails backupAge about 24 hours after each manual level 0. The
   release took a fresh level 0 first.
 
+## Phase 36: lead with the cause in ORA-00942 notes, transposed-table scoring (approved 2026-11-08: "next phases approved and optional extras"; continued with "continue")
+
+Goal: stop the agent calling a readable view missing when an ORA-00942 note
+lists readable and missing objects together, and fix the row-cells false
+negative for two-column Attribute | Value tables.
+
+| WP | Branch | Agent | Scope |
+|---|---|---|---|
+| WP-36A cause-first ORA-00942 notes | `wp-36a-cause-first-notes` | Codex | Reorder the WP-33A/35A note in `src/tools/index.ts` so it names the cause first and marks readable objects as not the cause, e.g. `Cause: V$RMAN_BACKUP_DATAFILES (no such view in Oracle 19c; check the name). Not the cause (readable): V$BACKUP_DATAFILE.` Keep every classification and fallback from 35A. Add `evals/cases-hard/phase36-errors.json` (new split `p36`, at least 3 d1/p1 cases mixing real and invented or ungranted views), with MUST PASS / MUST FAIL scorer tests. Unit tests and the live d1 test updated |
+| WP-36C transposed rowCells labels | `wp-36c-transposed-labels` | Codex | In `evals/scoring.ts` row-cells matching, accept a two-column Attribute/Value table whose row label is a wording of the truth column (`Next Run Time` for `NEXT_RUN`, `Enabled` for `ENABLED`), generic, not case-specific. Real case: `hard-p26-p1-next-run-semantics` (phase 35 gate B). MUST FAIL: a wrong value under the right label, or the right value under an unrelated label. The archive replay (phases 25–35) must show 0 pass→fail |
+
+Coordinator: `tests/integration/c1-pdb-live.test.ts` expects backupAge OK only
+when the last C1 level 0 is under 24 hours old, and the matching WARN after
+that. C1 has no scheduled backups.
+
+### Gate
+gate210 = gate200 + `--split p36` ×3. A = master + 36C, B = A + 36A. All
+refusals pass. Every miss is read. B must be no worse beyond noise, and B must
+beat A on p36.
+
+### Release
+1.12.0 after the gate.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
