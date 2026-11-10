@@ -5219,6 +5219,36 @@ cause-first note appeared in 18 B records, always in the expected form.
   not yet known what parsed it without `CURRENT_SCHEMA`. Make the truth or
   the validation independent of which schema parsed first.
 
+## Phase 37: wallet and TLS connections, connection guide (owner request 2026-11-10: "create an md file to how to add oracle connections, include wallet connections like the oracle cloud, you can use my repo https://github.com/rammsguns/OracleDataForge to reuse code")
+
+Goal: let a target connect over TCPS, with or without an Oracle wallet. This
+covers Oracle Cloud Autonomous Database wallets (mTLS) and one-way TLS. Also
+write a user guide for adding connections. The product stays Oracle 19c only
+and read-only, so an ADB on 23ai/26ai is still refused by the version gate.
+`ADMIN` is still refused by the account check, so a read-only user is
+required. Thin mode only: no Instant Client. Reuse OracleDataForge's
+`server/oracleWallet.ts` (zip extraction keeping only `ewallet.pem` and
+`tnsnames.ora`, refusals, `parseTnsNames`, `walletNeedsPassword`) and its
+connection options (`configDir`, `walletLocation`, `walletPassword`). Both
+repos belong to the owner.
+
+Contract (coordinator, done): `TargetConfig.protocol?: "tcp" | "tcps"`,
+`TargetConfig.wallet?: WalletConfig { directory; tnsAlias; passwordFile? }`.
+
+| WP | Branch | Agent | Scope |
+|---|---|---|---|
+| WP-37A wallet/TCPS connections and guide | `wp-37a-wallet-connections` | Codex | `src/config/` validates `protocol` and `wallet`: the directory is absolute, private (0700, files 0600) and holds `tnsnames.ora` plus `ewallet.pem`; the alias exists; `passwordFile` follows the `passwordFile` rules; host/port/serviceName are filled from the alias, and an explicit value that disagrees is refused. `src/oracle/index.ts` connects with `connectString` set to the alias, `configDir`, `walletLocation` and `walletPassword` (read from the secret dir, never logged); one-way TLS uses `tcps://host:port/service`. A new `piagent wallet import <zip> --name <n>` extracts into `$PIAGENT_HOME/wallets/<n>` (0700/0600), ported from OracleDataForge, and prints the aliases. `targets check`, `doctor` and the web targets list show the protocol and the wallet alias, never the paths of secrets or their contents. Error messages: auto-login-only wallet, encrypted PEM without `passwordFile`, unknown alias, unreachable TCPS. New user guide `docs/connections.md`: plain TCP, one-way TLS, wallet/ADB step by step (download the wallet with a password, import, read-only user, grants, ACL/allowlist, high/medium/low/tp services, 19c only), troubleshooting. Linked from README and `docs/real-targets.md`. Unit tests use mocked `oracledb` options and real zip fixtures built in the tests |
+| WP-37B lab TCPS endpoint | `wp-37b-lab-tcps` | Codex | On C1 (`oracle19c-cdb`), additive only: create a lab CA, a server wallet and a client wallet with `orapki`; add a TCPS listener endpoint (port 2484, reached on the container's bridge IP; no container recreate, keep 1524 and Data Guard to C1S working); export a client wallet directory (`ewallet.pem` and `tnsnames.ora` with alias `pipdb1_tcps`) to a private host directory, the wallet password in `PIAGENT_SECRET_DIR`. Script it under `scripts/lab/c1-tcps/` so it can be repeated, and document it in `docs/lab-c1-tcps.md`. Add `tests/integration/c1-tcps-live.test.ts`, which skips clearly when the endpoint or wallet is missing: connects over mTLS as PIAGENT_RO, gets the identity, version 19 and PIPDB1, runs `check`, refuses a wrong alias, and refuses an encrypted PEM without its password. It codes against the phase 37 contract |
+
+### Gate
+No LLM-facing change. Gate: typecheck, unit, browser and full integration
+(including the new C1 TCPS live test) on the merged branch. Then the
+`gate170` mvp and pdb splits on both sides to confirm the plain TCP path did
+not regress. Release smoke adds `check` and one `ask` over the TCPS target.
+
+### Release
+1.13.0.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
@@ -5233,5 +5263,6 @@ Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
 
 ## Out of scope for MVP
 
-Writes, runbooks and DDL. Multi-user auth. 26ai/ADB/TCPS. Remote LLMs.
+Writes, runbooks and DDL. Multi-user auth. 26ai/23ai (including ADB on them). Remote LLMs.
+(TCPS, wallets and ADB 19c entered scope in phase 37.)
 ASH/AWR. Thick driver mode.

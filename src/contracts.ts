@@ -23,6 +23,30 @@ export interface TargetConfig {
 	environment: TargetEnvironment;
 	/** Application log tables that `triage` may read (phase 16). Optional; validated by loadConfig. */
 	logTables?: LogTableConfig[];
+	/**
+	 * Network protocol (phase 37). Default "tcp". "tcps" uses TLS: with `wallet`, mutual TLS
+	 * (Oracle Cloud Autonomous Database wallets); without it, one-way TLS against a server
+	 * certificate trusted by the system CA store.
+	 */
+	protocol?: "tcp" | "tcps";
+	/** Oracle wallet for TCPS/mTLS connections (phase 37). Implies protocol "tcps". */
+	wallet?: WalletConfig;
+}
+
+/**
+ * An Oracle wallet directory read by node-oracledb Thin mode (phase 37). Only
+ * `tnsnames.ora` and `ewallet.pem` are used; `cwallet.sso` (auto-login) is not readable
+ * in Thin mode. When `host`, `port` or `serviceName` are omitted from targets.json,
+ * loadConfig fills them from the alias entry in `tnsnames.ora`, so TargetConfig always
+ * carries the resolved endpoint.
+ */
+export interface WalletConfig {
+	/** Absolute path to a private directory (0700, files 0600) holding tnsnames.ora and ewallet.pem. */
+	directory: string;
+	/** Net service alias in tnsnames.ora, e.g. "mydb_high"; used as the connect string. */
+	tnsAlias: string;
+	/** File name inside AppConfig.secretDir holding the wallet password, when ewallet.pem is encrypted. */
+	passwordFile?: string;
 }
 
 /** One application log table for issue triage: read-only, newest rows first, row-capped. */
