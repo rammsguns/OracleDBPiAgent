@@ -1,5 +1,5 @@
 import { TARGET_FIELDS } from './targetErrors.js';
-import { constants, openSync, closeSync, fstatSync, readFileSync, lstatSync, type Stats } from 'node:fs';
+import { constants, openSync, closeSync, fstatSync, readFileSync, lstatSync, realpathSync, type Stats } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
 import type { TargetConfig } from '../contracts.js';
@@ -8,16 +8,54 @@ import { ensureAgentHome } from './environment.js';
 import { APPROVED_TARGETS } from './approvedTargets.js';
 import { SafeConfigError } from './safeErrors.js';
 import { validateLogTables } from './logTables.js';
+import { parseTnsNames, walletNeedsPassword } from '../oracle/wallet.js';
 const packagedTargets = new WeakSet<object>();
 export function usesPackagedTargets(targets: readonly TargetConfig[]): boolean { return packagedTargets.has(targets); }
 export const DENIED_USERS = new Set('SYS SYSTEM SYSBACKUP SYSDG SYSKM SYSRAC AUDSYS DBSNMP XDB GSMADMIN_INTERNAL OUTLN LBACSYS DVSYS MDSYS CTXSYS ORDSYS WMSYS OJVMSYS APPQOSSYS ANONYMOUS HARNESS_APP SHOPAPP'.split(' '));
 export const targetNamePattern = /^[a-z0-9][a-z0-9-]{0,62}$/;
 export const identifier = /^(?:C##)?[A-Za-z][A-Za-z0-9_$#]{0,127}$/;
+function resolveWalletTarget(t: any, context: { index?: number; name?: string }): void {
+	const invalid = (field: typeof TARGET_FIELDS[number]): never => { throw new SafeConfigError({kind:'invalid',field,...context}); };
+	if (t.protocol !== undefined && !['tcp','tcps'].includes(t.protocol)) invalid('protocol');
+	if (t.wallet === undefined) { if (t.protocol === 'tcps') return; return; }
+	if (t.protocol === 'tcp') invalid('protocol');
+	if (!t.wallet || typeof t.wallet !== 'object' || Array.isArray(t.wallet) || Object.keys(t.wallet).some(k => !['directory','tnsAlias','passwordFile'].includes(k))) invalid('wallet');
+	const wallet = t.wallet;
+	if (typeof wallet.directory !== 'string' || !wallet.directory.startsWith('/') || !wallet.tnsAlias || typeof wallet.tnsAlias !== 'string') invalid('wallet');
+	if (wallet.passwordFile !== undefined && (typeof wallet.passwordFile !== 'string' || !/^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(wallet.passwordFile))) invalid('wallet');
+	try {
+		const normalizedDirectory = resolve(wallet.directory);
+		if (wallet.directory !== normalizedDirectory || realpathSync(wallet.directory) !== normalizedDirectory) invalid('wallet');
+		const dir = lstatSync(normalizedDirectory);
+		if (!dir.isDirectory() || dir.isSymbolicLink() || (dir.mode & 0o777) !== 0o700 || (typeof process.getuid === 'function' && dir.uid !== process.getuid())) invalid('wallet');
+		for (const filename of ['tnsnames.ora','ewallet.pem']) {
+			const file = lstatSync(join(normalizedDirectory, filename));
+			if (!file.isFile() || file.isSymbolicLink() || (file.mode & 0o777) !== 0o600 || (typeof process.getuid === 'function' && file.uid !== process.getuid())) invalid('wallet');
+		}
+		const names = readFileSync(join(normalizedDirectory, 'tnsnames.ora'), 'utf8');
+		const alias = parseTnsNames(names).find(s => s.alias.toLowerCase() === wallet.tnsAlias.toLowerCase());
+		if (!alias) invalid('wallet');
+		const resolved = alias!;
+		if (resolved.protocol !== 'TCPS') invalid('wallet');
+		wallet.directory = normalizedDirectory;
+		const pem = readFileSync(join(normalizedDirectory, 'ewallet.pem'), 'utf8');
+		if (walletNeedsPassword(pem) && !wallet.passwordFile) throw new SafeConfigError('wallet.passwordFile is required for an encrypted wallet');
+		for (const [field, expected] of [['host',resolved.host],['port',resolved.port],['serviceName',resolved.serviceName]] as const) {
+			if (t[field] !== undefined && String(t[field]).toLowerCase() !== String(expected).toLowerCase()) invalid(field);
+			t[field] = expected;
+		}
+		t.protocol = 'tcps';
+	} catch (error) {
+		if (error instanceof SafeConfigError) throw error;
+		invalid('wallet');
+	}
+}
 export function validateTarget(t: any, index?: number): asserts t is TargetConfig {
 	const context = { index, name: typeof t?.name === 'string' ? t.name : undefined };
 	const invalid = (field: typeof TARGET_FIELDS[number]): never => { throw new SafeConfigError({kind:'invalid',field,...context}); };
 	if (!t || typeof t !== 'object' || Array.isArray(t)) invalid('name');
 	for (const property of Object.keys(t)) if (!(TARGET_FIELDS as readonly string[]).includes(property)) throw new SafeConfigError({kind:'unknown',property,...context});
+	resolveWalletTarget(t, context);
 	if (typeof t.name !== 'string' || !targetNamePattern.test(t.name)) invalid('name');
 	const host = typeof t.host === 'string' ? t.host : '';
 	const validHost = host.startsWith('[') ? host.endsWith(']') && isIP(host.slice(1,-1)) === 6 : host.length <= 253 && host.split('.').every((s: string) => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(s));

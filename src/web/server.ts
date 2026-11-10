@@ -106,7 +106,7 @@ export function createWebServer(options: WebServerOptions = {}) {
 		if (!hosts.includes(req.headers.host ?? "") || (req.headers.origin !== undefined && req.headers.origin !== `http://${req.headers.host}`)) throw new WebError(403, "Forbidden");
 		if (api) {
 			if (!timingSafeEqual(expected, digest(req.headers.authorization ?? ""))) throw new WebError(401, "Unauthorized");
-			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username }) => ({ name, environment, description: redactUsername(description, username) })));
+			if (raw === "/api/targets" && req.method === "GET") return json(res, 200, manager.config.targets.map(({ name, environment, description, username, protocol, wallet }) => ({ name, environment, protocol: protocol ?? "tcp", walletAlias: wallet?.tnsAlias, description: redactUsername(description, username) })));
 			if (['/api/check', '/api/backup', '/api/jobs', '/api/top', '/api/plsql/list', '/api/plsql/doc', '/api/triage', '/api/alertlog', '/api/sql', '/api/security', '/api/db-sessions', '/api/space'].includes(raw)) {
 				const isTriage = raw === '/api/triage';
 				const isAlert = raw === '/api/alertlog';

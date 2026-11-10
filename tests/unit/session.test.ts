@@ -1,11 +1,11 @@
 import { it, expect, vi, beforeEach } from 'vitest';
-const mocks = vi.hoisted(() => ({ connect: vi.fn(), read: vi.fn() }));
+const mocks = vi.hoisted(() => ({ connect: vi.fn(), read: vi.fn(), open: vi.fn(), close: vi.fn() }));
 vi.mock('oracledb',()=>({default:{thin:true,getConnection:mocks.connect,OUT_FORMAT_ARRAY:4001,STRING:"STRING",DB_TYPE_DATE:"DATE",DB_TYPE_TIMESTAMP:"TIMESTAMP"}}));
-vi.mock('node:fs/promises',()=>({open:async()=>({stat:async()=>({isFile:()=>true,mode:0o600}),readFile:mocks.read,close:async()=>{}})}));
+vi.mock('node:fs/promises',()=>({open:mocks.open}));
 import { createSessionProvider, previewValue } from '../../src/oracle/index.js';
 import type { AppConfig } from '../../src/contracts.js';
 const config = {defaultTarget:'d1-19c-lab', secretDir:'/secrets',targets:[{name:'d1-19c-lab',host:'localhost',port:1522,serviceName:'ORCL',username:'HARNESS_LAB',passwordFile:'d1_lab.pw',defaultSchema:'HR',environment:'development',description:'Test'}],limits:{maxRows:2,statementTimeoutSeconds:3}} as AppConfig;
-beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mocks.read.mockResolvedValue('test-only');});
+beforeEach(()=>{vi.resetAllMocks(); process.env.PIAGENT_SECRET_DIR='/secrets';mocks.read.mockResolvedValue('test-only');mocks.close.mockResolvedValue(undefined);mocks.open.mockImplementation(async (path: string) => ({stat:async()=>({isFile:()=>true,mode:0o600}),readFile:async()=>path.endsWith('ewallet.pem')?'-----BEGIN PRIVATE KEY-----\\nfixture\\n-----END PRIVATE KEY-----':'test-only',close:()=>mocks.close(path)}));});
 function connection(version='19.9.1.0.0') {
 	const rs = {getRows:vi.fn().mockResolvedValue([[1],[2],[3]]),close:vi.fn()};
 	const c = {callTimeout:0,getStatementInfo:vi.fn().mockRejectedValue(new Error('Unexpected metadata describe')),execute:vi.fn().mockResolvedValue({metaData:[{name:'N'}],resultSet:rs}),rollback:vi.fn(),close:vi.fn()};
@@ -166,4 +166,41 @@ it('uses one execute per non-date query and never calls getStatementInfo',async(
 	expect(calls.filter(call=>call[0]==='SET TRANSACTION READ ONLY')).toHaveLength(2);
 	expect(calls.filter(call=>(call[2] as any)?.resultSet)).toHaveLength(2);
 	await p.closeAll();
+});
+
+it('uses unchanged TCP, one-way TCPS and wallet connection options', async () => {
+	connection();
+	const provider = createSessionProvider(config);
+	await provider.get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'localhost:1522/ORCL' });
+	await provider.closeAll();
+
+	connection();
+	const tcpsTarget = { ...config, targets: [{ ...config.targets[0]!, protocol: 'tcps' as const }] };
+	const tcpsProvider = createSessionProvider(tcpsTarget);
+	await tcpsProvider.get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'tcps://localhost:1522/ORCL' });
+	await tcpsProvider.closeAll();
+	const { mkdtempSync, chmodSync, writeFileSync, rmSync } = await import('node:fs');
+	const { tmpdir } = await import('node:os');
+	const { join } = await import('node:path');
+	const directory = mkdtempSync(join(tmpdir(), 'session-wallet-')); chmodSync(directory, 0o700);
+	writeFileSync(join(directory, 'tnsnames.ora'), 'lab_tcps=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=localhost)(PORT=1522))(CONNECT_DATA=(SERVICE_NAME=ORCL)))', { mode: 0o600 });
+	writeFileSync(join(directory, 'ewallet.pem'), '-----BEGIN ENCRYPTED PRIVATE KEY-----\\nfixture\\n-----END ENCRYPTED PRIVATE KEY-----', { mode: 0o600 });
+	const wallet = { directory, tnsAlias: 'lab_tcps', passwordFile: 'wallet.pw' };
+	const walletTarget = { ...config, targets: [{ ...config.targets[0]!, protocol: 'tcps' as const, wallet }] };
+	connection();
+	const walletProvider = createSessionProvider(walletTarget);
+	await walletProvider.get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'lab_tcps', configDir: directory, walletLocation: directory, walletPassword: 'test-only' });
+	expect(mocks.close).toHaveBeenCalledWith(join(directory, 'ewallet.pem'));
+	expect(mocks.close).toHaveBeenCalled();
+	await walletProvider.closeAll();
+	writeFileSync(join(directory, 'ewallet.pem'), '-----BEGIN PRIVATE KEY-----\\nfixture\\n-----END PRIVATE KEY-----', { mode: 0o600 });
+	const plainWallet = { ...wallet, passwordFile: undefined };
+	const plainTarget = { ...config, targets: [{ ...config.targets[0]!, protocol: 'tcps' as const, wallet: plainWallet }] };
+	connection(); const plainProvider = createSessionProvider(plainTarget); await plainProvider.get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'lab_tcps', configDir: directory, walletLocation: directory });
+	await plainProvider.closeAll();
+	rmSync(directory, { recursive: true, force: true });
 });

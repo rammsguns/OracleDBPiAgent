@@ -229,3 +229,6 @@ separately reported `challenge`; opt-in `rowCells` checks row attribution. The
 remain on the primary. Results go to ignored `evals/results/`.
 
 See the [documentation index](docs/README.md) for status, evals, reports and reviews.
+
+For plain TCP, one-way TLS, or wallet-backed TCPS connections, see the
+[Oracle connections guide](docs/connections.md).

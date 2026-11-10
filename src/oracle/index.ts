@@ -12,6 +12,7 @@ import { constants } from "node:fs";
 import { resolve, basename } from "node:path";
 import { UnsupportedVersionError, type AppConfig, type OracleSession, type SessionProvider, type QueryOptions, type QueryResult, type DatabaseIdentity } from "../contracts.js";
 import { classifySql } from "./sqlPolicy.js";
+import { walletNeedsPassword } from "./wallet.js";
 
 export function gate19c(target: string, version: string): void {
 	if (!/^19\./.test(version)) throw new UnsupportedVersionError(target, version);
@@ -50,7 +51,30 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 					if (!password) throw new Error();
 				} finally { await file.close(); }
 			} catch { throw recordConnectionFailure(new PasswordFileError(target.name, basename(target.passwordFile))); }
-			const connection = await oracledb.getConnection({ user: target.username, password, connectString: `${target.host}:${target.port}/${target.serviceName}` }).catch((error: unknown) => { throw recordConnectionFailure(error); });
+			let walletPassword: string | undefined;
+			if (target.wallet) {
+				const pemPath = resolve(target.wallet.directory, 'ewallet.pem');
+				let encrypted: boolean;
+				try {
+					const pemFile = await open(pemPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+					try { encrypted = walletNeedsPassword(await pemFile.readFile('utf8')); }
+					finally { await pemFile.close(); }
+				}
+				catch { throw recordConnectionFailure(new SafeConfigError('Invalid or unapproved target configuration')); }
+				if (encrypted && !target.wallet.passwordFile) throw recordConnectionFailure(new SafeConfigError('wallet.passwordFile is required for an encrypted wallet'));
+				if (target.wallet.passwordFile) {
+					if (basename(target.wallet.passwordFile) !== target.wallet.passwordFile) throw new SafeConfigError('Invalid password file');
+					try {
+						const file = await open(resolve(secretDir, target.wallet.passwordFile), constants.O_RDONLY | constants.O_NONBLOCK);
+						try { const info = await file.stat(); if (!info.isFile() || !(info.mode & 0o444)) throw new Error(); walletPassword = (await file.readFile('utf8')).trim(); if (!walletPassword) throw new Error(); }
+						finally { await file.close(); }
+					} catch { throw recordConnectionFailure(new PasswordFileError(target.name, basename(target.wallet.passwordFile))); }
+				}
+			}
+			const connectString = target.wallet ? target.wallet.tnsAlias : target.protocol === 'tcps' ? `tcps://${target.host}:${target.port}/${target.serviceName}` : `${target.host}:${target.port}/${target.serviceName}`;
+			const options: any = { user: target.username, password, connectString };
+			if (target.wallet) Object.assign(options, { configDir: target.wallet.directory, walletLocation: target.wallet.directory, ...(walletPassword === undefined ? {} : { walletPassword }) });
+			const connection = await oracledb.getConnection(options).catch((error: unknown) => { throw recordConnectionFailure(error); });
 			connection.module = 'piagent';
 			const sessionAction = oracleAction();
 			connection.action = sessionAction;

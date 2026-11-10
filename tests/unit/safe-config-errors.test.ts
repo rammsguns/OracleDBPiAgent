@@ -56,7 +56,15 @@ const expected = [
 	"Invalid password file",
 	"Target endpoint is not approved",
 	"Only thin mode is supported",
-	"Invalid query limits"
+	"Invalid query limits",
+	"wallet.passwordFile is required for an encrypted wallet",
+	"Cannot read private wallet directory",
+	"Invalid wallet name",
+	"Wallet destination must be a real directory",
+	"Wallet already exists; use --force to replace it",
+	"Cannot write private wallet files",
+	"Invalid wallet zip",
+	"Cannot replace private wallet"
 ];
 
 it("lists every reviewed safe configuration message", () => {

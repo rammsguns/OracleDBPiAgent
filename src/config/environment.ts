@@ -44,7 +44,7 @@ export function loadEnvironment(env: NodeJS.ProcessEnv = process.env): void {
 export function initializeHome(env: NodeJS.ProcessEnv = process.env): boolean {
 	const home = ensureAgentHome(env);
 	try {
-		writeFileSync(join(home, 'targets.example.json'), '// Copy to targets.json after owner approval. Passwords belong only in PIAGENT_SECRET_DIR.\n' + readFileSync(join(PACKAGE_ROOT, 'config/targets.json'), 'utf8'), { flag: 'wx', mode: 0o600 });
+		writeFileSync(join(home, 'targets.example.json'), '// Copy to targets.json after owner approval. Passwords belong only in PIAGENT_SECRET_DIR.\n' + readFileSync(join(PACKAGE_ROOT, 'config/targets.example.json'), 'utf8'), { flag: 'wx', mode: 0o600 });
 	} catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw new SafeConfigError('Cannot initialize private environment file'); }
 	const template = readFileSync(join(PACKAGE_ROOT, ".env.example"), "utf8")
 		.replace(/^PIAGENT_LLM_API_KEY_FILE=.*$/m, "PIAGENT_LLM_API_KEY_FILE=/absolute/path/to/strata-api-key")

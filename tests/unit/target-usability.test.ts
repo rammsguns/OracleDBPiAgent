@@ -41,7 +41,7 @@ it('file diagnostics omit actual paths and values and remain SafeConfigError',()
 	try{loadTargets({PIAGENT_HOME:fixture({}).PIAGENT_HOME,PIAGENT_TARGETS_FILE:'/private/path/password'});}catch(error){expect(error).toBeInstanceOf(SafeConfigError);expect(String(error)).not.toContain('/private/path');}
 });
 const cases = [
-	['ORA-01017','invalid username/password'],['ORA-28000','account locked'],['ORA-12514','use the PDB service'],['ORA-12505','use the PDB service'],['ORA-12541','listener unreachable'],['ORA-12170','connection timeout'],['NJS-503','listener unreachable'],['ORA-01045','missing CREATE SESSION'],['ORA-28001','expired password'],
+	['ORA-01017','invalid username/password'],['ORA-28000','account locked'],['ORA-12514','use the PDB service'],['ORA-12505','use the PDB service'],['ORA-12541','listener unreachable'],['ORA-12170','connection timeout'],['NJS-503','listener unreachable'],['NJS-505','TLS initialization failed'],['NJS-506','TLS handshake failed'],['NJS-507','distinguished name validation failed'],['NJS-508','hostname validation failed'],['NJS-517','unknown wallet alias'],['ORA-01045','missing CREATE SESSION'],['ORA-28001','expired password'],
 ] as const;
 it.each(cases)('maps %s safely in targets, doctor and the shared command error handler',async(code,hint)=>{
 	const error=new Error(`${code}: private-password private-host`);

@@ -1,4 +1,4 @@
-export const TARGET_FIELDS = ['name','host','port','serviceName','username','passwordFile','defaultSchema','environment','description','logTables'] as const;
+export const TARGET_FIELDS = ['name','host','port','serviceName','username','passwordFile','defaultSchema','environment','description','logTables','protocol','wallet'] as const;
 export type TargetIssue =
 	| { kind: 'file' | 'size' | 'json' | 'version' | 'count' | 'shape' | 'pin' }
 	| { kind: 'invalid'; field: typeof TARGET_FIELDS[number]; index?: number; name?: string }

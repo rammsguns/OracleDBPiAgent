@@ -7,9 +7,9 @@ import { ReportSectionUsageError, validateReportSections } from "../report/argum
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
 import { AccountCheckError } from '../oracle/account.js';
-import { readFileSync, realpathSync } from "node:fs";
-import { join } from "node:path";
-import { PACKAGE_ROOT, reportDirectory } from "../config/paths.js";
+import { readFileSync, realpathSync, mkdirSync, writeFileSync, lstatSync, chmodSync, readdirSync, rmSync, renameSync } from "node:fs";
+import { join, basename } from "node:path";
+import { PACKAGE_ROOT, reportDirectory, agentHome } from "../config/paths.js";
 import { loadEnvironment, initializeHome, assertConfiguredLlmKeyFile, SafeConfigError } from "../config/environment.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
@@ -23,6 +23,7 @@ import { createSessions } from "../agent/dbToolsAdapter.js";
 import { UnsupportedVersionError, type SessionProvider } from "../contracts.js";
 import type { AppConfig } from "../contracts.js";
 import { parseTriageCommand, prepareChatQuestion } from "./chatTriage.js";
+import { extractWallet, parseTnsNames, walletNeedsPassword } from "../oracle/wallet.js";
 
 export interface DoctorDependencies {
 	report?: (name: string, ok: boolean) => void;
@@ -54,7 +55,7 @@ export async function doctor(config: AppConfig, dependencies: DoctorDependencies
 				const oracleOwners = "(SELECT username FROM all_users WHERE oracle_maintained = 'Y')";
 				const viewCode = await session.query(`SELECT d.owner, d.name FROM all_dependencies d WHERE d.type IN ('VIEW', 'MATERIALIZED VIEW') AND ((d.referenced_type IN ${code} AND d.referenced_owner <> 'PUBLIC' AND d.referenced_owner NOT IN ${oracleOwners}) OR (d.referenced_type = 'SYNONYM' AND EXISTS (SELECT 1 FROM all_synonyms s JOIN all_objects o ON o.owner = s.table_owner AND o.object_name = s.table_name WHERE s.owner = d.referenced_owner AND s.synonym_name = d.referenced_name AND o.object_type IN ${code} AND o.owner NOT IN ${oracleOwners})))`);
 				if (viewCode.rows.length) throw new Error("Accessible views call non-Oracle code");
-				if (report) report(target.name, true); else console.log(`${target.name}: Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; account check passed`);
+				if (report) report(target.name, true); else console.log(`${target.name} (${target.protocol ?? 'tcp'}${target.wallet ? `, wallet alias ${target.wallet.tnsAlias}` : ''}): Oracle ${session.identity.versionFull}, ${session.identity.currentUser}; account check passed`);
 			} catch (error) {
 				ok = false;
 				if (error instanceof UnsupportedVersionError) check = "19c gate";
@@ -73,6 +74,41 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	if (argv.slice(2, 5).join(" ") !== "report schedule run") loadEnvironment();
 	const version = (JSON.parse(readFileSync(join(PACKAGE_ROOT, "package.json"), "utf8")) as { version: string }).version;
 	const program = new Command().enablePositionalOptions().version(version).name("piagent").description("Read-only Oracle 19c assistant using local Strata");
+	const wallet = program.command("wallet").description("Import and list private Thin-mode Oracle wallets");
+	wallet.command("list").description("List imported wallet names and aliases").action(() => {
+		const root = join(agentHome(), "wallets");
+		try { for (const name of readdirSync(root).sort()) { const dir = join(root, name); try { const services = parseTnsNames(readFileSync(join(dir, "tnsnames.ora"), "utf8")); console.log(`${name}\t${services.map(s => s.alias).join(", ")}\twallet password ${walletNeedsPassword(readFileSync(join(dir, "ewallet.pem"), "utf8")) ? "required" : "not required"}`); } catch { /* malformed entries are omitted */ } } }
+		catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new SafeConfigError("Cannot read private wallet directory"); }
+	});
+	wallet.command("import <zip>").description("Import a password-protected Oracle wallet zip").requiredOption("--name <name>").option("--force", "Replace an existing wallet").action((zip: string, options: { name: string; force?: boolean }) => {
+		if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(options.name)) throw new SafeConfigError("Invalid wallet name");
+		const home = agentHome(), root = join(home, "wallets"), destination = join(root, options.name);
+		mkdirSync(root, { recursive: true, mode: 0o700 }); chmodSync(root, 0o700);
+		let files: ReturnType<typeof extractWallet>;
+		try { files = extractWallet(readFileSync(zip)); } catch { throw new SafeConfigError("Invalid wallet zip"); }
+		let exists = false;
+		try { const existing = lstatSync(destination); exists = true; if (existing.isSymbolicLink() || !existing.isDirectory()) throw new SafeConfigError("Wallet destination must be a real directory"); if (!options.force) throw new SafeConfigError("Wallet already exists; use --force to replace it"); }
+		catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+		const temporary = join(root, `.${options.name}.new-${randomUUID()}`), previous = join(root, `.${options.name}.old-${randomUUID()}`);
+		try {
+			mkdirSync(temporary, { mode: 0o700 }); chmodSync(temporary, 0o700);
+			for (const [file, contents] of Object.entries(files)) { const path = join(temporary, basename(file)); writeFileSync(path, contents, { flag: "wx", mode: 0o600 }); chmodSync(path, 0o600); }
+		} catch { rmSync(temporary, { recursive: true, force: true }); throw new SafeConfigError("Cannot write private wallet files"); }
+		let movedOld = false;
+		try {
+			if (exists) { renameSync(destination, previous); movedOld = true; }
+			renameSync(temporary, destination);
+			if (movedOld) rmSync(previous, { recursive: true, force: true });
+		} catch {
+			rmSync(temporary, { recursive: true, force: true });
+			if (movedOld) { try { renameSync(previous, destination); } catch { throw new SafeConfigError("Cannot replace private wallet"); } }
+			throw new SafeConfigError("Cannot replace private wallet");
+		}
+		const aliases = parseTnsNames(files["tnsnames.ora"]!);
+		console.log(`Imported wallet ${options.name}. Aliases: ${aliases.map(s => s.alias).join(", ")}. Wallet password ${walletNeedsPassword(files["ewallet.pem"]!) ? "required" : "not required"}.`);
+		const first = aliases[0]!;
+		console.log(JSON.stringify({ name: "my-19c-target", description: "Oracle 19c read-only target", protocol: "tcps", wallet: { directory: `<PIAGENT_HOME>/wallets/${options.name}`, tnsAlias: first.alias, passwordFile: "my_wallet.pw" }, username: "READ_ONLY_USER", passwordFile: "my_database.pw", defaultSchema: "READ_ONLY_USER", environment: "production-like" }, null, 2));
+	});
 	program.command("init").description("Create private local configuration").action(() => { console.log(initializeHome() ? "Created private configuration; edit the placeholder paths before use." : "Configuration already exists; left unchanged."); });
 	program.command("web").description("Serve the local database dashboard").option("--port <port>", "Loopback port", "8765").action(async (options: { port: string }) => withoutConnectionFailures(async () => {
 		const port = Number(options.port);
@@ -231,7 +267,7 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 	const targets = program.command("targets").description("List configured Oracle 19c targets and their source file").action(() => {
 		const cfg = loadConfig();
 		console.log(`Source: ${targetsSource()}`);
-		for (const target of cfg.targets) console.log(`${target.name}\t${target.environment}\t${target.description}`);
+		for (const target of cfg.targets) console.log(`${target.name}\t${target.protocol ?? 'tcp'}${target.wallet ? `\t${target.wallet.tnsAlias}` : ''}\t${target.environment}\t${target.description}`);
 	});
 	targets.command("check").description("Check account safety and feature view access; no LLM").requiredOption("--target <target>").option("--json").option("--all", "List every feature view").option("--grants-sql").action(async options => {
 		requireConfiguredTarget(options.target, loadConfig().targets);
