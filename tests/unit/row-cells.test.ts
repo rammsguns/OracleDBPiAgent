@@ -103,6 +103,23 @@ it('accepts an asserted NO with a positive repeated dash annotation', () => {
 	const noCase: EvalCase = { ...test, groundTruth: { sql: 'SELECT stale_stats, global_stats FROM dual', mode: 'rowCells' } };
 	expect(score(noCase, result('| Attribute | Value |\n|---|---|\n| Stale Stats | NO — STALE_STATS = NO |\n| Global Stats | NO — GLOBAL_STATS = NO |'), [['NO', 'NO']]).pass).toBe(true);
 });
+it('scores the transposed p21 statistics answer through its real hard case', async () => {
+	const cases = await loadHardCases();
+	const statsCase = cases.find(item => item.id === 'hard-p21-products-stats')!;
+	const truth = [['YES', 'YES']];
+	const scoreAnswer = (answer: string) => score(statsCase, { ...result(answer), toolCalls: ['run_query'] }, truth).pass;
+	const exactAnswer = `| Attribute | Value |
+|-----------|-------|
+| Last Analyzed | 2026-11-09 22:00:25 UTC |
+| Stale? | **YES** (stale) |
+| Global Statistics? | **YES** (global stats are gathered) |
+| Row Count (at last analysis) | 5,000 |
+
+(\`STALE_STATS = YES\`) and they **are global statistics** (\`GLOBAL_STATS = YES\`).`;
+	expect(scoreAnswer(exactAnswer)).toBe(true);
+	expect(scoreAnswer('| Attribute | Value |\n|---|---|\n| Stale? | NO |\n| Global Statistics? | YES |')).toBe(false);
+	expect(scoreAnswer('| Attribute | Value |\n|---|---|\n| Not stale? | YES |\n| Global Statistics? | YES |')).toBe(false);
+});
 it('normalizes numeric text in prose without losing precision', () => {
 	expect(score(test, result('Alpha has 1.2000 and −55,500.00.'), [['Alpha', '1.2', -55500]]).pass).toBe(true);
 	expect(score(test, result('| A | 9007199254740993 |'), [['A', '9007199254740992']]).pass).toBe(false);
