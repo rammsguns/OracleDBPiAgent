@@ -4,6 +4,42 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-10
+
+Phase 36: cause-first ORA-00942 notes and transposed-table eval scoring.
+
+### Changed
+
+- **ORA-00942 notes name the cause first.** When a failed query mixes
+  readable and unreadable objects, the `run_query` note now leads with the
+  object that caused the error and marks the rest as not the cause, e.g.
+  `Source: No such view in Oracle 19c (check the name): V$RMAN_BACKUP_DATAFILES.
+  Not the cause (readable): V$BACKUP_DATAFILE.` Every 1.11.0 classification
+  and fallback is unchanged, and no extra SQL is run. In the 1.11.0 package
+  smoke test, the agent once called the readable view missing. In this
+  release's gate, the agent answered correctly with both the old and new
+  note order (A 23/24, B 24/24 on the new `p36` cases). The new order is
+  kept because it is clearer, not because it scored better.
+
+### Fixed
+
+- **Eval scoring of two-column `Attribute | Value` tables (eval harness).**
+  A row label that rewords the truth column (`Next Run Time` for
+  `NEXT_RUN`, `Stale?` for `STALE_STATS`, `Global Statistics?` for
+  `GLOBAL_STATS`) now matches. A wrong value, an unrelated label, a negated
+  label, or disagreeing duplicate rows still fail. Replaying the scorer over
+  the archived answers from phases 25–36 (6,743 records) against both the
+  v1.11.0 and the current scorer: 0 pass→fail.
+- **`p36` eval cases accept contractions** such as "doesn't exist" and
+  "isn't valid" for the missing view.
+
+### Added
+
+- `evals/cases-hard/phase36-errors.json` (split `p36`): three d1 cases that
+  mix a real view with an invented one.
+- `evals/replay-scorer-archive.ts --base <git-ref>` compares any earlier
+  scorer with the current one on archived results.
+
 ## [1.11.0] - 2026-11-09
 
 Phase 35: honest missing-view notes and eval template false negatives.

@@ -5134,6 +5134,85 @@ beat A on p36.
 ### Release
 1.12.0 after the gate.
 
+## Phase 36 results (2026-11-10, shipped as 1.12.0)
+
+**Merges.** Antigravity approved each WP.
+- **WP-36C transposed labels** (round 2): a generic `Attribute | Value` label
+  matcher. Replayed against master: 0 pass→fail, 2 fail→pass, both of them
+  correct answers.
+- **WP-36A cause-first notes** (round 3): rounds 1–2 fixed the
+  `forbiddenClaims` regexes, which missed leading-pipe tables, backticks and
+  bold, and a test that used an escaped `\n` instead of a real newline.
+- **WP-36D label fallback** (added after the gate): a coordinator re-score
+  with the v1.11.0 scorer found one 36C regression. A correct
+  `hard-p21-products-stats` answer ("Stale? | **YES**") failed because the
+  36C branch returned false whenever no label bound to the truth column. The
+  fix accepts "stats" and "statistics" as the same word, and accepts a label
+  that leaves "stats" out. The replay tool gained `--base`. Replays against
+  v1.11.0 and master over phases 25–36 (6,743 records) both show 0
+  pass→fail.
+- **WP-36E p36 wording** (added after the gate; round 2): the `p36` facts now accept
+  "doesn't exist" and similar contractions. Gate A's only `p36` miss was a
+  correct answer that used one. Round 1 found that inverted answers (the
+  readable view called missing) passed, because `forbiddenClaims` lacked the
+  new variants. The coordinator's re-score found that round 2's fix failed a
+  correct answer across a semicolon. Round 2 of the review approved the
+  version that stops matches at clause breaks. Re-scored, the gate's p36
+  records give A 24/24 and B 24/24.
+
+**Gate (gate210, sequential), plus 5 extra alternating `p36` rounds.**
+A = master + 36C + 36A's eval cases, keeping the old note order (982904d).
+B = master + 36C + 36A.
+
+| split | A | B |
+|---|---|---|
+| dev ×2 | 66/66 | 64/66 |
+| challenge ×2 | 162/172 | 160/172 |
+| holdout | 70/72 | 70/72 |
+| regression | 20/21 | 20/21 |
+| mvp | 39/39 | 39/39 |
+| p23–p27 | 30/30 | 28/30 |
+| p30 ×2 | 14/16 | 15/16 |
+| pdb ×2 | 22/22 | 22/22 |
+| standby ×2 | 13/14 | 13/14 |
+| p36 ×8 | 23/24 | 24/24 |
+| **total** | **459/476** | **455/476** |
+
+Every miss was read (17 in A, 21 in B), and none involves the note. The
+cause-first note appeared in 18 B records, always in the expected form.
+
+- **Refusals.** Each side failed one p27 refusal "check": A on `refuse-ash`,
+  B on `refuse-repository`. Both were correct refusals with no tool calls,
+  and they failed only the fact that asks the answer to also say historical
+  data is unavailable. Scorer strictness, not a safety failure.
+- **Noise.** The other misses are either scorer strictness on correct
+  answers, hitting both sides (p16 bold error code, p18 quoted job name, p19
+  plan controls, p30 recovery config), or ordinary model errors (p21 plan
+  options "NONE", p25 retention default, p23 and p33 skipping `run_query`).
+  B's 4-point deficit is within the noise seen in Phase 35 (a 10-point gap
+  with no code cause).
+- **The `p36` criterion was not met.** B did not clearly beat A on `p36`
+  (24/24 against 23/24, and A's one miss was a scorer false negative). The
+  new cases don't reproduce the 1.11.0 smoke error. The coordinator shipped
+  36A anyway: the note is verifiably correct, it costs nothing on the gate,
+  and it reads more clearly. CHANGELOG says this.
+
+**Follow-ups.**
+- p27 refusal fact: accept refusals that name a missing licence or tool
+  boundary without the word "history".
+- Row scorer strictness that hits both sides: `SHOPAPP"."NIGHTLY_PURGE_JOB`
+  quoting, bold `ORA-**20001**`, "180 days", and `MRP0 status | APPLYING_LOG`
+  in a 3-column table.
+- Model: "V$BACKUP_DATAFILE returns zero rows" after a failed UNION, a row
+  claim with no rows fetched (gate A, `p36-8`).
+- Lab: `hard-lines-plan` failed "nonempty ground truth" on both sides. The
+  seed text names `SHOPAPP.ORDER_LINES` in full, so Oracle shared a child
+  first parsed under the HARNESS_RO schema (`gyudx7yr31w5w`), and the
+  SHOPAPP-schema truth found no rows. The coordinator purged that one cursor
+  as SYSTEM (`DBMS_SHARED_POOL.PURGE`) and reseeded it under SHOPAPP. It is
+  not yet known what parsed it without `CURRENT_SCHEMA`. Make the truth or
+  the validation independent of which schema parsed first.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
