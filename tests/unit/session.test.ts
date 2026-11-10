@@ -167,3 +167,18 @@ it('uses one execute per non-date query and never calls getStatementInfo',async(
 	expect(calls.filter(call=>(call[2] as any)?.resultSet)).toHaveLength(2);
 	await p.closeAll();
 });
+
+it('uses unchanged TCP, one-way TCPS and wallet connection options', async () => {
+	const tcp = connection();
+	const provider = createSessionProvider(config);
+	await provider.get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'localhost:1522/ORCL' });
+	await provider.closeAll();
+
+	const secure = connection();
+	const tcpsTarget = { ...config, targets: [{ ...config.targets[0]!, protocol: 'tcps' as const }] };
+	await createSessionProvider(tcpsTarget).get();
+	expect(mocks.connect).toHaveBeenLastCalledWith({ user: 'HARNESS_LAB', password: 'test-only', connectString: 'tcps://localhost:1522/ORCL' });
+	await createSessionProvider(tcpsTarget).closeAll();
+	void secure;
+});

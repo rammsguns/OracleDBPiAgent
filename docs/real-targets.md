@@ -287,3 +287,5 @@ protection mode. See [standby monitoring](check.md#physical-standby-phase-32)
 for gap baselines, copied backup evidence, replicated scheduler/object state,
 lag thresholds and PDB NULL apply-lag limitations. Empty or hidden statistics
 remain UNKNOWN. The product never starts recovery or changes Data Guard.
+
+For TLS and Oracle wallet setup (including ADB 19c), see the [Oracle connections guide](connections.md).

@@ -105,7 +105,8 @@ describe("loopback web API", () => {
 			const result = await f.call("/api/targets", "GET", undefined, { Host: `${host}:${f.port}`, Origin: `http://${host}:${f.port}` });
 			expect(result.status).toBe(200);
 			expect(result.headers).toMatchObject({ "content-security-policy": "default-src 'self'", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer", "cache-control": "no-store" });
-			expect(Object.keys(JSON.parse(result.text)[0]).sort()).toEqual(["description", "environment", "name"]);
+			expect(Object.keys(JSON.parse(result.text)[0]).sort()).toEqual(["description", "environment", "name", "protocol"]);
+			expect(JSON.parse(result.text)[0].protocol).toBe("tcp");
 			expect(result.text).not.toMatch(/1522|1523|HARNESS_|password|PRODCDB|localhost/);
 		}
 		expect((await f.call("/api/targets", "GET", undefined, { Host: `localhost:${f.port}`, Origin: `http://127.0.0.1:${f.port}` })).status).toBe(403);

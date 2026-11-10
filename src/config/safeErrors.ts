@@ -55,6 +55,13 @@ export const SAFE_CONFIG_MESSAGES = Object.freeze([
 	"Target endpoint is not approved",
 	"Only thin mode is supported",
 	"Invalid query limits"
+	,"wallet.passwordFile is required for an encrypted wallet",
+	"Cannot read private wallet directory",
+	"Invalid wallet name",
+	"Wallet destination must be a real directory",
+	"Wallet already exists; use --force to replace it",
+	"Cannot write private wallet files",
+	"Invalid wallet zip"
 ] as const);
 export type SafeConfigMessage = typeof SAFE_CONFIG_MESSAGES[number];
 
