@@ -219,8 +219,25 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 	const accepted = [
 		'V$RMAN_BACKUP_DATAFILES is not a valid Oracle 19c view. The second half (V$BACKUP_DATAFILE) is valid.',
 		'Cause: V$RMAN_BACKUP_DATAFILES does not exist in Oracle 19c. Not the cause (readable): V$BACKUP_DATAFILE is readable.',
+		'V$RMAN_BACKUP_DATAFILES doesn\'t exist.',
+		'V$RMAN_BACKUP_DATAFILES doesn’t exist.',
+		'V$RMAN_BACKUP_DATAFILES does not exist.',
+		'V$RMAN_BACKUP_DATAFILES is not a valid view.',
+		'V$RMAN_BACKUP_DATAFILES isn\'t valid.',
+		'V$RMAN_BACKUP_DATAFILES isn’t valid.',
+		'V$RMAN_BACKUP_DATAFILES is not valid.',
+		'V$RMAN_BACKUP_DATAFILES is nonexistent.',
+		'V$RMAN_BACKUP_DATAFILES is non-existent.',
+		'There is no such view as V$RMAN_BACKUP_DATAFILES.',
+		'No such view: V$RMAN_BACKUP_DATAFILES.',
+		'The V$RMAN_BACKUP_DATAFILES view does not exist.',
 	];
-	for (const answer of accepted) expect(score(smoke, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
+	for (const answer of accepted) {
+		const completeAnswer = answer.includes('V$BACKUP_DATAFILE') ? answer : `${answer} V$BACKUP_DATAFILE is readable.`;
+		expect(score(smoke, { answer: completeAnswer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
+	}
+	const wrongViewOnly = score(smoke, { answer: "V$BACKUP_DATAFILE doesn't exist.", toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+	expect(wrongViewOnly.pass).toBe(false);
 	const wrong = 'V$RMAN_BACKUP_DATAFILES does not exist; V$BACKUP_DATAFILE is valid.\n\n| Object | Status |\n| --- | --- |\n| `V$RMAN_BACKUP_DATAFILES` | Does not exist |\n| **V$BACKUP_DATAFILE** | Does not exist |';
 	const wrongScore = score(smoke, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
 	expect(wrongScore.pass).toBe(false);
