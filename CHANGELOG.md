@@ -4,6 +4,46 @@ All notable changes are documented here, following [Keep a Changelog](https://ke
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-10
+
+Phase 37: wallet and TLS connections, and a connection guide.
+
+### Added
+
+- **TCPS and Oracle wallet targets.** A target can set `"protocol": "tcps"`
+  for one-way TLS (`tcps://host:port/service`, server certificate checked
+  against the system CA store), or add a `wallet` block
+  (`directory`, `tnsAlias`, optional `passwordFile`) for mutual TLS, as used
+  by Oracle Cloud Autonomous Database wallets. Thin mode only, no Instant
+  Client. Host, port and service are filled from the alias in
+  `tnsnames.ora`; an explicit value that disagrees is refused. The wallet
+  directory must be a real directory owned by you (0700, files 0600, no
+  symlinks), and the alias must use `PROTOCOL=TCPS`. The wallet password is
+  read from `PIAGENT_SECRET_DIR` and never printed or audited. The 19c gate,
+  the account check (`ADMIN` is refused) and read-only transactions apply
+  unchanged, so an ADB on 23ai/26ai is still refused.
+- **`piagent wallet import <zip> --name <n>` and `piagent wallet list`.**
+  Import keeps only `ewallet.pem` and `tnsnames.ora` from the zip (adapted
+  from the owner's OracleDataForge `server/oracleWallet.ts`). It refuses
+  auto-login-only wallets, Zip64, encrypted zips, duplicate entries and
+  oversized files, and prints the aliases plus a `targets.json` snippet.
+  `--force` validates the new zip before replacing an existing wallet.
+- `targets`, `doctor` and the web target list show the protocol and the
+  wallet alias, never wallet paths or contents.
+- Connection guidance for TLS errors NJS-505 to NJS-508.
+- **`docs/connections.md`**: how to add plain TCP, one-way TLS, Oracle Cloud
+  ADB 19c wallet and self-managed wallet targets, with troubleshooting and
+  security notes. Linked from the README and `docs/real-targets.md`.
+- Lab: a separate `LISTENER_TCPS` (port 2484) with a lab CA and server/client
+  wallets on C1 (`scripts/lab/c1-tcps/`, `docs/lab-c1-tcps.md`), and
+  `tests/integration/c1-tcps-live.test.ts`, which connects over mTLS.
+
+### Not verified
+
+- Oracle Cloud Autonomous Database, one-way TLS without a wallet, and
+  self-managed wallets other than the lab one have not been tested against a
+  live database.
+
 ## [1.12.0] - 2026-11-10
 
 Phase 36: cause-first ORA-00942 notes and transposed-table eval scoring.

@@ -5249,6 +5249,41 @@ not regress. Release smoke adds `check` and one `ask` over the TCPS target.
 ### Release
 1.13.0.
 
+### Phase 37 results (released as 1.13.0)
+
+- WP-37A (`wallet` targets, one-way TCPS, `piagent wallet import/list`, `docs/connections.md`):
+  Antigravity round 1 REQUEST CHANGES (PEM FileHandle leak; `--force` deleted the old wallet before
+  validating the zip; troubleshooting rows quoting messages the code never emits; no NJS-50x TLS
+  guidance; duplicate zip entries; no wallet-option session tests; a plain-TCP alias accepted as
+  TCPS). All fixed in 28155de; round 2 APPROVE.
+- WP-37B (C1 lab TCPS): `lsnrctl reload` cannot add an address to the running LISTENER, so TCPS runs
+  on a separate `LISTENER_TCPS` (2484, static `pipdb1` registration, auto-login server wallet); the
+  main LISTENER was never stopped and Data Guard dest 2 stayed VALID. Round 1 REQUEST CHANGES (orapki
+  wallet password in argv; world-writable backups, 18 copies); fixed in c274676 (stdin, 0700/0600,
+  keep original + newest only); round 2 APPROVE. `LISTENER_TCPS` does not survive a container
+  restart: rerun `scripts/lab/c1-tcps/setup.sh`.
+- Gate on merged master 4a162fe: typecheck; unit 149 files / 2,975 tests; browser 90 passed, 7 skipped;
+  integration 46 files, 128 passed, 1 skipped (the Strata e2e, excluded as usual); `c1-tcps-live`
+  passed for real (mTLS identity, 19c, PIPDB1, `check`, wrong alias and missing wallet password refused).
+- A/B plain TCP regression (A = v1.12.0, B = master, alternating, Strata only):
+
+  | Split | A | B |
+  |---|---|---|
+  | mvp | 39/39 | 39/39 |
+  | pdb x2 | 21/22 | 21/22 |
+
+  The two pdb misses were different cases (A `hard-p31-identity`, B `hard-p31-headroom`) and both
+  passed in run 2: model variance, as expected with no LLM-facing change.
+- Packaged 1.13.0 smoke (private home): `wallet import` of a zip built from the lab wallet (aliases
+  printed, 0700/0600, password-required detected); a bad zip with `--force` left the wallet intact;
+  a target with only `wallet` (no host/port/service) resolved from `tnsnames.ora`; `targets`, `doctor`,
+  `targets check`, `check` (same checks and statuses as plain TCP lab-c1) and one `ask` over TCPS were
+  correct. Four plain-TCP lab checks matched 1.12.0 (c1s dgLag UNKNOWN -> OK is lab state: MRP0
+  had caught up). Secret scan: 25 needles (all lab passwords, Strata key, wallet key/cert fragments)
+  over repo, package, audit and smoke output: 0 hits.
+- Not verified live: Oracle Cloud ADB, one-way TCPS without a wallet, other self-managed wallets.
+- Archive: eval-archive/phase37.
+
 ## MVP exit criteria
 
 Status on 2026-10-26: [docs/mvp-status.md](docs/mvp-status.md).
