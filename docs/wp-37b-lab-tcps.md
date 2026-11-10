@@ -21,6 +21,8 @@
 - Listener and SQL*Net backups were made before cleanup. The repeated unmarked additions were removed. The main `LISTENER` remains IPC + TCP/1521; TCPS now runs on separate `LISTENER_TCPS` with IPC control, TCPS/2484, static `pipdb1` registration, auto-login server wallet, and listener-scoped wallet/authentication settings. Setup reloads but never stops/starts the main listener; reruns stop/start only `LISTENER_TCPS`.
 - OpenSSL verified the mutual TLS handshake and server certificate. Direct node-oracledb Thin mode connected through `pipdb1_tcps`, returning PIPDB1, `tcps`, and an Oracle 19c banner. Existing TCP/1521 PIPDB1 connected. A SYSDBA read-only query over stdin reported `v$archive_dest_status.dest_id=2` as `VALID` with no error.
 - Repeated `setup.sh` and `verify.sh`; setup replaced rather than duplicated marker blocks, and all four listener/SQL*Net begin/end marker counts remained exactly one. The main listener continued to report only TCP/1521.
+- Review follow-up: `orapki` 19c interactive wallet creation and PKCS#12 import were verified with disposable data; setup feeds prompts via stdin, never wallet-password argv, and its exit trap removes any legacy `/tmp/wp37b-wallet.pw`. No such file remains. Backup retention is the true original plus newest, with 0700 directories/0600 files; unchanged configuration does not create another backup. Setup dynamically checks bridge IP against TNS alias and server cert SAN, rotates on change, and atomically renames same-directory config temp files (Python 2.7 uses POSIX `os.rename`).
+- Setup and verification were rerun after review fixes. Verification was invoked from `/tmp` and passed, including OpenSSL, direct Thin-mode TCPS, TCP/1521, and Data Guard dest 2 checks. The dynamic C1 bridge IP was `172.17.0.6` and the server SAN matched it.
 - The host wallet directory and files were checked as mode 0700/0600. No password or private key was printed.
 
 ## Gates
@@ -30,6 +32,10 @@
 - `PIAGENT_SECRET_DIR=... npx vitest run tests/integration/c1-tcps-live.test.ts --no-file-parallelism`: passed with one clear skip; the product branch here does not yet support the phase 37 wallet target.
 - `git diff --check`: passed.
 - `bash -n scripts/lab/c1-tcps/setup.sh scripts/lab/c1-tcps/verify.sh`: passed.
+- Review follow-up `npm run typecheck`: passed; `npm test -- --maxWorkers=2`: passed (148 files, 2,961 tests).
+- Targeted C1 integration test: passed with one expected skip because WP-37A wallet support is not on this branch; timeout/unreachable errors now include ORA-12170, ETIMEDOUT, and NJS-503.
+- `PIAGENT_SECRET_DIR=... /absolute/path/to/scripts/lab/c1-tcps/setup.sh`: passed.
+- `cd /tmp && PIAGENT_SECRET_DIR=... /absolute/path/to/scripts/lab/c1-tcps/verify.sh`: passed.
 
 ## Contract changes and outstanding items
 

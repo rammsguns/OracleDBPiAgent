@@ -33,7 +33,7 @@ it('C1 TCPS wallet session, identity, check and safe wallet refusals', async tes
 			if (/unknown property.*(protocol|wallet)|protocol is invalid|wallet is invalid|wallet support/i.test(String(error))) {
 				test.skip('Session provider does not support wallet targets yet; waiting for WP-37A merge'); return;
 			}
-			if (/NJS-511|ECONNREFUSED|ORA-12541|ORA-12514|NJS-500/.test(String(error))) { test.skip('C1 TCPS listener or PIPDB1 service unavailable'); return; }
+			if (/NJS-511|NJS-503|ECONNREFUSED|ETIMEDOUT|ORA-12541|ORA-12514|ORA-12170|NJS-500/.test(String(error))) { test.skip('C1 TCPS listener or PIPDB1 service unavailable'); return; }
 			throw error;
 		}
 		expect(session.identity.containerName).toBe('PIPDB1');
