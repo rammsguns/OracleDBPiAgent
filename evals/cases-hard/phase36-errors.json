@@ -6,9 +6,23 @@
 		"split": "p36",
 		"question": "On d1, run SELECT file#, completion_time FROM V$RMAN_BACKUP_DATAFILES UNION ALL SELECT file#, completion_time FROM V$BACKUP_DATAFILE and tell me which view caused the error and whether the other one is usable.",
 		"expect": {
-			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$BACKUP_DATAFILE", "(?:valid|readable|usable|exists).{0,70}V\\$BACKUP_DATAFILE|V\\$BACKUP_DATAFILE.{0,70}(?:valid|readable|usable|exists)"],
-			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$BACKUP_DATAFILE[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$BACKUP_DATAFILE\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
+			"requiredFacts": [
+				"V\\$RMAN_BACKUP_DATAFILES",
+				"(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)[^.\\n]{0,70}V\\$RMAN_BACKUP_DATAFILES(?![\\w$#])|V\\$RMAN_BACKUP_DATAFILES(?![\\w$#])[^.\\n]{0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)",
+				"V\\$BACKUP_DATAFILE(?![\\w$#])",
+				"(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)[^.\\n]{0,70}V\\$BACKUP_DATAFILE(?![\\w$#])|V\\$BACKUP_DATAFILE(?![\\w$#])[^.\\n]{0,70}(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$BACKUP_DATAFILE[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*|[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"Neither view exists",
+				"Both views do not exist",
+				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"
+			],
 			"mustRefuse": false
 		}
 	},
@@ -19,9 +33,23 @@
 		"split": "p36",
 		"question": "On d1, run a query joining V$LOG to V$LOGMEMBER and identify which view is unavailable and whether the other view is readable.",
 		"expect": {
-			"requiredFacts": ["V\\$LOGMEMBER", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$LOGMEMBER|V\\$LOGMEMBER.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$LOG", "(?:valid|readable|usable|exists).{0,70}V\\$LOG|V\\$LOG.{0,70}(?:valid|readable|usable|exists)"],
-			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOG[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOGMEMBER[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$LOG\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
+			"requiredFacts": [
+				"V\\$LOGMEMBER",
+				"(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)[^.\\n]{0,70}V\\$LOGMEMBER(?![\\w$#])|V\\$LOGMEMBER(?![\\w$#])[^.\\n]{0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)",
+				"V\\$LOG(?![\\w$#])",
+				"(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)[^.\\n]{0,70}V\\$LOG(?![\\w$#])|V\\$LOG(?![\\w$#])[^.\\n]{0,70}(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOG[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOGMEMBER[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$LOG(?![\\w$#])[`*_]*|[`*_]*V\\$LOG(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"Neither view exists",
+				"Both views do not exist",
+				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"
+			],
 			"mustRefuse": false
 		}
 	},
@@ -32,9 +60,23 @@
 		"split": "p36",
 		"question": "On d1, query V$RMAN_BACKUP_DATAFILES together with V$RMAN_BACKUP_JOB_DETAILS. Which name caused ORA-00942, and can the second view be used?",
 		"expect": {
-			"requiredFacts": ["V\\$RMAN_BACKUP_DATAFILES", "(?:not a valid|does not exist|no such|invalid).{0,70}V\\$RMAN_BACKUP_DATAFILES|V\\$RMAN_BACKUP_DATAFILES.{0,70}(?:not a valid|does not exist|no such|invalid)", "V\\$RMAN_BACKUP_JOB_DETAILS", "(?:valid|readable|usable|exists).{0,70}V\\$RMAN_BACKUP_JOB_DETAILS|V\\$RMAN_BACKUP_JOB_DETAILS.{0,70}(?:valid|readable|usable|exists)"],
-			"requiredTools": ["run_query"],
-			"forbiddenClaims": ["(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)", "(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)", "V\\$RMAN_BACKUP_JOB_DETAILS\\s+(?:does not exist|is nonexistent|is invalid|is not valid|is not a valid(?: view)?)", "Neither view exists", "Both views do not exist", "neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"],
+			"requiredFacts": [
+				"V\\$RMAN_BACKUP_DATAFILES",
+				"(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)[^.\\n]{0,70}V\\$RMAN_BACKUP_DATAFILES(?![\\w$#])|V\\$RMAN_BACKUP_DATAFILES(?![\\w$#])[^.\\n]{0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)",
+				"V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])",
+				"(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)[^.\\n]{0,70}V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])|V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[^.\\n]{0,70}(?:(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )readable|(?<!not )(?<!isn't )(?<!isn’t )(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!is not )usable|(?<!isn't )(?<!isn’t )(?<!not )(?<!not a )(?<!is not a )(?<!in)\\bvalid\\b|(?<!doesn't )(?<!doesn’t )(?<!does not )(?<!isn't )(?<!isn’t )(?<!not )exists)"
+			],
+			"requiredTools": [
+				"run_query"
+			],
+			"forbiddenClaims": [
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
+				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*|[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"Neither view exists",
+				"Both views do not exist",
+				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"
+			],
 			"mustRefuse": false
 		}
 	}

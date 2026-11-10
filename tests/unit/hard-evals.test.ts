@@ -219,8 +219,64 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 	const accepted = [
 		'V$RMAN_BACKUP_DATAFILES is not a valid Oracle 19c view. The second half (V$BACKUP_DATAFILE) is valid.',
 		'Cause: V$RMAN_BACKUP_DATAFILES does not exist in Oracle 19c. Not the cause (readable): V$BACKUP_DATAFILE is readable.',
+		'**Summary:**\n\n- **`V$RMAN_BACKUP_DATAFILES`** — the culprit; it simply doesn\'t exist in 19c.\n- **`V$BACKUP_DATAFILE`** — valid and queryable, but currently returns **zero rows** on d1-19c-lab (no RMAN datafile backups have been recorded on this development instance).',
+		'V$RMAN_BACKUP_DATAFILES doesn\'t exist.',
+		'V$RMAN_BACKUP_DATAFILES doesn’t exist.',
+		'V$RMAN_BACKUP_DATAFILES does not exist.',
+		'V$RMAN_BACKUP_DATAFILES is not a valid view.',
+		'V$RMAN_BACKUP_DATAFILES isn\'t valid.',
+		'V$RMAN_BACKUP_DATAFILES isn’t valid.',
+		'V$RMAN_BACKUP_DATAFILES is not valid.',
+		'V$RMAN_BACKUP_DATAFILES is nonexistent.',
+		'V$RMAN_BACKUP_DATAFILES is non-existent.',
+		'There is no such view as V$RMAN_BACKUP_DATAFILES.',
+		'No such view: V$RMAN_BACKUP_DATAFILES.',
+		'The V$RMAN_BACKUP_DATAFILES view does not exist.',
 	];
-	for (const answer of accepted) expect(score(smoke, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
+	for (const answer of accepted) {
+		const completeAnswer = answer.includes('V$BACKUP_DATAFILE') ? answer : `${answer} V$BACKUP_DATAFILE is readable.`;
+		expect(score(smoke, { answer: completeAnswer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
+	}
+	const wrongViewOnly = score(smoke, { answer: "V$BACKUP_DATAFILE doesn't exist.", toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+	expect(wrongViewOnly.pass).toBe(false);
+	const reviewerAnswers: Record<string, string[]> = {
+		'hard-p36-d1-rman-missing': [
+			"V$BACKUP_DATAFILE doesn't exist. V$RMAN_BACKUP_DATAFILES is valid.",
+			"V$BACKUP_DATAFILE isn't valid. V$RMAN_BACKUP_DATAFILES is nonexistent.",
+		],
+		'hard-p36-d1-logmember-missing': ["V$LOG doesn't exist. V$LOGMEMBER is valid."],
+		'hard-p36-d1-mixed-rman-log': ["V$RMAN_BACKUP_JOB_DETAILS doesn't exist. V$RMAN_BACKUP_DATAFILES is valid."],
+	};
+	for (const test of cases) {
+		for (const answer of reviewerAnswers[test.id] ?? []) {
+			const result = score(test, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+			expect(result.pass, `${test.id}: ${answer}`).toBe(false);
+			expect(result.checks.some(check => !check.pass && check.check.startsWith('forbidden:')), `${test.id}: ${answer}`).toBe(true);
+		}
+	}
+	const invalidReadability = ["doesn't exist", 'doesn’t exist', "isn't valid", 'isn’t valid', 'is not a valid view', 'not valid', 'nonexistent', 'non-existent', 'no such view', 'invalid'];
+	const formats = [
+		(view: string, phrase: string, before: boolean) => before ? `${phrase} ${view}` : `${view} — ${phrase}`,
+		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | ${view} |` : `| ${view} | ${phrase} |`,
+		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | \`${view}\` |` : `| \`${view}\` | ${phrase} |`,
+		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | **${view}** |` : `| **${view}** | ${phrase} |`,
+	];
+	for (const test of cases) {
+		const readableView = test.id.includes('logmember') ? 'V$LOG' : test.id.includes('mixed-rman') ? 'V$RMAN_BACKUP_JOB_DETAILS' : 'V$BACKUP_DATAFILE';
+		const missingView = test.id.includes('logmember') ? 'V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES';
+		for (const phrase of invalidReadability) {
+			for (const format of formats) {
+				for (const before of [false, true]) {
+					const answer = `${format(readableView, phrase, before)}\n${missingView} does not exist.`;
+					const result = score(test, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+					expect(result.checks.some(check => !check.pass && check.check.startsWith('forbidden:')), `${test.id}: ${answer}`).toBe(true);
+					if (phrase === 'invalid') {
+						expect(result.checks.find(check => check.check === `fact: ${test.expect.requiredFacts[3]}`)?.pass, `${test.id}: ${answer}`).toBe(false);
+					}
+				}
+			}
+		}
+	}
 	const wrong = 'V$RMAN_BACKUP_DATAFILES does not exist; V$BACKUP_DATAFILE is valid.\n\n| Object | Status |\n| --- | --- |\n| `V$RMAN_BACKUP_DATAFILES` | Does not exist |\n| **V$BACKUP_DATAFILE** | Does not exist |';
 	const wrongScore = score(smoke, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
 	expect(wrongScore.pass).toBe(false);
@@ -228,6 +284,10 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 	for (const test of cases) {
 		const cause = test.id.includes('logmember') ? 'V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES';
 		const readable = test.id.includes('logmember') ? 'V$LOG' : test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_JOB_DETAILS' : 'V$BACKUP_DATAFILE';
+		if (test.id.includes('logmember')) {
+			const clauseBreak = 'The join fails solely because `V$LOGMEMBER` is not a valid 19c view; `V$LOG` itself is fully readable.';
+			expect(score(test, { answer: clauseBreak, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, clauseBreak).toBe(true);
+		}
 		const validAnswer = `${cause} does not exist in Oracle 19c. ${readable} is valid and readable.`;
 		expect(score(test, { answer: validAnswer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, test.id).toBe(true);
 		const pair = test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_DATAFILES nor V$RMAN_BACKUP_JOB_DETAILS'
