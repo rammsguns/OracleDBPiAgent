@@ -55,7 +55,11 @@ export function createSessionProvider(config: AppConfig, approvedEndpoints?: rea
 			if (target.wallet) {
 				const pemPath = resolve(target.wallet.directory, 'ewallet.pem');
 				let encrypted: boolean;
-				try { encrypted = walletNeedsPassword(await (await open(pemPath, constants.O_RDONLY | constants.O_NOFOLLOW)).readFile('utf8')); }
+				try {
+					const pemFile = await open(pemPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+					try { encrypted = walletNeedsPassword(await pemFile.readFile('utf8')); }
+					finally { await pemFile.close(); }
+				}
 				catch { throw recordConnectionFailure(new SafeConfigError('Invalid or unapproved target configuration')); }
 				if (encrypted && !target.wallet.passwordFile) throw recordConnectionFailure(new SafeConfigError('wallet.passwordFile is required for an encrypted wallet'));
 				if (target.wallet.passwordFile) {

@@ -63,7 +63,8 @@ const expected = [
 	"Wallet destination must be a real directory",
 	"Wallet already exists; use --force to replace it",
 	"Cannot write private wallet files",
-	"Invalid wallet zip"
+	"Invalid wallet zip",
+	"Cannot replace private wallet"
 ];
 
 it("lists every reviewed safe configuration message", () => {

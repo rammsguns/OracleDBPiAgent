@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { extractWallet, parseTnsNames, walletNeedsPassword } from "../../src/oracle/wallet.js";
@@ -24,16 +24,21 @@ afterEach(()=>{for(const dir of dirs.splice(0))rmSync(dir,{recursive:true,force:
 function walletDir() { const dir=mkdtempSync(join(tmpdir(),"wallet-fixture-"));dirs.push(dir);chmodSync(dir,0o700);writeFileSync(join(dir,"tnsnames.ora"),tns,{mode:0o600});writeFileSync(join(dir,"ewallet.pem"),pem,{mode:0o600});return dir; }
 const target = {name:"wallet-db",description:"fixture",username:"READER",passwordFile:"db.pw",defaultSchema:"APP",environment:"production-like"};
 
-it("parses nested aliases case-insensitively and detects encrypted PEM",()=>{expect(parseTnsNames(tns)).toEqual([{alias:"ALIAS_LOW",host:"db.example",port:2484,serviceName:"app_low"},{alias:"ALIAS_HIGH",host:"db.example",port:2484,serviceName:"app_high"}]);expect(walletNeedsPassword(pem)).toBe(true);});
+it("parses nested aliases case-insensitively and detects encrypted PEM",()=>{expect(parseTnsNames(tns)).toEqual([{alias:"ALIAS_LOW",host:"db.example",port:2484,serviceName:"app_low",protocol:"TCPS"},{alias:"ALIAS_HIGH",host:"db.example",port:2484,serviceName:"app_high",protocol:"TCPS"}]);expect(walletNeedsPassword(pem)).toBe(true);});
 it("extracts only supported wallet files and refuses missing inputs and path traversal writes",()=>{
 	const files=extractWallet(zip({"../ewallet.pem":pem,"tnsnames.ora":tns,"cwallet.sso":"ignored"}));expect(Object.keys(files).sort()).toEqual(["ewallet.pem","tnsnames.ora"]);
 	expect(()=>extractWallet(zip({"cwallet.sso":"auto"}))).toThrow(/no ewallet.pem/);
 	expect(()=>extractWallet(Buffer.from("not zip"))).toThrow(/not a wallet zip/);
+	expect(()=>extractWallet(zip({"a/ewallet.pem":pem,"b/ewallet.pem":pem,"tnsnames.ora":tns}))).toThrow(/duplicate required entries/);
 });
 it("resolves wallet endpoint fields and refuses unsafe dirs, files, aliases and mismatches",()=>{
 	const directory=walletDir(), ok={...target,wallet:{directory,tnsAlias:"alias_low",passwordFile:"wallet.pw"}};
 	validateTarget(ok);expect(ok).toMatchObject({host:"db.example",port:2484,serviceName:"app_low",protocol:"tcps"});
 	for(const patch of [{wallet:{...ok.wallet,directory:"relative"}},{wallet:{...ok.wallet,tnsAlias:"missing"}},{wallet:{...ok.wallet,passwordFile:"../bad"}},{protocol:"tcp",wallet:ok.wallet},{host:"other",wallet:ok.wallet}]) expect(()=>validateTarget({...target,...patch})).toThrow();
+	const tcpDir=mkdtempSync(join(tmpdir(),"wallet-tcp-"));dirs.push(tcpDir);chmodSync(tcpDir,0o700);writeFileSync(join(tcpDir,"tnsnames.ora"),"ALIAS=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=db.example)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=app)))",{mode:0o600});writeFileSync(join(tcpDir,"ewallet.pem"),pem,{mode:0o600});
+	expect(()=>validateTarget({...target,wallet:{directory:tcpDir,tnsAlias:"ALIAS",passwordFile:"wallet.pw"}})).toThrow("wallet is invalid");
+	const symlink=join(directory,"link");symlinkSync(directory,symlink);expect(()=>validateTarget({...target,wallet:{directory:symlink,tnsAlias:"ALIAS_LOW",passwordFile:"wallet.pw"}})).toThrow();
+	expect(()=>validateTarget({...target,wallet:{directory:`${directory}/`,tnsAlias:"ALIAS_LOW",passwordFile:"wallet.pw"}})).toThrow();
 	chmodSync(join(directory,"ewallet.pem"),0o644);expect(()=>validateTarget({...target,wallet:ok.wallet})).toThrow();
 });
 it("reports encrypted PEM without a wallet password file as a clear config error",()=>{const directory=walletDir();expect(()=>validateTarget({...target,wallet:{directory,tnsAlias:"ALIAS_LOW"}})).toThrow("wallet.passwordFile is required for an encrypted wallet");});
@@ -46,4 +51,7 @@ it("writes imported wallet fixture permissions in the CLI",async()=>{
 	const {main}=await import("../../src/cli/index.js");
 	await main(["node","piagent","wallet","import",archive,"--name","fixture"]);
 	const dir=join(home,"wallets","fixture");expect(statSync(dir).mode & 0o777).toBe(0o700);expect(statSync(join(dir,"ewallet.pem")).mode & 0o777).toBe(0o600);expect(readFileSync(join(dir,"tnsnames.ora"),"utf8")).toBe(tns);expect(log.mock.calls.join(" ")).toContain("ALIAS_LOW");
+	writeFileSync(archive,"bad zip");
+	await expect(main(["node","piagent","wallet","import",archive,"--name","fixture","--force"])).rejects.toThrow("Invalid wallet zip");
+	expect(readFileSync(join(dir,"tnsnames.ora"),"utf8")).toBe(tns);
 });

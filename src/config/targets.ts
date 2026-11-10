@@ -1,5 +1,5 @@
 import { TARGET_FIELDS } from './targetErrors.js';
-import { constants, openSync, closeSync, fstatSync, readFileSync, lstatSync, type Stats } from 'node:fs';
+import { constants, openSync, closeSync, fstatSync, readFileSync, lstatSync, realpathSync, type Stats } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { isIP } from 'node:net';
 import type { TargetConfig } from '../contracts.js';
@@ -24,17 +24,21 @@ function resolveWalletTarget(t: any, context: { index?: number; name?: string })
 	if (typeof wallet.directory !== 'string' || !wallet.directory.startsWith('/') || !wallet.tnsAlias || typeof wallet.tnsAlias !== 'string') invalid('wallet');
 	if (wallet.passwordFile !== undefined && (typeof wallet.passwordFile !== 'string' || !/^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/.test(wallet.passwordFile))) invalid('wallet');
 	try {
-		const dir = lstatSync(wallet.directory);
+		const normalizedDirectory = resolve(wallet.directory);
+		if (wallet.directory !== normalizedDirectory || realpathSync(wallet.directory) !== normalizedDirectory) invalid('wallet');
+		const dir = lstatSync(normalizedDirectory);
 		if (!dir.isDirectory() || dir.isSymbolicLink() || (dir.mode & 0o777) !== 0o700 || (typeof process.getuid === 'function' && dir.uid !== process.getuid())) invalid('wallet');
 		for (const filename of ['tnsnames.ora','ewallet.pem']) {
-			const file = lstatSync(join(wallet.directory, filename));
+			const file = lstatSync(join(normalizedDirectory, filename));
 			if (!file.isFile() || file.isSymbolicLink() || (file.mode & 0o777) !== 0o600 || (typeof process.getuid === 'function' && file.uid !== process.getuid())) invalid('wallet');
 		}
-		const names = readFileSync(join(wallet.directory, 'tnsnames.ora'), 'utf8');
+		const names = readFileSync(join(normalizedDirectory, 'tnsnames.ora'), 'utf8');
 		const alias = parseTnsNames(names).find(s => s.alias.toLowerCase() === wallet.tnsAlias.toLowerCase());
 		if (!alias) invalid('wallet');
 		const resolved = alias!;
-		const pem = readFileSync(join(wallet.directory, 'ewallet.pem'), 'utf8');
+		if (resolved.protocol !== 'TCPS') invalid('wallet');
+		wallet.directory = normalizedDirectory;
+		const pem = readFileSync(join(normalizedDirectory, 'ewallet.pem'), 'utf8');
 		if (walletNeedsPassword(pem) && !wallet.passwordFile) throw new SafeConfigError('wallet.passwordFile is required for an encrypted wallet');
 		for (const [field, expected] of [['host',resolved.host],['port',resolved.port],['serviceName',resolved.serviceName]] as const) {
 			if (t[field] !== undefined && String(t[field]).toLowerCase() !== String(expected).toLowerCase()) invalid(field);

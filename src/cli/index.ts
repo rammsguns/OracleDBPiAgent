@@ -7,7 +7,7 @@ import { ReportSectionUsageError, validateReportSections } from "../report/argum
 import { targetsSource } from '../config/targets.js';
 import { checkTarget } from '../preflight/index.js';
 import { AccountCheckError } from '../oracle/account.js';
-import { readFileSync, realpathSync, mkdirSync, writeFileSync, lstatSync, chmodSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, realpathSync, mkdirSync, writeFileSync, lstatSync, chmodSync, readdirSync, rmSync, renameSync } from "node:fs";
 import { join, basename } from "node:path";
 import { PACKAGE_ROOT, reportDirectory, agentHome } from "../config/paths.js";
 import { loadEnvironment, initializeHome, assertConfiguredLlmKeyFile, SafeConfigError } from "../config/environment.js";
@@ -84,13 +84,26 @@ export async function main(argv = process.argv, dependencies: DoctorDependencies
 		if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(options.name)) throw new SafeConfigError("Invalid wallet name");
 		const home = agentHome(), root = join(home, "wallets"), destination = join(root, options.name);
 		mkdirSync(root, { recursive: true, mode: 0o700 }); chmodSync(root, 0o700);
-		try { const existing = lstatSync(destination); if (existing.isSymbolicLink() || !existing.isDirectory()) throw new SafeConfigError("Wallet destination must be a real directory"); if (!options.force) throw new SafeConfigError("Wallet already exists; use --force to replace it"); rmSync(destination, { recursive: true, force: true }); }
-		catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
 		let files: ReturnType<typeof extractWallet>;
 		try { files = extractWallet(readFileSync(zip)); } catch { throw new SafeConfigError("Invalid wallet zip"); }
-		mkdirSync(destination, { mode: 0o700 });
-		try { for (const [file, contents] of Object.entries(files)) writeFileSync(join(destination, basename(file)), contents, { flag: "wx", mode: 0o600 }); }
-		catch { rmSync(destination, { recursive: true, force: true }); throw new SafeConfigError("Cannot write private wallet files"); }
+		let exists = false;
+		try { const existing = lstatSync(destination); exists = true; if (existing.isSymbolicLink() || !existing.isDirectory()) throw new SafeConfigError("Wallet destination must be a real directory"); if (!options.force) throw new SafeConfigError("Wallet already exists; use --force to replace it"); }
+		catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+		const temporary = join(root, `.${options.name}.new-${randomUUID()}`), previous = join(root, `.${options.name}.old-${randomUUID()}`);
+		try {
+			mkdirSync(temporary, { mode: 0o700 }); chmodSync(temporary, 0o700);
+			for (const [file, contents] of Object.entries(files)) { const path = join(temporary, basename(file)); writeFileSync(path, contents, { flag: "wx", mode: 0o600 }); chmodSync(path, 0o600); }
+		} catch { rmSync(temporary, { recursive: true, force: true }); throw new SafeConfigError("Cannot write private wallet files"); }
+		let movedOld = false;
+		try {
+			if (exists) { renameSync(destination, previous); movedOld = true; }
+			renameSync(temporary, destination);
+			if (movedOld) rmSync(previous, { recursive: true, force: true });
+		} catch {
+			rmSync(temporary, { recursive: true, force: true });
+			if (movedOld) { try { renameSync(previous, destination); } catch { throw new SafeConfigError("Cannot replace private wallet"); } }
+			throw new SafeConfigError("Cannot replace private wallet");
+		}
 		const aliases = parseTnsNames(files["tnsnames.ora"]!);
 		console.log(`Imported wallet ${options.name}. Aliases: ${aliases.map(s => s.alias).join(", ")}. Wallet password ${walletNeedsPassword(files["ewallet.pem"]!) ? "required" : "not required"}.`);
 		const first = aliases[0]!;

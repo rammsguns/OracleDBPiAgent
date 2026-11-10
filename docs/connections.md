@@ -85,18 +85,19 @@ A self-managed Oracle 19c server can use a client wallet created with `orapki`. 
 
 | Error | Likely cause | Fix |
 |---|---|---|
-| `wallet is invalid` | Missing, symlinked, non-private or unowned wallet file/directory; alias missing | Use a real owned directory at 0700, files at 0600, and match `tnsAlias` to `tnsnames.ora` |
+| `targets.json target 1 (app-pdb): wallet is invalid` | Missing, symlinked, non-private or unowned wallet file/directory; alias missing or alias descriptor uses TCP | Use a real owned directory at 0700, files at 0600, and match `tnsAlias` to a TCPS descriptor in `tnsnames.ora` |
 | `wallet.passwordFile is required for an encrypted wallet` | Encrypted PEM without password file configured | Add `wallet.passwordFile` naming a file in `PIAGENT_SECRET_DIR` |
-| `Invalid password file` | Password file missing, empty, unreadable or not regular | Check filename, ownership, contents and mode 0600 |
-| `unknown wallet alias` | Alias not present in `tnsnames.ora` | Use an alias printed by `piagent wallet list` |
-| `ORA-29024` / `ORA-28860` | TLS certificate validation/handshake failure | Check wallet, certificate chain, TLS listener and system time |
-| `ORA-12541`, `NJS-503` | Listener unreachable or timeout | Check DNS, route, firewall, allowlist, host and port |
-| `ORA-12514` / `ORA-12505` | Service not registered or service name incorrect | Choose the correct PDB/ADB service alias |
-| Oracle version rejected | Endpoint is not Oracle 19c | Use a supported 19c target |
-| Account check rejected | System/admin or over-privileged account | Use a dedicated read-only account and reviewed grants |
+| `Password file adb-prod.pw for target adb-prod is missing, unreadable, non-regular or empty in PIAGENT_SECRET_DIR (chmod 600, owned by you)` | Database password file missing, empty, unreadable or not regular | Check filename, ownership, contents and mode 0600 |
+| `NJS-517: unknown wallet alias; check tnsAlias in the wallet tnsnames.ora` | Alias could not be resolved by node-oracledb | Use an alias printed by `piagent wallet list`; target configuration validates aliases before connecting |
+| `NJS-505: TLS initialization failed; check wallet credentials and TLS configuration` / `NJS-506: TLS handshake failed; check the wallet, certificate and server TLS configuration` / `NJS-507: TLS certificate distinguished name validation failed; check the configured server DN` / `NJS-508: TLS certificate hostname validation failed; check the server certificate hostname` | TLS initialization, handshake, distinguished name, or hostname certificate failure | Check wallet credentials, certificate chain, configured DN/hostname, TLS listener and system time |
+| `ORA-29024: TLS certificate validation failed; check the server certificate chain and wallet` / `ORA-28860: TLS connection failed; check the server and client wallet configuration` | TLS certificate validation/handshake failure | Check wallet, certificate chain, TLS listener and system time |
+| `ORA-12541: listener unreachable; check the host, port and listener availability` / `NJS-503: listener unreachable or connection timeout; check the host, port, network and listener availability` | Listener unreachable or timeout | Check DNS, route, firewall, allowlist, host and port |
+| `ORA-12514: unknown service name; use the PDB service name` / `ORA-12505: unknown service name; use the PDB service name` | Service not registered or service name incorrect | Choose the correct PDB/ADB service alias |
+| `Target app-pdb runs Oracle 23.0; only Oracle Database 19c is supported` | Endpoint is not Oracle 19c | Use a supported 19c target |
+| `Account check failed: CREATE ANY TABLE` / `CDB$ROOT refused; use the PDB service name` | System/admin or over-privileged account, or root container endpoint | Use a dedicated read-only account and a PDB service with reviewed grants |
 
 ## Security
 
 Wallet ZIPs are treated as untrusted input. The importer bounds archive and entry sizes, rejects unsupported ZIP features, ignores archive paths, and writes only the two Thin-mode files. Keep the original ZIP and extracted wallet private. Wallet and database passwords are read only from `PIAGENT_SECRET_DIR`; they are not printed or included in audit records. The product never writes to the database.
 
-**Verification status:** plain TCP remains covered by the existing lab integration suite. TCPS, Autonomous Database, encrypted-wallet connection, and self-managed wallet examples have not been live-verified by WP-37A.
+**Verification status:** plain TCP remains covered by the existing lab integration suite. Wallet-backed TCPS was checked against the separate WP-37B C1 TCPS lab using its existing wallet and read-only account; Oracle 19.9.1.0.0, PIPDB1, the read-only account check, and preflight checks passed. Autonomous Database, one-way TCPS, and self-managed wallet examples have not been live-verified here.

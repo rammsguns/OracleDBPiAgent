@@ -10,7 +10,7 @@ export const WALLET_FILE_MAX_BYTES = 512 * 1024;
 export const WALLET_KEPT_FILES = ["ewallet.pem", "tnsnames.ora"] as const;
 
 export interface WalletFiles { [name: string]: string }
-export interface WalletService { alias: string; host: string; port: number; serviceName: string }
+export interface WalletService { alias: string; host: string; port: number; serviceName: string; protocol: string }
 const EOCD = 0x06054b50;
 const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
@@ -26,6 +26,7 @@ function readZip(buf: Buffer): { name: string; data: Buffer }[] {
 	if (count === 0xffff || offset === 0xffffffff) throw new Error("Zip64 wallet archives are not supported");
 	const result: { name: string; data: Buffer }[] = [];
 	let hasAutoLogin = false;
+	const keptNames = new Set<string>();
 	for (let n = 0; n < count; n++) {
 		if (offset + 46 > buf.length || buf.readUInt32LE(offset) !== CENTRAL) throw new Error("Wallet zip directory is damaged");
 		const flags = buf.readUInt16LE(offset + 8), method = buf.readUInt16LE(offset + 10);
@@ -35,6 +36,8 @@ function readZip(buf: Buffer): { name: string; data: Buffer }[] {
 		offset += 46 + nameLength + extraLength + commentLength;
 		if (name === "cwallet.sso") hasAutoLogin = true;
 		if (!(WALLET_KEPT_FILES as readonly string[]).includes(name)) continue;
+		if (keptNames.has(name)) throw new Error("Wallet zip contains duplicate required entries");
+		keptNames.add(name);
 		if (flags & 1) throw new Error("Password protected zip archives are not supported");
 		if (method !== 0 && method !== 8) throw new Error("Wallet zip compression method is not supported");
 		if (compressed > WALLET_ZIP_MAX_BYTES || local + 30 > buf.length || buf.readUInt32LE(local) !== LOCAL) throw new Error("Wallet zip entry is invalid");
@@ -81,7 +84,8 @@ export function parseTnsNames(text: string): WalletService[] {
 		const host = /\(\s*host\s*=\s*([^()\s]+)/i.exec(descriptor)?.[1] ?? "";
 		const port = Number(/\(\s*port\s*=\s*([0-9]+)/i.exec(descriptor)?.[1] ?? 0);
 		const serviceName = /\(\s*service_name\s*=\s*([^()\s]+)/i.exec(descriptor)?.[1] ?? "";
-		if (host && port > 0 && serviceName) { seen.add(key); out.push({ alias, host, port, serviceName }); }
+		const protocol = /\(\s*protocol\s*=\s*([^()\s]+)/i.exec(descriptor)?.[1] ?? "";
+		if (host && port > 0 && serviceName && protocol) { seen.add(key); out.push({ alias, host, port, serviceName, protocol: protocol.toUpperCase() }); }
 	}
 	return out;
 }

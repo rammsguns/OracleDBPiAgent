@@ -18,10 +18,11 @@ Docs/config: `docs/connections.md`, `README.md`, `docs/real-targets.md`, `config
 ## Verification
 
 - `npm run typecheck`: passed.
-- `npx vitest run tests/unit/session.test.ts tests/unit/wallet.test.ts --maxWorkers=1`: passed, 2 files / 29 tests.
-- `npm test -- --maxWorkers=2`: invoked twice. The first run exposed the expected CLI help list needing wallet entries. The second run exited without its final output being returned by the command session; the wallet/session tests were run directly and passed. Full suite result is therefore unverified.
-- `PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets npm run test:integration -- --testNamePattern='^(?!.*answers one end-to-end ask through local Strata)'`: remained alive without output for five minutes and was stopped. Integration result is unverified.
-- Live TCPS, ADB, and encrypted wallet connections were not verified; WP-37B is separate.
+- `npm test -- --maxWorkers=2`: passed, 149 files / 2,975 tests.
+- Focused wallet, session and safe-config tests after the review fixes: passed, 3 files / 33 tests.
+- A private scratch target file outside the repository connected to the separate WP-37B lab using the provided wallet alias and secret filenames. `targets check` reported Oracle 19.9.1.0.0, PIPDB1, PIAGENT_RO, account check passed, and the feature checks completed. No credentials were printed.
+- The earlier full integration run from the initial WP-37A implementation remained active until stopped at five minutes; that run is unverified. The C1 TCPS scratch check independently verified live wallet-backed TCPS.
+- Autonomous Database, one-way TCPS, and self-managed wallet connections remain unverified.
 - `git diff --check`: passed.
 
 ## Contract changes
