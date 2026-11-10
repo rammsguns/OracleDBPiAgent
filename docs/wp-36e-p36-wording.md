@@ -35,3 +35,9 @@ Mirrored the missing-view variants in the forbidden claims for each readable vie
 Bound missing-view and positive readable-view facts to `[^.\\n]{0,70}` on the same sentence and line. Positive terms guard against negated `valid`, `readable`, `usable`, or `exists` wording. Added all four reviewer examples as scorer MUST FAIL fixtures, tested the negative variants across formatting/order combinations, and added the exact gateA answer as a MUST PASS fixture. Earlier MUST PASS and MUST FAIL fixtures remain in the production-scorer test.
 
 A temporary TypeScript rescore script loaded the real p36 case definitions and scorer, then walked every JSON record in `/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive/phase36/gateB`. Result: 24 split-p36 records, 24/24 pass with the revised case file (all 24 were also archived as passing). The script reported no failing checks and was removed after the run.
+
+## Review round 2 changes
+
+Forbidden-claim proximity now stops at clause breaks (`;`, `:`, `,`, em/en dash, `but`, `while`, `whereas`, and `and`) as well as sentence breaks, other `V$` names, and column references. Added the exact semicolon-separated `V$LOGMEMBER`/`V$LOG` sentence as a MUST PASS fixture. The four round 1 reviewer MUST FAIL answers still fail.
+
+Rescored every JSON record with a split-p36 case ID in both phase36 gates using a temporary script, the current case definitions, and the real scorer. GateA: 24 records, 24/24 pass, 0 true-to-false flips, and 1 false-to-true flip (the previously failing contraction answer). GateB: 24 records, 24/24 pass, 0 true-to-false flips, and 0 false-to-true flips. Neither gate had any rescored failures.

@@ -18,7 +18,7 @@
 			"forbiddenClaims": [
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$BACKUP_DATAFILE[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
-				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*|[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*|[`*_]*V\\$BACKUP_DATAFILE(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
 				"Neither view exists",
 				"Both views do not exist",
 				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"
@@ -45,7 +45,7 @@
 			"forbiddenClaims": [
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOG[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$LOGMEMBER[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
-				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}[`*_]*V\\$LOG(?![\\w$#])[`*_]*|[`*_]*V\\$LOG(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$LOG(?![\\w$#])[`*_]*|[`*_]*V\\$LOG(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
 				"Neither view exists",
 				"Both views do not exist",
 				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"
@@ -72,7 +72,7 @@
 			"forbiddenClaims": [
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS[`*_]*\\s*\\|\\s*(?:does not exist|invalid|not valid)",
 				"(?:^|\\n)\\s*\\|?\\s*[`*_]*V\\$RMAN_BACKUP_DATAFILES[`*_]*\\s*\\|\\s*(?:readable|valid|usable)",
-				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*|[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
+				"(?:(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid)(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*|[`*_]*V\\$RMAN_BACKUP_JOB_DETAILS(?![\\w$#])[`*_]*(?:(?!V\\$|columns?\\b|[;:,—–]|\\b(?:but|while|whereas|and)\\b)[^.\\n]){0,70}(?:does not exist|doesn't exist|doesn’t exist|is not a valid(?: view)?|not a valid(?: view)?|isn't valid|isn’t valid|is not valid|not valid|is nonexistent|nonexistent|is non-existent|non-existent|no such(?: view)?|is invalid|invalid))",
 				"Neither view exists",
 				"Both views do not exist",
 				"neither[^.\\n]{0,120}(?:is|are) (?:a )?valid"

@@ -256,7 +256,7 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 	}
 	const invalidReadability = ["doesn't exist", 'doesn’t exist', "isn't valid", 'isn’t valid', 'is not a valid view', 'not valid', 'nonexistent', 'non-existent', 'no such view', 'invalid'];
 	const formats = [
-		(view: string, phrase: string, before: boolean) => before ? `${phrase}: ${view}` : `${view} — ${phrase}`,
+		(view: string, phrase: string, before: boolean) => before ? `${phrase} ${view}` : `${view} — ${phrase}`,
 		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | ${view} |` : `| ${view} | ${phrase} |`,
 		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | \`${view}\` |` : `| \`${view}\` | ${phrase} |`,
 		(view: string, phrase: string, before: boolean) => before ? `| ${phrase} | **${view}** |` : `| **${view}** | ${phrase} |`,
@@ -284,6 +284,10 @@ it('scores phase36 cause-first cases through the production scorer', async () =>
 	for (const test of cases) {
 		const cause = test.id.includes('logmember') ? 'V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES';
 		const readable = test.id.includes('logmember') ? 'V$LOG' : test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_JOB_DETAILS' : 'V$BACKUP_DATAFILE';
+		if (test.id.includes('logmember')) {
+			const clauseBreak = 'The join fails solely because `V$LOGMEMBER` is not a valid 19c view; `V$LOG` itself is fully readable.';
+			expect(score(test, { answer: clauseBreak, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, clauseBreak).toBe(true);
+		}
 		const validAnswer = `${cause} does not exist in Oracle 19c. ${readable} is valid and readable.`;
 		expect(score(test, { answer: validAnswer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, test.id).toBe(true);
 		const pair = test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_DATAFILES nor V$RMAN_BACKUP_JOB_DETAILS'
