@@ -559,9 +559,10 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 				try { await lookup(`SELECT * FROM ${object} WHERE 1=0`, {}, ctx.config.limits.statementTimeoutSeconds); readable.push(object); }
 				catch (failure) { if (/ORA-(00942|01031)/.test(String(failure))) hidden.push(object); else unknownFailures++; }
 			}
-			const sections = [];
+			const causes: string[] = [];
+			let readableNote = "";
 			if (hidden.length) {
-				if (readable.length) sections.push(`Readable: ${readable.join(", ")}.`);
+				if (readable.length) readableNote = `Not the cause (readable): ${readable.join(", ")}.`;
 				const viewNames = new Map<string, { synonym: string; sysQualifiedPublicName: boolean; quotedCaseMismatch: boolean }>();
 				for (const object of hidden) {
 					const parts = object.split('.');
@@ -596,18 +597,19 @@ async function queryErrorHint(error: unknown, sql: string, session: OracleSessio
 						const caseMismatch = hidden.filter(object => viewNames.get(object)?.quotedCaseMismatch);
 						const nonexistent = hidden.filter(object => { const view = viewNames.get(object); return view && !view.quotedCaseMismatch && !existing.has(view.synonym); });
 						const other = hidden.filter(object => !viewNames.has(object));
-						if (ungranted.length) sections.push(`Not granted to this account (view exists): ${ungranted.join(", ")}.`);
-						if (usePrefix.length) sections.push(`Use ${usePrefix.map(object => viewNames.get(object)!.synonym).join(", ")} without the SYS. prefix: ${usePrefix.join(", ")}.`);
-						if (caseMismatch.length) sections.push(`No such view in Oracle 19c (quoted names are case-sensitive; check the name): ${caseMismatch.join(", ")}.`);
-						if (nonexistent.length) sections.push(`No such view in Oracle 19c (check the name): ${nonexistent.join(", ")}.`);
-						if (other.length) sections.push(`Not visible to this account (missing or not granted): ${other.join(", ")}.`);
+						if (ungranted.length) causes.push(`Not granted to this account (view exists): ${ungranted.join(", ")}.`);
+						if (usePrefix.length) causes.push(`Use ${usePrefix.map(object => viewNames.get(object)!.synonym).join(", ")} without the SYS. prefix: ${usePrefix.join(", ")}.`);
+						if (caseMismatch.length) causes.push(`No such view in Oracle 19c (quoted names are case-sensitive; check the name): ${caseMismatch.join(", ")}.`);
+						if (nonexistent.length) causes.push(`No such view in Oracle 19c (check the name): ${nonexistent.join(", ")}.`);
+						if (other.length) causes.push(`Not visible to this account (missing or not granted): ${other.join(", ")}.`);
 					} catch {
-						sections.push(`Not visible to this account: ${hidden.join(", ")}.`);
+						causes.push(`Not visible to this account: ${hidden.join(", ")}.`);
 					}
-				} else sections.push(`Not visible to this account (missing or not granted): ${hidden.join(", ")}.`);
-			} else sections.push(unknownFailures ? "No ungranted object was confirmed; the missing object could not be identified." : "All probed objects were readable; the missing object could not be identified.");
-			if (unknownFailures) sections.push(`${unknownFailures} probe(s) failed for another reason; visibility is unknown.`);
-			if (objects.length > 6) sections.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);
+				} else causes.push(`Not visible to this account (missing or not granted): ${hidden.join(", ")}.`);
+			} else causes.push(unknownFailures ? "No ungranted object was confirmed; the missing object could not be identified." : "All probed objects were readable; the missing object could not be identified.");
+			if (unknownFailures) causes.push(`${unknownFailures} probe(s) failed for another reason; visibility is unknown.`);
+			if (objects.length > 6) causes.push(`${objects.length - 6} additional referenced object(s) were not probed (limit 6).`);
+			const sections = [...causes, readableNote].filter(Boolean);
 			if (sections.length) hint = `Source: ${sections.join(" ")}`;
 		}
 		else {

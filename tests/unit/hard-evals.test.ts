@@ -8,7 +8,7 @@ import { score } from '../../evals/scoring.js';
 
 it('hard suite covers both splits and rejects unsafe truth before connecting', async () => {
 	const cases = await loadHardCases();
-	expect(cases).toHaveLength(182);
+	expect(cases).toHaveLength(185);
 	expect(cases.filter(test => test.split === 'dev')).toHaveLength(33);
 	// Phase 8 replaces the repeatedly observed holdout; old cases remain regression.
 	expect(cases.filter(test => test.split === 'holdout')).toHaveLength(24);
@@ -209,5 +209,39 @@ it('scores phase33 correct answers, affirmative wrong answers, and structured gu
 		for (const answer of samples.correct) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(true);
 		for (const answer of samples.wrong) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);
 		for (const answer of samples.structuredWrong ?? []) expect(score(test, { answer, toolCalls: test.expect.requiredTools, usage: { input: 0, output: 0 } }, truth).pass, `${test.id}: ${answer}`).toBe(false);
+	}
+});
+
+it('scores phase36 cause-first cases through the production scorer', async () => {
+	const cases = (await loadHardCases()).filter(test => test.split === 'p36');
+	expect(cases).toHaveLength(3);
+	const smoke = cases.find(test => test.id === 'hard-p36-d1-rman-missing')!;
+	const accepted = [
+		'V$RMAN_BACKUP_DATAFILES is not a valid Oracle 19c view. The second half (V$BACKUP_DATAFILE) is valid.',
+		'Cause: V$RMAN_BACKUP_DATAFILES does not exist in Oracle 19c. Not the cause (readable): V$BACKUP_DATAFILE is readable.',
+	];
+	for (const answer of accepted) expect(score(smoke, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, answer).toBe(true);
+	const wrong = 'V$RMAN_BACKUP_DATAFILES does not exist; V$BACKUP_DATAFILE is valid.\n\n| Object | Status |\n| --- | --- |\n| `V$RMAN_BACKUP_DATAFILES` | Does not exist |\n| **V$BACKUP_DATAFILE** | Does not exist |';
+	const wrongScore = score(smoke, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+	expect(wrongScore.pass).toBe(false);
+	expect(wrongScore.checks.filter(check => check.check.startsWith('forbidden:') && !check.pass).map(check => check.check)).toContain(`forbidden: ${smoke.expect.forbiddenClaims[0]}`);
+	for (const test of cases) {
+		const cause = test.id.includes('logmember') ? 'V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES';
+		const readable = test.id.includes('logmember') ? 'V$LOG' : test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_JOB_DETAILS' : 'V$BACKUP_DATAFILE';
+		const validAnswer = `${cause} does not exist in Oracle 19c. ${readable} is valid and readable.`;
+		expect(score(test, { answer: validAnswer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } }).pass, test.id).toBe(true);
+		const pair = test.id.includes('mixed-rman-log') ? 'V$RMAN_BACKUP_DATAFILES nor V$RMAN_BACKUP_JOB_DETAILS'
+			: test.id.includes('logmember') ? 'V$LOG nor V$LOGMEMBER' : 'V$RMAN_BACKUP_DATAFILES nor V$BACKUP_DATAFILE';
+		const proseFailures = ['Neither view exists', 'Both views do not exist', `neither ${pair} is a valid view`, `${readable} is not valid`, `${readable} is not a valid`];
+		for (const forbidden of proseFailures) {
+			const answer = `${validAnswer} ${forbidden}.`;
+			const result = score(test, { answer, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+			const failedForbidden = result.checks.find(check => !check.pass && check.check.startsWith('forbidden:'));
+			expect(failedForbidden?.check, `${test.id}: ${forbidden}`).toBe(`forbidden: ${test.expect.forbiddenClaims.find(pattern => new RegExp(pattern, 'i').test(forbidden))}`);
+		}
+		const wrong = `${cause} does not exist in Oracle 19c. ${readable} is valid.\n| **${readable}** | Invalid |`;
+		const wrongScore = score(test, { answer: wrong, toolCalls: ['run_query'], usage: { input: 0, output: 0 } });
+		expect(wrongScore.pass, test.id).toBe(false);
+		expect(wrongScore.checks.some(check => !check.pass && check.check.startsWith('forbidden:'))).toBe(true);
 	}
 });

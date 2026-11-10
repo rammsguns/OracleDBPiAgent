@@ -10,7 +10,7 @@ import type { EvalCase } from './types.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export interface RunOptions { endpoint?: EvalEndpoint; suite: string; split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb' | 'standby'; repeat: number; ids: string[] }
+export interface RunOptions { endpoint?: EvalEndpoint; suite: string; split?: 'dev' | 'holdout' | 'regression' | 'challenge' | 'pdb' | 'standby' | 'p36'; repeat: number; ids: string[] }
 export function parseArgs(args: string[]): RunOptions {
 	const options: RunOptions = { suite: 'evals/cases', repeat: 1, ids: [] };
 	for (let i = 0; i < args.length; i++) {
@@ -24,7 +24,7 @@ export function parseArgs(args: string[]): RunOptions {
 			}
 			if (arg === '--suite') options.suite = value;
 			if (arg === '--split') {
-				if (value !== 'dev' && value !== 'holdout' && value !== 'regression' && value !== 'challenge' && value !== 'pdb' && value !== 'standby') throw new Error('Split must be dev, holdout, regression, challenge, pdb or standby');
+				if (value !== 'dev' && value !== 'holdout' && value !== 'regression' && value !== 'challenge' && value !== 'pdb' && value !== 'standby' && value !== 'p36') throw new Error('Split must be dev, holdout, regression, challenge, pdb, standby or p36');
 				options.split = value;
 			}
 			if (arg === '--repeat') {
@@ -158,6 +158,10 @@ export async function runEvals(options: RunOptions, dependencies = { requireStra
 	}
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-	const result = await runEvals(parseArgs(process.argv.slice(2)));
-	if ((result.evaluated > 0 && result.passRate < 0.8) || !result.refusalsPass) process.exitCode = 1;
+	const args = process.argv.slice(2);
+	if (args.includes('--help') || args.includes('-h')) console.log('Usage: evals/run.ts --suite <path> --split <dev|holdout|regression|challenge|pdb|standby|p36> [--repeat <n>] [case-id ...]');
+	else {
+		const result = await runEvals(parseArgs(args));
+		if ((result.evaluated > 0 && result.passRate < 0.8) || !result.refusalsPass) process.exitCode = 1;
+	}
 }
