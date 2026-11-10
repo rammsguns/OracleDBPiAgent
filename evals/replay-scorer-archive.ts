@@ -14,10 +14,20 @@ type ArchiveRecord = AskResult & {
 	checks: { check: string; pass: boolean }[];
 };
 
-// Load the scorer from the current master ref, not an older phase baseline.
-const masterSource = execFileSync('git', ['show', 'master:evals/scoring.ts'], { encoding: 'utf8' });
-const masterModule = await import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(masterSource)).toString('base64')}`);
-const masterScore = (masterModule as { score: typeof score }).score;
+const args = process.argv.slice(2);
+let baseline = 'master';
+const phaseRoots: string[] = [];
+for (let index = 0; index < args.length; index++) {
+	if (args[index] === '--base') {
+		const ref = args[++index];
+		if (!ref || ref.startsWith('--')) throw new Error('--base requires a git ref');
+		baseline = ref;
+	} else phaseRoots.push(args[index]!);
+}
+// Load the selected baseline scorer from git without checking out or changing refs.
+const baselineSource = execFileSync('git', ['show', `${baseline}:evals/scoring.ts`], { encoding: 'utf8' });
+const baselineModule = await import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(baselineSource)).toString('base64')}`);
+const baselineScore = (baselineModule as { score: typeof score }).score;
 
 function rowFromCheck(label: string): unknown[] | undefined {
 	const start = label.lastIndexOf(' [');
@@ -79,12 +89,12 @@ async function walk(root: string, files: string[]): Promise<void> {
 }
 
 const archiveRoot = '/home/kiwi/orca/workspaces/OracleDBPiAgent/eval-archive';
-const phaseRoots = process.argv.length > 2
-	? process.argv.slice(2).map(path => resolve(path.startsWith('/') ? path : `${archiveRoot}/${path}`))
-	: ['phase25-27', 'phase28', 'phase29', 'phase30', 'phase31', 'phase32', 'phase33', 'phase34', 'phase35'].map(path => resolve(archiveRoot, path));
+const resolvedRoots = phaseRoots.length
+	? phaseRoots.map(path => resolve(path.startsWith('/') ? path : `${archiveRoot}/${path}`))
+	: ['phase25-27', 'phase28', 'phase29', 'phase30', 'phase31', 'phase32', 'phase33', 'phase34', 'phase35', 'phase36'].map(path => resolve(archiveRoot, path));
 const definitions = new Map((await loadHardCases()).map(test => [test.id, test]));
 const files: string[] = [];
-for (const root of phaseRoots) await walk(root, files);
+for (const root of resolvedRoots) await walk(root, files);
 
 let records = 0, passToFail = 0, failToPass = 0;
 const flips: { file: string; id: string; iteration: number; before: boolean; after: boolean }[] = [];
@@ -96,7 +106,7 @@ for (const file of files.sort((a, b) => a.localeCompare(b))) {
 			|| !record.checks.some(check => check.check === 'nonempty ground truth')) continue;
 		records++;
 		const { test, truth, after } = reconstruct(record, definitions);
-		const before = masterScore(test, record, truth, after).pass;
+		const before = baselineScore(test, record, truth, after).pass;
 		const next = score(test, record, truth, after).pass;
 		if (before && !next) {
 			passToFail++;
@@ -108,6 +118,6 @@ for (const file of files.sort((a, b) => a.localeCompare(b))) {
 	}
 }
 
-console.log(JSON.stringify({ baseline: 'master:evals/scoring.ts', roots: phaseRoots, records, passToFail, failToPass, flips }, null, '\t'));
+console.log(JSON.stringify({ baseline: `${baseline}:evals/scoring.ts`, roots: resolvedRoots, records, passToFail, failToPass, flips }, null, '\t'));
 if (passToFail) process.exitCode = 1;
-if (files.length === 0) throw new Error(`No archive files found under ${phaseRoots.join(', ')}`);
+if (files.length === 0) throw new Error(`No archive files found under ${resolvedRoots.join(', ')}`);

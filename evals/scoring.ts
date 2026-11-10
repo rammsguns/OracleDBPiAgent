@@ -221,7 +221,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		if (numeric(value)) return numeric(text) && decimal(text) === decimal(value);
 		return text.toLowerCase() === value.toLowerCase() || /^(?:[A-Za-z_][\w$]*\.)+[A-Za-z_][\w$]*$/.test(text) && text.split('.').at(-1)!.toLowerCase() === value.toLowerCase() || /^(?:VARCHAR2|NUMBER|CHAR|NVARCHAR2)$/i.test(value) && new RegExp(`^${value}\\(\\d+(?:,\\s*\\d+)?\\)$`, 'i').test(text);
 	};
-	const labelWords = (text: string) => text.replace(/[`*]/g, '').replace(/_/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+	const labelWords = (text: string) => text.replace(/[`*]/g, '').replace(/_/g, ' ').toLowerCase().replace(/\bstatistics\b/g, 'stats').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
 	const rowLabelScore = (actual: string, expected: string) => {
 		const allWords = labelWords(actual), expectedWords = labelWords(expected);
 		const expectedKey = expectedWords.join(' ');
@@ -241,6 +241,7 @@ function rowMatches(answer: string, row: unknown[], singleRow: boolean, labels: 
 		for (const word of expectedWords) {
 			const index = remaining.indexOf(word);
 			if (index >= 0) remaining.splice(index, 1);
+			else if (word === 'stats') continue;
 			else return -1;
 		}
 		if (remaining.some(word => !neutral.has(word))) return -1;
