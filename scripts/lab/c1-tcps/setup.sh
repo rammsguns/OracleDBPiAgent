@@ -64,43 +64,41 @@ docker exec -u oracle "$container" mkdir -p "$backup"
 docker exec -u oracle "$container" cp -p "$config/listener.ora" "$config/sqlnet.ora" "$backup/"
 cat > "$tmp/listener.block" <<EOF
 # BEGIN WP-37B TCPS
-    (ADDRESS = (PROTOCOL = TCPS)(HOST = 0.0.0.0)(PORT = 2484))
+LISTENER_TCPS=(DESCRIPTION_LIST=(DESCRIPTION=(ADDRESS=(PROTOCOL=IPC)(KEY=LISTENER_TCPS)))(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=0.0.0.0)(PORT=2484))(SECURITY=(WALLET_LOCATION=$root/server-wallet))))
+WALLET_LOCATION_LISTENER_TCPS=(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=$root/server-wallet)))
+SSL_CLIENT_AUTHENTICATION_LISTENER_TCPS=TRUE
+WALLET_LOCATION=(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=$root/server-wallet)))
+SID_LIST_LISTENER_TCPS=(SID_LIST=(SID_DESC=(GLOBAL_DBNAME=pipdb1)(ORACLE_HOME=/opt/oracle/product/19c/dbhome_1)(SID_NAME=CDB19)))
 # END WP-37B TCPS
 EOF
+docker cp "$tmp/listener.block" "$container:/tmp/wp37b-listener.block"
+docker exec -u root "$container" chown oracle:oinstall /tmp/wp37b-listener.block
+docker exec -i -u oracle "$container" python - "$config/listener.ora" /tmp/wp37b-listener.block <<'PY'
+import sys
+p,b=sys.argv[1:]; text=open(p).read(); start='# BEGIN WP-37B TCPS'; end='# END WP-37B TCPS'
+while start in text:
+ a=text.index(start); z=text.find(end,a)
+ if z<0: text=text[:a].rstrip()+'\n'; break
+ text=text[:a].rstrip()+text[z+len(end):]
+tcps='    (ADDRESS = (PROTOCOL = TCPS)(HOST = 0.0.0.0)(PORT = 2484))'
+text='\n'.join(line for line in text.splitlines() if tcps not in line)
+open(p,'w').write(text.rstrip()+'\n\n'+open(b).read().strip()+'\n')
+PY
 cat > "$tmp/sqlnet.block" <<EOF
 # BEGIN WP-37B TCPS
 SSL_CLIENT_AUTHENTICATION=TRUE
 WALLET_LOCATION=(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=$root/server-wallet)))
 # END WP-37B TCPS
 EOF
-for spec in "listener.ora listener" "sqlnet.ora sqlnet"; do
-	set -- $spec; file=$1; block="$tmp/$2.block"
-	if [[ "$2" == sqlnet ]]; then
-		cat > "$block" <<EOF
-# BEGIN WP-37B TCPS
-SSL_CLIENT_AUTHENTICATION=TRUE
-WALLET_LOCATION=(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=$root/server-wallet)))
-# END WP-37B TCPS
-EOF
-	fi
-	docker cp "$block" "$container:/tmp/wp37b-$2.block"
-	docker exec -u root "$container" chown oracle:oinstall "/tmp/wp37b-$2.block"
-	docker exec -i -u oracle "$container" python - "$config/$file" "/tmp/wp37b-$2.block" "$2" <<'PY'
+docker cp "$tmp/sqlnet.block" "$container:/tmp/wp37b-sqlnet.block"
+docker exec -u root "$container" chown oracle:oinstall /tmp/wp37b-sqlnet.block
+docker exec -i -u oracle "$container" python - "$config/sqlnet.ora" /tmp/wp37b-sqlnet.block <<'PY'
 import sys
-p,b,kind=sys.argv[1:]; text=open(p).read(); start='# BEGIN WP-37B TCPS'; end='# END WP-37B TCPS'
-while start in text:
- a=text.index(start); z=text.find(end,a)
- if z<0: text=text[:a].rstrip()+'\n'; break
- text=text[:a].rstrip()+text[z+len(end):]
-block=open(b).read().strip()
-if kind == 'listener':
- needle='    (ADDRESS = (PROTOCOL = TCP)(HOST = 0.0.0.0)(PORT = 1521))'
- idx=text.index(needle)+len(needle)
- text=text[:idx]+'\n'+block+text[idx:]
-else: text=text.rstrip()+'\n\n'+block+'\n'
-open(p,'w').write(text)
+p,b=sys.argv[1:]; s=open(p).read(); a='# BEGIN WP-37B TCPS'; z='# END WP-37B TCPS'
+while a in s:
+ i=s.index(a); j=s.find(z,i); s=s[:i].rstrip()+'\n' if j<0 else s[:i].rstrip()+s[j+len(z):]
+open(p,'w').write(s.rstrip()+'\n\n'+open(b).read().strip()+'\n')
 PY
-done
-docker exec -u oracle "$container" bash -lc 'lsnrctl reload LISTENER'
+docker exec -u oracle "$container" bash -lc 'lsnrctl reload LISTENER; lsnrctl stop LISTENER_TCPS >/dev/null 2>&1 || true; lsnrctl start LISTENER_TCPS'
 docker exec -u oracle "$container" rm -f /tmp/wp37b-wallet.pw /tmp/wp37b-listener.block /tmp/wp37b-sqlnet.block
 echo 'C1 TCPS setup complete; run scripts/lab/c1-tcps/verify.sh.'

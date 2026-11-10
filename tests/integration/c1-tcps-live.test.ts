@@ -8,7 +8,7 @@ import { runChecks } from '../../src/check/index.js';
 const secretDir = process.env.PIAGENT_SECRET_DIR;
 const target = {
 	name: 'c1-19c-tcps', description: 'C1 PIPDB1 TCPS integration target',
-	host: '172.17.0.6', port: 2484, serviceName: 'PIPDB1', username: 'PIAGENT_RO',
+	host: '172.17.0.6', port: 2484, serviceName: 'pipdb1', username: 'PIAGENT_RO',
 	passwordFile: 'c1_piagent_ro.pw', defaultSchema: 'PIAGENT_RO', environment: 'development' as const,
 	protocol: 'tcps' as const,
 	wallet: { directory: '/home/kiwi/OracleDBHarness/databases/wallets/c1-tcps', tnsAlias: 'pipdb1_tcps', passwordFile: 'c1_tcps_wallet.pw' },

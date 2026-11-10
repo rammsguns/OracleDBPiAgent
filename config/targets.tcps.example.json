@@ -6,7 +6,7 @@
 			"description": "Oracle 19c C1 PIPDB1 lab over mutual TLS",
 			"host": "172.17.0.6",
 			"port": 2484,
-			"serviceName": "PIPDB1",
+			"serviceName": "pipdb1",
 			"username": "PIAGENT_RO",
 			"passwordFile": "c1_piagent_ro.pw",
 			"defaultSchema": "PIAGENT_RO",

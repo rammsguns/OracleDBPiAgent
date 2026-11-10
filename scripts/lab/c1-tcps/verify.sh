@@ -7,8 +7,30 @@ container=oracle19c-cdb
 [[ -r "$secrets/c1_tcps_wallet.pw" && -r "$secrets/c1_piagent_ro.pw" ]] || { echo 'C1 TCPS or PIAGENT_RO secret missing' >&2; exit 1; }
 [[ -r "$wallet_dir/ewallet.pem" && -r "$wallet_dir/tnsnames.ora" ]] || { echo 'C1 TCPS wallet files missing' >&2; exit 1; }
 
-docker exec -u oracle "$container" bash -lc 'lsnrctl status LISTENER' | grep -qi 'PORT=2484'
-docker exec -u oracle "$container" bash -lc 'lsnrctl status LISTENER' | grep -q 'PORT=1521'
+main_status=$(docker exec -u oracle "$container" bash -lc 'lsnrctl status LISTENER')
+grep -q 'PORT=1521' <<<"$main_status"
+if grep -q 'PORT=2484' <<<"$main_status"; then echo 'TCPS endpoint unexpectedly appeared on main LISTENER' >&2; exit 1; fi
+tcps_status=$(docker exec -u oracle "$container" bash -lc 'lsnrctl status LISTENER_TCPS')
+grep -qi 'PORT=2484' <<<"$tcps_status"
+grep -qi 'Service "pipdb1"' <<<"$tcps_status"
+
+# Prove mutual TLS handshake using the encrypted client key in ewallet.pem.
+PIAGENT_SECRET_DIR="$secrets" python3 - <<'PY'
+import os,pathlib,re,subprocess,tempfile
+wallet=pathlib.Path('/home/kiwi/OracleDBHarness/databases/wallets/c1-tcps/ewallet.pem').read_text()
+key=re.search(r'-----BEGIN ENCRYPTED PRIVATE KEY-----.*?-----END ENCRYPTED PRIVATE KEY-----\s*',wallet,re.S).group(0)
+certs=re.findall(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----\s*',wallet,re.S)
+if len(certs)<2: raise SystemExit('Client wallet certificate chain is incomplete')
+with tempfile.TemporaryDirectory(prefix='c1-tcps-verify-') as directory:
+ os.chmod(directory,0o700); root=pathlib.Path(directory)
+ for name,data in [('client.key',key),('client.pem',certs[0]),('ca.pem',certs[1])]:
+  path=root/name; path.write_text(data); path.chmod(0o600)
+ result=subprocess.run(['openssl','s_client','-connect','172.17.0.6:2484','-cert',str(root/'client.pem'),'-key',str(root/'client.key'),'-pass',f'file:{os.environ["PIAGENT_SECRET_DIR"]}/c1_tcps_wallet.pw','-CAfile',str(root/'ca.pem'),'-verify_return_error','-brief'],input=b'',stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=20)
+ output=result.stdout.decode(errors='replace')
+ if result.returncode or 'CONNECTION ESTABLISHED' not in output or 'Verification: OK' not in output:
+  raise SystemExit('OpenSSL TCPS mTLS handshake failed')
+ print('OpenSSL mTLS handshake verified.')
+PY
 
 PIAGENT_SECRET_DIR="$secrets" node --input-type=module <<'NODE'
 import fs from 'node:fs';
@@ -44,7 +66,7 @@ try {
 NODE
 
 # Read-only SYS check; password is piped on stdin and never placed in argv or output.
-sys_script=$(mktemp --suffix=.mjs); chmod 600 "$sys_script"; trap 'python3 -c "from pathlib import Path; Path(\"$sys_script\").unlink(missing_ok=True)"' EXIT
+sys_script=$(mktemp "$PWD/.c1-dg-verify-XXXXXX.mjs"); chmod 600 "$sys_script"; trap 'python3 -c "from pathlib import Path; Path(\"$sys_script\").unlink(missing_ok=True)"' EXIT
 cat > "$sys_script" <<'NODE'
 import oracledb from 'oracledb';
 const chunks=[]; for await (const chunk of process.stdin) chunks.push(chunk);

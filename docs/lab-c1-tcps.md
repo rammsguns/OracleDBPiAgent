@@ -1,6 +1,6 @@
 # C1 PIPDB1 TCPS lab endpoint
 
-`oracle19c-cdb` is configured for a mutual TLS endpoint on container port 2484, using the existing `172.17.0.6` bridge address and the lower-case `pipdb1` service. The ordinary TCP listener on 1521 and the primary database were left intact. The host client wallet lives at `/home/kiwi/OracleDBHarness/databases/wallets/c1-tcps`; its password is stored privately as `c1_tcps_wallet.pw` under `PIAGENT_SECRET_DIR`.
+`oracle19c-cdb` uses a separate `LISTENER_TCPS` for mutual TLS on container port 2484, at bridge IP `172.17.0.6`, with static service `pipdb1`. The main `LISTENER` remains IPC plus TCP/1521 and does not include TCPS. The host client wallet lives at `/home/kiwi/OracleDBHarness/databases/wallets/c1-tcps`; its password is stored privately as `c1_tcps_wallet.pw` under `PIAGENT_SECRET_DIR`.
 
 ## Repeat setup and verify
 
@@ -11,14 +11,14 @@ PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets scripts/lab/c1-t
 PIAGENT_SECRET_DIR=/home/kiwi/OracleDBHarness/databases/secrets scripts/lab/c1-tcps/verify.sh
 ```
 
-Setup backs up listener and SQL*Net configuration for each run. It maintains exactly one `# BEGIN WP-37B TCPS` / `# END WP-37B TCPS` block in each file, replacing that block on subsequent runs. It reuses wallet state only when the host PEM/tnsnames pair and container auto-login server wallet both exist; otherwise it rotates the WP-37B wallet state. Client private key generation happens in a private host temporary directory, and only server certificates/key are staged into the container for Oracle wallet import. The container staging key is removed after import.
+Setup backs up listener and SQL*Net configuration for each run. It maintains exactly one `# BEGIN WP-37B TCPS` / `# END WP-37B TCPS` block in each file, replacing that block on subsequent runs. The listener block defines `LISTENER_TCPS`, its static `pipdb1` registration, and its listener-scoped wallet/authentication values. The SQL*Net block supplies the database-side TLS wallet and client authentication; these settings are used for TLS and do not change the plain TCP listener. Setup reuses wallet state only when the host PEM/tnsnames pair and container auto-login server wallet both exist; otherwise it rotates WP-37B wallet state. Client private key generation happens in a private host temporary directory, and only server certificates/key are staged into the container for Oracle wallet import. The container staging key is removed after import.
 
-The wallet directory and files should remain mode 0700 and 0600 respectively. Setup does not recreate the C1 container or alter port mappings. It requests an `lsnrctl reload LISTENER`, never a restart.
+The wallet directory and files should remain mode 0700 and 0600 respectively. Setup does not recreate the C1 container or alter port mappings. It reloads the main `LISTENER` without stopping it, and starts `LISTENER_TCPS` separately. On reruns it stops and starts only `LISTENER_TCPS`. The secondary listener does not survive a container restart, so run `setup.sh` again after the container restarts.
 
 ## Roll back
 
-Restore the latest `listener.ora` and `sqlnet.ora` backups from `/opt/oracle/oradata/dbconfig/CDB19/wp37b-backup-*` after removing the managed TCPS block, then request a listener reload. Remove `/opt/oracle/admin/CDB19/tcps`, the host `wallets/c1-tcps` directory, and `c1_tcps_wallet.pw` only when the TCPS endpoint is no longer needed. Do not remove or replace C1 database files.
+Stop only the secondary listener with `lsnrctl stop LISTENER_TCPS`. Restore the original `listener.ora` and `sqlnet.ora` from the chosen backup under `/opt/oracle/oradata/dbconfig/CDB19/wp37b-backup-*`, then run `lsnrctl reload LISTENER` (do not stop/start the main listener). Remove `/opt/oracle/admin/CDB19/tcps`, the host `wallets/c1-tcps` directory, and `c1_tcps_wallet.pw` only when the TCPS endpoint is no longer needed. Do not remove or replace C1 database files.
 
 ## Verification status
 
-At this WP-37B run, Oracle accepted the listener reload command but the running listener continued to report only TCP/1521; its process did not bind the newly configured 2484 endpoint. The TCPS live check therefore cannot pass without a listener restart, which was intentionally not performed. TCP/1521 PIPDB1 and Data Guard destination 2 were separately checked; destination 2 reported `VALID` with no error. Repeat the verification after an approved listener maintenance window.
+Verified: the main `LISTENER` retains IPC and TCP/1521; `LISTENER_TCPS` reports TCPS/2484 and static `pipdb1`; OpenSSL completed a client-authenticated TLS handshake with certificate verification; node-oracledb Thin connected through `pipdb1_tcps` and returned PIPDB1, `tcps`, and Oracle Database 19c; the existing TCP PIPDB1 connection succeeded; and Data Guard destination 2 was `VALID` with no error. `LISTENER_TCPS` is not configured to survive container restart; rerun setup after restart.
