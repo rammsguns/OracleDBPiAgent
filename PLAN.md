@@ -5205,6 +5205,12 @@ cause-first note appeared in 18 B records, always in the expected form.
   in a 3-column table.
 - Model: "V$BACKUP_DATAFILE returns zero rows" after a failed UNION, a row
   claim with no rows fetched (gate A, `p36-8`).
+- Package smoke (1.12.0, d1 missing-view ask ×2): both runs named
+  `V$RMAN_BACKUP_DATAFILES` as the cause and `V$BACKUP_DATAFILE` as
+  readable. Run 1, however, offered a nonexistent "fix",
+  `V$RMAN_BACKUP_DATAFILE_DETAILS` (only `V$BACKUP_DATAFILE_DETAILS` exists
+  on d1). Suggested replacement views are not checked against the
+  catalogue.
 - Lab: `hard-lines-plan` failed "nonempty ground truth" on both sides. The
   seed text names `SHOPAPP.ORDER_LINES` in full, so Oracle shared a child
   first parsed under the HARNESS_RO schema (`gyudx7yr31w5w`), and the
